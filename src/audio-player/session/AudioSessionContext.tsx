@@ -59,9 +59,14 @@ export function AudioSessionProvider({
     const [shuffle, setShuffle] = useState(initialShuffle)
     const [repeatMode, setRepeatMode] = useState<RepeatMode>(initialRepeat)
 
-    // Playback order (queue indices). Rebuilt when the queue or shuffle changes.
-    const orderRef = useRef<number[]>(
-        buildOrder(initialQueue.length, currentIndex < 0 ? 0 : currentIndex, initialShuffle)
+    // Playback order (queue indices). Computed during render so canNext /
+    // canPrevious never read a stale value. Deliberately keyed on [queue,
+    // shuffle] only: re-anchoring on every track change would reshuffle
+    // mid-queue. The current index is used purely to seed the shuffle front.
+    const order = useMemo(
+        () => buildOrder(queue.length, currentIndex < 0 ? 0 : currentIndex, shuffle),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [queue, shuffle]
     )
     // Set true to play once the next source has loaded (used by end-of-track
     // advance, playTrack, playNow, and setQueue's autoPlay). We can't rely on
@@ -82,19 +87,6 @@ export function AudioSessionProvider({
         onEnded: () => advanceRef.current(),
     })
 
-    // Keep the order in sync whenever the queue length or shuffle flag changes.
-    useEffect(() => {
-        orderRef.current = buildOrder(
-            queue.length,
-            currentIndex < 0 ? 0 : currentIndex,
-            shuffle
-        )
-        // currentIndex intentionally omitted: re-anchoring the shuffle on every
-        // track change would reshuffle mid-queue. We only rebuild on structural
-        // changes (length / shuffle toggle).
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [queue.length, shuffle])
-
     // Clamp the index if the queue shrinks out from under it.
     useEffect(() => {
         if (queue.length === 0 && currentIndex !== -1) setCurrentIndex(-1)
@@ -105,11 +97,11 @@ export function AudioSessionProvider({
     // Returns null when there is nothing to advance to (end + repeat off).
     const stepIndex = useCallback(
         (from: number, dir: 1 | -1): number | null => {
-            const order = orderRef.current
             if (order.length === 0) return null
             const pos = order.indexOf(from)
-            const base = pos === -1 ? 0 : pos
-            let nextPos = base + dir
+            // No active track yet: "next" starts at the first track in order.
+            if (pos === -1) return dir === 1 ? order[0] : null
+            let nextPos = pos + dir
             if (nextPos >= order.length) {
                 if (repeatMode === "all") nextPos = 0
                 else return null
@@ -118,7 +110,7 @@ export function AudioSessionProvider({
             }
             return order[nextPos]
         },
-        [repeatMode]
+        [order, repeatMode]
     )
 
     // Move to a queue index, optionally requesting playback once it loads.
@@ -174,7 +166,7 @@ export function AudioSessionProvider({
             const idx = tracks.length > 0
                 ? Math.min(Math.max(startIndex, 0), tracks.length - 1)
                 : -1
-            orderRef.current = buildOrder(tracks.length, idx < 0 ? 0 : idx, shuffle)
+            // `order` recomputes from the new queue during the next render.
             // If already playing, the engine continues into the new source; only
             // arm a deferred play when starting from a paused session.
             if (autoPlayNext && idx >= 0 && !engine.isPlaying) {
@@ -183,7 +175,7 @@ export function AudioSessionProvider({
             setQueueState(tracks)
             setCurrentIndex(idx)
         },
-        [shuffle, engine.isPlaying]
+        [engine.isPlaying]
     )
 
     const playTrack = useCallback(
@@ -231,7 +223,6 @@ export function AudioSessionProvider({
 
     const clearQueue = useCallback(() => {
         engine.pause()
-        orderRef.current = []
         setQueueState([])
         setCurrentIndex(-1)
     }, [engine])
