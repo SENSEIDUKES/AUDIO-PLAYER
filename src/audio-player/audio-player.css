@@ -565,18 +565,3 @@
         transition: none !important;
     }
 }
-
-/* ----------------------------- Lab / global session layout helpers --------- */
-/* These rules are for the wrapping lab page that hosts the global session
-   section. The session provider renders a hidden <audio> element and two
-   sibling divs inside a CSS grid. Without an explicit column span they
-   collapse to a single grid cell instead of using the full row width.      */
-
-.lab-section__grid > audio {
-    display: none; /* Provider-owned audio must never contribute to layout. */
-}
-
-.lab-session,
-.lab-session__sticky {
-    grid-column: 1 / -1; /* Always span all columns of the parent grid. */
-}

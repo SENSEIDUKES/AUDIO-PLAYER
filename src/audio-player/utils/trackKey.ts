@@ -11,5 +11,9 @@ import type { Track } from "../types"
  * why setting `id` is strongly recommended for production use.
  */
 export function trackKey(track: Track): string {
-    return track.id ?? `${track.title}:${track.artist}:${track.audioFile}`
+    if (!track) return ""
+    return (
+        track.id ??
+        `${track.title ?? ""}:${track.artist ?? ""}:${track.audioFile ?? ""}`
+    )
 }
