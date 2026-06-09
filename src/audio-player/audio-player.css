@@ -1,0 +1,567 @@
+/* SEIHouse Audio Player — zero-dependency styles.
+   Theming is driven by CSS custom properties set on .ap-root from props. */
+
+.ap-root {
+    --ap-accent: #ffffff;
+    --ap-play-icon: #000000;
+    --ap-text: #ffffff;
+    --ap-progress: #ffffff;
+    --ap-track: rgba(204, 204, 204, 0.35);
+    --ap-bg: rgba(255, 255, 255, 0);
+    --ap-blur: 20px;
+
+    position: relative;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    padding: 24px;
+    border-radius: 16px;
+    overflow: hidden;
+    background-color: var(--ap-bg);
+    -webkit-backdrop-filter: blur(var(--ap-blur));
+    backdrop-filter: blur(var(--ap-blur));
+    box-shadow: inset 0 0.5px 0.5px rgba(255, 255, 255, 0.1),
+        0 1px 4px rgba(0, 0, 0, 0.08);
+    color: var(--ap-text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.ap-root *,
+.ap-root *::before,
+.ap-root *::after {
+    box-sizing: border-box;
+}
+
+.ap-sr-only {
+    position: absolute;
+    left: -10000px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+}
+
+.ap-bg-image {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    filter: blur(var(--ap-blur));
+    z-index: 0;
+    border-radius: 16px;
+}
+.ap-bg-darken {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: 16px;
+}
+
+.ap-content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+}
+
+.ap-content > audio {
+    display: none;
+}
+
+/* ----------------------------- Banners ----------------------------- */
+
+.ap-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+}
+.ap-banner--col {
+    flex-direction: column;
+}
+.ap-banner__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.ap-banner--error {
+    background-color: rgba(255, 59, 48, 0.15);
+    border: 1px solid rgba(255, 59, 48, 0.3);
+}
+.ap-banner--error svg {
+    color: #ff3b30;
+}
+.ap-retry-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    background-color: var(--ap-accent);
+    color: var(--ap-play-icon);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+/* ----------------------------- Share ----------------------------- */
+
+.ap-share-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--ap-accent);
+    background-color: var(--ap-bg);
+    color: var(--ap-accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    z-index: 10;
+}
+
+/* ----------------------------- Track info ----------------------------- */
+
+.ap-track-counter {
+    text-align: center;
+    font-size: 12px;
+    opacity: 0.5;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ap-track-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+.ap-track-info__title {
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ap-track-info__artist {
+    font-size: 15px;
+    font-weight: 500;
+    opacity: 0.7;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ----------------------------- Progress bar ----------------------------- */
+
+.ap-progress-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.ap-progress {
+    position: relative;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    touch-action: pan-y;
+    outline: none;
+}
+.ap-progress--seeking {
+    touch-action: none;
+    cursor: grabbing;
+}
+.ap-progress__track,
+.ap-progress__buffered,
+.ap-progress__fill {
+    position: absolute;
+    left: 0;
+    height: 8px;
+    border-radius: 4px;
+    pointer-events: none;
+}
+.ap-progress__track {
+    width: 100%;
+    background-color: var(--ap-track);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+.ap-progress__buffered {
+    background-color: var(--ap-progress);
+    opacity: 0.3;
+}
+.ap-progress__fill {
+    background-color: var(--ap-progress);
+}
+.ap-progress__thumb {
+    position: absolute;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background-color: var(--ap-accent);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    transition: transform 0.15s ease;
+}
+.ap-progress:hover .ap-progress__thumb,
+.ap-progress--seeking .ap-progress__thumb {
+    transform: translate(-50%, -50%) scale(1.15);
+}
+.ap-progress:focus-visible {
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+}
+.ap-progress[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.ap-times {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+/* ----------------------------- Transport ----------------------------- */
+
+.ap-transport {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+}
+.ap-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    cursor: pointer;
+    flex-shrink: 0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.ap-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+.ap-btn--ghost {
+    width: 40px;
+    height: 40px;
+    border: 2px solid var(--ap-accent);
+    background-color: transparent;
+    color: var(--ap-accent);
+}
+.ap-btn--sm {
+    width: 28px;
+    height: 28px;
+    opacity: 0.6;
+}
+.ap-btn--play {
+    width: 60px;
+    height: 60px;
+    border: none;
+    background-color: var(--ap-accent);
+    color: var(--ap-play-icon);
+}
+.ap-btn--play-active {
+    animation: ap-pulse 3s ease-in-out infinite;
+}
+
+/* ----------------------------- Volume ----------------------------- */
+
+.ap-volume {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.ap-icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    color: var(--ap-accent);
+    cursor: pointer;
+    border-radius: 8px;
+}
+.ap-icon-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.ap-volume__slider {
+    position: relative;
+    flex: 1;
+    max-width: 140px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    touch-action: none;
+    outline: none;
+}
+.ap-volume__track,
+.ap-volume__fill {
+    position: absolute;
+    left: 0;
+    height: 6px;
+    border-radius: 3px;
+    pointer-events: none;
+}
+.ap-volume__track {
+    width: 100%;
+    background-color: var(--ap-track);
+}
+.ap-volume__fill {
+    background-color: var(--ap-progress);
+}
+.ap-volume__thumb {
+    position: absolute;
+    top: 50%;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: var(--ap-accent);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+.ap-volume__slider:focus-visible {
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+}
+
+/* ----------------------------- Wide buttons ----------------------------- */
+
+.ap-wide-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+.ap-wide-btn--ghost {
+    background-color: transparent;
+    border: 1px solid var(--ap-accent);
+    color: var(--ap-accent);
+}
+.ap-wide-btn--solid {
+    background-color: var(--ap-accent);
+    color: var(--ap-play-icon);
+    border: none;
+}
+
+/* ----------------------------- Lyrics ----------------------------- */
+
+.ap-lyrics {
+    padding: 16px;
+    border-radius: 8px;
+    background-color: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--ap-accent);
+    font-size: 14px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+/* ----------------------------- Tracklist ----------------------------- */
+
+.ap-tracklist {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 8px;
+    padding: 12px;
+    border-radius: 8px;
+    background-color: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--ap-accent);
+    max-height: 300px;
+    overflow-y: auto;
+}
+.ap-tracklist__item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    background-color: transparent;
+    border: 1px solid transparent;
+    color: var(--ap-text);
+    cursor: pointer;
+    text-align: left;
+    transition: background-color 0.2s ease;
+}
+.ap-tracklist__item:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+.ap-tracklist__item--active {
+    background-color: rgba(255, 255, 255, 0.15);
+    border-color: var(--ap-accent);
+}
+.ap-tracklist__num {
+    min-width: 24px;
+    font-size: 14px;
+    font-weight: 500;
+    opacity: 0.6;
+}
+.ap-tracklist__item--active .ap-tracklist__num {
+    opacity: 1;
+    font-weight: 700;
+}
+.ap-tracklist__meta {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+}
+.ap-tracklist__title {
+    font-size: 14px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ap-tracklist__artist {
+    font-size: 12px;
+    opacity: 0.6;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Equalizer bars on the active, playing track. */
+.ap-eq {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+.ap-eq i {
+    width: 3px;
+    height: 12px;
+    border-radius: 2px;
+    background-color: var(--ap-accent);
+    animation: ap-eq 1s ease-in-out infinite;
+}
+.ap-eq i:nth-child(2) {
+    height: 16px;
+    animation-delay: 0.2s;
+}
+.ap-eq i:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+/* ----------------------------- Animations ----------------------------- */
+
+.ap-tap {
+    transition: transform 0.1s ease;
+}
+.ap-tap:active:not(:disabled) {
+    transform: scale(0.92);
+}
+
+.ap-spin {
+    animation: ap-spin 1s linear infinite;
+    transform-origin: center;
+}
+
+.ap-anim-in {
+    animation: ap-fade-in 0.25s ease;
+}
+
+.ap-root :focus-visible {
+    outline: none;
+}
+.ap-btn:focus-visible,
+.ap-icon-btn:focus-visible,
+.ap-wide-btn:focus-visible,
+.ap-share-btn:focus-visible,
+.ap-tracklist__item:focus-visible,
+.ap-retry-btn:focus-visible {
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+}
+
+@keyframes ap-pulse {
+    0%,
+    100% {
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15),
+            inset 0 1px 0 rgba(255, 255, 255, 0.2),
+            0 0 0 0 transparent;
+    }
+    50% {
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15),
+            inset 0 1px 0 rgba(255, 255, 255, 0.2),
+            0 0 16px 4px var(--ap-accent);
+    }
+}
+@keyframes ap-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+@keyframes ap-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+@keyframes ap-eq {
+    0%,
+    100% {
+        opacity: 0.5;
+        transform: scaleY(0.7);
+    }
+    50% {
+        opacity: 1;
+        transform: scaleY(1);
+    }
+}
+
+@media (max-width: 480px) {
+    .ap-track-info__title {
+        font-size: 20px;
+    }
+    .ap-track-info__artist {
+        font-size: 13px;
+    }
+    .ap-progress__thumb {
+        width: 18px;
+        height: 18px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ap-btn--play-active,
+    .ap-spin,
+    .ap-anim-in,
+    .ap-eq i,
+    .ap-tap {
+        animation: none !important;
+        transition: none !important;
+    }
+}
