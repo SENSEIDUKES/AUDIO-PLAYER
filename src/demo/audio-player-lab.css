@@ -1,0 +1,1018 @@
+/* SEIHouse Audio Player Lab
+   --------------------------------------------------------------
+   Fake real-world environments for manually testing the portable
+   SEIHouse audio player. This file is intentionally separate from
+   the player's own stylesheet so the component itself stays
+   portable and zero-dep. Touching styles in here is fine — it
+   only affects the lab page. */
+
+:root {
+    --lab-bg: #07070a;
+    --lab-bg-elev: #121218;
+    --lab-bg-card: #181820;
+    --lab-border: rgba(255, 255, 255, 0.08);
+    --lab-border-strong: rgba(255, 255, 255, 0.16);
+    --lab-text: #f4f4f7;
+    --lab-text-dim: rgba(244, 244, 247, 0.65);
+    --lab-text-faint: rgba(244, 244, 247, 0.4);
+    --lab-accent: #7C5CFF;
+    --lab-success: #22D3A6;
+    --lab-danger: #ff5a55;
+    --lab-radius: 14px;
+    --lab-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(124, 92, 255, 0.12), transparent 60%),
+        radial-gradient(900px 500px at 100% 10%, rgba(34, 211, 166, 0.10), transparent 60%),
+        var(--lab-bg);
+    color: var(--lab-text);
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+}
+
+.lab-shell {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 32px 24px 96px;
+}
+
+/* ----------------------------- Header ----------------------------- */
+.lab-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 28px;
+}
+.lab-header__title {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0 0 4px;
+}
+.lab-header__sub {
+    color: var(--lab-text-dim);
+    font-size: 14px;
+    margin: 0;
+    max-width: 60ch;
+}
+.lab-header__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(34, 211, 166, 0.12);
+    color: var(--lab-success);
+    border: 1px solid rgba(34, 211, 166, 0.3);
+    font-size: 12px;
+    font-weight: 600;
+}
+.lab-header__chip::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--lab-success);
+    box-shadow: 0 0 0 4px rgba(34, 211, 166, 0.2);
+}
+
+/* ----------------------------- Top checklist ----------------------------- */
+.lab-checklist {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+    margin-bottom: 32px;
+    padding: 16px;
+    background: var(--lab-bg-elev);
+    border: 1px solid var(--lab-border);
+    border-radius: var(--lab-radius);
+}
+.lab-checklist__title {
+    grid-column: 1 / -1;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--lab-text-faint);
+    margin: 0 0 4px;
+}
+.lab-checklist__item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--lab-text-dim);
+}
+.lab-checklist__item strong {
+    color: var(--lab-text);
+    font-weight: 600;
+}
+
+/* ----------------------------- Section base ----------------------------- */
+.lab-section {
+    margin-bottom: 48px;
+}
+.lab-section__title {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    margin: 0 0 6px;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+.lab-section__title small {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--lab-text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+.lab-section__desc {
+    color: var(--lab-text-dim);
+    font-size: 13px;
+    margin: 0 0 16px;
+    max-width: 70ch;
+}
+.lab-section__grid {
+    display: grid;
+    gap: 20px;
+    grid-template-columns: repeat(12, 1fr);
+}
+
+/* ----------------------------- 1. Feed / hero ----------------------------- */
+.lab-feed {
+    grid-column: span 12;
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 20px;
+    align-items: start;
+}
+@media (max-width: 880px) {
+    .lab-feed {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ----------------------------- Framer-style control panel ----------------------------- */
+.framer-panel {
+    position: relative;
+    border-radius: var(--lab-radius);
+    background: #0f0f14;
+    border: 1px solid var(--lab-border);
+    box-shadow: var(--lab-shadow);
+    display: flex;
+    flex-direction: column;
+    max-height: 720px;
+    overflow: hidden;
+    font-family: "Inter", system-ui, sans-serif;
+}
+.framer-panel__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--lab-border);
+    background: rgba(255, 255, 255, 0.02);
+}
+.framer-panel__title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--lab-text-faint);
+    font-weight: 600;
+    margin: 0;
+}
+.framer-panel__actions {
+    display: flex;
+    gap: 6px;
+}
+.framer-panel__btn {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--lab-border);
+    border-radius: 6px;
+    padding: 4px 8px;
+    color: var(--lab-text-dim);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.framer-panel__btn:hover {
+    color: var(--lab-text);
+    border-color: var(--lab-border-strong);
+}
+.framer-panel__btn--accent {
+    background: rgba(124, 92, 255, 0.15);
+    border-color: rgba(124, 92, 255, 0.4);
+    color: #b9a8ff;
+}
+.framer-panel__btn--accent:hover {
+    background: rgba(124, 92, 255, 0.25);
+    color: #fff;
+}
+.framer-panel__body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 0;
+}
+.framer-panel__group {
+    border-bottom: 1px solid var(--lab-border);
+}
+.framer-panel__group:last-child {
+    border-bottom: none;
+}
+.framer-panel__group-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--lab-text);
+    background: rgba(255, 255, 255, 0.03);
+    cursor: pointer;
+    user-select: none;
+}
+.framer-panel__group-head:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+.framer-panel__chevron {
+    font-size: 10px;
+    color: var(--lab-text-faint);
+    transition: transform 0.15s ease;
+}
+.framer-panel__group--open .framer-panel__chevron {
+    transform: rotate(90deg);
+}
+.framer-panel__group-body {
+    display: none;
+    padding: 6px 0 10px;
+}
+.framer-panel__group--open .framer-panel__group-body {
+    display: block;
+}
+.framer-panel__row {
+    display: grid;
+    grid-template-columns: 88px 1fr;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 12px;
+    min-height: 28px;
+}
+.framer-panel__row--col {
+    grid-template-columns: 1fr;
+}
+.framer-panel__label {
+    font-size: 11px;
+    color: var(--lab-text-dim);
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.framer-panel__input,
+.framer-panel__select,
+.framer-panel__textarea {
+    width: 100%;
+    background: #1a1a22;
+    border: 1px solid var(--lab-border);
+    border-radius: 5px;
+    padding: 5px 7px;
+    color: var(--lab-text);
+    font-size: 11px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s ease;
+    box-sizing: border-box;
+}
+.framer-panel__input:focus,
+.framer-panel__select:focus,
+.framer-panel__textarea:focus {
+    border-color: var(--lab-accent);
+}
+.framer-panel__textarea {
+    resize: vertical;
+    min-height: 50px;
+    line-height: 1.4;
+}
+.framer-panel__select {
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f4f4f7' stroke-width='2'%3e%3cpolyline points='6 9 12 15 18 9'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 6px center;
+    background-size: 12px;
+    padding-right: 22px;
+}
+.framer-panel__color {
+    width: 100%;
+    height: 24px;
+    padding: 0;
+    background: #1a1a22;
+    border: 1px solid var(--lab-border);
+    border-radius: 5px;
+    cursor: pointer;
+}
+.framer-panel__color::-webkit-color-swatch-wrapper {
+    padding: 2px;
+}
+.framer-panel__color::-webkit-color-swatch {
+    border: none;
+    border-radius: 3px;
+}
+.framer-panel__toggle {
+    position: relative;
+    width: 30px;
+    height: 16px;
+    background: #2a2a35;
+    border-radius: 999px;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.15s ease;
+}
+.framer-panel__toggle::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 12px;
+    height: 12px;
+    background: #f4f4f7;
+    border-radius: 50%;
+    transition: transform 0.15s ease;
+}
+.framer-panel__toggle--on {
+    background: var(--lab-accent);
+}
+.framer-panel__toggle--on::after {
+    transform: translateX(14px);
+}
+.framer-panel__range {
+    width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    height: 16px;
+    cursor: pointer;
+    margin: 0;
+}
+.framer-panel__range::-webkit-slider-runnable-track {
+    height: 3px;
+    background: #2a2a35;
+    border-radius: 2px;
+}
+.framer-panel__range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--lab-accent);
+    margin-top: -4.5px;
+    cursor: pointer;
+}
+.framer-panel__range::-moz-range-track {
+    height: 3px;
+    background: #2a2a35;
+    border-radius: 2px;
+}
+.framer-panel__range::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--lab-accent);
+    border: none;
+    cursor: pointer;
+}
+.framer-panel__value {
+    font-size: 10px;
+    color: var(--lab-text-faint);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    text-align: right;
+    padding-right: 4px;
+    margin-top: 2px;
+}
+.framer-panel__preset-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 6px 12px 8px;
+}
+.framer-panel__preset {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--lab-border);
+    border-radius: 999px;
+    padding: 3px 9px;
+    color: var(--lab-text-dim);
+    font-size: 10px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.framer-panel__preset:hover {
+    color: var(--lab-text);
+    border-color: var(--lab-border-strong);
+}
+.framer-panel__preset--err {
+    color: #ff8080;
+    border-color: rgba(255, 90, 85, 0.3);
+}
+.framer-panel__preset--warn {
+    color: #ffcb6b;
+    border-color: rgba(245, 158, 11, 0.3);
+}
+.framer-panel__footer {
+    padding: 10px 12px;
+    border-top: 1px solid var(--lab-border);
+    background: rgba(255, 255, 255, 0.02);
+    display: flex;
+    gap: 6px;
+}
+.framer-panel__copy {
+    flex: 1;
+    background: var(--lab-accent);
+    color: #000;
+    border: none;
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+}
+.framer-panel__copy:hover {
+    opacity: 0.85;
+}
+.framer-panel__copy--ok {
+    background: var(--lab-success);
+}
+.framer-panel__reset {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--lab-border);
+    border-radius: 6px;
+    padding: 7px 10px;
+    color: var(--lab-text-dim);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+}
+.framer-panel__reset:hover {
+    color: var(--lab-text);
+    border-color: var(--lab-border-strong);
+}
+.framer-panel__check-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--lab-text-dim);
+    cursor: pointer;
+}
+.framer-panel__check-row input {
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--lab-accent);
+}
+.framer-panel__hidden {
+    display: none;
+}
+
+.framer-panel__tracks {
+    padding: 4px 12px 8px;
+    border-top: 1px dashed var(--lab-border);
+    margin-top: 4px;
+}
+.framer-panel__tracks-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--lab-text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+.framer-panel__tracks-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 320px;
+    overflow-y: auto;
+    padding-right: 2px;
+}
+.framer-panel__track {
+    display: grid;
+    grid-template-columns: 18px 1fr 22px;
+    gap: 6px;
+    align-items: start;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--lab-border);
+    border-radius: 6px;
+    padding: 6px 8px;
+}
+.framer-panel__track-num {
+    font-size: 10px;
+    color: var(--lab-text-faint);
+    font-weight: 600;
+    padding-top: 5px;
+    text-align: center;
+}
+.framer-panel__track-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+.framer-panel__track-remove {
+    background: transparent;
+    border: 1px solid var(--lab-border);
+    color: var(--lab-text-dim);
+    border-radius: 4px;
+    width: 22px;
+    height: 22px;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    transition: all 0.15s ease;
+}
+.framer-panel__track-remove:hover {
+    color: var(--lab-danger);
+    border-color: var(--lab-danger);
+}
+
+.lab-feed__panel {
+    background: var(--lab-bg-elev);
+    border: 1px solid var(--lab-border);
+    border-radius: var(--lab-radius);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-height: 360px;
+}
+.lab-feed__meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    color: var(--lab-text-dim);
+}
+.lab-feed__meta-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #7C5CFF, #22D3A6);
+}
+.lab-feed__meta-author {
+    color: var(--lab-text);
+    font-weight: 600;
+}
+.lab-feed__title {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0;
+}
+.lab-feed__stats {
+    display: flex;
+    gap: 14px;
+    color: var(--lab-text-faint);
+    font-size: 12px;
+}
+.lab-feed__player {
+    flex: 1;
+    min-height: 280px;
+}
+.lab-feed__actions {
+    display: flex;
+    gap: 8px;
+}
+.lab-feed__action {
+    flex: 1;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--lab-border);
+    border-radius: 10px;
+    color: var(--lab-text-dim);
+    font-size: 13px;
+    font-weight: 500;
+    text-align: center;
+    cursor: pointer;
+}
+.lab-feed__action:hover {
+    color: var(--lab-text);
+    border-color: var(--lab-border-strong);
+}
+
+/* ----------------------------- 2. Album / marketplace grid ----------------------------- */
+.lab-grid {
+    grid-column: span 12;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+}
+.lab-card {
+    background: var(--lab-bg-card);
+    border: 1px solid var(--lab-border);
+    border-radius: var(--lab-radius);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.lab-card__art {
+    aspect-ratio: 4 / 3;
+    background: linear-gradient(135deg, #FF7AC6, #7C5CFF);
+    position: relative;
+}
+.lab-card__art--b {
+    background: linear-gradient(135deg, #22D3A6, #0EA5E9);
+}
+.lab-card__art--c {
+    background: linear-gradient(135deg, #F59E0B, #EF4444);
+}
+.lab-card__art--d {
+    background: linear-gradient(135deg, #A855F7, #EC4899);
+}
+.lab-card__body {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.lab-card__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.lab-card__title {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.lab-card__artist {
+    font-size: 12px;
+    color: var(--lab-text-faint);
+    margin: 2px 0 0;
+}
+.lab-card__price {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--lab-success);
+    background: rgba(34, 211, 166, 0.1);
+    border: 1px solid rgba(34, 211, 166, 0.25);
+    padding: 4px 8px;
+    border-radius: 999px;
+}
+.lab-card__player {
+    height: 200px;
+}
+
+/* ----------------------------- 3. Sidebar widget + main content ----------------------------- */
+.lab-app {
+    grid-column: span 12;
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 20px;
+    background: var(--lab-bg-elev);
+    border: 1px solid var(--lab-border);
+    border-radius: var(--lab-radius);
+    overflow: hidden;
+}
+@media (max-width: 880px) {
+    .lab-app {
+        grid-template-columns: 1fr;
+    }
+}
+.lab-app__sidebar {
+    background: rgba(255, 255, 255, 0.02);
+    border-right: 1px solid var(--lab-border);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 460px;
+}
+.lab-app__sidebar-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--lab-text-faint);
+    margin: 0;
+}
+.lab-app__player {
+    height: 280px;
+}
+.lab-app__nav {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 4px;
+}
+.lab-app__nav-item {
+    padding: 8px 10px;
+    border-radius: 8px;
+    color: var(--lab-text-dim);
+    font-size: 13px;
+    cursor: pointer;
+}
+.lab-app__nav-item--active {
+    color: var(--lab-text);
+    background: rgba(255, 255, 255, 0.05);
+}
+.lab-app__main {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 460px;
+}
+.lab-app__row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 10px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--lab-border);
+}
+.lab-app__row-thumb {
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #7C5CFF, #22D3A6);
+    flex-shrink: 0;
+}
+.lab-app__row-thumb--b { background: linear-gradient(135deg, #F59E0B, #EF4444); }
+.lab-app__row-thumb--c { background: linear-gradient(135deg, #22D3A6, #0EA5E9); }
+.lab-app__row-meta {
+    flex: 1;
+    min-width: 0;
+}
+.lab-app__row-title {
+    font-size: 14px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.lab-app__row-sub {
+    font-size: 12px;
+    color: var(--lab-text-faint);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.lab-app__row-cta {
+    font-size: 12px;
+    color: var(--lab-accent);
+    font-weight: 600;
+}
+
+/* ----------------------------- 4. Mobile preview ----------------------------- */
+.lab-mobile-row {
+    grid-column: span 12;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+}
+.lab-phone {
+    background: #0b0b10;
+    border: 1px solid var(--lab-border-strong);
+    border-radius: 28px;
+    padding: 12px;
+    box-shadow: var(--lab-shadow);
+    max-width: 340px;
+    margin: 0 auto;
+    width: 100%;
+}
+.lab-phone__notch {
+    width: 80px;
+    height: 16px;
+    background: #000;
+    border-radius: 0 0 12px 12px;
+    margin: 0 auto 8px;
+}
+.lab-phone__screen {
+    background: linear-gradient(180deg, #1a1a24 0%, #0f0f15 100%);
+    border-radius: 18px;
+    padding: 14px;
+    min-height: 560px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.lab-phone__top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--lab-text-faint);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+.lab-phone__art {
+    aspect-ratio: 1 / 1;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #7C5CFF, #22D3A6);
+    position: relative;
+    overflow: hidden;
+}
+.lab-phone__art::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(closest-side at 30% 20%, rgba(255, 255, 255, 0.3), transparent 60%);
+}
+.lab-phone__player {
+    flex: 1;
+    min-height: 0;
+}
+.lab-phone__handle {
+    width: 100px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 999px;
+    margin: 8px auto 0;
+}
+
+/* ----------------------------- 5. State tests ----------------------------- */
+.lab-states {
+    grid-column: span 12;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px;
+}
+.lab-state {
+    background: var(--lab-bg-elev);
+    border: 1px solid var(--lab-border);
+    border-radius: var(--lab-radius);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 360px;
+}
+.lab-state__title {
+    font-size: 14px;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.lab-state__title::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--lab-accent);
+}
+.lab-state__title--ok::before { background: var(--lab-success); }
+.lab-state__title--warn::before { background: #F59E0B; }
+.lab-state__title--err::before { background: var(--lab-danger); }
+.lab-state__desc {
+    font-size: 12px;
+    color: var(--lab-text-dim);
+    margin: 0;
+}
+.lab-state__player {
+    flex: 1;
+    min-height: 220px;
+}
+.lab-state__note {
+    font-size: 11px;
+    color: var(--lab-text-faint);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px dashed var(--lab-border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    line-height: 1.5;
+}
+
+/* ----------------------------- 6. Rapid interaction panel ----------------------------- */
+.lab-rapid {
+    grid-column: span 12;
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 20px;
+    background: var(--lab-bg-elev);
+    border: 1px solid var(--lab-border);
+    border-radius: var(--lab-radius);
+    padding: 20px;
+}
+@media (max-width: 880px) {
+    .lab-rapid {
+        grid-template-columns: 1fr;
+    }
+}
+.lab-rapid__player {
+    min-height: 360px;
+}
+.lab-rapid__steps {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.lab-rapid__step {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--lab-text-dim);
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--lab-border);
+}
+.lab-rapid__step strong {
+    color: var(--lab-text);
+    font-weight: 600;
+}
+.lab-rapid__step-num {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(124, 92, 255, 0.15);
+    border: 1px solid rgba(124, 92, 255, 0.4);
+    color: var(--lab-accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    margin-top: 1px;
+}
+
+/* ----------------------------- 7. Sticky / overflow ----------------------------- */
+.lab-sticky-wrap {
+    grid-column: span 12;
+    height: 360px;
+    overflow-y: auto;
+    background: var(--lab-bg-elev);
+    border: 1px solid var(--lab-border);
+    border-radius: var(--lab-radius);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.lab-sticky {
+    position: sticky;
+    top: 12px;
+    height: 200px;
+    z-index: 2;
+}
+.lab-sticky__filler {
+    color: var(--lab-text-faint);
+    font-size: 13px;
+    line-height: 1.6;
+}
+.lab-sticky__filler h4 {
+    color: var(--lab-text);
+    margin: 12px 0 4px;
+    font-size: 13px;
+}
+.lab-sticky__filler p {
+    margin: 0 0 10px;
+}
+
+/* ----------------------------- Footer ----------------------------- */
+.lab-footer {
+    text-align: center;
+    color: var(--lab-text-faint);
+    font-size: 12px;
+    margin-top: 48px;
+}
+.lab-footer kbd {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--lab-border);
+    border-bottom-width: 2px;
+    border-radius: 6px;
+    padding: 1px 6px;
+    font-size: 11px;
+    color: var(--lab-text);
+}

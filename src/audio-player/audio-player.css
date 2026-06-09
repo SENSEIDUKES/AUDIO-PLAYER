@@ -108,12 +108,19 @@
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
-/* ----------------------------- Share ----------------------------- */
+/* ----------------------------- Top actions (menu + share) ----------------------------- */
 
-.ap-share-btn {
+.ap-top-actions {
     position: absolute;
     top: 0;
     right: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 10;
+}
+
+.ap-share-btn {
     width: 36px;
     height: 36px;
     border-radius: 50%;
@@ -125,7 +132,103 @@
     justify-content: center;
     cursor: pointer;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-    z-index: 10;
+}
+
+.ap-menu {
+    position: relative;
+}
+.ap-menu__btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--ap-accent);
+    background-color: var(--ap-bg);
+    color: var(--ap-accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    padding: 0;
+}
+.ap-menu__btn[aria-expanded="true"] {
+    background-color: var(--ap-accent);
+    color: var(--ap-play-icon);
+}
+.ap-menu__panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 200px;
+    padding: 6px;
+    border-radius: 10px;
+    background-color: rgba(20, 20, 24, 0.92);
+    border: 1px solid var(--ap-accent);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    color: var(--ap-text);
+    z-index: 20;
+    transform-origin: top right;
+}
+.ap-menu__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    padding: 8px 10px;
+    border: none;
+    background: transparent;
+    color: inherit;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    text-align: left;
+}
+.ap-menu__item:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+.ap-menu__label {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--ap-text);
+}
+.ap-menu__label svg {
+    color: var(--ap-accent);
+    flex-shrink: 0;
+}
+.ap-menu__switch {
+    position: relative;
+    width: 34px;
+    height: 20px;
+    border-radius: 999px;
+    background-color: rgba(255, 255, 255, 0.18);
+    flex-shrink: 0;
+    transition: background-color 0.15s ease;
+}
+.ap-menu__knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background-color: #ffffff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    transition: transform 0.15s ease;
+}
+.ap-menu__switch--on {
+    background-color: var(--ap-accent);
+}
+.ap-menu__switch--on .ap-menu__knob {
+    transform: translateX(14px);
+    background-color: var(--ap-play-icon);
 }
 
 /* ----------------------------- Track info ----------------------------- */
@@ -498,8 +601,13 @@
 .ap-wide-btn:focus-visible,
 .ap-share-btn:focus-visible,
 .ap-tracklist__item:focus-visible,
-.ap-retry-btn:focus-visible {
+.ap-retry-btn:focus-visible,
+.ap-menu__btn:focus-visible,
+.ap-menu__item:focus-visible {
     box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+}
+.ap-menu__item:focus-visible {
+    background-color: rgba(255, 255, 255, 0.08);
 }
 
 @keyframes ap-pulse {
