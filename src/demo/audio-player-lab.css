@@ -1000,6 +1000,18 @@ body {
 }
 
 /* ----------------------------- Global session section ----------------------------- */
+/* The AudioSessionProvider renders its single <audio> element plus the
+   .lab-session and .lab-session__sticky divs as direct children of the
+   12-column .lab-section__grid. Without an explicit span they collapse into a
+   single grid cell, and the hidden <audio> would also occupy a cell. */
+.lab-section__grid > audio {
+    display: none;
+}
+.lab-session,
+.lab-session__sticky {
+    grid-column: 1 / -1;
+}
+
 .lab-session {
     display: grid;
     grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.9fr);

@@ -192,12 +192,17 @@ function AudioPlayerInner(props: AudioPlayerProps) {
 
     const src = currentTrack.audioFile?.trim() ?? ""
 
-    // Build a sourceKey that encodes the playlist position AND track identity.
-    // This ensures the engine resets correctly when switching between tracks
-    // that share the same audio URL (e.g. a demo playlist with a single sample).
+    // Build a sourceKey that encodes the playlist position AND track identity,
+    // so the engine resets when switching between playlist tracks that share the
+    // same audio URL (e.g. a demo playlist with a single sample).
+    //
+    // In single-track mode the key is tied to `src` only. Folding title/artist
+    // into it there would make display metadata part of the playback identity:
+    // a consumer replacing placeholder metadata (CMS/localization fetch) while
+    // the audio URL is unchanged would otherwise restart playback from 0.
     const sourceKey = isPlaylistMode
         ? `${trackIndex}:${trackKey(currentTrack)}`
-        : trackKey(currentTrack)
+        : src
 
     const advanceTrack = useCallback(() => {
         if (!isPlaylistMode) return

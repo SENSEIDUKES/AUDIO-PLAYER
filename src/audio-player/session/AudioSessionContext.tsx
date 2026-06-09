@@ -203,6 +203,22 @@ export function AudioSessionProvider({
             const key = trackKey(track)
             const existing = queue.findIndex((t) => trackKey(t) === key)
             if (existing !== -1) {
+                // A track with the same identity (e.g. a stable id) is already
+                // queued, but its audioFile/metadata may have been refreshed
+                // (re-signed CDN URL, updated title). Replace the stale entry
+                // with the fresh argument so we don't replay old data.
+                if (queue[existing] !== track) {
+                    setQueueState((q) =>
+                        q.map((t, i) => (i === existing ? track : t))
+                    )
+                    if (existing === currentIndex) {
+                        // The active source/sourceKey changes, so the engine
+                        // reloads; arm a deferred play to start the refreshed
+                        // source once it has loaded.
+                        pendingPlayRef.current = true
+                        return
+                    }
+                }
                 goTo(existing, true)
                 return
             }
@@ -213,7 +229,7 @@ export function AudioSessionProvider({
             setQueueState((q) => [...q, track])
             setCurrentIndex(nextIndex)
         },
-        [queue, goTo, engine.isPlaying]
+        [queue, goTo, engine.isPlaying, currentIndex]
     )
 
     const next = useCallback(() => {

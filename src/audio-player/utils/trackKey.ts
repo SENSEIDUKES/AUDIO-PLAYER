@@ -12,8 +12,14 @@ import type { Track } from "../types"
  */
 export function trackKey(track: Track): string {
     if (!track) return ""
-    return (
-        track.id ??
-        `${track.title ?? ""}:${track.artist ?? ""}:${track.audioFile ?? ""}`
-    )
+    if (track.id) return `id:${track.id}`
+    // Unambiguous tuple encoding. A raw "title:artist:audioFile" join collides
+    // when user-controlled metadata itself contains the delimiter (e.g. a title
+    // with a colon vs. an artist with one). JSON.stringify escapes each field so
+    // distinct (title, artist, audioFile) triples always map to distinct keys.
+    return `t:${JSON.stringify([
+        track.title ?? "",
+        track.artist ?? "",
+        track.audioFile ?? "",
+    ])}`
 }
