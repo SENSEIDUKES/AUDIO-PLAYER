@@ -37,25 +37,33 @@ export function useMediaSessionObserver(
     const latest = useRef({ engine, options })
     latest.current = { engine, options }
 
-    const registerKey = options.sourceKey ?? options.title
-
+    // 1. Sync metadata whenever any of the displayed fields change so the OS
+    //    media UI never shows stale information (e.g. after lazy loading or
+    //    localization updates while the same track is active).
     useEffect(() => {
         if (typeof navigator === "undefined" || !("mediaSession" in navigator))
             return
 
         const ms = navigator.mediaSession
-        const { options: opts } = latest.current
-
-        // Set metadata.
         ms.metadata = new MediaMetadata({
-            title: opts.title,
-            artist: opts.artist ?? "",
-            album: opts.album ?? "",
-            artwork: opts.artwork ?? [],
+            title: options.title,
+            artist: options.artist ?? "",
+            album: options.album ?? "",
+            artwork: options.artwork ?? [],
         })
 
-        // Register action handlers. Older browsers throw when an unknown action
-        // type is passed, so each registration is wrapped.
+        return () => {
+            ms.metadata = null
+        }
+    }, [options.title, options.artist, options.album, options.artwork])
+
+    // 2. Register action handlers once on mount. All handlers read from the
+    //    `latest` ref so they never go stale without re-registering.
+    useEffect(() => {
+        if (typeof navigator === "undefined" || !("mediaSession" in navigator))
+            return
+
+        const ms = navigator.mediaSession
         const actions: MediaSessionAction[] = [
             "play",
             "pause",
@@ -65,14 +73,19 @@ export function useMediaSessionObserver(
             "seekforward",
             "stop",
         ]
-        const step = opts.seekStep ?? 10
         const handlers: Record<string, MediaSessionActionHandler> = {
             play: () => latest.current.engine.play(true),
             pause: () => latest.current.engine.pause(),
             previoustrack: () => latest.current.options.onPrevious?.(),
             nexttrack: () => latest.current.options.onNext?.(),
-            seekbackward: () => latest.current.engine.seekBy(-step),
-            seekforward: () => latest.current.engine.seekBy(step),
+            seekbackward: () => {
+                const step = latest.current.options.seekStep ?? 10
+                latest.current.engine.seekBy(-step)
+            },
+            seekforward: () => {
+                const step = latest.current.options.seekStep ?? 10
+                latest.current.engine.seekBy(step)
+            },
             stop: () => latest.current.engine.pause(),
         }
         for (const action of actions) {
@@ -83,10 +96,7 @@ export function useMediaSessionObserver(
             }
         }
 
-        // Clean up metadata + handlers on unmount and before re-registering
-        // for the next track.
         return () => {
-            ms.metadata = null
             for (const action of actions) {
                 try {
                     ms.setActionHandler(action, null)
@@ -95,10 +105,8 @@ export function useMediaSessionObserver(
                 }
             }
         }
-        // Re-register only when the logical track changes; everything else is
-        // read through `latest`.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [registerKey])
+    }, [])
 
     // Keep playback state in sync with the OS.
     useEffect(() => {

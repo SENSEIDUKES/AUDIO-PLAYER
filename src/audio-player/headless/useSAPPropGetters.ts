@@ -76,7 +76,8 @@ export function useSAPPropGetters(
         // the gap for button-like hosts (div, span, custom elements).
         const keyboardActivation =
             (run: () => void) => (event: KeyboardEvent<HTMLElement>) => {
-                if (event.currentTarget.tagName === "BUTTON") return
+                const tag = event.currentTarget.tagName
+                if (tag === "BUTTON" || tag === "INPUT" || tag === "TEXTAREA") return
                 if (event.key !== "Enter" && event.key !== " ") return
                 event.preventDefault()
                 run()
@@ -180,7 +181,7 @@ export function useSAPPropGetters(
          */
         const getProgressBarProps = (user: SAPProgressBarProps = {}) => {
             const { onKeyDown, ...rest } = user
-            const duration = engine.duration
+            const duration = engine.duration || 0
             const now =
                 duration > 0
                     ? Math.min(Math.max(engine.currentTime, 0), duration)
