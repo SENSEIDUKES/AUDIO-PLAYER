@@ -157,20 +157,20 @@ export function AudioSessionProvider({
         setCurrentIndex(next)
     }
 
-    // Start playback for any pending request after a track change. Keyed on
-    // `sourceKey` (which encodes both the queue position AND track identity)
-    // rather than `src` or `currentIndex` alone, so it fires for every logical
-    // track change — including same-URL swaps and same-index queue replacements
-    // that would otherwise strand a pending play. The engine's own
-    // [src, sourceKey] reset effect is registered earlier in the body, so any
-    // needed reload has already run; the ref guard keeps this idempotent.
+    // Start playback for any pending request after a track/source change. Keyed
+    // on both `sourceKey` and `src`: a same-id active refresh can keep the
+    // sourceKey stable while changing a re-signed/new audioFile URL. The
+    // engine's own [src, sourceKey] reset effect is registered earlier in the
+    // body, so any needed reload has already run; the ref guard keeps this
+    // idempotent and prevents stale pending plays from leaking into later
+    // navigation.
     useEffect(() => {
         if (pendingPlayRef.current) {
             pendingPlayRef.current = false
             if (src) engine.play(true)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sourceKey])
+    }, [sourceKey, src])
 
     const setQueue = useCallback(
         (tracks: Track[], startIndex = 0, autoPlayNext = false) => {
@@ -212,10 +212,19 @@ export function AudioSessionProvider({
                         q.map((t, i) => (i === existing ? track : t))
                     )
                     if (existing === currentIndex) {
-                        // The active source/sourceKey changes, so the engine
-                        // reloads; arm a deferred play to start the refreshed
-                        // source once it has loaded.
-                        pendingPlayRef.current = true
+                        const nextSrc = track.audioFile?.trim() ?? ""
+                        const sourceChanged = nextSrc !== src
+                        if (!engine.isPlaying) {
+                            if (sourceChanged) {
+                                // Same stable id, new active URL: sourceKey is
+                                // unchanged, so consume the deferred play on the
+                                // `src` effect instead of leaking it to a later
+                                // navigation.
+                                pendingPlayRef.current = true
+                            } else {
+                                engine.play(true)
+                            }
+                        }
                         return
                     }
                 }
@@ -229,7 +238,7 @@ export function AudioSessionProvider({
             setQueueState((q) => [...q, track])
             setCurrentIndex(nextIndex)
         },
-        [queue, goTo, engine.isPlaying, currentIndex]
+        [queue, goTo, engine, currentIndex, src]
     )
 
     const next = useCallback(() => {

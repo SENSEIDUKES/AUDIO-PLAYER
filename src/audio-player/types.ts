@@ -49,7 +49,15 @@ export interface AudioPlayerProps extends AudioPlayerTheme {
 
     /** Playback behavior. */
     autoPlay?: boolean
+    /**
+     * Legacy single-source loop toggle. Kept for backwards compatibility; when
+     * `repeatMode` is omitted, `loop={true}` initializes repeat-one behavior.
+     */
     loop?: boolean
+    /** Initial playlist shuffle state. */
+    shuffle?: boolean
+    /** Initial repeat behavior. Defaults to `"one"` when `loop` is true. */
+    repeatMode?: RepeatMode
 
     /** Presentation. */
     backgroundImage?: BackgroundImage

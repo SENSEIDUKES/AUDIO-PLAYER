@@ -11,7 +11,7 @@ import type {
     KeyboardEvent,
     ReactNode,
 } from "react"
-import type { AudioPlayerProps, Track } from "./types"
+import type { AudioPlayerProps, RepeatMode, Track } from "./types"
 import { useAudioPlayer } from "./useAudioPlayer"
 import { ProgressBar } from "./components/ProgressBar"
 import { VolumeControl } from "./components/VolumeControl"
@@ -21,6 +21,18 @@ import "./audio-player.css"
 
 const DEFAULT_AUDIO =
     "https://framerusercontent.com/assets/8w3IUatLX9a5JVJ6XPCVuHi94.mp3"
+
+function buildPlaybackOrder(length: number, startIndex: number, shuffle: boolean): number[] {
+    const indices = Array.from({ length }, (_, i) => i)
+    if (!shuffle || length <= 1) return indices
+    for (let i = indices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[indices[i], indices[j]] = [indices[j], indices[i]]
+    }
+    const at = indices.indexOf(startIndex)
+    if (at > 0) [indices[0], indices[at]] = [indices[at], indices[0]]
+    return indices
+}
 
 /**
  * React error boundary wrapping the player body. Keeps an unexpected render
@@ -89,6 +101,8 @@ function AudioPlayerInner(props: AudioPlayerProps) {
         lyrics = "",
         autoPlay = false,
         loop = false,
+        shuffle = false,
+        repeatMode: repeatModeProp,
         backgroundImage,
         blurSize = 20,
         darkenAmount = 0,
@@ -113,7 +127,10 @@ function AudioPlayerInner(props: AudioPlayerProps) {
     const [announcement, setAnnouncement] = useState("")
     const [menuOpen, setMenuOpen] = useState(false)
     const [localAutoPlay, setLocalAutoPlay] = useState(autoPlay)
-    const [localLoop, setLocalLoop] = useState(loop)
+    const [localShuffle, setLocalShuffle] = useState(shuffle)
+    const [localRepeatMode, setLocalRepeatMode] = useState<RepeatMode>(
+        repeatModeProp ?? (loop ? "one" : "off")
+    )
     const rootRef = useRef<HTMLDivElement>(null)
     const menuRef = useRef<HTMLDivElement>(null)
     const menuButtonRef = useRef<HTMLButtonElement>(null)
@@ -133,8 +150,11 @@ function AudioPlayerInner(props: AudioPlayerProps) {
         setLocalAutoPlay(autoPlay)
     }, [autoPlay])
     useEffect(() => {
-        setLocalLoop(loop)
-    }, [loop])
+        setLocalShuffle(shuffle)
+    }, [shuffle])
+    useEffect(() => {
+        setLocalRepeatMode(repeatModeProp ?? (loop ? "one" : "off"))
+    }, [loop, repeatModeProp])
 
     // Close the ellipsis menu when clicking outside the player. Escape closes
     // the menu and returns focus to the menu button so keyboard users land
@@ -204,17 +224,39 @@ function AudioPlayerInner(props: AudioPlayerProps) {
         ? `${trackIndex}:${trackKey(currentTrack)}`
         : src
 
-    const advanceTrack = useCallback(() => {
-        if (!isPlaylistMode) return
-        setTrackIndex((i) => (i < tracks.length - 1 ? i + 1 : 0))
-    }, [isPlaylistMode, tracks.length])
+    const playbackOrder = useMemo(
+        () => buildPlaybackOrder(tracks.length, trackIndex, localShuffle),
+        // Deliberately do not key on trackIndex: changing tracks should walk the
+        // current shuffled order instead of reshuffling on every navigation.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [tracks, localShuffle]
+    )
+
+    const stepTrackIndex = useCallback(
+        (from: number, direction: 1 | -1): number | null => {
+            if (!isPlaylistMode || playbackOrder.length === 0) return null
+            const position = playbackOrder.indexOf(from)
+            if (position === -1) return direction === 1 ? playbackOrder[0] : null
+            let nextPosition = position + direction
+            if (nextPosition >= playbackOrder.length) {
+                if (localRepeatMode === "all") nextPosition = 0
+                else return null
+            } else if (nextPosition < 0) {
+                nextPosition = localRepeatMode === "all" ? playbackOrder.length - 1 : 0
+            }
+            return playbackOrder[nextPosition]
+        },
+        [isPlaylistMode, playbackOrder, localRepeatMode]
+    )
+
+    const advanceRef = useRef<() => void>(() => {})
 
     const engine = useAudioPlayer({
         src,
         sourceKey,
         autoPlay: localAutoPlay,
-        loop: localLoop,
-        onEnded: advanceTrack,
+        loop: localRepeatMode === "one",
+        onEnded: () => advanceRef.current(),
     })
 
     const {
@@ -243,8 +285,8 @@ function AudioPlayerInner(props: AudioPlayerProps) {
     } = engine
 
     const goToTrack = useCallback(
-        (next: number) => {
-            if (!isPlaylistMode) return
+        (next: number | null) => {
+            if (!isPlaylistMode || next === null) return
             const clamped = ((next % tracks.length) + tracks.length) % tracks.length
             if (clamped !== trackIndex) setTrackIndex(clamped)
         },
@@ -252,13 +294,27 @@ function AudioPlayerInner(props: AudioPlayerProps) {
     )
 
     const previousTrack = useCallback(
-        () => goToTrack(trackIndex - 1),
-        [goToTrack, trackIndex]
+        () => goToTrack(stepTrackIndex(trackIndex, -1)),
+        [goToTrack, stepTrackIndex, trackIndex]
     )
     const nextTrack = useCallback(
-        () => goToTrack(trackIndex + 1),
-        [goToTrack, trackIndex]
+        () => goToTrack(stepTrackIndex(trackIndex, 1)),
+        [goToTrack, stepTrackIndex, trackIndex]
     )
+
+    const canPreviousTrack = isPlaylistMode && stepTrackIndex(trackIndex, -1) !== null
+    const canNextTrack = isPlaylistMode && stepTrackIndex(trackIndex, 1) !== null
+
+    advanceRef.current = () => {
+        const next = stepTrackIndex(trackIndex, 1)
+        if (next === null) return
+        if (next === trackIndex) {
+            seek(0)
+            engine.play(true)
+            return
+        }
+        setTrackIndex(next)
+    }
 
     const toggleLyrics = useCallback(() => setShowLyrics((v) => !v), [])
     const toggleMenu = useCallback(() => {
@@ -332,8 +388,14 @@ function AudioPlayerInner(props: AudioPlayerProps) {
         () => setLocalAutoPlay((v) => !v),
         []
     )
-    const handleLoopToggle = useCallback(
-        () => setLocalLoop((v) => !v),
+    const handleShuffleToggle = useCallback(
+        () => setLocalShuffle((v) => !v),
+        []
+    )
+    const handleRepeatCycle = useCallback(
+        () => setLocalRepeatMode((mode) =>
+            mode === "off" ? "all" : mode === "all" ? "one" : "off"
+        ),
         []
     )
 
@@ -577,23 +639,38 @@ function AudioPlayerInner(props: AudioPlayerProps) {
                                 <button
                                     type="button"
                                     role="menuitemcheckbox"
-                                    aria-checked={localLoop}
+                                    aria-checked={localShuffle}
                                     className="ap-menu__item ap-tap"
-                                    onClick={handleLoopToggle}
+                                    onClick={handleShuffleToggle}
                                     ref={(el) => {
                                         menuItemRefs.current[1] = el
                                     }}
                                 >
                                     <span className="ap-menu__label">
-                                        <LoopIcon />
-                                        Loop
+                                        <ShuffleIcon />
+                                        Shuffle
                                     </span>
                                     <span
-                                        className={`ap-menu__switch${localLoop ? " ap-menu__switch--on" : ""}`}
+                                        className={`ap-menu__switch${localShuffle ? " ap-menu__switch--on" : ""}`}
                                         aria-hidden="true"
                                     >
                                         <span className="ap-menu__knob" />
                                     </span>
+                                </button>
+                                <button
+                                    type="button"
+                                    role="menuitem"
+                                    className="ap-menu__item ap-tap"
+                                    onClick={handleRepeatCycle}
+                                    ref={(el) => {
+                                        menuItemRefs.current[2] = el
+                                    }}
+                                >
+                                    <span className="ap-menu__label">
+                                        {localRepeatMode === "one" ? <RepeatOneIcon /> : <RepeatIcon />}
+                                        Repeat
+                                    </span>
+                                    <span className="ap-menu__value">{localRepeatMode}</span>
                                 </button>
                             </div>
                         )}
@@ -611,6 +688,8 @@ function AudioPlayerInner(props: AudioPlayerProps) {
                 {isPlaylistMode && (
                     <div className="ap-track-counter">
                         Track {trackIndex + 1} of {tracks.length}
+                        {localShuffle ? " · Shuffle" : ""}
+                        {localRepeatMode !== "off" ? ` · Repeat ${localRepeatMode}` : ""}
                     </div>
                 )}
 
@@ -652,8 +731,20 @@ function AudioPlayerInner(props: AudioPlayerProps) {
                     {isPlaylistMode && (
                         <button
                             type="button"
+                            className={`ap-icon-btn ap-tap${localShuffle ? " ap-mode-btn--on" : ""}`}
+                            onClick={handleShuffleToggle}
+                            aria-label="Shuffle"
+                            aria-pressed={localShuffle}
+                        >
+                            <ShuffleIcon />
+                        </button>
+                    )}
+                    {isPlaylistMode && (
+                        <button
+                            type="button"
                             className="ap-btn ap-btn--ghost ap-btn--sm ap-tap"
                             onClick={previousTrack}
+                            disabled={!canPreviousTrack}
                             aria-label="Previous track"
                         >
                             <PrevIcon />
@@ -709,9 +800,20 @@ function AudioPlayerInner(props: AudioPlayerProps) {
                             type="button"
                             className="ap-btn ap-btn--ghost ap-btn--sm ap-tap"
                             onClick={nextTrack}
+                            disabled={!canNextTrack}
                             aria-label="Next track"
                         >
                             <NextIcon />
+                        </button>
+                    )}
+                    {isPlaylistMode && (
+                        <button
+                            type="button"
+                            className={`ap-icon-btn ap-tap${localRepeatMode !== "off" ? " ap-mode-btn--on" : ""}`}
+                            onClick={handleRepeatCycle}
+                            aria-label={`Repeat: ${localRepeatMode}`}
+                        >
+                            {localRepeatMode === "one" ? <RepeatOneIcon /> : <RepeatIcon />}
                         </button>
                     )}
                 </div>
@@ -891,11 +993,29 @@ const AutoPlayIcon = () => (
         <polygon points="6 4 20 12 6 20 6 4" fill="currentColor" stroke="none" />
     </svg>
 )
-const LoopIcon = () => (
+const ShuffleIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <polyline points="16 3 21 3 21 8" />
+        <line x1="4" y1="20" x2="21" y2="3" />
+        <polyline points="21 16 21 21 16 21" />
+        <line x1="15" y1="15" x2="21" y2="21" />
+        <line x1="4" y1="4" x2="9" y2="9" />
+    </svg>
+)
+const RepeatIcon = () => (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <polyline points="17 1 21 5 17 9" />
         <path d="M3 11V9a4 4 0 0 1 4-4h14" />
         <polyline points="7 23 3 19 7 15" />
         <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+    </svg>
+)
+const RepeatOneIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <polyline points="17 1 21 5 17 9" />
+        <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+        <polyline points="7 23 3 19 7 15" />
+        <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+        <text x="12" y="15" textAnchor="middle" fontSize="8" fontWeight="700" fill="currentColor" stroke="none" fontFamily="system-ui, sans-serif">1</text>
     </svg>
 )

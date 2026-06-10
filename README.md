@@ -28,12 +28,26 @@ Open the printed Vite preview URL to inspect the production build. The preview s
 - `npm run preview:smoke` — start Vite preview on `127.0.0.1:4173`, fetch the demo page, and verify referenced built assets return HTTP 200.
 - `npm test` — run type-checking, production build, and the preview smoke test.
 
+## Browser / mobile quality matrix
+
+The officially supported browser and mobile behavior is documented in [`docs/browser-mobile-quality-matrix.md`](./docs/browser-mobile-quality-matrix.md). Use it to verify autoplay-blocked recovery, iOS volume limitations, pointer/touch scrubbing, reduced-motion behavior, playlist shuffle/repeat modes, and preview smoke coverage before merging player changes.
+
 ## Audio player source
 
 - Component entry point: `src/audio-player/AudioPlayer.tsx`
 - Hook / audio engine: `src/audio-player/useAudioPlayer.ts`
 - Demo harness: `src/demo/main.tsx`
 - Demo styling: `src/demo/audio-player-lab.css`
+
+## Playback modes
+
+`AudioPlayer` supports sequential playback by default plus richer playlist controls:
+
+- `shuffle` — starts playlist mode with a shuffled playback order while keeping the active track anchored.
+- `repeatMode="off"` — stops advancing at the end of the current playback order.
+- `repeatMode="all"` — wraps from the end of the playback order back to the beginning.
+- `repeatMode="one"` — loops the active track without advancing.
+- `loop` — legacy compatibility prop; when `repeatMode` is omitted, `loop={true}` initializes repeat-one behavior.
 
 ## License / usage restrictions
 

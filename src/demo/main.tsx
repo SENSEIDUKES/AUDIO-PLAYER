@@ -145,7 +145,7 @@ type CustomizerState = Required<
         | "title" | "artist" | "audioFile" | "lyrics" | "purchaseUrl"
         | "backgroundColor" | "accentColor" | "textColor" | "progressColor"
         | "trackColor" | "playIconColor" | "blurSize" | "darkenAmount"
-        | "autoPlay" | "loop" | "showTracklist"
+        | "autoPlay" | "loop" | "shuffle" | "repeatMode" | "showTracklist"
     >
 > & {
     titleFont: NonNullable<AudioPlayerProps["titleFont"]>
@@ -247,7 +247,7 @@ function FramerControlPanel({
             "title", "artist", "audioFile", "lyrics", "purchaseUrl",
             "backgroundColor", "accentColor", "textColor", "progressColor",
             "trackColor", "playIconColor", "blurSize", "darkenAmount",
-            "autoPlay", "loop", "showTracklist",
+            "autoPlay", "loop", "shuffle", "repeatMode", "showTracklist",
         ]
         const formatScalar = (v: unknown): string => {
             if (typeof v === "string") return `"${v}"`
@@ -521,12 +521,26 @@ function FramerControlPanel({
                             aria-pressed={state.autoPlay}
                             aria-label="Toggle autoplay" />
                     </div>
-                    <div className="framer-panel__row"><label className="framer-panel__label" htmlFor="fr-loop">Loop</label>
+                    <div className="framer-panel__row"><label className="framer-panel__label" htmlFor="fr-shuffle">Shuffle</label>
+                        <button id="fr-shuffle" type="button"
+                            className={`framer-panel__toggle${state.shuffle ? " framer-panel__toggle--on" : ""}`}
+                            onClick={() => set("shuffle", !state.shuffle)}
+                            aria-pressed={state.shuffle}
+                            aria-label="Toggle shuffle" />
+                    </div>
+                    <div className="framer-panel__row"><label className="framer-panel__label" htmlFor="fr-repeat">Repeat Mode</label>
+                        <select id="fr-repeat" className="framer-panel__select" value={state.repeatMode} onChange={(e) => set("repeatMode", e.target.value as CustomizerState["repeatMode"])}>
+                            <option value="off">Off</option>
+                            <option value="all">All</option>
+                            <option value="one">One</option>
+                        </select>
+                    </div>
+                    <div className="framer-panel__row"><label className="framer-panel__label" htmlFor="fr-loop">Legacy Loop</label>
                         <button id="fr-loop" type="button"
                             className={`framer-panel__toggle${state.loop ? " framer-panel__toggle--on" : ""}`}
                             onClick={() => set("loop", !state.loop)}
                             aria-pressed={state.loop}
-                            aria-label="Toggle loop" />
+                            aria-label="Toggle legacy loop" />
                     </div>
                 </ControlGroup>
 
@@ -609,6 +623,8 @@ function defaultState(): CustomizerState {
         darkenAmount: OG_DEFAULTS.darkenAmount ?? 45,
         autoPlay: OG_DEFAULTS.autoPlay ?? false,
         loop: OG_DEFAULTS.loop ?? false,
+        shuffle: OG_DEFAULTS.shuffle ?? false,
+        repeatMode: OG_DEFAULTS.repeatMode ?? "off",
         showTracklist: OG_DEFAULTS.showTracklist ?? false,
         titleFont: { ...(OG_DEFAULTS.titleFont as CSSProperties) },
         artistFont: { ...(OG_DEFAULTS.artistFont as CSSProperties) },
@@ -661,6 +677,8 @@ function LiveCustomizer() {
                         darkenAmount={state.darkenAmount}
                         autoPlay={state.autoPlay}
                         loop={state.loop}
+                        shuffle={state.shuffle}
+                        repeatMode={state.repeatMode}
                         showTracklist={state.showTracklist}
                         titleFont={state.titleFont}
                         artistFont={state.artistFont}
@@ -896,7 +914,7 @@ function Lab() {
                         </PhoneFrame>
                         <PhoneFrame topLeft="9:41" topRight="Playlist" art="linear-gradient(135deg,#F59E0B,#EF4444)">
                             <div className="lab-phone__player">
-                                <AudioPlayer tracks={playlist} showTracklist
+                                <AudioPlayer tracks={playlist} showTracklist shuffle repeatMode="all"
                                     accentColor="#ffffff" progressColor="#ffffff" backgroundColor="rgba(20,20,28,0.55)" />
                             </div>
                         </PhoneFrame>
@@ -938,7 +956,7 @@ function Lab() {
                             <h3 className="lab-state__title lab-state__title--ok">Playlist with mixed validity</h3>
                             <p className="lab-state__desc">Switch to the broken track to see the playlist keep state but show the error banner for that source only.</p>
                             <div className="lab-state__player">
-                                <AudioPlayer tracks={playlist} showTracklist
+                                <AudioPlayer tracks={playlist} showTracklist repeatMode="one"
                                     accentColor="#22D3A6" progressColor="#22D3A6" backgroundColor="rgba(16,28,22,0.6)" />
                             </div>
                             <div className="lab-state__note">expect: switching tracks resets time · broken track shows error · EQ on active row</div>
