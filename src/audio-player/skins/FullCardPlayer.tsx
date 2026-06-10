@@ -6,6 +6,7 @@ import { VolumeControl } from "../components/VolumeControl"
 import { formatTime } from "../utils/formatTime"
 import { buildThemeVars } from "./themeVars"
 import {
+    AutomixIcon,
     ErrorIcon,
     NextIcon,
     PauseIcon,
@@ -57,6 +58,7 @@ export function FullCardPlayer({
         autoplayBlocked,
         shuffle,
         repeatMode,
+        automix,
         canNext,
         canPrevious,
     } = s
@@ -112,6 +114,7 @@ export function FullCardPlayer({
             {!isEmpty && (
                 <div className="ap-fc__counter">
                     Track {currentIndex + 1} of {queue.length}
+                    {automix ? " · Automix" : ""}
                 </div>
             )}
 
@@ -185,6 +188,15 @@ export function FullCardPlayer({
                     aria-label={`Repeat: ${repeatMode}`}
                 >
                     {repeatMode === "one" ? <RepeatOneIcon /> : <RepeatIcon />}
+                </button>
+                <button
+                    type="button"
+                    className={`ap-icon-btn ap-tap${automix ? " ap-fc__toggle--on" : ""}`}
+                    onClick={s.toggleAutomix}
+                    aria-label="Automix Lite"
+                    aria-pressed={automix}
+                >
+                    <AutomixIcon />
                 </button>
             </div>
 

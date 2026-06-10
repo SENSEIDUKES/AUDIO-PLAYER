@@ -1,5 +1,10 @@
 export { AudioPlayer, default } from "./AudioPlayer"
 export { useAudioPlayer } from "./useAudioPlayer"
+export { useAutomix, AUTOMIX_FADE_MS } from "./automix/useAutomix"
+export {
+    ensureTrackAnalysis,
+    getTrackTrims,
+} from "./automix/silenceAnalysis"
 export { formatTime } from "./utils/formatTime"
 export { trackKey } from "./utils/trackKey"
 export { ProgressBar } from "./components/ProgressBar"
@@ -18,7 +23,12 @@ export { MiniSidebarPlayer } from "./skins/MiniSidebarPlayer"
 export { SeaCardPlayer } from "./skins/SeaCardPlayer"
 
 export type {
+    UseAutomixOptions,
+    AutomixController,
+} from "./automix/useAutomix"
+export type {
     Track,
+    TrackTrims,
     AudioPlayerProps,
     AudioPlayerTheme,
     BackgroundImage,

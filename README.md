@@ -49,6 +49,10 @@ The officially supported browser and mobile behavior is documented in [`docs/bro
 - `repeatMode="one"` — loops the active track without advancing.
 - `loop` — legacy compatibility prop; when `repeatMode` is omitted, `loop={true}` initializes repeat-one behavior.
 
+## Automix Lite
+
+Opt-in two-deck crossfade transitions (~5.5 s equal-power fade) with conservative RMS-based silence trimming so fades skip dead air. Toggle it from the standalone player's ellipsis menu (playlist mode), the `FullCardPlayer` / `StickyBottomPlayer` transport rows, or programmatically via `SessionEngine.toggleAutomix()` / the `automix` props. With the toggle off, playback is unchanged. Details, fallbacks, and known limits: [`docs/automix-lite.md`](./docs/automix-lite.md).
+
 ## License / usage restrictions
 
 This repository is **not open source**. The code is publicly visible for review and evaluation only; public visibility does not grant permission to copy, reuse, redistribute, modify, publish, sell, host, embed, or create derivative works from any part of this project.

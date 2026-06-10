@@ -57,6 +57,12 @@ export const RepeatOneIcon = () => (
         <text x="12" y="15" textAnchor="middle" fontSize="8" fontWeight="700" fill="currentColor" stroke="none" fontFamily="system-ui, sans-serif">1</text>
     </svg>
 )
+export const AutomixIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M3 7c6 0 6 10 12 10h6" />
+        <path d="M3 17c6 0 6-10 12-10h6" />
+    </svg>
+)
 export const ErrorIcon = () => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
         <circle cx="12" cy="12" r="10" />

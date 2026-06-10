@@ -13,6 +13,7 @@ import type {
 } from "react"
 import type { AudioPlayerProps, RepeatMode, Track } from "./types"
 import { useAudioPlayer } from "./useAudioPlayer"
+import { useAutomix } from "./automix/useAutomix"
 import { ProgressBar } from "./components/ProgressBar"
 import { VolumeControl } from "./components/VolumeControl"
 import { formatTime } from "./utils/formatTime"
@@ -103,6 +104,7 @@ function AudioPlayerInner(props: AudioPlayerProps) {
         loop = false,
         shuffle = false,
         repeatMode: repeatModeProp,
+        automix = false,
         backgroundImage,
         blurSize = 20,
         darkenAmount = 0,
@@ -131,6 +133,7 @@ function AudioPlayerInner(props: AudioPlayerProps) {
     const [localRepeatMode, setLocalRepeatMode] = useState<RepeatMode>(
         repeatModeProp ?? (loop ? "one" : "off")
     )
+    const [localAutomix, setLocalAutomix] = useState(automix)
     const rootRef = useRef<HTMLDivElement>(null)
     const menuRef = useRef<HTMLDivElement>(null)
     const menuButtonRef = useRef<HTMLButtonElement>(null)
@@ -155,6 +158,9 @@ function AudioPlayerInner(props: AudioPlayerProps) {
     useEffect(() => {
         setLocalRepeatMode(repeatModeProp ?? (loop ? "one" : "off"))
     }, [loop, repeatModeProp])
+    useEffect(() => {
+        setLocalAutomix(automix)
+    }, [automix])
 
     // Close the ellipsis menu when clicking outside the player. Escape closes
     // the menu and returns focus to the menu button so keyboard users land
@@ -319,7 +325,10 @@ function AudioPlayerInner(props: AudioPlayerProps) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sourceKey, src])
 
-    advanceRef.current = () => {
+    // Raw playlist advance shared by the natural end-of-track path and Automix
+    // handoffs (same split as the global session provider).
+    const advanceToNextRef = useRef<() => void>(() => {})
+    advanceToNextRef.current = () => {
         const next = stepTrackIndex(trackIndex, 1)
         if (next === null) return
         if (next === trackIndex) {
@@ -329,6 +338,30 @@ function AudioPlayerInner(props: AudioPlayerProps) {
         }
         pendingPlayRef.current = true
         setTrackIndex(next)
+    }
+    const requestAdvance = useCallback(() => advanceToNextRef.current(), [])
+
+    const automixNextIndex =
+        localAutomix && isPlaylistMode && localRepeatMode !== "one"
+            ? stepTrackIndex(trackIndex, 1)
+            : null
+    const automixNextTrack =
+        automixNextIndex !== null && automixNextIndex !== trackIndex
+            ? tracks[automixNextIndex] ?? null
+            : null
+
+    const automixCtl = useAutomix({
+        engine,
+        enabled: localAutomix && isPlaylistMode,
+        sourceKey,
+        currentTrack,
+        nextTrack: automixNextTrack,
+        requestAdvance,
+    })
+
+    advanceRef.current = () => {
+        if (automixCtl.handleTrackEnded()) return
+        advanceToNextRef.current()
     }
 
     const toggleLyrics = useCallback(() => setShowLyrics((v) => !v), [])
@@ -411,6 +444,10 @@ function AudioPlayerInner(props: AudioPlayerProps) {
         () => setLocalRepeatMode((mode) =>
             mode === "off" ? "all" : mode === "all" ? "one" : "off"
         ),
+        []
+    )
+    const handleAutomixToggle = useCallback(
+        () => setLocalAutomix((v) => !v),
         []
     )
 
@@ -703,13 +740,36 @@ function AudioPlayerInner(props: AudioPlayerProps) {
                                     </span>
                                     <span className="ap-menu__value">{localRepeatMode}</span>
                                 </button>
+                                {isPlaylistMode && (
+                                    <button
+                                        type="button"
+                                        role="menuitemcheckbox"
+                                        aria-checked={localAutomix}
+                                        className="ap-menu__item ap-tap"
+                                        onClick={handleAutomixToggle}
+                                        ref={(el) => {
+                                            menuItemRefs.current[3] = el
+                                        }}
+                                    >
+                                        <span className="ap-menu__label">
+                                            <AutomixIcon />
+                                            Automix Lite
+                                        </span>
+                                        <span
+                                            className={`ap-menu__switch${localAutomix ? " ap-menu__switch--on" : ""}`}
+                                            aria-hidden="true"
+                                        >
+                                            <span className="ap-menu__knob" />
+                                        </span>
+                                    </button>
+                                )}
                                 <button
                                     type="button"
                                     role="menuitem"
                                     className="ap-menu__item ap-tap"
                                     onClick={handleShareClick}
                                     ref={(el) => {
-                                        menuItemRefs.current[3] = el
+                                        menuItemRefs.current[4] = el
                                     }}
                                 >
                                     <span className="ap-menu__label">
@@ -730,6 +790,7 @@ function AudioPlayerInner(props: AudioPlayerProps) {
                         Track {trackIndex + 1} of {tracks.length}
                         {localShuffle ? " · Shuffle" : ""}
                         {localRepeatMode !== "off" ? ` · Repeat ${localRepeatMode}` : ""}
+                        {localAutomix ? " · Automix" : ""}
                     </div>
                 )}
 
@@ -1031,6 +1092,12 @@ const DotsIcon = () => (
 const AutoPlayIcon = () => (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <polygon points="6 4 20 12 6 20 6 4" fill="currentColor" stroke="none" />
+    </svg>
+)
+const AutomixIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M3 7c6 0 6 10 12 10h6" />
+        <path d="M3 17c6 0 6-10 12-10h6" />
     </svg>
 )
 const ShuffleIcon = () => (

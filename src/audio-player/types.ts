@@ -58,6 +58,8 @@ export interface AudioPlayerProps extends AudioPlayerTheme {
     shuffle?: boolean
     /** Initial repeat behavior. Defaults to `"one"` when `loop` is true. */
     repeatMode?: RepeatMode
+    /** Initial Automix Lite (crossfade transitions) state. Playlist mode only. */
+    automix?: boolean
 
     /** Presentation. */
     backgroundImage?: BackgroundImage
@@ -94,6 +96,15 @@ export interface UseAudioPlayerOptions {
     loop?: boolean
     /** Fired when the current track reaches its end. */
     onEnded?: () => void
+}
+
+/**
+ * Conservative silence trims computed for a track by the Automix Lite
+ * analysis. Milliseconds measured from the natural start/end of the file.
+ */
+export interface TrackTrims {
+    trimStartMs: number
+    trimEndMs: number
 }
 
 /** A single buffered range reported by the <audio> element. */
@@ -173,6 +184,8 @@ export interface SessionEngine extends AudioPlayerEngine {
     shuffle: boolean
     /** Repeat behavior at the end of a track. */
     repeatMode: RepeatMode
+    /** Whether Automix Lite (two-deck crossfade transitions) is enabled. */
+    automix: boolean
     /** True when there is a track to advance to. */
     canNext: boolean
     /** True when there is a track to go back to. */
@@ -196,6 +209,8 @@ export interface SessionEngine extends AudioPlayerEngine {
     toggleShuffle: () => void
     /** Cycle repeat mode: off → all → one → off. */
     cycleRepeat: () => void
+    /** Toggle Automix Lite crossfade transitions. */
+    toggleAutomix: () => void
 }
 
 /** Props for `AudioSessionProvider`. */
@@ -211,4 +226,6 @@ export interface AudioSessionProviderProps {
     repeatMode?: RepeatMode
     /** Initial shuffle state. Defaults to false. */
     shuffle?: boolean
+    /** Initial Automix Lite state. Defaults to false. */
+    automix?: boolean
 }

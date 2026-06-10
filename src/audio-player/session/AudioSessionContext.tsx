@@ -14,6 +14,7 @@ import type {
     Track,
 } from "../types"
 import { useAudioPlayer } from "../useAudioPlayer"
+import { useAutomix } from "../automix/useAutomix"
 import { trackKey } from "../utils/trackKey"
 
 const AudioSessionContext = createContext<SessionEngine | null>(null)
@@ -50,6 +51,7 @@ export function AudioSessionProvider({
     autoPlay = false,
     repeatMode: initialRepeat = "off",
     shuffle: initialShuffle = false,
+    automix: initialAutomix = false,
 }: AudioSessionProviderProps) {
     const [queue, setQueueState] = useState<Track[]>(initialQueue)
     const [currentIndex, setCurrentIndex] = useState<number>(
@@ -59,6 +61,7 @@ export function AudioSessionProvider({
     )
     const [shuffle, setShuffle] = useState(initialShuffle)
     const [repeatMode, setRepeatMode] = useState<RepeatMode>(initialRepeat)
+    const [automix, setAutomix] = useState(initialAutomix)
 
     // Playback order (queue indices). Computed during render so canNext /
     // canPrevious never read a stale value. Deliberately keyed on [queue,
@@ -140,11 +143,11 @@ export function AudioSessionProvider({
         [queue.length, currentIndex, engine]
     )
 
-    // End-of-track auto-advance: always continue into the next track. We force
-    // the deferred play here because the engine has already flipped its internal
-    // "was playing" flag to false by the time onEnded fires, so its own continue
-    // path won't run.
-    advanceRef.current = () => {
+    // Raw queue advance shared by the natural end-of-track path and Automix
+    // handoffs. Kept in a ref so the automix hook always calls the latest
+    // closure without routing back through the onEnded guard below.
+    const advanceToNextRef = useRef<() => void>(() => {})
+    advanceToNextRef.current = () => {
         const next = stepIndex(currentIndex, 1)
         if (next === null) return
         if (next === currentIndex) {
@@ -155,6 +158,36 @@ export function AudioSessionProvider({
         }
         pendingPlayRef.current = true
         setCurrentIndex(next)
+    }
+    const requestAdvance = useCallback(() => advanceToNextRef.current(), [])
+
+    // Resolve the automixable next track through the same order/repeat logic a
+    // natural advance would use. Null disables transitions (repeat-one, end of
+    // queue with repeat off, or a single-track wrap).
+    const automixNextIndex =
+        automix && repeatMode !== "one" ? stepIndex(currentIndex, 1) : null
+    const automixNextTrack =
+        automixNextIndex !== null && automixNextIndex !== currentIndex
+            ? queue[automixNextIndex] ?? null
+            : null
+
+    const automixCtl = useAutomix({
+        engine,
+        enabled: automix,
+        sourceKey,
+        currentTrack,
+        nextTrack: automixNextTrack,
+        requestAdvance,
+    })
+
+    // End-of-track auto-advance: always continue into the next track. We force
+    // the deferred play here because the engine has already flipped its internal
+    // "was playing" flag to false by the time onEnded fires, so its own continue
+    // path won't run. Automix gets first claim: when a crossfade already moved
+    // (or is moving) the queue, the normal advance must not run again.
+    advanceRef.current = () => {
+        if (automixCtl.handleTrackEnded()) return
+        advanceToNextRef.current()
     }
 
     // Start playback for any pending request after a track/source change. Keyed
@@ -268,6 +301,8 @@ export function AudioSessionProvider({
         setRepeatMode((r) => (r === "off" ? "all" : r === "all" ? "one" : "off"))
     }, [])
 
+    const toggleAutomix = useCallback(() => setAutomix((v) => !v), [])
+
     const canNext = stepIndex(currentIndex, 1) !== null
     const canPrevious = queue.length > 1 || engine.currentTime > 3
 
@@ -279,6 +314,7 @@ export function AudioSessionProvider({
             currentTrack,
             shuffle,
             repeatMode,
+            automix,
             canNext,
             canPrevious,
             setQueue,
@@ -290,6 +326,7 @@ export function AudioSessionProvider({
             clearQueue,
             toggleShuffle,
             cycleRepeat,
+            toggleAutomix,
         }),
         [
             engine,
@@ -298,6 +335,7 @@ export function AudioSessionProvider({
             currentTrack,
             shuffle,
             repeatMode,
+            automix,
             canNext,
             canPrevious,
             setQueue,
@@ -309,6 +347,7 @@ export function AudioSessionProvider({
             clearQueue,
             toggleShuffle,
             cycleRepeat,
+            toggleAutomix,
         ]
     )
 

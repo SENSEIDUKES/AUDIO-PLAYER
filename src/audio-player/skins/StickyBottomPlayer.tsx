@@ -6,6 +6,7 @@ import { VolumeControl } from "../components/VolumeControl"
 import { formatTime } from "../utils/formatTime"
 import { buildThemeVars } from "./themeVars"
 import {
+    AutomixIcon,
     NextIcon,
     PauseIcon,
     PlayIcon,
@@ -42,7 +43,7 @@ export function StickyBottomPlayer({
 
     if (s.queue.length === 0 || !s.currentTrack) return null
 
-    const { currentTrack, isPlaying, isBuffering, shuffle, repeatMode } = s
+    const { currentTrack, isPlaying, isBuffering, shuffle, repeatMode, automix } = s
 
     return (
         <div
@@ -105,6 +106,15 @@ export function StickyBottomPlayer({
                         aria-label={`Repeat: ${repeatMode}`}
                     >
                         {repeatMode === "one" ? <RepeatOneIcon /> : <RepeatIcon />}
+                    </button>
+                    <button
+                        type="button"
+                        className={`ap-icon-btn ap-tap${automix ? " ap-fc__toggle--on" : ""}`}
+                        onClick={s.toggleAutomix}
+                        aria-label="Automix Lite"
+                        aria-pressed={automix}
+                    >
+                        <AutomixIcon />
                     </button>
                 </div>
                 <div className="ap-sb__scrub">
