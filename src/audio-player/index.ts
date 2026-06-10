@@ -32,6 +32,25 @@ export { checkCodecSupport } from "./utils/checkCodecSupport"
 export { ProgressBar } from "./components/ProgressBar"
 export { VolumeControl } from "./components/VolumeControl"
 
+// Headless adapter layer: Downshift-style prop getters and utilities over an
+// existing engine/session — no styling, no second engine.
+export {
+    composeEventHandlers,
+    isSAPDefaultPrevented,
+    mergeRefs,
+    useSAPPropGetters,
+    isSessionEngine,
+    useMediaSessionObserver,
+} from "./headless"
+export type {
+    SAPButtonProps,
+    SAPProgressBarProps,
+    SAPAudioElementProps,
+    SAPPropGetters,
+    UseSAPPropGettersOptions,
+    UseMediaSessionObserverOptions,
+} from "./headless"
+
 // Global session (one <audio> element + shared queue) and the UI skins that
 // read from it.
 export {

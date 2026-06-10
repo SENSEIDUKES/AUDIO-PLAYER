@@ -12,7 +12,10 @@ import {
     createAnalyticsPlugin,
     createKeyboardShortcutPlugin,
     createLyricsPlugin,
+    formatTime,
     useAudioPlayer,
+    useAudioSession,
+    useSAPPropGetters,
 } from "../audio-player"
 import type { AudioBackendKind, AudioPlayerProps, Track } from "../audio-player"
 import "./audio-player-lab.css"
@@ -711,6 +714,50 @@ const SEA_ARTS = [
     "linear-gradient(135deg,#A855F7,#EC4899)",
 ]
 
+/* Raw, intentionally unstyled controls built from the headless prop getters.
+   Reads the SAME session as every skin above it (useAudioSession), so it
+   proves the adapter drives the one shared <audio> element instead of
+   creating a second engine. */
+function HeadlessAdapterProbe() {
+    const session = useAudioSession()
+    const {
+        getPlayButtonProps,
+        getMuteButtonProps,
+        getPreviousButtonProps,
+        getNextButtonProps,
+        getSeekBackwardButtonProps,
+        getSeekForwardButtonProps,
+        getProgressBarProps,
+    } = useSAPPropGetters(session)
+
+    return (
+        <div>
+            <p>
+                Headless adapter probe — raw <code>useSAPPropGetters</code>{" "}
+                buttons over the same session (open the console to see the
+                custom <code>onClick</code> fire before SAP toggles):
+            </p>
+            <button
+                {...getPlayButtonProps({
+                    onClick: () => console.log("Custom trigger"),
+                })}
+            >
+                Toggle
+            </button>{" "}
+            <button {...getMuteButtonProps()}>Mute</button>{" "}
+            <button {...getPreviousButtonProps()}>Prev</button>{" "}
+            <button {...getNextButtonProps()}>Next</button>{" "}
+            <button {...getSeekBackwardButtonProps()}>-10s</button>{" "}
+            <button {...getSeekForwardButtonProps()}>+10s</button>
+            <div {...getProgressBarProps()}>
+                {formatTime(session.currentTime)} /{" "}
+                {formatTime(session.duration)} —{" "}
+                {session.currentTrack?.title ?? "(no track)"}
+            </div>
+        </div>
+    )
+}
+
 /* Every skin below shares ONE AudioSessionProvider — and therefore one <audio>
    element and one queue. Pressing play / seeking / switching tracks in any skin
    updates all the others live. */
@@ -767,6 +814,7 @@ function GlobalSessionSection() {
                     <div className="lab-session__sticky">
                         <StickyBottomPlayer fixed={false} {...SEA_THEME} />
                     </div>
+                    <HeadlessAdapterProbe />
                 </AudioSessionProvider>
             </div>
         </section>
