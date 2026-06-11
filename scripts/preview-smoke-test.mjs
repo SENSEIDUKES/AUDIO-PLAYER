@@ -12,7 +12,10 @@ async function stop(child) {
     if (process.platform === "win32") {
         // The preview runs under a shell wrapper (see spawn below), so kill
         // the whole process tree or vite keeps the port bound for later runs.
-        spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"])
+        spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"]).on(
+            "error",
+            () => {}
+        )
         await Promise.race([
             new Promise((resolve) => child.once("close", resolve)),
             delay(2_000),

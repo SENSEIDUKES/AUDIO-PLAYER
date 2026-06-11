@@ -379,6 +379,13 @@ export function useAudioPlayer(
     }, [])
 
     // Wire up all backend events. Single rAF loop owns currentTime while playing.
+    //
+    // Mount contract: hosts render the <audio> element in the same commit as
+    // this hook call (AudioPlayer/AudioSessionProvider both do), so for the
+    // html5 backend the ref is populated before effects run; the webaudio
+    // backend is always attached. A host that mounts the element in a LATER
+    // commit would never get listeners attached — same as the pre-backend
+    // behavior, and intentionally not supported.
     useEffect(() => {
         const backend = backendRef.current!
         if (!backend.isAttached()) return
@@ -668,6 +675,10 @@ export function useAudioPlayer(
     }, [])
 
     const getBackendInfo = useCallback(() => backendRef.current!.getInfo(), [])
+    const getDecodedData = useCallback(
+        () => backendRef.current!.getDecodedData(),
+        []
+    )
 
     return {
         audioRef,
@@ -700,5 +711,6 @@ export function useAudioPlayer(
         unload,
         fade,
         getBackendInfo,
+        getDecodedData,
     }
 }

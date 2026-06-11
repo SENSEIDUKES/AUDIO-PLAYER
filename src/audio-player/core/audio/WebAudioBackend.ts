@@ -44,6 +44,39 @@ function getAudioContextCtor(): typeof AudioContext | undefined {
 }
 
 /**
+ * One AudioContext shared by every WebAudioBackend instance on the page.
+ * Browsers cap (and charge resources for) concurrent contexts, so each
+ * backend gets its own GainNode into the shared context instead. Reference
+ * counted: closed when the last backend releases it, recreated on demand.
+ */
+let sharedContext: AudioContext | null = null
+let sharedContextUsers = 0
+
+function retainSharedContext(): AudioContext {
+    if (!sharedContext || sharedContext.state === "closed") {
+        const Ctor = getAudioContextCtor()
+        if (!Ctor) {
+            throw namedError("NotSupportedError", "Web Audio API unavailable.")
+        }
+        sharedContext = new Ctor()
+        sharedContextUsers = 0
+    }
+    sharedContextUsers += 1
+    return sharedContext
+}
+
+function releaseSharedContext(ctx: AudioContext): void {
+    if (ctx !== sharedContext) return
+    sharedContextUsers = Math.max(0, sharedContextUsers - 1)
+    if (sharedContextUsers === 0) {
+        if (sharedContext.state !== "closed") {
+            void sharedContext.close().catch(() => {})
+        }
+        sharedContext = null
+    }
+}
+
+/**
  * Web Audio playback backend: fetch + decodeAudioData into an AudioBuffer,
  * played through AudioBufferSourceNode → GainNode → destination.
  *
@@ -83,6 +116,8 @@ export class WebAudioBackend implements AudioBackend {
     private fetchAbort: AbortController | null = null
     private decodeCache = new Map<string, AudioBuffer>()
     private preloadAborts = new Map<string, AbortController>()
+    /** In-flight preload decodes, so load() can adopt them instead of re-fetching. */
+    private preloadPromises = new Map<string, Promise<AudioBuffer | null>>()
     private listeners = new Map<AudioBackendEvent, Set<() => void>>()
 
     constructor(info: AudioBackendInfo) {
@@ -97,11 +132,7 @@ export class WebAudioBackend implements AudioBackend {
 
     private ensureContext(): AudioContext {
         if (this.ctx && this.ctx.state !== "closed") return this.ctx
-        const Ctor = getAudioContextCtor()
-        if (!Ctor) {
-            throw namedError("NotSupportedError", "Web Audio API unavailable.")
-        }
-        this.ctx = new Ctor()
+        this.ctx = retainSharedContext()
         this.gain = this.ctx.createGain()
         this.gain.gain.value = this.muted ? 0 : this.volume
         this.gain.connect(this.ctx.destination)
@@ -197,6 +228,11 @@ export class WebAudioBackend implements AudioBackend {
             return
         }
 
+        this.completeLoad(url, buffer)
+    }
+
+    /** Adopt a decoded buffer as the active source and announce readiness. */
+    private completeLoad(url: string, buffer: AudioBuffer): void {
         this.buffer = buffer
         this.cachePut(url, buffer)
         this.state = "ready"
@@ -204,6 +240,25 @@ export class WebAudioBackend implements AudioBackend {
         this.emit("progress")
         this.emit("canplay")
         this.emit("canplaythrough")
+    }
+
+    /**
+     * Wait for an in-flight preload of the same URL instead of starting a
+     * second fetch+decode. Falls back to a real load when the preload failed
+     * or was aborted, so errors surface through the normal path.
+     */
+    private async adoptPreload(
+        url: string,
+        pending: Promise<AudioBuffer | null>,
+        gen: number
+    ): Promise<void> {
+        const buffer = await pending
+        if (gen !== this.generation) return
+        if (buffer) {
+            this.completeLoad(url, buffer)
+            return
+        }
+        await this.fetchAndDecode(url, gen)
     }
 
     /** Start (or restart) playback of the decoded buffer at `offset` seconds. */
@@ -294,7 +349,9 @@ export class WebAudioBackend implements AudioBackend {
     }
 
     setSource(src: string | null): void {
-        const next = src && src.trim().length > 0 ? src : null
+        // Store the trimmed form so load()'s decode-cache and preload lookups
+        // use the same key preload() trims to.
+        const next = src && src.trim().length > 0 ? src.trim() : null
         this.generation += 1
         this.abortFetch()
         this.stopSourceNode()
@@ -323,17 +380,15 @@ export class WebAudioBackend implements AudioBackend {
         }
         const cached = this.cacheTouch(url)
         if (cached) {
-            this.buffer = cached
-            this.state = "ready"
+            this.completeLoad(url, cached)
             this.loadPromise = Promise.resolve()
-            this.emit("loadedmetadata")
-            this.emit("progress")
-            this.emit("canplay")
-            this.emit("canplaythrough")
             return
         }
         this.state = "loading"
-        this.loadPromise = this.fetchAndDecode(url, gen)
+        const pending = this.preloadPromises.get(url)
+        this.loadPromise = pending
+            ? this.adoptPreload(url, pending, gen)
+            : this.fetchAndDecode(url, gen)
     }
 
     clearSource(): void {
@@ -445,6 +500,10 @@ export class WebAudioBackend implements AudioBackend {
         return this.lastError
     }
 
+    getDecodedData(): AudioBuffer | null {
+        return this.buffer
+    }
+
     addEventListener(event: AudioBackendEvent, handler: () => void): void {
         let handlers = this.listeners.get(event)
         if (!handlers) {
@@ -461,34 +520,38 @@ export class WebAudioBackend implements AudioBackend {
     preload(url: string): void {
         const trimmed = url.trim()
         if (!trimmed) return
-        if (this.decodeCache.has(trimmed) || this.preloadAborts.has(trimmed)) {
+        if (this.decodeCache.has(trimmed) || this.preloadPromises.has(trimmed)) {
             return
         }
         const abort = new AbortController()
         this.preloadAborts.set(trimmed, abort)
-        const run = async () => {
+        const run = async (): Promise<AudioBuffer | null> => {
             try {
                 const response = await fetch(trimmed, { signal: abort.signal })
-                if (!response.ok) return
+                if (!response.ok) return null
                 const data = await response.arrayBuffer()
-                if (abort.signal.aborted) return
+                if (abort.signal.aborted) return null
                 const buffer = await this.ensureContext().decodeAudioData(data)
-                if (abort.signal.aborted) return
+                if (abort.signal.aborted) return null
                 this.cachePut(trimmed, buffer)
+                return buffer
             } catch {
                 // Preload is best-effort; failures surface on the real load.
+                return null
             } finally {
                 if (this.preloadAborts.get(trimmed) === abort) {
                     this.preloadAborts.delete(trimmed)
                 }
+                this.preloadPromises.delete(trimmed)
             }
         }
-        void run()
+        this.preloadPromises.set(trimmed, run())
     }
 
     releasePreload(): void {
         for (const abort of this.preloadAborts.values()) abort.abort()
         this.preloadAborts.clear()
+        this.preloadPromises.clear()
         this.decodeCache.clear()
     }
 
@@ -518,8 +581,8 @@ export class WebAudioBackend implements AudioBackend {
             }
             this.gain = null
         }
-        if (this.ctx && this.ctx.state !== "closed") {
-            void this.ctx.close().catch(() => {})
+        if (this.ctx) {
+            releaseSharedContext(this.ctx)
         }
         this.ctx = null
         // Revivable by design: the next load()/play() lazily recreates the

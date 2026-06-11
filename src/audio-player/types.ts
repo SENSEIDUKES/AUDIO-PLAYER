@@ -15,6 +15,13 @@ export interface Track {
     audioFile: string
     purchaseUrl?: string
     lyrics?: string
+    /**
+     * Precomputed waveform peaks (per-channel arrays of 0–1 amplitudes).
+     * When present, the waveform renders instantly with no decode/download.
+     */
+    peaks?: number[][]
+    /** Duration in seconds matching `peaks`. Required for peaks-only rendering. */
+    waveformDuration?: number
 }
 
 /** Theme colors. Applied to the player root as CSS custom properties. */
@@ -81,6 +88,14 @@ export interface AudioPlayerProps extends AudioPlayerTheme {
     darkenAmount?: number
     showTracklist?: boolean
     showVolume?: boolean
+    /**
+     * Render a wavesurfer.js waveform as the scrubber instead of the plain
+     * progress bar. Lazy-loads wavesurfer; falls back to the progress bar
+     * while peaks are loading or unavailable. Default false.
+     */
+    showWaveform?: boolean
+    /** Waveform canvas height in px. Default 48. */
+    waveformHeight?: number
 
     /** Typography (inline style objects). */
     titleFont?: CSSProperties
@@ -209,6 +224,11 @@ export interface AudioPlayerEngine {
     fade: (to: number, durationMs: number) => void
     /** Which playback backend is running, whether it fell back, and what it can do. */
     getBackendInfo: () => AudioBackendInfo
+    /**
+     * Decoded PCM for the active source when the backend has it (webaudio
+     * after load; null on html5). Used for waveform rendering.
+     */
+    getDecodedData: () => AudioBuffer | null
 }
 
 /** How the global session behaves when a track ends. */

@@ -1173,6 +1173,76 @@ function PluginRegistrySection() {
     )
 }
 
+/* ----------------------------- Waveform demo ----------------------------- */
+function WaveformSection() {
+    const [backend, setBackend] = useState<AudioBackendKind>("html5")
+
+    return (
+        <section className="lab-section">
+            <h2 className="lab-section__title">
+                13. Waveform
+                <small>wavesurfer.js scrubber</small>
+            </h2>
+            <p className="lab-section__desc">
+                <code>showWaveform</code> swaps the progress bar for a
+                wavesurfer.js waveform that doubles as the scrubber. The engine
+                stays the only playback owner — wavesurfer just renders peaks
+                and forwards clicks/drags. Under <code>webaudio</code> the
+                peaks come from the already-decoded buffer (after the first
+                play); under <code>html5</code> the file is fetched and decoded
+                separately for analysis (requires CORS). While peaks load — or
+                for the broken track — the plain progress bar renders in the
+                same slot.
+            </p>
+            <div className="lab-section__grid">
+                <div className="lab-states">
+                    <div className="lab-state">
+                        <h3 className="lab-state__title">
+                            Backend: {backend}
+                        </h3>
+                        <div className="framer-panel__preset-row">
+                            {(["html5", "webaudio"] as const).map((kind) => (
+                                <button
+                                    key={kind}
+                                    type="button"
+                                    className={`framer-panel__preset${backend === kind ? " framer-panel__preset--warn" : ""}`}
+                                    onClick={() => setBackend(kind)}
+                                    aria-pressed={backend === kind}
+                                >
+                                    {kind}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="lab-state__player">
+                            <AudioPlayer
+                                key={backend}
+                                audioBackend={backend}
+                                showWaveform
+                                tracks={playlist}
+                                showTracklist
+                                repeatMode="all"
+                                accentColor="#F59E0B"
+                                progressColor="#F59E0B"
+                                trackColor="rgba(245,158,11,0.3)"
+                                backgroundColor="rgba(40,30,14,0.6)"
+                            />
+                        </div>
+                        <div className="lab-state__note">
+                            expect: waveform appears once peaks are ready ·
+                            click + drag scrub seek the engine (audio seeks on
+                            release) · keyboard ←/→ on the waveform works ·
+                            broken track stays a plain bar · webaudio decodes
+                            on first load, so its waveform can appear after the
+                            first play (immediately in dev, where StrictMode
+                            pre-loads)
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    )
+}
+
 /* ----------------------------- Lab page ----------------------------- */
 function Lab() {
     return (
@@ -1440,6 +1510,8 @@ function Lab() {
             <PluginRegistryProvider>
                 <PluginRegistrySection />
             </PluginRegistryProvider>
+
+            <WaveformSection />
         </div>
     )
 }

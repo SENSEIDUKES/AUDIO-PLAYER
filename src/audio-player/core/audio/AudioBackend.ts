@@ -120,6 +120,13 @@ export interface AudioBackend {
     getBufferedRanges(): BufferedRange[]
     getError(): AudioBackendErrorCode | null
 
+    /**
+     * Decoded PCM for the active source when the backend has it (webaudio
+     * after load). html5 streams through the element and returns null —
+     * consumers needing waveform data must decode separately.
+     */
+    getDecodedData(): AudioBuffer | null
+
     addEventListener(event: AudioBackendEvent, handler: () => void): void
     removeEventListener(event: AudioBackendEvent, handler: () => void): void
 

@@ -160,6 +160,11 @@ export class HTML5AudioBackend implements AudioBackend {
         }
     }
 
+    getDecodedData(): AudioBuffer | null {
+        // The element streams; no decoded PCM is available on this backend.
+        return null
+    }
+
     addEventListener(event: AudioBackendEvent, handler: () => void): void {
         this.audio?.addEventListener(event, handler)
     }
