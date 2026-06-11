@@ -9,6 +9,7 @@ export { WebAudioBackend } from "./core/audio/WebAudioBackend"
 export {
     AutomixPlugin,
     createAutomixPlugin,
+    createAutomixProPlugin,
 } from "./plugins/AutomixPlugin"
 export {
     KeyboardShortcutPlugin,
@@ -26,6 +27,21 @@ export {
     ensureTrackAnalysis,
     getTrackTrims,
 } from "./automix/silenceAnalysis"
+// Automix Pro metadata layer. Pure helpers are exported for host apps that
+// want to score queues or display analysis; none of them pull in the essentia
+// worker chunk — that loads only when a Pro analysis actually runs.
+export {
+    ensureProTrackAnalysis,
+    getTrackAnalysis,
+} from "./automix/trackAnalysis"
+export {
+    PRO_CONFIDENCE_MIN,
+    bpmCompatibility,
+    computeTransitionPoints,
+    normalizeRhythmConfidence,
+    planTransition,
+    snapToBeat,
+} from "./automix/transitionPlanner"
 export { formatTime } from "./utils/formatTime"
 export { trackKey } from "./utils/trackKey"
 export { checkCodecSupport } from "./utils/checkCodecSupport"
@@ -93,9 +109,11 @@ export type {
     LyricsPluginConfig,
     TimedLyricLine,
 } from "./plugins/LyricsPlugin"
+export type { TransitionPlan } from "./automix/transitionPlanner"
 export type {
     Track,
     TrackTrims,
+    TrackAnalysis,
     AudioPlayerProps,
     AudioPlayerTheme,
     BackgroundImage,

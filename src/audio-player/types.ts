@@ -121,6 +121,31 @@ export interface TrackTrims {
     trimEndMs: number
 }
 
+/**
+ * Per-track metadata computed by the Automix Pro analysis. All fields are
+ * optional: a partial result (e.g. trims without rhythm) is still usable, and
+ * `confidence` tells consumers how much to trust the rhythm fields.
+ */
+export interface TrackAnalysis {
+    /** Estimated tempo in beats per minute. */
+    bpm?: number
+    /** Beat positions in milliseconds of track time (head + tail segments only). */
+    beats?: number[]
+    /** Reserved for bar-start positions. Unfilled in v1. */
+    downbeats?: number[]
+    /** Mean loudness of the trimmed region mapped to 0..1. */
+    energy?: number
+    /** Silence trims, same semantics as `TrackTrims`. */
+    trimStartMs?: number
+    trimEndMs?: number
+    /** Beat-snapped position where an incoming deck should start playing. */
+    transitionInMs?: number
+    /** Beat-snapped position where an outgoing crossfade should start. */
+    transitionOutMs?: number
+    /** Rhythm reliability, 0..1. 0 means trims-only / rhythm unavailable. */
+    confidence?: number
+}
+
 /** A single buffered range reported by the <audio> element. */
 export interface BufferedRange {
     /** Inclusive start time in seconds. */

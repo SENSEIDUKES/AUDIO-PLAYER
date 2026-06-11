@@ -1,5 +1,6 @@
 import type { Track, TrackTrims } from "../types"
 import { trackKey } from "../utils/trackKey"
+import { fetchAndDecodeTrack } from "./decodeTrack"
 
 /**
  * Conservative silence trimming for Automix Lite.
@@ -22,13 +23,8 @@ const RMS_THRESHOLD = 0.01
 const MAX_TRIM_START_MS = 12_000
 /** Never trim more than this from the tail of a track. */
 const MAX_TRIM_END_MS = 20_000
-/** Skip analysis for files larger than this (decode memory + bandwidth). */
-const MAX_FILE_BYTES = 30 * 1024 * 1024
-/** Skip analysis for tracks longer than this. */
-const MAX_DURATION_S = 15 * 60
 /** If trims would leave less audio than this, distrust them entirely. */
 const MIN_REMAINING_S = 10
-const FETCH_TIMEOUT_MS = 10_000
 
 const NO_TRIMS: TrackTrims = { trimStartMs: 0, trimEndMs: 0 }
 
@@ -39,37 +35,11 @@ const settled = new Map<string, TrackTrims | null>()
 /** Serializes analyses so at most one decode is in memory at a time. */
 let lastJob: Promise<unknown> = Promise.resolve()
 
-function getDecodeContext(): OfflineAudioContext | null {
-    if (typeof window === "undefined") return null
-    try {
-        const Ctor =
-            window.OfflineAudioContext ??
-            (window as unknown as { webkitOfflineAudioContext?: typeof OfflineAudioContext })
-                .webkitOfflineAudioContext
-        if (!Ctor) return null
-        // The context is only used for decodeAudioData; the 1-frame render
-        // graph is never started.
-        return new Ctor(1, 1, 44100)
-    } catch {
-        return null
-    }
-}
-
-/** decodeAudioData with support for callback-only (older WebKit) signatures. */
-function decode(ctx: OfflineAudioContext, data: ArrayBuffer): Promise<AudioBuffer> {
-    return new Promise<AudioBuffer>((resolve, reject) => {
-        try {
-            const maybePromise = ctx.decodeAudioData(data, resolve, reject)
-            if (maybePromise && typeof maybePromise.then === "function") {
-                maybePromise.then(resolve, reject)
-            }
-        } catch (error) {
-            reject(error)
-        }
-    })
-}
-
-function scanEdges(buffer: AudioBuffer): TrackTrims {
+/**
+ * RMS-scan the first/last seconds of a decoded buffer for near-silence.
+ * Pure: also used by the Automix Pro analysis on its shared decode.
+ */
+export function scanSilenceEdges(buffer: AudioBuffer): TrackTrims {
     const win = Math.max(1, Math.round((WINDOW_MS / 1000) * buffer.sampleRate))
     const length = buffer.length
     const channels: Float32Array[] = []
@@ -127,27 +97,9 @@ function scanEdges(buffer: AudioBuffer): TrackTrims {
 }
 
 async function analyze(url: string): Promise<TrackTrims | null> {
-    if (typeof window === "undefined" || typeof fetch !== "function") return null
-    const ctx = getDecodeContext()
-    if (!ctx) return null
-
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
-    try {
-        const response = await fetch(url, { signal: controller.signal })
-        if (!response.ok) return null
-        const declared = Number(response.headers.get("content-length") ?? 0)
-        if (declared > MAX_FILE_BYTES) return null
-        const data = await response.arrayBuffer()
-        if (data.byteLength === 0 || data.byteLength > MAX_FILE_BYTES) return null
-        const buffer = await decode(ctx, data)
-        if (buffer.duration > MAX_DURATION_S) return null
-        return scanEdges(buffer)
-    } catch {
-        return null
-    } finally {
-        clearTimeout(timer)
-    }
+    const buffer = await fetchAndDecodeTrack(url)
+    if (!buffer) return null
+    return scanSilenceEdges(buffer)
 }
 
 /**
@@ -187,4 +139,16 @@ export function ensureTrackAnalysis(track: Track): Promise<TrackTrims | null> {
 export function getTrackTrims(track: Track | null): TrackTrims | null {
     if (!track) return null
     return settled.get(trackKey(track)) ?? null
+}
+
+/**
+ * Seed the trims cache from another analysis pipeline. The Automix Pro
+ * orchestrator shares this module's decode and silence scan; seeding lets
+ * `getTrackTrims()` serve trims as soon as the scan finishes, long before the
+ * slower rhythm extraction settles, without a second download. Existing
+ * entries are never overwritten.
+ */
+export function seedTrackTrims(key: string, trims: TrackTrims | null): void {
+    if (!key || settled.has(key)) return
+    settled.set(key, trims)
 }

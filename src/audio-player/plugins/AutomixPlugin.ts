@@ -2,8 +2,14 @@ import type {
     AudioPlayerPlugin,
     PluginPlayerContext,
 } from "../core/plugins/PluginInterface"
-import type { Track } from "../types"
+import type { Track, TrackTrims } from "../types"
 import { ensureTrackAnalysis, getTrackTrims } from "../automix/silenceAnalysis"
+import { ensureProTrackAnalysis, getTrackAnalysis } from "../automix/trackAnalysis"
+import {
+    PRO_CONFIDENCE_MIN,
+    planTransition,
+    type TransitionPlan,
+} from "../automix/transitionPlanner"
 import { trackKey } from "../utils/trackKey"
 
 /** Crossfade duration. Conservative fixed value for V1. */
@@ -32,6 +38,14 @@ export interface AutomixPluginConfig {
     name?: string
     /** Master switch. When false the plugin does nothing at all. */
     enabled?: boolean
+    /**
+     * Automix Pro: beat/BPM/energy analysis drives fade timing and duration.
+     * Falls back to Lite behavior per track pair whenever the analysis is
+     * unavailable or below the confidence threshold. Default false.
+     */
+    pro?: boolean
+    /** Minimum normalized rhythm confidence (0..1) for Pro transitions. */
+    proConfidenceMin?: number
     /** Optional bridge for React UIs that want to expose transition state. */
     onTransitionChange?: (isTransitioning: boolean) => void
 }
@@ -62,10 +76,16 @@ export class AutomixPlugin implements AudioPlayerPlugin {
     private failedPair: string | null = null
     private prevSourceKey: string | null = null
     private transitioning = false
+    private pro: boolean
+    private readonly proConfidenceMin: number
+    private plan: TransitionPlan | null = null
+    private activeFadeMs = AUTOMIX_FADE_MS
 
     constructor(config: AutomixPluginConfig = {}) {
         this.name = config.name ?? "automix"
         this.enabled = config.enabled ?? true
+        this.pro = config.pro ?? false
+        this.proConfidenceMin = config.proConfidenceMin ?? PRO_CONFIDENCE_MIN
         this.onTransitionChange = config.onTransitionChange
     }
 
@@ -85,10 +105,11 @@ export class AutomixPlugin implements AudioPlayerPlugin {
         this.prevSourceKey = null
     }
 
-    updateConfig(config: Pick<AutomixPluginConfig, "enabled">) {
+    updateConfig(config: Pick<AutomixPluginConfig, "enabled" | "pro">) {
         const nextEnabled = config.enabled ?? this.enabled
         if (this.enabled && !nextEnabled) this.cancel()
         this.enabled = nextEnabled
+        this.pro = config.pro ?? this.pro
         this.analyzeCurrentTrack()
     }
 
@@ -115,7 +136,13 @@ export class AutomixPlugin implements AudioPlayerPlugin {
             }
         }
 
-        if (this.enabled && track) void ensureTrackAnalysis(track)
+        if (this.enabled && track) void this.ensureAnalysis(track)
+        // Pro analysis needs minutes, not the 15s preload lead: start the next
+        // track's analysis as soon as the current one loads.
+        if (this.enabled && this.usePro()) {
+            const next = context.getNextTrack()
+            if (next) void this.ensureAnalysis(next)
+        }
         this.supervise()
     }
 
@@ -153,7 +180,49 @@ export class AutomixPlugin implements AudioPlayerPlugin {
     private analyzeCurrentTrack() {
         if (!this.enabled || !this.context) return
         const track = this.context.getCurrentTrack()
-        if (track) void ensureTrackAnalysis(track)
+        if (track) void this.ensureAnalysis(track)
+        if (this.usePro()) {
+            const next = this.context.getNextTrack()
+            if (next) void this.ensureAnalysis(next)
+        }
+    }
+
+    /** Pro behavior is pointless where fades can't run (volume-locked browsers). */
+    private usePro(): boolean {
+        return this.pro && !fadeUnsupported
+    }
+
+    private ensureAnalysis(track: Track): Promise<unknown> {
+        return this.usePro() ? ensureProTrackAnalysis(track) : ensureTrackAnalysis(track)
+    }
+
+    /** Trims from the Pro analysis when available, else the Lite silence scan. */
+    private effectiveTrims(track: Track | null): TrackTrims | null {
+        if (this.usePro()) {
+            const analysis = getTrackAnalysis(track)
+            if (analysis) {
+                return {
+                    trimStartMs: analysis.trimStartMs ?? 0,
+                    trimEndMs: analysis.trimEndMs ?? 0,
+                }
+            }
+        }
+        return getTrackTrims(track)
+    }
+
+    /**
+     * Where deck B should be parked before the fade, in milliseconds. The
+     * beat-aligned entry point applies only while a confident pair plan is
+     * active; any fallback parks at the silence trim start exactly like Lite,
+     * so low-confidence beat guesses never skip the next track's intro.
+     */
+    private deckStartMs(next: Track): number {
+        if (this.usePro()) {
+            if (this.plan) return this.plan.deckStartMsInB
+            const analysis = getTrackAnalysis(next)
+            if (analysis) return analysis.trimStartMs ?? 0
+        }
+        return getTrackTrims(next)?.trimStartMs ?? 0
     }
 
     private setTransitioning(next: boolean) {
@@ -173,6 +242,8 @@ export class AutomixPlugin implements AudioPlayerPlugin {
         this.deckAbort?.abort()
         this.deckAbort = null
         this.preloadedKey = null
+        this.plan = null
+        this.activeFadeMs = AUTOMIX_FADE_MS
         const deck = this.deck
         this.deck = null
         if (deck) {
@@ -244,11 +315,11 @@ export class AutomixPlugin implements AudioPlayerPlugin {
         deck.src = src
         const ac = new AbortController()
         const applyTrimStart = () => {
-            const trims = getTrackTrims(next)
-            if (!trims || trims.trimStartMs <= 0) return
+            const startMs = this.deckStartMs(next)
+            if (startMs <= 0) return
             if (deck.paused && deck.readyState >= 1) {
                 try {
-                    deck.currentTime = trims.trimStartMs / 1000
+                    deck.currentTime = startMs / 1000
                 } catch {
                     // Falls back to the natural track start.
                 }
@@ -279,7 +350,7 @@ export class AutomixPlugin implements AudioPlayerPlugin {
         this.deck = deck
         this.preloadedKey = key
         this.phase = "preloading"
-        void ensureTrackAnalysis(next).then(applyTrimStart)
+        void this.ensureAnalysis(next).then(applyTrimStart)
     }
 
     /**
@@ -302,7 +373,7 @@ export class AutomixPlugin implements AudioPlayerPlugin {
             }
             const t = Math.min(
                 1,
-                (performance.now() - this.fadeT0) / AUTOMIX_FADE_MS
+                (performance.now() - this.fadeT0) / this.activeFadeMs
             )
             const vol = context.getEngine().volume
             const mainTarget = Math.cos((t * Math.PI) / 2) * vol
@@ -361,6 +432,9 @@ export class AutomixPlugin implements AudioPlayerPlugin {
         }
         this.phase = "fading"
         this.setTransitioning(true)
+        // Lock the fade length for the whole ramp, even if analyses settle
+        // mid-fade and the plan would now differ.
+        this.activeFadeMs = this.plan?.fadeMs ?? AUTOMIX_FADE_MS
         this.fadeT0 = performance.now()
         this.fadeAnchor = context.getEngine().currentTime
         playPromise
@@ -471,15 +545,44 @@ export class AutomixPlugin implements AudioPlayerPlugin {
         const nextKey = trackKey(nextTrack)
         if (this.failedPair === `${sourceKey}->${nextKey}`) return
 
-        const trims = getTrackTrims(currentTrack)
+        const trims = this.effectiveTrims(currentTrack)
         const effectiveEnd = engine.duration - (trims ? trims.trimEndMs / 1000 : 0)
+
+        // Pro: re-plan from whatever analyses have settled by now. The plan
+        // collapses to Lite values (usedPro: false) until both sides carry
+        // confident rhythm data; the fade length is locked at fade start.
+        let plan: TransitionPlan | null = null
+        if (this.usePro()) {
+            // Dedup'd to a map lookup once analysis is underway. Kept here
+            // (not just onTrackLoad) because this is the only path that sees
+            // a next track changed mid-playback — shuffle toggles or queue
+            // edits — early enough for the multi-second Pro analysis.
+            void this.ensureAnalysis(nextTrack)
+            const outgoing = getTrackAnalysis(currentTrack)
+            const incoming = getTrackAnalysis(nextTrack)
+            if (outgoing && incoming) {
+                const candidate = planTransition(
+                    outgoing,
+                    incoming,
+                    engine.duration * 1000,
+                    AUTOMIX_FADE_MS,
+                    this.proConfidenceMin
+                )
+                if (candidate.usedPro) plan = candidate
+            }
+        }
+        this.plan = plan
+
+        const fadeMs = plan?.fadeMs ?? AUTOMIX_FADE_MS
         const fadeStartAt = Math.max(
-            effectiveEnd - AUTOMIX_FADE_MS / 1000,
+            plan ? plan.fadeStartMsInA / 1000 : effectiveEnd - fadeMs / 1000,
             engine.duration * 0.5
         )
 
         if (phase === "idle") {
-            if (engine.currentTime >= effectiveEnd - PRELOAD_LEAD_S) {
+            // Long blends need a longer runway than the default lead.
+            const leadS = Math.max(PRELOAD_LEAD_S, fadeMs / 1000 + 5)
+            if (engine.currentTime >= effectiveEnd - leadS) {
                 this.startPreload(nextTrack)
             }
             return
@@ -498,4 +601,13 @@ export class AutomixPlugin implements AudioPlayerPlugin {
 
 export function createAutomixPlugin(config?: AutomixPluginConfig) {
     return new AutomixPlugin(config)
+}
+
+/**
+ * Automix Pro: an `AutomixPlugin` with metadata-driven transitions enabled.
+ * BPM, beats, and energy steer fade timing and length; pairs without
+ * trustworthy analysis fall back to Lite behavior automatically.
+ */
+export function createAutomixProPlugin(config?: Omit<AutomixPluginConfig, "pro">) {
+    return new AutomixPlugin({ ...config, pro: true })
 }
