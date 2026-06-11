@@ -1,4 +1,4 @@
-import { StrictMode, useMemo, useState } from "react"
+import { StrictMode, useEffect, useMemo, useState } from "react"
 import type { CSSProperties, ReactNode } from "react"
 import { createRoot } from "react-dom/client"
 import {
@@ -10,9 +10,11 @@ import {
     MiniSidebarPlayer,
     SeaCardPlayer,
     createAnalyticsPlugin,
+    createAutomixProPlugin,
     createKeyboardShortcutPlugin,
     createLyricsPlugin,
     formatTime,
+    getTrackAnalysis,
     useAudioPlayer,
     useAudioSession,
     useSAPPropGetters,
@@ -943,6 +945,91 @@ function PluginArchitectureSection() {
     )
 }
 
+/* ----------------------------- Automix Pro demo ----------------------------- */
+// Clean playlist (no broken track) so transitions actually fire back to back.
+const proPlaylist: Track[] = playlist.filter((t) => t.audioFile !== BROKEN)
+
+function AutomixProSection() {
+    const [transitioning, setTransitioning] = useState(false)
+    const [readout, setReadout] = useState("analyzing…")
+
+    const proPlugins = useMemo(
+        () => [
+            createAutomixProPlugin({
+                name: "demo-automix-pro",
+                onTransitionChange: setTransitioning,
+            }),
+        ],
+        []
+    )
+
+    // Poll the synchronous analysis cache so the metadata becomes visible as
+    // soon as each track settles.
+    useEffect(() => {
+        const fmt = (n: number | undefined, digits = 2) =>
+            n === undefined ? "–" : n.toFixed(digits)
+        const tick = () => {
+            const lines = proPlaylist.map((t) => {
+                const a = getTrackAnalysis(t)
+                if (!a) return `${t.title}: pending`
+                return (
+                    `${t.title}: bpm ${fmt(a.bpm, 1)} · conf ${fmt(a.confidence)} · ` +
+                    `energy ${fmt(a.energy)} · beats ${a.beats?.length ?? 0} · ` +
+                    `in ${a.transitionInMs ?? "–"}ms · out ${a.transitionOutMs ?? "–"}ms`
+                )
+            })
+            setReadout(lines.join("\n"))
+        }
+        tick()
+        const interval = setInterval(tick, 1000)
+        return () => clearInterval(interval)
+    }, [])
+
+    return (
+        <section className="lab-section">
+            <h2 className="lab-section__title">
+                11. Automix Pro
+                <small>beat-near · energy-aware</small>
+            </h2>
+            <p className="lab-section__desc">
+                <code>createAutomixProPlugin()</code> analyzes each track in a
+                worker (essentia.js BPM/beat extraction, lazy-loaded WASM) and
+                drives crossfade timing from the metadata: fades start on a
+                beat, BPM-compatible high-energy pairs blend longer, tempo
+                clashes fade short, and low-confidence pairs fall back to
+                Automix Lite. Note the player&apos;s own Automix Lite switch
+                stays off — the plugin owns the transitions here.
+            </p>
+            <div className="lab-section__grid">
+                <div className="lab-states">
+                    <div className="lab-state">
+                        <h3 className="lab-state__title">
+                            Pro transitions {transitioning ? "· crossfading…" : ""}
+                        </h3>
+                        <div className="lab-state__player">
+                            <AudioPlayer
+                                tracks={proPlaylist}
+                                showTracklist
+                                repeatMode="all"
+                                plugins={proPlugins}
+                                accentColor="#F4B860"
+                                progressColor="#F4B860"
+                                backgroundColor="rgba(28,22,14,0.6)"
+                            />
+                        </div>
+                        <pre
+                            className="lab-state__note"
+                            style={{ whiteSpace: "pre-wrap", userSelect: "text" }}
+                        >
+                            {readout}
+                        </pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+    )
+}
+
 /* ----------------------------- Audio backend demo ----------------------------- */
 /* Headless engine instance whose only job is to surface getBackendInfo() for
    the selected backend — including the auto-fallback fields when Web Audio is
@@ -1280,6 +1367,8 @@ function Lab() {
             <PluginArchitectureSection />
 
             <AudioBackendSection />
+
+            <AutomixProSection />
         </div>
     )
 }
