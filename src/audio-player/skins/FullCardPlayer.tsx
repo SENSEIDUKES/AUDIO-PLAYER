@@ -83,6 +83,7 @@ export function FullCardPlayer({
             <QueueDrawer
                 queue={queue}
                 currentIndex={currentIndex}
+                isPlaying={isPlaying}
                 open={queueDrawerOpen}
                 onClose={handleCloseQueue}
                 onPlayTrack={s.playTrack}

@@ -14,6 +14,8 @@ export interface QueueDrawerProps {
     queue: Track[]
     /** Index of the currently playing track. */
     currentIndex: number
+    /** Whether the active track is currently playing. */
+    isPlaying?: boolean
     /** Whether the drawer is visible. */
     open: boolean
     /** Close the drawer. */
@@ -199,14 +201,14 @@ function QueueRow({
             tabIndex={-1}
             aria-label={`${track.title} by ${track.artist}${isActive ? " (now playing)" : ""}`}
             style={isDragging && dragOffset !== 0 ? { transform: `translateY(${dragOffset}px)` } : undefined}
-            onPointerDown={dragHandlers.onPointerDown}
-            onPointerMove={dragHandlers.onPointerMove}
-            onPointerUp={dragHandlers.onPointerUp}
         >
             <span
                 className="ap-q-row__drag"
                 aria-hidden="true"
                 style={{ touchAction: "none" }}
+                onPointerDown={dragHandlers.onPointerDown}
+                onPointerMove={dragHandlers.onPointerMove}
+                onPointerUp={dragHandlers.onPointerUp}
             >
                 <DragHandleIcon />
             </span>
@@ -273,6 +275,7 @@ function QueueRow({
 export function QueueDrawer({
     queue,
     currentIndex,
+    isPlaying = false,
     open,
     onClose,
     onPlayTrack,
@@ -368,7 +371,7 @@ export function QueueDrawer({
 
                         return (
                             <QueueRow
-                                key={trackKey(track)}
+                                key={`${i}:${trackKey(track)}`}
                                 track={track}
                                 index={i}
                                 isActive={isActive}
@@ -377,7 +380,7 @@ export function QueueDrawer({
                                 dragHandlers={drag.getRowHandlers(i)}
                                 onPlay={() => onPlayTrack(i)}
                                 onRemove={() => onRemove(i)}
-                                isPlaying={true}
+                                isPlaying={isPlaying}
                             />
                         )
                     })}

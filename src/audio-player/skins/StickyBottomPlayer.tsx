@@ -62,6 +62,7 @@ export function StickyBottomPlayer({
             <QueueDrawer
                 queue={s.queue}
                 currentIndex={s.currentIndex}
+                isPlaying={s.isPlaying}
                 open={queueDrawerOpen}
                 onClose={handleCloseQueue}
                 onPlayTrack={s.playTrack}
