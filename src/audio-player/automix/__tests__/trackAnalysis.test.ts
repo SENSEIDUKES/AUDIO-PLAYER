@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { Track } from "../../types"
+import { getTrackTrims } from "../silenceAnalysis"
 import {
     configureTrackAnalysis,
     ensureProTrackAnalysis,
@@ -130,6 +131,24 @@ describe("ensureProTrackAnalysis", () => {
         expect(decode).toHaveBeenCalledTimes(1)
         expect(a).toBe(b)
         expect(b).toBe(c)
+    })
+
+    it("seeds the Lite trims cache before rhythm extraction finishes", async () => {
+        const decode = vi.fn(async () => fakeBuffer(120))
+        let release!: () => void
+        const gate = new Promise<null>((resolve) => {
+            release = () => resolve(null)
+        })
+        configureTrackAnalysis({ decode, rhythm: () => gate, persist: false })
+
+        const t = track("seeded")
+        const job = ensureProTrackAnalysis(t)
+        // Trims become readable via the Lite API while rhythm is still pending.
+        await vi.waitFor(() => expect(getTrackTrims(t)).toEqual({ trimStartMs: 0, trimEndMs: 0 }))
+        expect(getTrackAnalysis(t)).toBeNull()
+        release()
+        await job
+        expect(getTrackAnalysis(t)).not.toBeNull()
     })
 
     it("exposes settled results synchronously through getTrackAnalysis", async () => {

@@ -210,11 +210,17 @@ export class AutomixPlugin implements AudioPlayerPlugin {
         return getTrackTrims(track)
     }
 
-    /** Where deck B should be parked before the fade, in milliseconds. */
+    /**
+     * Where deck B should be parked before the fade, in milliseconds. The
+     * beat-aligned entry point applies only while a confident pair plan is
+     * active; any fallback parks at the silence trim start exactly like Lite,
+     * so low-confidence beat guesses never skip the next track's intro.
+     */
     private deckStartMs(next: Track): number {
         if (this.usePro()) {
+            if (this.plan) return this.plan.deckStartMsInB
             const analysis = getTrackAnalysis(next)
-            if (analysis) return analysis.transitionInMs ?? analysis.trimStartMs ?? 0
+            if (analysis) return analysis.trimStartMs ?? 0
         }
         return getTrackTrims(next)?.trimStartMs ?? 0
     }

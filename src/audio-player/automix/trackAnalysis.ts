@@ -1,7 +1,7 @@
 import type { Track, TrackAnalysis, TrackTrims } from "../types"
 import { trackKey } from "../utils/trackKey"
 import { fetchAndDecodeTrack } from "./decodeTrack"
-import { scanSilenceEdges } from "./silenceAnalysis"
+import { scanSilenceEdges, seedTrackTrims } from "./silenceAnalysis"
 import { analyzeRhythm, type RhythmSegmentResult } from "./rhythmClient"
 import { readStoredAnalysis, writeStoredAnalysis } from "./analysisStore"
 import {
@@ -182,13 +182,22 @@ function mergeSegments(
 async function analyze(key: string, url: string): Promise<TrackAnalysis | null> {
     if (persist) {
         const stored = await readStoredAnalysis(key)
-        if (stored) return stored
+        if (stored) {
+            seedTrackTrims(key, {
+                trimStartMs: stored.trimStartMs ?? 0,
+                trimEndMs: stored.trimEndMs ?? 0,
+            })
+            return stored
+        }
     }
 
     const buffer = await decodeFn(url)
     if (!buffer) return null
 
     const trims = scanSilenceEdges(buffer)
+    // Publish trims immediately: getTrackTrims() consumers (and the Lite
+    // fallback inside AutomixPlugin) shouldn't wait out the rhythm extraction.
+    seedTrackTrims(key, trims)
     const energy = computeEnergy(buffer, trims)
     const durationMs = buffer.duration * 1000
     const trimmedEndMs = durationMs - trims.trimEndMs

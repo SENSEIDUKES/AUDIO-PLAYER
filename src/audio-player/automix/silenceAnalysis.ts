@@ -140,3 +140,15 @@ export function getTrackTrims(track: Track | null): TrackTrims | null {
     if (!track) return null
     return settled.get(trackKey(track)) ?? null
 }
+
+/**
+ * Seed the trims cache from another analysis pipeline. The Automix Pro
+ * orchestrator shares this module's decode and silence scan; seeding lets
+ * `getTrackTrims()` serve trims as soon as the scan finishes, long before the
+ * slower rhythm extraction settles, without a second download. Existing
+ * entries are never overwritten.
+ */
+export function seedTrackTrims(key: string, trims: TrackTrims | null): void {
+    if (!key || settled.has(key)) return
+    settled.set(key, trims)
+}
