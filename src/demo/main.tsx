@@ -1243,21 +1243,135 @@ function WaveformSection() {
     )
 }
 
+
+/* ----------------------------- Demo mode shell ----------------------------- */
+type DemoMode = "product" | "lab"
+
+function ModeToggle({ mode, onModeChange }: { mode: DemoMode; onModeChange: (mode: DemoMode) => void }) {
+    return (
+        <nav className="demo-mode" aria-label="Demo view mode">
+            <div>
+                <p className="demo-mode__eyebrow">SEIHouse Audio Player</p>
+                <strong className="demo-mode__title">Preview surface</strong>
+            </div>
+            <div className="demo-mode__actions" role="group" aria-label="Switch preview mode">
+                <button
+                    type="button"
+                    className={`demo-mode__button${mode === "product" ? " demo-mode__button--active" : ""}`}
+                    onClick={() => onModeChange("product")}
+                    aria-pressed={mode === "product"}
+                >
+                    ProductPreview
+                </button>
+                <button
+                    type="button"
+                    className={`demo-mode__button${mode === "lab" ? " demo-mode__button--active" : ""}`}
+                    onClick={() => onModeChange("lab")}
+                    aria-pressed={mode === "lab"}
+                >
+                    Lab / QA
+                </button>
+            </div>
+        </nav>
+    )
+}
+
+function ProductPreview() {
+    return (
+        <main className="product-preview" aria-labelledby="product-preview-title">
+            <section className="product-preview__hero">
+                <div className="product-preview__copy">
+                    <div className="product-preview__pill">Production target · Marketplace player</div>
+                    <h1 id="product-preview-title" className="product-preview__title">
+                        A focused audio storefront for one release.
+                    </h1>
+                    <p className="product-preview__lede">
+                        This is the polished target layout customers should see first: one cohesive release page, one visual language, and one embedded SEIHouse player with playlist, lyrics, and purchase affordances ready to ship.
+                    </p>
+                    <div className="product-preview__metrics" aria-label="Release highlights">
+                        <span><strong>3</strong> tracks</span>
+                        <span><strong>Lossless</strong> preview</span>
+                        <span><strong>Framer</strong> ready</span>
+                    </div>
+                </div>
+
+                <div className="product-preview__stage">
+                    <div className="product-preview__art" aria-hidden="true">
+                        <div className="product-preview__orb product-preview__orb--one" />
+                        <div className="product-preview__orb product-preview__orb--two" />
+                        <div className="product-preview__vinyl" />
+                    </div>
+                    <div className="product-preview__player-card">
+                        <div className="product-preview__release-meta">
+                            <span>Featured release</span>
+                            <strong>Signals From The House</strong>
+                        </div>
+                        <AudioPlayer
+                            tracks={playlist.filter((track) => track.audioFile !== BROKEN)}
+                            showTracklist
+                            repeatMode="all"
+                            accentColor="#22D3A6"
+                            progressColor="#22D3A6"
+                            trackColor="rgba(34,211,166,0.22)"
+                            playIconColor="#07100d"
+                            textColor="#FFFFFF"
+                            backgroundColor="rgba(9, 12, 18, 0.68)"
+                            backgroundImage={{ src: OG_BG }}
+                            darkenAmount={58}
+                            blurSize={24}
+                        />
+                    </div>
+                </div>
+            </section>
+
+            <section className="product-preview__details" aria-label="Product details">
+                <article>
+                    <span>01</span>
+                    <h2>Single destination</h2>
+                    <p>One art direction, one release story, and one player treatment instead of competing demo patterns.</p>
+                </article>
+                <article>
+                    <span>02</span>
+                    <h2>Real component</h2>
+                    <p>The hero uses the same production AudioPlayer and playlist data as the QA lab, so the preview stays honest.</p>
+                </article>
+                <article>
+                    <span>03</span>
+                    <h2>QA preserved</h2>
+                    <p>Switch to Lab / QA for card grids, mobile, broken states, stress flows, backend checks, and plugin coverage.</p>
+                </article>
+            </section>
+        </main>
+    )
+}
+
+function DemoApp() {
+    const [mode, setMode] = useState<DemoMode>("product")
+
+    return (
+        <>
+            <ModeToggle mode={mode} onModeChange={setMode} />
+            {mode === "product" ? <ProductPreview /> : <Lab />}
+        </>
+    )
+}
+
 /* ----------------------------- Lab page ----------------------------- */
 function Lab() {
     return (
         <div className="lab-shell">
             <header className="lab-header">
                 <div>
-                    <h1 className="lab-header__title">Audio Player Lab</h1>
+                    <h1 className="lab-header__title">Audio Player Lab / QA</h1>
                     <p className="lab-header__sub">
                         Manually exercise the portable SEIHouse audio player
-                        inside fake real-world layouts. Every player on this
-                        page is a real AudioPlayer component; only the
-                        surrounding chrome is fake.
+                        across card grids, mobile previews, broken states,
+                        stress tests, backend checks, and plugin coverage.
+                        Every player on this page is a real AudioPlayer
+                        component; only the surrounding chrome is fake.
                     </p>
                 </div>
-                <div className="lab-header__chip">Manual test environment</div>
+                <div className="lab-header__chip">Lab / QA environment</div>
             </header>
 
             <Checklist />
@@ -1518,6 +1632,6 @@ function Lab() {
 
 createRoot(document.getElementById("root")!).render(
     <StrictMode>
-        <Lab />
+        <DemoApp />
     </StrictMode>
 )
