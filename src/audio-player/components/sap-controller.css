@@ -21,6 +21,8 @@
 .sap-ctl__sheet {
     position: relative;
     width: min(480px, 100%);
+    /* vh fallback for browsers without dvh support. */
+    max-height: min(80vh, 640px);
     max-height: min(80dvh, 640px);
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
@@ -30,6 +32,8 @@
     border-bottom: none;
     border-radius: 16px 16px 0 0;
     box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.5);
+    /* Plain fallback for browsers without env() support. */
+    padding: 8px 16px 16px;
     padding: 8px 16px calc(16px + env(safe-area-inset-bottom));
     animation: sap-sheet-in 0.22s ease;
 }

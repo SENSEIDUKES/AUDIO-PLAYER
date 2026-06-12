@@ -161,7 +161,9 @@ export function SAPController({
         return () => {
             cancelAnimationFrame(raf)
             document.removeEventListener("keydown", handleKey)
-            opener?.focus()
+            // The opener can unmount while the sheet is up (face switches,
+            // queue empties); only restore focus to a node still in the DOM.
+            if (opener?.isConnected) opener.focus()
         }
     }, [open])
 
@@ -175,14 +177,18 @@ export function SAPController({
         if (event.key !== "Tab" || !sheetRef.current) return
         const focusables = Array.from(
             sheetRef.current.querySelectorAll<HTMLElement>(
-                "button, [href], [tabindex]:not([tabindex='-1'])"
+                "button:not([disabled]), [href], [tabindex]:not([tabindex='-1'])"
             )
         )
         if (focusables.length === 0) return
         const first = focusables[0]
         const last = focusables[focusables.length - 1]
         const active = document.activeElement
-        if (event.shiftKey && active === first) {
+        if (!active || !sheetRef.current.contains(active)) {
+            // Focus drifted outside the dialog — pull it back in.
+            event.preventDefault()
+            ;(event.shiftKey ? last : first).focus()
+        } else if (event.shiftKey && active === first) {
             event.preventDefault()
             last.focus()
         } else if (!event.shiftKey && active === last) {

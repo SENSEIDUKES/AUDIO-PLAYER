@@ -35,6 +35,9 @@ export function useShareTrack(title: string, artist: string): {
                 }
                 setCopied(true)
                 timeoutRef.current = setTimeout(() => setCopied(false), 2000)
+            }).catch(() => {
+                // Clipboard permission denied / document unfocused: no
+                // feedback, but never an unhandled rejection.
             })
         }
     }, [title, artist])
