@@ -27,8 +27,10 @@ function isPreset(value: unknown): value is WorkshopPreset {
 }
 
 export function loadPresets(): WorkshopPreset[] {
-    if (typeof localStorage === "undefined") return []
+    // Even `typeof localStorage` can throw (SecurityError) when storage is
+    // disabled, so the whole access lives inside the try.
     try {
+        if (typeof localStorage === "undefined") return []
         const raw = localStorage.getItem(STORAGE_KEY)
         if (!raw) return []
         const parsed: unknown = JSON.parse(raw)
@@ -41,12 +43,13 @@ export function loadPresets(): WorkshopPreset[] {
 }
 
 function writePresets(presets: WorkshopPreset[]): WorkshopPreset[] {
-    if (typeof localStorage !== "undefined") {
-        try {
+    try {
+        if (typeof localStorage !== "undefined") {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(presets))
-        } catch {
-            // Quota/private-mode failures: keep the in-memory list usable.
         }
+    } catch {
+        // Quota/private-mode/disabled-storage failures: keep the in-memory
+        // list usable.
     }
     return presets
 }

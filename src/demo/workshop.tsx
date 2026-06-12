@@ -27,7 +27,11 @@ import type { WorkshopPreset } from "./workshopPresets"
 function normalizeColor(value: string | undefined, fallback = "#000000"): string {
     if (!value) return fallback
     const v = value.trim()
-    if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v)) return v
+    if (/^#[0-9a-f]{6}$/i.test(v)) return v
+    // expand shorthand hex — the picker only accepts #rrggbb
+    if (/^#[0-9a-f]{3}$/i.test(v)) {
+        return `#${v[1]}${v[1]}${v[2]}${v[2]}${v[3]}${v[3]}`
+    }
     // extract rgb/rgba into hex
     const m = v.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i)
     if (m) {
@@ -493,11 +497,20 @@ function WorkshopInner() {
         })
         setPresetName(p.name)
         // Reconcile the plugin registry with the preset's saved plugin set.
+        // Only touch entries whose state actually differs — activate/uninstall
+        // bump the registry's revision counter, which re-instantiates active
+        // plugins even when nothing changed.
         for (const entry of registry.available) {
+            const record = registry.installed.find((r) => r.entry.id === entry.id)
             if (p.enabledPlugins.includes(entry.id)) {
-                registry.install(entry.id)
-                registry.activate(entry.id)
-            } else {
+                if (!record) {
+                    registry.install(entry.id)
+                    // A fresh install starts at entry.defaultActive.
+                    if (!entry.defaultActive) registry.activate(entry.id)
+                } else if (!record.active) {
+                    registry.activate(entry.id)
+                }
+            } else if (record) {
                 registry.uninstall(entry.id)
             }
         }
