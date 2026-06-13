@@ -32,75 +32,78 @@ export function PluginManagerPanel() {
                 </span>
             </div>
 
-            {/* ── Available plugins ── */}
-            <PluginListSection
-                title="Available"
-                count={availableButNotInstalled.length}
-                emptyLabel="All plugins are installed."
-            >
-                {availableButNotInstalled.map((entry) => (
-                    <PluginCard
-                        key={entry.id}
-                        entry={entry}
-                        action={
-                            <button
-                                type="button"
-                                className="lab-plugin-card__btn lab-plugin-card__btn--install"
-                                onClick={() => install(entry.id)}
-                                aria-label={`Install ${entry.label}`}
-                            >
-                                Install
-                            </button>
-                        }
-                    />
-                ))}
-            </PluginListSection>
-
-            {/* ── Installed plugins ── */}
-            <PluginListSection
-                title="Installed"
-                count={installed.length}
-                emptyLabel="No plugins installed yet."
-            >
-                {installed.map((record) => {
-                    const active = record.active
-                    return (
+            {/* ── Scroll body so long plugin lists stay reachable ── */}
+            <div className="lab-plugin-manager__body">
+                {/* ── Available plugins ── */}
+                <PluginListSection
+                    title="Available"
+                    count={availableButNotInstalled.length}
+                    emptyLabel="All plugins are installed."
+                >
+                    {availableButNotInstalled.map((entry) => (
                         <PluginCard
-                            key={record.entry.id}
-                            entry={record.entry}
-                            active={active}
+                            key={entry.id}
+                            entry={entry}
                             action={
-                                <>
-                                    {/* Active/inactive toggle */}
-                                    <button
-                                        type="button"
-                                        className={`lab-plugin-card__btn${
-                                            active
-                                                ? " lab-plugin-card__btn--active"
-                                                : " lab-plugin-card__btn--inactive"
-                                        }`}
-                                        onClick={() => toggleActive(record.entry.id)}
-                                        aria-label={`${
-                                            active ? "Deactivate" : "Activate"
-                                        } ${record.entry.label}`}
-                                    >
-                                        {active ? "Active" : "Inactive"}
-                                    </button>
-                                    {/* Uninstall */}
-                                    <button
-                                        type="button"
-                                        className="lab-plugin-card__btn lab-plugin-card__btn--uninstall"
-                                        onClick={() => uninstall(record.entry.id)}
-                                        aria-label={`Uninstall ${record.entry.label}`}
-                                    >
-                                        ×
-                                    </button>
-                                </>
+                                <button
+                                    type="button"
+                                    className="lab-plugin-card__btn lab-plugin-card__btn--install"
+                                    onClick={() => install(entry.id)}
+                                    aria-label={`Install ${entry.label}`}
+                                >
+                                    Install
+                                </button>
                             }
                         />
-                    )
-                })}
-            </PluginListSection>
+                    ))}
+                </PluginListSection>
+
+                {/* ── Installed plugins ── */}
+                <PluginListSection
+                    title="Installed"
+                    count={installed.length}
+                    emptyLabel="No plugins installed yet."
+                >
+                    {installed.map((record) => {
+                        const active = record.active
+                        return (
+                            <PluginCard
+                                key={record.entry.id}
+                                entry={record.entry}
+                                active={active}
+                                action={
+                                    <>
+                                        {/* Active/inactive toggle */}
+                                        <button
+                                            type="button"
+                                            className={`lab-plugin-card__btn${
+                                                active
+                                                    ? " lab-plugin-card__btn--active"
+                                                    : " lab-plugin-card__btn--inactive"
+                                            }`}
+                                            onClick={() => toggleActive(record.entry.id)}
+                                            aria-label={`${
+                                                active ? "Deactivate" : "Activate"
+                                            } ${record.entry.label}`}
+                                        >
+                                            {active ? "Active" : "Inactive"}
+                                        </button>
+                                        {/* Uninstall */}
+                                        <button
+                                            type="button"
+                                            className="lab-plugin-card__btn lab-plugin-card__btn--uninstall"
+                                            onClick={() => uninstall(record.entry.id)}
+                                            aria-label={`Uninstall ${record.entry.label}`}
+                                        >
+                                            ×
+                                        </button>
+                                    </>
+                                }
+                            />
+                        )
+                    })}
+                </PluginListSection>
+            </div>
         </div>
     )
 }

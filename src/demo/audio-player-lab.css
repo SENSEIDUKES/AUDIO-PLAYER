@@ -1095,6 +1095,15 @@ body {
     max-height: 620px;
 }
 
+/* On narrow/mobile layouts let the panel grow with the page instead of
+   clipping its taller stacked cards behind a fixed height (which hid the
+   bottom plugins entirely, with no way to scroll to them). */
+@media (max-width: 960px) {
+    .lab-plugin-manager {
+        max-height: none;
+    }
+}
+
 .lab-plugin-manager__head {
     display: flex;
     align-items: center;
@@ -1122,6 +1131,9 @@ body {
 
 .lab-plugin-manager__body {
     flex: 1;
+    /* min-height:0 lets this flex child shrink below content size so the
+       overflow scroll actually engages instead of pushing the panel taller. */
+    min-height: 0;
     overflow-y: auto;
     padding: 8px 0;
 }
