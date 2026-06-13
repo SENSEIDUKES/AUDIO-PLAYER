@@ -23,7 +23,7 @@ import {
     PluginManagerPanel,
 } from "../audio-player"
 import type { AudioBackendKind } from "../audio-player"
-import { SAMPLE, BROKEN, playlist, proPlaylist, stressPlaylist, SEA_THEME, SEA_ARTS } from "./data"
+import { SAMPLE, BROKEN, OG_BG, playlist, proPlaylist, stressPlaylist, SEA_THEME, SEA_ARTS } from "./data"
 
 /* ----------------------------- Reusable lab chrome ----------------------------- */
 function Checklist() {
@@ -536,8 +536,10 @@ function PluginRegistrySection() {
                 built-in SEIHouse plugins. Browse available plugins, install
                 them, and toggle them active/inactive. Active plugins are
                 passed into the <code>AudioPlayer</code> below — install the
-                keyboard plugin to control playback with Space/J/K/L, or add
-                analytics to see console.table output.
+                keyboard plugin to control playback with Space/J/K/L, add
+                analytics to see console.table output, or activate{" "}
+                <strong>Auto Theme</strong> to recolor the player from the album
+                artwork.
             </p>
             <div className="lab-section__grid">
                 <div className="lab-plugin-registry-section">
@@ -554,6 +556,8 @@ function PluginRegistrySection() {
                             showTracklist
                             repeatMode="all"
                             plugins={plugins}
+                            backgroundImage={{ src: OG_BG }}
+                            darkenAmount={45}
                             accentColor="#7C5CFF"
                             progressColor="#7C5CFF"
                             backgroundColor="rgba(20,20,28,0.6)"
