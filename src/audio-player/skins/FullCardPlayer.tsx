@@ -71,8 +71,9 @@ export function FullCardPlayer({
 
     const themeVars = buildThemeVars(theme)
     const isEmpty = queue.length === 0
-    // Spinner only while actually playing — never at idle/paused.
-    const showPlaySpinner = isBuffering && isPlaying
+    // Engine gates `isBuffering` to active/pending playback (and clears it on
+    // pause/ended), so the spinner can render straight from it.
+    const showPlaySpinner = isBuffering
 
     const handleOpenQueue = useCallback(() => setQueueDrawerOpen(true), [])
     const handleCloseQueue = useCallback(() => setQueueDrawerOpen(false), [])

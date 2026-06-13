@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { shouldEnterBuffering, shouldShowPlaySpinner } from "../buffering"
+import { shouldEnterBuffering } from "../buffering"
 
 describe("shouldEnterBuffering", () => {
     it("does not buffer on waiting/stalled while paused and idle", () => {
@@ -43,23 +43,5 @@ describe("shouldEnterBuffering", () => {
                 hasPendingPlay: false,
             })
         ).toBe(true)
-    })
-})
-
-describe("shouldShowPlaySpinner", () => {
-    it("never spins while paused, even if buffering lingered", () => {
-        expect(shouldShowPlaySpinner(true, false)).toBe(false)
-    })
-
-    it("does not spin when not buffering", () => {
-        expect(shouldShowPlaySpinner(false, true)).toBe(false)
-    })
-
-    it("spins only while buffering during active playback", () => {
-        expect(shouldShowPlaySpinner(true, true)).toBe(true)
-    })
-
-    it("does not spin when idle at 0:00", () => {
-        expect(shouldShowPlaySpinner(false, false)).toBe(false)
     })
 })

@@ -4,6 +4,7 @@ import {
     hasAutomixPlugin,
     withInternalAutomix,
 } from "../automixIntegration"
+import { createAutomixPlugin } from "../AutomixPlugin"
 import type { AudioPlayerPlugin } from "../../core/plugins/PluginInterface"
 
 function fakePlugin(name: string): AudioPlayerPlugin {
@@ -52,5 +53,19 @@ describe("hasAutomixPlugin", () => {
         expect(hasAutomixPlugin([fakePlugin(AUTOMIX_PLUGIN_NAME)])).toBe(true)
         expect(hasAutomixPlugin([fakePlugin("lyrics")])).toBe(false)
         expect(hasAutomixPlugin([])).toBe(false)
+    })
+
+    it("detects an AutomixPlugin instance regardless of its name", () => {
+        // The plugin registry registers Automix as "registry-automix"; it must
+        // still be recognized so the internal one is not added beside it.
+        const registryAutomix = createAutomixPlugin({ name: "registry-automix" })
+        expect(hasAutomixPlugin([registryAutomix])).toBe(true)
+
+        const internal = createAutomixPlugin({ name: AUTOMIX_PLUGIN_NAME })
+        const external = [registryAutomix]
+        const resolved = withInternalAutomix(external, internal)
+        // External (registry) automix wins → internal omitted, exactly one controller.
+        expect(resolved).toBe(external)
+        expect(resolved).not.toContain(internal)
     })
 })

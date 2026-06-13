@@ -22,7 +22,6 @@ import {
 } from "./plugins/automixIntegration"
 import { useMediaSessionObserver } from "./headless/useMediaSessionObserver"
 import { usePluginManager } from "./core/plugins/usePluginManager"
-import { shouldShowPlaySpinner } from "./utils/buffering"
 import { ProgressBar } from "./components/ProgressBar"
 import { WaveformProgress } from "./components/WaveformProgress"
 import { VolumeControl } from "./components/VolumeControl"
@@ -300,10 +299,11 @@ function AudioPlayerInner(props: AudioPlayerProps) {
         dismissAutoplayBlocked,
     } = engine
 
-    // The buffering spinner is gated by active playback intent so the play
-    // button never spins while idle/paused (engine also clears buffering on
-    // pause/ended); genuine mid-playback buffering still shows.
-    const showPlaySpinner = shouldShowPlaySpinner(isBuffering, isPlaying)
+    // `isBuffering` is the engine's gated source of truth: it is only true
+    // during active or pending-play waiting, and is cleared on
+    // pause/ended/error/source-reset. So the spinner renders straight from it —
+    // no idle/paused spinner, but the initial pending-play load still shows one.
+    const showPlaySpinner = isBuffering
 
     const goToTrack = useCallback(
         (next: number | null) => {

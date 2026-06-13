@@ -1,10 +1,17 @@
 /**
- * Pure decision helpers for the buffering ("loading") spinner.
+ * Pure decision helper for the buffering ("loading") spinner.
  *
  * The media element fires `waiting`/`stalled` during passive preload too — even
  * while paused or idle at 0:00 — which previously stranded the play button on a
- * spinner. These helpers encode the rule that buffering only represents *active*
- * playback waiting, so the logic stays unit-testable without a DOM.
+ * spinner. This encodes the rule that buffering only represents *active* (or
+ * pending) playback waiting, so the logic stays unit-testable without a DOM.
+ *
+ * Because the engine applies this gate (and clears buffering on
+ * pause/ended/error/source-reset), the resulting `isBuffering` flag is an
+ * accurate source of truth: the UI can render the spinner directly from it
+ * without re-gating on `isPlaying` (which would hide the spinner during the
+ * initial pending-play load, e.g. the Web Audio backend emits `waiting` before
+ * `play`).
  */
 
 export interface BufferingIntent {
@@ -28,17 +35,4 @@ export function shouldEnterBuffering({
     hasPendingPlay,
 }: BufferingIntent): boolean {
     return isPlaying || hasPendingPlay || !isPaused
-}
-
-/**
- * Whether the main play button should render the buffering spinner.
- *
- * The spinner is gated by active playback intent so an idle/paused player never
- * spins, while genuine mid-playback buffering still surfaces.
- */
-export function shouldShowPlaySpinner(
-    isBuffering: boolean,
-    isPlaying: boolean
-): boolean {
-    return isBuffering && isPlaying
 }

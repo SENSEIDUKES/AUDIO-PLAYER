@@ -64,8 +64,9 @@ export function StickyBottomPlayer({
     if (s.queue.length === 0 || !s.currentTrack) return null
 
     const { currentTrack, isPlaying, isBuffering, shuffle, repeatMode, automix } = s
-    // Spinner only while actually playing — never at idle/paused.
-    const showPlaySpinner = isBuffering && isPlaying
+    // Engine gates `isBuffering` to active/pending playback (and clears it on
+    // pause/ended), so the spinner can render straight from it.
+    const showPlaySpinner = isBuffering
 
     return (
         <div

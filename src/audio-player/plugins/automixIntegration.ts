@@ -1,4 +1,5 @@
 import type { AudioPlayerPlugin } from "../core/plugins/PluginInterface"
+import { AutomixPlugin } from "./AutomixPlugin"
 
 /**
  * Canonical plugin name for Automix. The internal controller and the public
@@ -7,11 +8,22 @@ import type { AudioPlayerPlugin } from "../core/plugins/PluginInterface"
  */
 export const AUTOMIX_PLUGIN_NAME = "automix"
 
-/** Whether a plugin list already contains an Automix controller. */
+/**
+ * Whether a plugin list already contains an Automix controller.
+ *
+ * Detect by type first so any `AutomixPlugin` instance counts regardless of its
+ * `name` — the built-in plugin registry, for example, registers Automix as
+ * `"registry-automix"`. The canonical-name check is a defensive fallback for
+ * automix-equivalent plugins that aren't `AutomixPlugin` instances.
+ */
 export function hasAutomixPlugin(
     plugins: readonly AudioPlayerPlugin[]
 ): boolean {
-    return plugins.some((plugin) => plugin.name === AUTOMIX_PLUGIN_NAME)
+    return plugins.some(
+        (plugin) =>
+            plugin instanceof AutomixPlugin ||
+            plugin.name === AUTOMIX_PLUGIN_NAME
+    )
 }
 
 /**

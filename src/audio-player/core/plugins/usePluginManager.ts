@@ -52,12 +52,15 @@ export function usePluginManager(
     return manager
 }
 
-/** Whether two plugin arrays contain exactly the same set of plugin names. */
+/** Whether two plugin arrays contain exactly the same multiset of plugin names. */
 function sameNameSet(
     a: readonly AudioPlayerPlugin[],
     b: readonly AudioPlayerPlugin[]
 ): boolean {
     if (a.length !== b.length) return false
-    const names = new Set(a.map((plugin) => plugin.name))
-    return b.every((plugin) => names.has(plugin.name))
+    // Sort and compare so duplicate names are handled correctly, e.g.
+    // ["a","b"] vs ["a","a"] must differ.
+    const namesA = a.map((plugin) => plugin.name).sort()
+    const namesB = b.map((plugin) => plugin.name).sort()
+    return namesA.every((name, i) => name === namesB[i])
 }

@@ -17,12 +17,14 @@ including passive media preload while paused — and never cleared it on
   preload while paused no longer arms the spinner.
 - `handlePause` and `handleEnded` now clear `isBuffering`. (Error, unload, source
   reset, and autoplay-rejection paths already cleared it.)
-- Play-button spinner is additionally gated by active playback intent
-  (`shouldShowPlaySpinner(isBuffering, isPlaying)` = `isBuffering && isPlaying`) in
-  `AudioPlayer.tsx` and every skin, so idle/paused never spins while real
-  mid-playback buffering still shows.
+- With the engine gate + clears, `isBuffering` is an accurate source of truth (only
+  true during active/pending-play waiting). The play button renders the spinner
+  straight from `isBuffering` — no idle/paused spinner, and the initial
+  pending-play load still shows one (the Web Audio backend emits `waiting` before
+  `play`, so an `isBuffering && isPlaying` UI gate would wrongly hide it).
 
-New pure helpers (DOM-free, unit-tested): `src/audio-player/utils/buffering.ts`.
+New pure helper (DOM-free, unit-tested): `shouldEnterBuffering`
+(`src/audio-player/utils/buffering.ts`).
 
 ## 2. One Automix path (no duplicate controllers)
 
@@ -64,9 +66,10 @@ memoization. Legitimate plugin-set changes still replace normally. Docs updated 
 
 ## Tests (Vitest, no new deps)
 - `utils/__tests__/buffering.test.ts` — `shouldEnterBuffering` (waiting while
-  paused vs playing vs pending) and `shouldShowPlaySpinner` (never spins idle/paused).
+  paused vs playing vs pending).
 - `plugins/__tests__/automixIntegration.test.ts` — only one Automix controller is
-  ever resolved; external plugin wins over the internal one.
+  ever resolved; an external plugin (incl. a differently-named `AutomixPlugin`
+  instance like the registry's `registry-automix`) wins over the internal one.
 - `plugins/__tests__/AutomixPlugin.test.ts` — `handleTrackEnded` does not suppress
   the host advance while idle (single advance); disabled/cancel stays idle.
 
