@@ -232,7 +232,7 @@ Files excluded: demo code, tests, docs, scripts, and development configs.
 
 1. **Peer Dependencies**: React and React-DOM are peer dependencies. Consumer apps must have these installed.
 
-2. **Optional Dependencies**: `essentia.js` and `wavesurfer.js` are bundled but loaded lazily only when AutoMix Pro mode or waveform plugins are used.
+2. **Optional Dependencies**: `essentia.js` and `wavesurfer.js` are bundled but loaded lazily only when smart AutoMix analysis or waveform plugins are used.
 
 3. **CSS Import**: Don't forget to import the CSS file in your app's entry point:
    ```typescript

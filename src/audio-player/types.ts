@@ -71,7 +71,10 @@ export interface AudioPlayerProps extends AudioPlayerTheme {
     shuffle?: boolean
     /** Initial repeat behavior. Defaults to `"one"` when `loop` is true. */
     repeatMode?: RepeatMode
-    /** Initial Automix Lite (crossfade transitions) state. Playlist mode only. */
+    /**
+     * Legacy basic crossfade state. Playlist mode only.
+     * Prefer `createAutomixPlugin()` for smart AutoMix.
+     */
     automix?: boolean
     /** Optional lifecycle plugins. Empty by default. */
     plugins?: readonly AudioPlayerPlugin[]
@@ -132,8 +135,8 @@ export interface UseAudioPlayerOptions {
 }
 
 /**
- * Conservative silence trims computed for a track by the Automix Lite
- * analysis. Milliseconds measured from the natural start/end of the file.
+ * Conservative silence trims computed for basic crossfade fallback.
+ * Milliseconds measured from the natural start/end of the file.
  */
 export interface TrackTrims {
     trimStartMs: number
@@ -141,7 +144,7 @@ export interface TrackTrims {
 }
 
 /**
- * Per-track metadata computed by the Automix Pro analysis. All fields are
+ * Per-track metadata computed by smart transition analysis. All fields are
  * optional: a partial result (e.g. trims without rhythm) is still usable, and
  * `confidence` tells consumers how much to trust the rhythm fields.
  */
@@ -258,7 +261,7 @@ export interface SessionEngine extends AudioPlayerEngine {
     shuffle: boolean
     /** Repeat behavior at the end of a track. */
     repeatMode: RepeatMode
-    /** Whether Automix Lite (two-deck crossfade transitions) is enabled. */
+    /** Whether legacy basic crossfade transitions are enabled. */
     automix: boolean
     /** True when there is a track to advance to. */
     canNext: boolean
@@ -287,7 +290,7 @@ export interface SessionEngine extends AudioPlayerEngine {
     toggleShuffle: () => void
     /** Cycle repeat mode: off → all → one → off. */
     cycleRepeat: () => void
-    /** Toggle Automix Lite crossfade transitions. */
+    /** Toggle legacy basic crossfade transitions. */
     toggleAutomix: () => void
     /** Render a plugin-owned UI slot, if an active plugin claims it. */
     renderPluginSlot: <K extends PluginRenderSlot>(
@@ -309,7 +312,7 @@ export interface AudioSessionProviderProps {
     repeatMode?: RepeatMode
     /** Initial shuffle state. Defaults to false. */
     shuffle?: boolean
-    /** Initial Automix Lite state. Defaults to false. */
+    /** Initial legacy basic crossfade state. Defaults to false. */
     automix?: boolean
     /** Optional lifecycle plugins for the shared session. Empty by default. */
     plugins?: readonly AudioPlayerPlugin[]

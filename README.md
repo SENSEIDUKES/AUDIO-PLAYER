@@ -40,7 +40,7 @@ The player currently supports:
 - Legacy `loop` compatibility.
 - Loading, buffering, and playback-state handling.
 - Browser and mobile quality checks documented in the repo.
-- Opt-in **AutoMix** plugin transitions with Lite and Pro modes.
+- Opt-in **AutoMix** plugin transitions with smart automatic fallback behavior.
 - Optional waveform scrubber via `createWaveformPlugin()`.
 - Multiple player surfaces, including standalone/full-card and sticky bottom player contexts.
 
@@ -104,20 +104,19 @@ This allows SEIHouse to keep the playback behavior consistent while designing di
 
 ## AutoMix and Waveform Plugins
 
-**AutoMix** is an opt-in transition system for smoother playlist movement.
-
-Use one plugin with either Lite or Pro mode:
+**AutoMix** is an opt-in smart transition system for smoother playlist movement.
+Use one plugin:
 
 ```tsx
 import { createAutomixPlugin, createWaveformPlugin } from "@seihouse/audio-player"
 
 const plugins = [
-  createAutomixPlugin({ mode: "lite" }),
+  createAutomixPlugin(),
   createWaveformPlugin(),
 ]
 ```
 
-Lite mode uses two-deck crossfade transitions with an approximately 5.5 second equal-power fade and conservative RMS-based silence trimming. Pro mode adds BPM/beat/energy analysis and falls back to Lite behavior per transition when metadata is unavailable or low-confidence.
+AutoMix uses BPM, beat, energy, and transition-point analysis when it is available and confident. It falls back automatically to silence-trimmed crossfade, then basic crossfade, then normal track advance when browser or media limits prevent a transition.
 
 Legacy AutoMix wrappers still work:
 
@@ -126,7 +125,7 @@ Legacy AutoMix wrappers still work:
 - the `StickyBottomPlayer` transport row,
 - or programmatically through `SessionEngine.toggleAutomix()` / the `automix` props.
 
-With AutoMix off, normal playback behavior is unchanged.
+The existing `automix` props and session toggle still enable the legacy basic crossfade bridge for backward compatibility. New integrations should use `createAutomixPlugin()` for smart AutoMix. With AutoMix off, normal playback behavior is unchanged.
 
 Waveforms are now available as a progress render-slot plugin through `createWaveformPlugin()`. The old `showWaveform` prop remains as a compatibility wrapper for standalone `AudioPlayer`.
 

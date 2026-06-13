@@ -6,28 +6,41 @@ import {
 } from "../AutomixPlugin"
 
 describe("AutomixPlugin factories", () => {
-    it("defaults to lite mode", () => {
+    it("defaults to smart automatic behavior", () => {
         const plugin = createAutomixPlugin()
 
         expect(plugin).toBeInstanceOf(AutomixPlugin)
+        expect(plugin.isSmartAnalysisEnabled()).toBe(true)
+    })
+
+    it("can disable smart analysis for basic-only fallback testing", () => {
+        const plugin = createAutomixPlugin({ smartAnalysis: false })
+
+        expect(plugin.isSmartAnalysisEnabled()).toBe(false)
         expect(plugin.getMode()).toBe("lite")
     })
 
-    it("accepts pro mode through the unified factory", () => {
+    it("maps deprecated pro mode to smart automatic behavior", () => {
         const plugin = createAutomixPlugin({ mode: "pro" })
 
-        expect(plugin.getMode()).toBe("pro")
+        expect(plugin.isSmartAnalysisEnabled()).toBe(true)
     })
 
-    it("keeps deprecated pro boolean compatibility", () => {
+    it("maps deprecated pro boolean compatibility to smart automatic behavior", () => {
         const plugin = createAutomixPlugin({ pro: true })
 
-        expect(plugin.getMode()).toBe("pro")
+        expect(plugin.isSmartAnalysisEnabled()).toBe(true)
     })
 
-    it("keeps createAutomixProPlugin as a pro-mode wrapper", () => {
+    it("maps deprecated lite mode to the basic-only compatibility path", () => {
+        const plugin = createAutomixPlugin({ mode: "lite" })
+
+        expect(plugin.isSmartAnalysisEnabled()).toBe(false)
+    })
+
+    it("keeps createAutomixProPlugin as a smart automatic wrapper", () => {
         const plugin = createAutomixProPlugin()
 
-        expect(plugin.getMode()).toBe("pro")
+        expect(plugin.isSmartAnalysisEnabled()).toBe(true)
     })
 })

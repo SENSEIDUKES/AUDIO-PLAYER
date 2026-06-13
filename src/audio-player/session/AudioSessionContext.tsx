@@ -181,8 +181,11 @@ export function AudioSessionProvider({
             ? queue[pluginNextIndex] ?? null
             : null
 
+    // Compatibility bridge: the legacy session `automix` flag preserves the
+    // old basic crossfade behavior. New smart AutoMix should be registered as
+    // a plugin until a core crossfade API lands.
     const legacyAutomixPlugin = useMemo(
-        () => (automix ? createAutomixPlugin({ mode: "lite" }) : null),
+        () => (automix ? createAutomixPlugin({ smartAnalysis: false }) : null),
         [automix]
     )
     const activePlugins = useMemo<readonly AudioPlayerPlugin[]>(() => {

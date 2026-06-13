@@ -11,12 +11,12 @@ import {
 } from "./transitionPlanner"
 
 /**
- * Automix Pro track analysis orchestrator.
+ * Smart transition analysis orchestrator.
  *
  * One download + decode per track feeds everything: silence trims (same scan
- * as Automix Lite), an energy estimate, and beat/BPM extraction in the
+ * as the basic fallback), an energy estimate, and beat/BPM extraction in the
  * essentia worker. Results are cached in memory for the page (same
- * pending/settled/serializer pattern as the Lite analysis) and persisted to
+ * pending/settled/serializer pattern as the trim analysis) and persisted to
  * IndexedDB when the rhythm data is trustworthy.
  *
  * Rhythm is only extracted from two windows — the first ~60s after the trim
@@ -195,8 +195,8 @@ async function analyze(key: string, url: string): Promise<TrackAnalysis | null> 
     if (!buffer) return null
 
     const trims = scanSilenceEdges(buffer)
-    // Publish trims immediately: getTrackTrims() consumers (and the Lite
-    // fallback inside AutomixPlugin) shouldn't wait out the rhythm extraction.
+    // Publish trims immediately: getTrackTrims() consumers and the basic
+    // fallback inside AutomixPlugin shouldn't wait out rhythm extraction.
     seedTrackTrims(key, trims)
     const energy = computeEnergy(buffer, trims)
     const durationMs = buffer.duration * 1000
@@ -254,11 +254,12 @@ async function analyze(key: string, url: string): Promise<TrackAnalysis | null> 
 }
 
 /**
- * Kick off (or join) Automix Pro analysis for a track. Results are cached for
+ * Kick off (or join) smart transition analysis for a track. Results are cached for
  * the lifetime of the page and persisted to IndexedDB when rhythm extraction
  * succeeded; analyses run one at a time. Resolves to `null` when analysis is
- * entirely unavailable — callers fall back to Automix Lite behavior.
+ * entirely unavailable — callers fall back to basic crossfade behavior.
  */
+/** @deprecated Use `ensureSmartTrackAnalysis`. */
 export function ensureProTrackAnalysis(track: Track): Promise<TrackAnalysis | null> {
     const key = trackKey(track)
     const url = track.audioFile?.trim()
@@ -283,14 +284,21 @@ export function ensureProTrackAnalysis(track: Track): Promise<TrackAnalysis | nu
     return job
 }
 
+/** Kick off (or join) smart transition analysis for a track. */
+export const ensureSmartTrackAnalysis = ensureProTrackAnalysis
+
 /**
- * Synchronous read of a finished Pro analysis. Returns `null` while analysis
+ * Synchronous read of a finished smart analysis. Returns `null` while analysis
  * is pending, failed, or was never requested.
  */
+/** @deprecated Use `getSmartTrackAnalysis`. */
 export function getTrackAnalysis(track: Track | null): TrackAnalysis | null {
     if (!track) return null
     return settled.get(trackKey(track)) ?? null
 }
+
+/** Synchronous read of a finished smart transition analysis. */
+export const getSmartTrackAnalysis = getTrackAnalysis
 
 /** Test seam: clear the page-lifetime caches. */
 export function resetTrackAnalysisCacheForTests(): void {

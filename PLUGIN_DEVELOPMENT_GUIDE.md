@@ -237,22 +237,21 @@ plugin instance from custom UI.
 
 ### `AutoMixPlugin`
 
-AutoMix is available as one plugin class/factory with Lite and Pro modes:
+AutoMix is available as one smart plugin class/factory:
 
 ```ts
-createAutomixPlugin({ mode: "lite" }) // default
-createAutomixPlugin({ mode: "pro" })
+createAutomixPlugin()
 ```
 
-Lite mode mirrors the legacy two-deck crossfade behavior: the main engine audio
-element remains deck A/source-of-truth, while the plugin owns a detached deck B
-around the transition window. Pro mode adds BPM/beat/energy analysis and falls
-back to Lite behavior per transition. AutoMix returns `true` from
-`onTrackEnded` during handoff to prevent double-advancing.
+The main engine audio element remains deck A/source-of-truth, while the plugin
+owns a detached deck B around the transition window. AutoMix uses smart
+BPM/beat/energy analysis when available and confident, then falls back through
+silence-trimmed crossfade, basic crossfade, and normal track advance. AutoMix
+returns `true` from `onTrackEnded` during handoff to prevent double-advancing.
 
 > Compatibility: the existing `useAutomix` hook remains exported for older code,
-> but direct hook usage is deprecated. `createAutomixProPlugin()` remains as a
-> wrapper for `createAutomixPlugin({ mode: "pro" })`.
+> but direct hook usage is deprecated. Old mode/pro config and
+> `createAutomixProPlugin()` remain as silent deprecated wrappers.
 
 ### `WaveformPlugin`
 

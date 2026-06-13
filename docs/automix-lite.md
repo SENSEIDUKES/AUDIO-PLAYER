@@ -1,15 +1,14 @@
-# AutoMix Lite Compatibility
+# Legacy AutoMix Compatibility
 
-AutoMix Lite is now the default mode of the unified AutoMix plugin:
+The old basic crossfade path is now treated as a compatibility bridge and
+fallback layer, not a separate user-facing AutoMix product.
+
+Use the current AutoMix plugin for new code:
 
 ```tsx
 createAutomixPlugin()
-createAutomixPlugin({ mode: "lite" })
 ```
 
-The old `automix` prop and session toggle still create an internal Lite-mode
-plugin for compatibility. New integrations should pass
-`createAutomixPlugin({ mode: "lite" })` in the `plugins` array.
-
-See [`automix.md`](./automix.md) for the current AutoMix API, fallback behavior,
-and compatibility notes.
+Existing mode-based configs continue to work silently for older integrations,
+but new docs and demos use the single automatic plugin. See
+[`automix.md`](./automix.md).

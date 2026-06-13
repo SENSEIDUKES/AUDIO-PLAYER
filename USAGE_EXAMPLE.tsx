@@ -80,7 +80,7 @@ export function CustomPlayerUI() {
 
 export function AppWithPlugins() {
   const plugins = [
-    createAutomixPlugin({ mode: 'pro' }),
+    createAutomixPlugin(),
     createKeyboardShortcutPlugin(),
     createWaveformPlugin(),
   ]

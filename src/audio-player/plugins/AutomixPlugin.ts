@@ -4,9 +4,9 @@ import type {
 } from "../core/plugins/PluginInterface"
 import type { Track, TrackTrims } from "../types"
 import { ensureTrackAnalysis, getTrackTrims } from "../automix/silenceAnalysis"
-import { ensureProTrackAnalysis, getTrackAnalysis } from "../automix/trackAnalysis"
+import { ensureSmartTrackAnalysis, getSmartTrackAnalysis } from "../automix/trackAnalysis"
 import {
-    PRO_CONFIDENCE_MIN,
+    SMART_CONFIDENCE_MIN,
     planTransition,
     type TransitionPlan,
 } from "../automix/transitionPlanner"
@@ -34,37 +34,54 @@ type Phase = "idle" | "preloading" | "fading" | "handoff"
  */
 let fadeUnsupported = false
 
-export type AutomixMode = "lite" | "pro"
+/**
+ * @deprecated AutoMix no longer exposes product modes. Use
+ * `smartAnalysis?: boolean` on `AutomixPluginConfig` for advanced/debug control.
+ */
+export type AutomixMode =
+    /** @deprecated Basic-only compatibility path. */
+    | "lite"
+    /** @deprecated Equivalent to the default smart AutoMix behavior. */
+    | "pro"
 
 export interface AutomixPluginConfig {
     name?: string
     /** Master switch. When false the plugin does nothing at all. */
     enabled?: boolean
     /**
-     * Transition analysis mode. "lite" uses silence-trimmed fixed crossfades;
-     * "pro" adds BPM/beat/energy analysis and falls back to Lite per pair.
+     * Enables smart BPM/beat/energy analysis when available. When disabled,
+     * AutoMix uses only the basic crossfade stack. Defaults to true.
+     */
+    smartAnalysis?: boolean
+    /**
+     * @deprecated AutoMix no longer exposes Lite/Pro product modes. Use
+     * `smartAnalysis: false` only for advanced/debug basic-only transitions.
+     * `mode: "pro"` maps to default smart behavior; `mode: "lite"` maps to
+     * the basic-only compatibility path.
      */
     mode?: AutomixMode
     /**
-     * Automix Pro: beat/BPM/energy analysis drives fade timing and duration.
-     * Falls back to Lite behavior per track pair whenever the analysis is
-     * unavailable or below the confidence threshold. Default false.
-     *
-     * @deprecated Use `mode: "pro"` instead.
+     * @deprecated Use `smartAnalysis` for advanced/debug control. `true` maps
+     * to default smart behavior; `false` maps to basic-only compatibility.
      */
     pro?: boolean
-    /** Minimum normalized rhythm confidence (0..1) for Pro transitions. */
+    /** Minimum normalized rhythm confidence (0..1) for smart transitions. */
+    smartConfidenceMin?: number
+    /**
+     * @deprecated Use `smartConfidenceMin`.
+     */
     proConfidenceMin?: number
     /** Optional bridge for React UIs that want to expose transition state. */
     onTransitionChange?: (isTransitioning: boolean) => void
 }
 
 /**
- * Automix Lite as a lifecycle plugin.
+ * Smart AutoMix as a lifecycle plugin.
  *
- * The implementation intentionally mirrors the legacy `useAutomix` hook: the
- * main engine audio element remains deck A/source-of-truth, while this plugin
- * owns one detached deck B only around a transition.
+ * The main engine audio element remains deck A/source-of-truth, while this
+ * plugin owns one detached deck B only around a transition. Smart analysis
+ * improves timing when confident; otherwise the stack falls back to
+ * silence-trimmed crossfade, then basic crossfade, then normal advance.
  */
 export class AutomixPlugin implements AudioPlayerPlugin {
     readonly name: string
@@ -85,16 +102,17 @@ export class AutomixPlugin implements AudioPlayerPlugin {
     private failedPair: string | null = null
     private prevSourceKey: string | null = null
     private transitioning = false
-    private pro: boolean
-    private readonly proConfidenceMin: number
+    private smartAnalysis: boolean
+    private readonly smartConfidenceMin: number
     private plan: TransitionPlan | null = null
     private activeFadeMs = AUTOMIX_FADE_MS
 
     constructor(config: AutomixPluginConfig = {}) {
         this.name = config.name ?? "automix"
         this.enabled = config.enabled ?? true
-        this.pro = (config.mode ?? (config.pro ? "pro" : "lite")) === "pro"
-        this.proConfidenceMin = config.proConfidenceMin ?? PRO_CONFIDENCE_MIN
+        this.smartAnalysis = resolveSmartAnalysis(config)
+        this.smartConfidenceMin =
+            config.smartConfidenceMin ?? config.proConfidenceMin ?? SMART_CONFIDENCE_MIN
         this.onTransitionChange = config.onTransitionChange
     }
 
@@ -102,8 +120,13 @@ export class AutomixPlugin implements AudioPlayerPlugin {
         return this.transitioning
     }
 
+    isSmartAnalysisEnabled() {
+        return this.smartAnalysis
+    }
+
+    /** @deprecated AutoMix no longer exposes product modes. */
     getMode(): AutomixMode {
-        return this.pro ? "pro" : "lite"
+        return this.smartAnalysis ? "pro" : "lite"
     }
 
     init(playerInstance: PluginPlayerContext) {
@@ -118,12 +141,16 @@ export class AutomixPlugin implements AudioPlayerPlugin {
         this.prevSourceKey = null
     }
 
-    updateConfig(config: Pick<AutomixPluginConfig, "enabled" | "mode" | "pro">) {
+    updateConfig(
+        config: Pick<
+            AutomixPluginConfig,
+            "enabled" | "smartAnalysis" | "mode" | "pro"
+        >
+    ) {
         const nextEnabled = config.enabled ?? this.enabled
         if (this.enabled && !nextEnabled) this.cancel()
         this.enabled = nextEnabled
-        if (config.mode !== undefined) this.pro = config.mode === "pro"
-        else if (config.pro !== undefined) this.pro = config.pro
+        this.smartAnalysis = resolveSmartAnalysis(config, this.smartAnalysis)
         this.analyzeCurrentTrack()
     }
 
@@ -151,9 +178,9 @@ export class AutomixPlugin implements AudioPlayerPlugin {
         }
 
         if (this.enabled && track) void this.ensureAnalysis(track)
-        // Pro analysis needs minutes, not the 15s preload lead: start the next
-        // track's analysis as soon as the current one loads.
-        if (this.enabled && this.usePro()) {
+        // Smart analysis needs minutes, not the 15s preload lead: start the
+        // next track's analysis as soon as the current one loads.
+        if (this.enabled && this.useSmartAnalysis()) {
             const next = context.getNextTrack()
             if (next) void this.ensureAnalysis(next)
         }
@@ -195,25 +222,27 @@ export class AutomixPlugin implements AudioPlayerPlugin {
         if (!this.enabled || !this.context) return
         const track = this.context.getCurrentTrack()
         if (track) void this.ensureAnalysis(track)
-        if (this.usePro()) {
+        if (this.useSmartAnalysis()) {
             const next = this.context.getNextTrack()
             if (next) void this.ensureAnalysis(next)
         }
     }
 
-    /** Pro behavior is pointless where fades can't run (volume-locked browsers). */
-    private usePro(): boolean {
-        return this.pro && !fadeUnsupported
+    /** Smart analysis is pointless where fades can't run (volume-locked browsers). */
+    private useSmartAnalysis(): boolean {
+        return this.smartAnalysis && !fadeUnsupported
     }
 
     private ensureAnalysis(track: Track): Promise<unknown> {
-        return this.usePro() ? ensureProTrackAnalysis(track) : ensureTrackAnalysis(track)
+        return this.useSmartAnalysis()
+            ? ensureSmartTrackAnalysis(track)
+            : ensureTrackAnalysis(track)
     }
 
-    /** Trims from the Pro analysis when available, else the Lite silence scan. */
+    /** Trims from smart analysis when available, else the silence scan. */
     private effectiveTrims(track: Track | null): TrackTrims | null {
-        if (this.usePro()) {
-            const analysis = getTrackAnalysis(track)
+        if (this.useSmartAnalysis()) {
+            const analysis = getSmartTrackAnalysis(track)
             if (analysis) {
                 return {
                     trimStartMs: analysis.trimStartMs ?? 0,
@@ -227,13 +256,13 @@ export class AutomixPlugin implements AudioPlayerPlugin {
     /**
      * Where deck B should be parked before the fade, in milliseconds. The
      * beat-aligned entry point applies only while a confident pair plan is
-     * active; any fallback parks at the silence trim start exactly like Lite,
+     * active; any fallback parks at the silence trim start,
      * so low-confidence beat guesses never skip the next track's intro.
      */
     private deckStartMs(next: Track): number {
-        if (this.usePro()) {
+        if (this.useSmartAnalysis()) {
             if (this.plan) return this.plan.deckStartMsInB
-            const analysis = getTrackAnalysis(next)
+            const analysis = getSmartTrackAnalysis(next)
             if (analysis) return analysis.trimStartMs ?? 0
         }
         return getTrackTrims(next)?.trimStartMs ?? 0
@@ -562,27 +591,27 @@ export class AutomixPlugin implements AudioPlayerPlugin {
         const trims = this.effectiveTrims(currentTrack)
         const effectiveEnd = engine.duration - (trims ? trims.trimEndMs / 1000 : 0)
 
-        // Pro: re-plan from whatever analyses have settled by now. The plan
-        // collapses to Lite values (usedPro: false) until both sides carry
-        // confident rhythm data; the fade length is locked at fade start.
+        // Smart analysis: re-plan from whatever analyses have settled by now.
+        // The plan stays on the basic stack until both sides carry confident
+        // rhythm data; the fade length is locked at fade start.
         let plan: TransitionPlan | null = null
-        if (this.usePro()) {
+        if (this.useSmartAnalysis()) {
             // Dedup'd to a map lookup once analysis is underway. Kept here
             // (not just onTrackLoad) because this is the only path that sees
             // a next track changed mid-playback — shuffle toggles or queue
-            // edits — early enough for the multi-second Pro analysis.
+            // edits — early enough for the multi-second smart analysis.
             void this.ensureAnalysis(nextTrack)
-            const outgoing = getTrackAnalysis(currentTrack)
-            const incoming = getTrackAnalysis(nextTrack)
+            const outgoing = getSmartTrackAnalysis(currentTrack)
+            const incoming = getSmartTrackAnalysis(nextTrack)
             if (outgoing && incoming) {
                 const candidate = planTransition(
                     outgoing,
                     incoming,
                     engine.duration * 1000,
                     AUTOMIX_FADE_MS,
-                    this.proConfidenceMin
+                    this.smartConfidenceMin
                 )
-                if (candidate.usedPro) plan = candidate
+                if (candidate.usedSmartAnalysis) plan = candidate
             }
         }
         this.plan = plan
@@ -613,15 +642,23 @@ export class AutomixPlugin implements AudioPlayerPlugin {
     }
 }
 
+function resolveSmartAnalysis(
+    config: Pick<AutomixPluginConfig, "smartAnalysis" | "mode" | "pro">,
+    fallback = true
+): boolean {
+    if (config.smartAnalysis !== undefined) return config.smartAnalysis
+    if (config.mode !== undefined) return config.mode === "pro"
+    if (config.pro !== undefined) return config.pro
+    return fallback
+}
+
 export function createAutomixPlugin(config?: AutomixPluginConfig) {
     return new AutomixPlugin(config)
 }
 
 /**
- * Automix Pro: an `AutomixPlugin` with metadata-driven transitions enabled.
- * BPM, beats, and energy steer fade timing and length; pairs without
- * trustworthy analysis fall back to Lite behavior automatically.
+ * @deprecated Use `createAutomixPlugin()`; smart AutoMix is now the default.
  */
 export function createAutomixProPlugin(config?: Omit<AutomixPluginConfig, "pro">) {
-    return new AutomixPlugin({ ...config, mode: "pro" })
+    return new AutomixPlugin({ ...config, smartAnalysis: true })
 }

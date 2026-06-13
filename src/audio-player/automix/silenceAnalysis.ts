@@ -3,7 +3,7 @@ import { trackKey } from "../utils/trackKey"
 import { fetchAndDecodeTrack } from "./decodeTrack"
 
 /**
- * Conservative silence trimming for Automix Lite.
+ * Conservative silence trimming for basic crossfade fallback.
  *
  * Downloads a track, decodes it, and RMS-scans the first/last seconds for
  * near-silence so crossfades don't run through dead air. This is deliberately
@@ -37,7 +37,7 @@ let lastJob: Promise<unknown> = Promise.resolve()
 
 /**
  * RMS-scan the first/last seconds of a decoded buffer for near-silence.
- * Pure: also used by the Automix Pro analysis on its shared decode.
+ * Pure: also used by smart transition analysis on its shared decode.
  */
 export function scanSilenceEdges(buffer: AudioBuffer): TrackTrims {
     const win = Math.max(1, Math.round((WINDOW_MS / 1000) * buffer.sampleRate))
@@ -142,8 +142,8 @@ export function getTrackTrims(track: Track | null): TrackTrims | null {
 }
 
 /**
- * Seed the trims cache from another analysis pipeline. The Automix Pro
- * orchestrator shares this module's decode and silence scan; seeding lets
+ * Seed the trims cache from another analysis pipeline. Smart analysis shares
+ * this module's decode and silence scan; seeding lets
  * `getTrackTrims()` serve trims as soon as the scan finishes, long before the
  * slower rhythm extraction settles, without a second download. Existing
  * entries are never overwritten.

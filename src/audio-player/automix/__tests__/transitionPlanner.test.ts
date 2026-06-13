@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { TrackAnalysis } from "../../types"
 import {
-    PRO_CONFIDENCE_MIN,
+    SMART_CONFIDENCE_MIN,
     bpmCompatibility,
     computeTransitionPoints,
     normalizeRhythmConfidence,
@@ -131,8 +131,8 @@ describe("planTransition", () => {
     const durationAMs = 240_000
     const baseFadeMs = 5500
 
-    it("falls back to Lite when either side lacks confidence", () => {
-        const weak = confidentAnalysis({ confidence: PRO_CONFIDENCE_MIN - 0.1 })
+    it("falls back to the basic crossfade plan when either side lacks confidence", () => {
+        const weak = confidentAnalysis({ confidence: SMART_CONFIDENCE_MIN - 0.1 })
         const strong = confidentAnalysis()
         for (const [a, b] of [
             [weak, strong],
@@ -141,17 +141,19 @@ describe("planTransition", () => {
             [strong, null],
         ] as const) {
             const plan = planTransition(a, b, durationAMs, baseFadeMs)
+            expect(plan.usedSmartAnalysis).toBe(false)
             expect(plan.usedPro).toBe(false)
             expect(plan.fadeMs).toBe(baseFadeMs)
         }
     })
 
-    it("Lite fallback reproduces trim-based timing", () => {
+    it("basic fallback reproduces trim-based timing", () => {
         const outgoing = confidentAnalysis({ confidence: 0, trimEndMs: 10_000 })
         const incoming = confidentAnalysis({ confidence: 0, trimStartMs: 2000 })
         const plan = planTransition(outgoing, incoming, durationAMs, baseFadeMs)
         expect(plan.fadeStartMsInA).toBe(durationAMs - 10_000 - baseFadeMs)
         expect(plan.deckStartMsInB).toBe(2000)
+        expect(plan.usedSmartAnalysis).toBe(false)
     })
 
     it("extends the blend for BPM-compatible high-energy pairs", () => {
@@ -161,6 +163,7 @@ describe("planTransition", () => {
             durationAMs,
             baseFadeMs
         )
+        expect(plan.usedSmartAnalysis).toBe(true)
         expect(plan.usedPro).toBe(true)
         expect(plan.fadeMs).toBeGreaterThanOrEqual(9000)
         expect(plan.fadeMs).toBeLessThanOrEqual(12_000)
@@ -173,7 +176,7 @@ describe("planTransition", () => {
             durationAMs,
             baseFadeMs
         )
-        expect(plan.usedPro).toBe(true)
+        expect(plan.usedSmartAnalysis).toBe(true)
         expect(plan.fadeMs).toBe(baseFadeMs)
     })
 
@@ -184,7 +187,7 @@ describe("planTransition", () => {
             durationAMs,
             baseFadeMs
         )
-        expect(plan.usedPro).toBe(true)
+        expect(plan.usedSmartAnalysis).toBe(true)
         expect(plan.fadeMs).toBeGreaterThanOrEqual(2500)
         expect(plan.fadeMs).toBeLessThanOrEqual(3500)
     })
@@ -199,7 +202,7 @@ describe("planTransition", () => {
             shortDurationMs,
             baseFadeMs
         )
-        expect(plan.usedPro).toBe(true)
+        expect(plan.usedSmartAnalysis).toBe(true)
         expect(plan.fadeMs).toBeLessThanOrEqual(shortDurationMs - 2000)
     })
 
@@ -210,7 +213,7 @@ describe("planTransition", () => {
             durationAMs,
             baseFadeMs
         )
-        expect(plan.usedPro).toBe(true)
+        expect(plan.usedSmartAnalysis).toBe(true)
         expect(plan.fadeStartMsInA % 500).toBe(0)
     })
 

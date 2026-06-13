@@ -149,11 +149,10 @@ export const availablePlugins: PluginRegistryEntry[] = [
         id: "automix",
         label: "AutoMix",
         description:
-            "Crossfade transitions between playlist tracks. Defaults to Lite " +
-            "silence trimming; use createAutomixPlugin({ mode: \"pro\" }) for " +
-            "beat-aware transitions.",
+            "Smart automatic playlist transitions with beat, energy, and " +
+            "silence-aware planning plus graceful crossfade fallback.",
         factory: () =>
-            createAutomixPlugin({ name: "registry-automix", mode: "lite" }),
+            createAutomixPlugin({ name: "registry-automix" }),
         defaultActive: false,
         category: "playback",
     },

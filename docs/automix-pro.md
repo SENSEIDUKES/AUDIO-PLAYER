@@ -1,19 +1,12 @@
-# AutoMix Pro Compatibility
+# Legacy AutoMix Compatibility
 
-AutoMix Pro is now `mode: "pro"` on the unified AutoMix plugin:
+The old advanced AutoMix helper is now a deprecated compatibility wrapper.
+Smart automatic behavior is the default:
 
 ```tsx
-import { createAutomixPlugin } from "@seihouse/audio-player"
-
-<AudioPlayer tracks={tracks} plugins={[createAutomixPlugin({ mode: "pro" })]} />
+createAutomixPlugin()
 ```
 
-`createAutomixProPlugin()` remains exported as a compatibility wrapper, but new
-code should prefer `createAutomixPlugin({ mode: "pro" })`.
-
-Pro mode keeps the same two-deck crossfade and handoff lifecycle as Lite mode,
-then adds BPM, beat, energy, and transition-point analysis. Low-confidence or
-failed analysis falls back to Lite behavior for that track pair.
-
-See [`automix.md`](./automix.md) for the current AutoMix API, fallback behavior,
-and compatibility notes.
+Existing `createAutomixProPlugin()` and old mode/pro configs continue to work
+silently for older integrations, but new code should use the single automatic
+plugin. See [`automix.md`](./automix.md).

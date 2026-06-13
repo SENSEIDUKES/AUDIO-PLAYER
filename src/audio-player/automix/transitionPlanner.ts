@@ -1,7 +1,7 @@
 import type { TrackAnalysis, TrackTrims } from "../types"
 
 /**
- * Pure transition math for Automix Pro. No DOM, no Web Audio — everything
+ * Pure transition math for smart AutoMix. No DOM, no Web Audio — everything
  * here is deterministic and unit-tested. The orchestrator uses
  * `computeTransitionPoints` to bake default transition points into a
  * `TrackAnalysis`; `AutomixPlugin` calls `planTransition` at preload time to
@@ -11,12 +11,14 @@ import type { TrackAnalysis, TrackTrims } from "../types"
 /** RhythmExtractor2013 ("multifeature") reports confidence on a 0–5.32 scale. */
 const RAW_CONFIDENCE_MAX = 5.32
 /** Below this normalized confidence a track's rhythm data is not trusted. */
-export const PRO_CONFIDENCE_MIN = 0.55
+export const SMART_CONFIDENCE_MIN = 0.55
+/** @deprecated Use `SMART_CONFIDENCE_MIN`. */
+export const PRO_CONFIDENCE_MIN = SMART_CONFIDENCE_MIN
 /** BPM compatibility at/above this allows an extended beat-aware blend. */
 const COMPAT_BLEND_MIN = 0.5
 /** Mean pair energy at/above this stretches the blend toward the maximum. */
 const HIGH_ENERGY_MIN = 0.5
-/** Hard bounds for any Pro fade. */
+/** Hard bounds for any smart fade. */
 const FADE_MIN_MS = 2500
 const FADE_MAX_MS = 12_000
 /** Extended blend range used for BPM-compatible, high-energy pairs. */
@@ -35,7 +37,9 @@ export interface TransitionPlan {
     fadeStartMsInA: number
     /** Position where the incoming deck should be parked before the fade. */
     deckStartMsInB: number
-    /** False when the pair fell back to Automix Lite constants. */
+    /** True when the pair used confident smart transition analysis. */
+    usedSmartAnalysis: boolean
+    /** @deprecated Use `usedSmartAnalysis`. */
     usedPro: boolean
 }
 
@@ -137,15 +141,16 @@ function trimsOf(analysis: TrackAnalysis | null): TrackTrims {
  * high-energy pairs get a long beat-snapped blend (9–12s, scaled by energy),
  * compatible low-energy pairs keep the base fade, and BPM-incompatible pairs
  * get a short fade (2.5–3.5s) so the tempo clash stays brief. When either
- * side's confidence is below `confidenceMin` the plan reproduces Automix
- * Lite: base fade ending at the trimmed end, deck parked at the trim start.
+ * side's confidence is below `confidenceMin` the plan uses the basic
+ * crossfade fallback: base fade ending at the trimmed end, deck parked at the
+ * trim start.
  */
 export function planTransition(
     outgoing: TrackAnalysis | null,
     incoming: TrackAnalysis | null,
     durationAMs: number,
     baseFadeMs: number,
-    confidenceMin = PRO_CONFIDENCE_MIN
+    confidenceMin = SMART_CONFIDENCE_MIN
 ): TransitionPlan {
     const trimsA = trimsOf(outgoing)
     const trimsB = trimsOf(incoming)
@@ -155,6 +160,7 @@ export function planTransition(
         fadeMs: baseFadeMs,
         fadeStartMsInA: Math.max(trimmedEndAMs - baseFadeMs, 0),
         deckStartMsInB: trimsB.trimStartMs,
+        usedSmartAnalysis: false,
         usedPro: false,
     }
 
@@ -195,6 +201,7 @@ export function planTransition(
         fadeMs,
         fadeStartMsInA: pointsA.transitionOutMs,
         deckStartMsInB,
+        usedSmartAnalysis: true,
         usedPro: true,
     }
 }

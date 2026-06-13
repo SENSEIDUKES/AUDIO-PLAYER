@@ -1,7 +1,7 @@
 import type { TrackAnalysis } from "../types"
 
 /**
- * Best-effort IndexedDB persistence for Automix Pro analyses. Rhythm
+ * Best-effort IndexedDB persistence for smart transition analyses. Rhythm
  * extraction costs a download, a decode, and seconds of WASM CPU while the
  * result is ~1KB of JSON, so caching across page loads is a large win.
  *

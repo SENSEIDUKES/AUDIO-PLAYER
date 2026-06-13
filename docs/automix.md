@@ -1,33 +1,33 @@
 # AutoMix Plugin
 
-AutoMix is one plugin with two modes:
+AutoMix is one smart automatic transition plugin:
 
 ```tsx
 import { createAutomixPlugin } from "@seihouse/audio-player"
 
 const plugins = [
-  createAutomixPlugin({ mode: "lite" }), // default
-  createAutomixPlugin({ mode: "pro" }),
+  createAutomixPlugin(),
 ]
 ```
 
-`mode: "lite"` uses the two-deck crossfade with conservative silence trimming.
-It preloads the resolved next track into a detached deck, runs an equal-power
-fade near the trimmed end of the current track, then advances through the host's
-normal queue path.
+AutoMix preloads the resolved next track into a detached deck, runs an
+equal-power fade near the best transition point, then advances through the
+host's normal queue path. It uses BPM, beat, energy, and transition-point
+analysis when that data is available and confident.
 
-`mode: "pro"` uses the same deck and handoff lifecycle, but adds BPM, beat,
-energy, and transition-point analysis. If either side lacks confident rhythm
-metadata, that transition falls back to Lite behavior.
+Fallbacks are automatic: smart analysis, silence-trimmed crossfade, basic fixed
+crossfade, then normal track advance when the browser or media cannot support a
+safe crossfade.
 
 Legacy compatibility remains:
 
 - `<AudioPlayer automix>` and `<AudioSessionProvider automix>` create an
-  internal Lite-mode plugin.
+  internal basic crossfade bridge for older integrations. A future core
+  transition API is expected to expose this foundation more directly.
 - `useAutomix()` remains exported for older code, but delegates to
-  `AutomixPlugin` and emits a deprecation warning.
-- `createAutomixProPlugin()` remains exported as
-  `createAutomixPlugin({ mode: "pro" })`.
+  `AutomixPlugin`.
+- Old mode/pro config and `createAutomixProPlugin()` remain exported as silent
+  deprecated compatibility wrappers.
 
 Known constraints are unchanged: crossfades require an HTML media element and
 programmatic volume support, CORS-readable audio is needed for analysis, and

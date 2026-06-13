@@ -36,14 +36,17 @@ export {
     ensureTrackAnalysis,
     getTrackTrims,
 } from "./automix/silenceAnalysis"
-// Automix Pro metadata layer. Pure helpers are exported for host apps that
-// want to score queues or display analysis; none of them pull in the essentia
-// worker chunk — that loads only when a Pro analysis actually runs.
+// Smart transition metadata layer. Pure helpers are exported for host apps
+// that want to score queues or display analysis; none of them pull in the
+// essentia worker chunk until advanced analysis actually runs.
 export {
+    ensureSmartTrackAnalysis,
     ensureProTrackAnalysis,
+    getSmartTrackAnalysis,
     getTrackAnalysis,
 } from "./automix/trackAnalysis"
 export {
+    SMART_CONFIDENCE_MIN,
     PRO_CONFIDENCE_MIN,
     bpmCompatibility,
     computeTransitionPoints,

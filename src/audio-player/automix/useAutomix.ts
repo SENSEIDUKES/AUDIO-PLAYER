@@ -19,7 +19,7 @@ export interface UseAutomixOptions {
      * the next index equals the current one).
      */
     nextTrack: Track | null
-    /** Internal callers can suppress the compatibility warning. */
+    /** @deprecated No-op retained for older callers. */
     suppressDeprecatedWarning?: boolean
     /**
      * Advance the queue to the next track using the host's normal end-of-track
@@ -40,17 +40,6 @@ export interface AutomixController {
     handleTrackEnded: () => boolean
 }
 
-let warnedUseAutomixDeprecated = false
-
-function warnUseAutomixDeprecated() {
-    if (warnedUseAutomixDeprecated || typeof console === "undefined") return
-    warnedUseAutomixDeprecated = true
-    // eslint-disable-next-line no-console
-    console.warn(
-        "[AudioPlayer] useAutomix is deprecated. Prefer registering AutomixPlugin through the plugin system."
-    )
-}
-
 /**
  * Deprecated compatibility adapter for older integrations.
  *
@@ -68,14 +57,10 @@ export function useAutomix(options: UseAutomixOptions): AutomixController {
         pluginRef.current = new AutomixPlugin({
             name: "legacy-use-automix",
             enabled: options.enabled,
-            mode: "lite",
+            smartAnalysis: false,
             onTransitionChange: setIsTransitioning,
         })
     }
-
-    useEffect(() => {
-        if (!options.suppressDeprecatedWarning) warnUseAutomixDeprecated()
-    }, [options.suppressDeprecatedWarning])
 
     const context = useMemo<PluginPlayerContext>(
         () => ({
@@ -99,7 +84,10 @@ export function useAutomix(options: UseAutomixOptions): AutomixController {
     }, [context])
 
     useEffect(() => {
-        pluginRef.current?.updateConfig({ enabled: options.enabled, mode: "lite" })
+        pluginRef.current?.updateConfig({
+            enabled: options.enabled,
+            smartAnalysis: false,
+        })
     }, [options.enabled])
 
     useEffect(() => {

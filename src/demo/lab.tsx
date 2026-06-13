@@ -15,7 +15,7 @@ import {
     createSleepTimerPlugin,
     createWaveformPlugin,
     formatTime,
-    getTrackAnalysis,
+    getSmartTrackAnalysis,
     useAudioPlayer,
     useAudioSession,
     useSAPPropGetters,
@@ -351,16 +351,15 @@ function PluginArchitectureSection() {
     )
 }
 
-/* ----------------------------- AutoMix Pro mode demo ----------------------------- */
-function AutomixProSection() {
+/* ----------------------------- Smart AutoMix demo ----------------------------- */
+function SmartAutomixSection() {
     const [transitioning, setTransitioning] = useState(false)
     const [readout, setReadout] = useState("analyzing…")
 
-    const proPlugins = useMemo(
+    const smartPlugins = useMemo(
         () => [
             createAutomixPlugin({
-                name: "demo-automix-pro",
-                mode: "pro",
+                name: "demo-smart-automix",
                 onTransitionChange: setTransitioning,
             }),
         ],
@@ -374,7 +373,7 @@ function AutomixProSection() {
             n === undefined ? "–" : n.toFixed(digits)
         const tick = () => {
             const lines = proPlaylist.map((t) => {
-                const a = getTrackAnalysis(t)
+                const a = getSmartTrackAnalysis(t)
                 if (!a) return `${t.title}: pending`
                 return (
                     `${t.title}: bpm ${fmt(a.bpm, 1)} · conf ${fmt(a.confidence)} · ` +
@@ -392,30 +391,30 @@ function AutomixProSection() {
     return (
         <section className="lab-section">
             <h2 className="lab-section__title">
-                AutoMix Pro mode
+                Smart AutoMix
                 <small>beat-near · energy-aware</small>
             </h2>
             <p className="lab-section__desc">
-                <code>createAutomixPlugin(&#123; mode: "pro" &#125;)</code> analyzes each track in a
-                worker (essentia.js BPM/beat extraction, lazy-loaded WASM) and
-                drives crossfade timing from the metadata: fades start on a
-                beat, BPM-compatible high-energy pairs blend longer, tempo
-                clashes fade short, and low-confidence pairs fall back to Lite
-                mode. The player&apos;s legacy AutoMix toggle stays off because
-                the plugin owns the transitions here.
+                <code>createAutomixPlugin()</code> analyzes each track in a worker
+                (essentia.js BPM/beat extraction, lazy-loaded WASM) and drives
+                crossfade timing from the metadata: fades start on a beat,
+                BPM-compatible high-energy pairs blend longer, tempo clashes
+                fade short, and low-confidence pairs fall back to the basic
+                crossfade stack. The player&apos;s legacy AutoMix toggle stays off
+                because the plugin owns the smart transitions here.
             </p>
             <div className="lab-section__grid">
                 <div className="lab-states">
                     <div className="lab-state">
                         <h3 className="lab-state__title">
-                            Pro transitions {transitioning ? "· crossfading…" : ""}
+                            Smart transitions {transitioning ? "· crossfading…" : ""}
                         </h3>
                         <div className="lab-state__player">
                             <AudioPlayer
                                 tracks={proPlaylist}
                                 showTracklist
                                 repeatMode="all"
-                                plugins={proPlugins}
+                                plugins={smartPlugins}
                                 accentColor="#F4B860"
                                 progressColor="#F4B860"
                                 backgroundColor="rgba(28,22,14,0.6)"
@@ -891,7 +890,7 @@ export function Lab() {
                     <PluginRegistrySection />
                 </PluginRegistryProvider>
 
-                <AutomixProSection />
+                <SmartAutomixSection />
             </LabGroup>
 
             <LabGroup title="Backends & waveform">

@@ -3,8 +3,8 @@ import type { Track } from "../../types"
 import { getTrackTrims } from "../silenceAnalysis"
 import {
     configureTrackAnalysis,
-    ensureProTrackAnalysis,
-    getTrackAnalysis,
+    ensureSmartTrackAnalysis,
+    getSmartTrackAnalysis,
     resetTrackAnalysisCacheForTests,
 } from "../trackAnalysis"
 
@@ -31,7 +31,7 @@ afterEach(() => {
     configureTrackAnalysis({ rhythm: null, decode: null, persist: true })
 })
 
-describe("ensureProTrackAnalysis", () => {
+describe("ensureSmartTrackAnalysis", () => {
     it("analyzes a short track as a single segment and fills rhythm fields", async () => {
         const decode = vi.fn(async () => fakeBuffer(120))
         const rhythm = vi.fn(async (_s: Float32Array, _sr: number, offsetMs: number) => ({
@@ -41,7 +41,7 @@ describe("ensureProTrackAnalysis", () => {
         }))
         configureTrackAnalysis({ decode, rhythm, persist: false })
 
-        const analysis = await ensureProTrackAnalysis(track("short"))
+        const analysis = await ensureSmartTrackAnalysis(track("short"))
         expect(rhythm).toHaveBeenCalledTimes(1)
         expect(analysis?.bpm).toBe(120)
         expect(analysis?.beats).toEqual([500, 1000, 1500])
@@ -61,7 +61,7 @@ describe("ensureProTrackAnalysis", () => {
         })
         configureTrackAnalysis({ decode, rhythm, persist: false })
 
-        const analysis = await ensureProTrackAnalysis(track("long"))
+        const analysis = await ensureSmartTrackAnalysis(track("long"))
         expect(rhythm).toHaveBeenCalledTimes(2)
         expect(offsets[0]).toBe(0) // head starts at the trim start
         expect(offsets[1]).toBe(durationS * 1000 - 120_000) // tail covers the last 120s
@@ -79,7 +79,7 @@ describe("ensureProTrackAnalysis", () => {
         }))
         configureTrackAnalysis({ decode, rhythm, persist: false })
 
-        const analysis = await ensureProTrackAnalysis(track("halftime"))
+        const analysis = await ensureSmartTrackAnalysis(track("halftime"))
         expect(analysis?.bpm).toBe(170)
     })
 
@@ -93,7 +93,7 @@ describe("ensureProTrackAnalysis", () => {
         }))
         configureTrackAnalysis({ decode, rhythm, persist: false })
 
-        const analysis = await ensureProTrackAnalysis(track("clash"))
+        const analysis = await ensureSmartTrackAnalysis(track("clash"))
         expect(analysis?.confidence).toBeCloseTo((4.0 / 5.32) * 0.7, 3)
     })
 
@@ -102,7 +102,7 @@ describe("ensureProTrackAnalysis", () => {
         const rhythm = vi.fn(async () => null)
         configureTrackAnalysis({ decode, rhythm, persist: false })
 
-        const analysis = await ensureProTrackAnalysis(track("norhythm"))
+        const analysis = await ensureSmartTrackAnalysis(track("norhythm"))
         expect(analysis).not.toBeNull()
         expect(analysis?.confidence).toBe(0)
         expect(analysis?.bpm).toBeUndefined()
@@ -112,7 +112,7 @@ describe("ensureProTrackAnalysis", () => {
 
     it("resolves null when decoding fails", async () => {
         configureTrackAnalysis({ decode: async () => null, rhythm: async () => null, persist: false })
-        const analysis = await ensureProTrackAnalysis(track("broken"))
+        const analysis = await ensureSmartTrackAnalysis(track("broken"))
         expect(analysis).toBeNull()
     })
 
@@ -126,14 +126,14 @@ describe("ensureProTrackAnalysis", () => {
         configureTrackAnalysis({ decode, rhythm, persist: false })
 
         const t = track("cached")
-        const [a, b] = await Promise.all([ensureProTrackAnalysis(t), ensureProTrackAnalysis(t)])
-        const c = await ensureProTrackAnalysis(t)
+        const [a, b] = await Promise.all([ensureSmartTrackAnalysis(t), ensureSmartTrackAnalysis(t)])
+        const c = await ensureSmartTrackAnalysis(t)
         expect(decode).toHaveBeenCalledTimes(1)
         expect(a).toBe(b)
         expect(b).toBe(c)
     })
 
-    it("seeds the Lite trims cache before rhythm extraction finishes", async () => {
+    it("seeds the trim cache before rhythm extraction finishes", async () => {
         const decode = vi.fn(async () => fakeBuffer(120))
         let release!: () => void
         const gate = new Promise<null>((resolve) => {
@@ -142,22 +142,22 @@ describe("ensureProTrackAnalysis", () => {
         configureTrackAnalysis({ decode, rhythm: () => gate, persist: false })
 
         const t = track("seeded")
-        const job = ensureProTrackAnalysis(t)
-        // Trims become readable via the Lite API while rhythm is still pending.
+        const job = ensureSmartTrackAnalysis(t)
+        // Trims become readable while rhythm is still pending.
         await vi.waitFor(() => expect(getTrackTrims(t)).toEqual({ trimStartMs: 0, trimEndMs: 0 }))
-        expect(getTrackAnalysis(t)).toBeNull()
+        expect(getSmartTrackAnalysis(t)).toBeNull()
         release()
         await job
-        expect(getTrackAnalysis(t)).not.toBeNull()
+        expect(getSmartTrackAnalysis(t)).not.toBeNull()
     })
 
-    it("exposes settled results synchronously through getTrackAnalysis", async () => {
+    it("exposes settled results synchronously through getSmartTrackAnalysis", async () => {
         const decode = vi.fn(async () => fakeBuffer(120))
         configureTrackAnalysis({ decode, rhythm: async () => null, persist: false })
 
         const t = track("sync")
-        expect(getTrackAnalysis(t)).toBeNull()
-        await ensureProTrackAnalysis(t)
-        expect(getTrackAnalysis(t)?.trimStartMs).toBe(0)
+        expect(getSmartTrackAnalysis(t)).toBeNull()
+        await ensureSmartTrackAnalysis(t)
+        expect(getSmartTrackAnalysis(t)?.trimStartMs).toBe(0)
     })
 })

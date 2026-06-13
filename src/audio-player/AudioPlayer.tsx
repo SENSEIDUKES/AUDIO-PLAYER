@@ -356,10 +356,13 @@ function AudioPlayerInner(props: AudioPlayerProps) {
             ? localQueue[pluginNextIndex] ?? null
             : null
 
+    // Compatibility bridge: the legacy `automix` prop preserves the old
+    // basic crossfade behavior. New smart AutoMix should be registered through
+    // `plugins={[createAutomixPlugin()]}` until a core crossfade API lands.
     const legacyAutomixPlugin = useMemo(
         () =>
             localAutomix && isPlaylistMode
-                ? createAutomixPlugin({ mode: "lite" })
+                ? createAutomixPlugin({ smartAnalysis: false })
                 : null,
         [isPlaylistMode, localAutomix]
     )
