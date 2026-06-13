@@ -97,7 +97,10 @@ export class AutoThemePlugin implements AudioPlayerPlugin {
         // A newer track loaded (or the plugin was destroyed) while we decoded.
         if (token !== this.generation) return
         if (!palette) {
-            // Keep manual colors; extraction failed (load error or CORS taint).
+            // Extraction failed (load error or CORS taint). Clear any vars from
+            // a prior track so we revert to the player's manual theme rather
+            // than leaving stale colors behind.
+            this.clearVars()
             this.onPaletteChange?.(null, track)
             return
         }
