@@ -1,0 +1,192 @@
+/* SEI Canvas Action Menu — the bottom-anchored half-circle command wheel.
+   Rendered through a portal on document.body; the player's --ap-* tokens are
+   copied onto the .sac root inline by the component. Sits at the same overlay
+   layer as the SAP Controller (z 120). */
+
+.sac {
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Dim + light blur, fades in. Mirrors the SAP Controller backdrop. */
+.sac__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+.sac__backdrop[data-entered="true"] {
+    opacity: 1;
+}
+
+/* Anchors the arc to the bottom-center within the safe area. */
+.sac__stage {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: max(3rem, calc(env(safe-area-inset-bottom) + 2rem));
+    pointer-events: none;
+}
+
+/* Zero-size pivot: all nodes + the center button are positioned relative to this
+   point (the bottom-center of the half-circle). */
+.sac__arc {
+    position: relative;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+
+/* Center button: Close at root depth, Back inside a submenu. */
+.sac__center {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 64px;
+    height: 64px;
+    transform: translate(-50%, -50%) scale(0.6);
+    opacity: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 1px solid color-mix(in srgb, var(--ap-text, #fff) 22%, transparent);
+    background-color: color-mix(in srgb, var(--ap-text, #fff) 12%, transparent);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: var(--ap-text, #fff);
+    cursor: pointer;
+    pointer-events: auto;
+    transition: transform 0.2s ease, opacity 0.2s ease, background-color 0.2s ease;
+}
+.sac__arc[data-open="true"] .sac__center {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+}
+.sac__center:hover {
+    background-color: color-mix(in srgb, var(--ap-text, #fff) 18%, transparent);
+}
+
+/* Breadcrumb pill, floats above the top of the arc. */
+.sac__crumb {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform: translate(-50%, calc(-50% - 184px));
+    white-space: nowrap;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--ap-text, #fff);
+    background-color: color-mix(in srgb, var(--ap-text, #fff) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ap-text, #fff) 16%, transparent);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    pointer-events: none;
+}
+
+/* A node: an icon disc with a label beneath it. Animates from the pivot out to
+   its polar offset (--sac-x / --sac-y), staggered via inline transition-delay. */
+.sac__node {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 72px;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--ap-text, #fff);
+    cursor: pointer;
+    pointer-events: auto;
+    transform: translate(-50%, -50%) scale(0.4);
+    opacity: 0;
+    transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease;
+}
+.sac__arc[data-open="true"] .sac__node {
+    transform: translate(-50%, -50%) translate(var(--sac-x), var(--sac-y)) scale(1);
+    opacity: 1;
+}
+
+.sac__node-icon {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 1px solid color-mix(in srgb, var(--ap-text, #fff) 16%, transparent);
+    background-color: color-mix(in srgb, var(--ap-text, #fff) 8%, transparent);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ap-text, #fff) 14%, transparent);
+    transition: background-color 0.2s ease, border-color 0.2s ease,
+        box-shadow 0.2s ease, color 0.2s ease;
+}
+.sac__node-label {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    text-align: center;
+    max-width: 72px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* "soon" badge for coming-soon nodes. */
+.sac__badge {
+    position: absolute;
+    top: -4px;
+    right: 2px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ap-bg, #14141c);
+    background-color: color-mix(in srgb, var(--ap-text, #fff) 70%, transparent);
+}
+
+/* ------------------------------- States ------------------------------- */
+.sac__node--active .sac__node-icon {
+    background-color: color-mix(in srgb, var(--ap-accent, #fff) 22%, transparent);
+    border-color: var(--ap-accent, #fff);
+    color: var(--ap-accent, #fff);
+    box-shadow: 0 0 0 1px var(--ap-accent, #fff),
+        0 0 18px color-mix(in srgb, var(--ap-accent, #fff) 45%, transparent);
+}
+.sac__node--inactive {
+    opacity: 0.62;
+}
+.sac__node--disabled,
+.sac__node--coming-soon,
+.sac__node--locked {
+    opacity: 0.45;
+    pointer-events: none;
+    cursor: default;
+}
+
+/* ------------------------------- Motion ------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+    .sac__backdrop,
+    .sac__center,
+    .sac__node,
+    .sac__node-icon {
+        transition: none;
+    }
+}

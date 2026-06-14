@@ -330,7 +330,7 @@ export function FullCardPlayer({
                     />
                 )}
 
-                <PlayerSurfaceButtons surface={surface} />
+                <PlayerSurfaceButtons surface={surface} onOpenQueue={handleOpenQueue} />
             </div>
         </div>
     )

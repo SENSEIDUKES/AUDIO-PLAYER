@@ -34,6 +34,17 @@ export type { SurfaceButtonProps } from "./SurfaceButton"
 export { PlayerSurfaceButtons } from "./PlayerSurfaceButtons"
 export type { PlayerSurfaceButtonsProps } from "./PlayerSurfaceButtons"
 
+export { SEICanvasActionMenu, arcOffsets, ARC_RADIUS } from "./SEICanvasActionMenu"
+export type { SEICanvasActionMenuProps, ArcOffset } from "./SEICanvasActionMenu"
+
+export { buildMenuTree, isNodeInteractive } from "../menu/menuData"
+export type {
+    MenuNode,
+    MenuItemState,
+    MenuActionId,
+    BuildMenuTreeOptions,
+} from "../menu/menuData"
+
 export { SEICanvasHost } from "./SEICanvasHost"
 export type { SEICanvasHostProps } from "./SEICanvasHost"
 
