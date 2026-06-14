@@ -108,6 +108,11 @@ export const CanvasIcon = () => (
         <path d="M21 15l-5-4-7 6" />
     </svg>
 )
+export const WaveIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M4 12v0M8 8v8M12 4v16M16 8v8M20 12v0" />
+    </svg>
+)
 export const ShareIcon = () => (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <circle cx="18" cy="5" r="3" />

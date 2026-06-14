@@ -3,7 +3,7 @@ import type { CSSProperties } from "react"
 import type { AudioPlayerTheme } from "../types"
 import { useAudioSession } from "../session/AudioSessionContext"
 import { QueueDrawer } from "../components/QueueDrawer"
-import { ProgressBar } from "../components/ProgressBar"
+import { WaveformAdapter } from "../components/WaveformAdapter"
 import { VolumeControl } from "../components/VolumeControl"
 import { SAPController } from "../components/SAPController"
 import { useShareTrack } from "../components/useShareTrack"
@@ -206,7 +206,11 @@ export function StickyBottomPlayer({
                             progress={s.duration > 0 ? s.currentTime / s.duration : 0}
                             onSeek={s.seek}
                         >
-                            <ProgressBar
+                            {/* Compact face: WaveformAdapter resolves to the plain
+                                ProgressBar (supportsWaveform: false). */}
+                            <WaveformAdapter
+                                face="stickyBottom"
+                                density={getScrubberDensity("stickyBottom")}
                                 currentTime={s.currentTime}
                                 duration={s.duration}
                                 buffered={s.buffered}

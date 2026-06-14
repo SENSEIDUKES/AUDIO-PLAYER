@@ -5,8 +5,10 @@ import {
     faceSupportsHeroCollapse,
     faceSupportsSEICanvas,
     faceSupportsScrubberCanvas,
+    faceSupportsWaveform,
     getPreferredCanvasPlacement,
     getScrubberDensity,
+    getScrubberHeight,
 } from "../faceCapabilities"
 import type { PlayerFace } from "../faceCapabilities"
 
@@ -58,6 +60,29 @@ describe("PLAYER_FACE_CAPABILITIES", () => {
                 typeof PLAYER_FACE_CAPABILITIES[face].supportsContextualActions
             ).toBe("boolean")
         }
+    })
+
+    it("opts spacious faces into the waveform and compact faces out", () => {
+        expect(faceSupportsWaveform("fullCard")).toBe(true)
+        expect(faceSupportsWaveform("portable")).toBe(true)
+        expect(faceSupportsWaveform("seaCard")).toBe(true)
+        expect(faceSupportsWaveform("miniSidebar")).toBe(false)
+        expect(faceSupportsWaveform("stickyBottom")).toBe(false)
+        expect(faceSupportsWaveform("vaultRow")).toBe(false)
+    })
+
+    it("declares supportsWaveform for every face", () => {
+        for (const face of ALL_FACES) {
+            expect(typeof PLAYER_FACE_CAPABILITIES[face].supportsWaveform).toBe(
+                "boolean"
+            )
+        }
+    })
+
+    it("maps scrubber density to a waveform height", () => {
+        expect(getScrubberHeight("compact")).toBe(28)
+        expect(getScrubberHeight("standard")).toBe(48)
+        expect(getScrubberHeight("expanded")).toBe(64)
     })
 
     it("reports hero collapse from declared capability", () => {

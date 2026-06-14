@@ -64,6 +64,7 @@ export {
 export { ProgressBar } from "./components/ProgressBar"
 export { VolumeControl } from "./components/VolumeControl"
 export { WaveformProgress } from "./components/WaveformProgress"
+export { WaveformAdapter } from "./components/WaveformAdapter"
 export { extractPeaks, computePeaksFromUrl } from "./core/waveform/peaks"
 export { QueueDrawer } from "./components/QueueDrawer"
 export type { QueueDrawerProps } from "./components/QueueDrawer"
@@ -116,8 +117,10 @@ export {
     faceSupportsSEICanvas,
     faceSupportsScrubberCanvas,
     faceSupportsContextualActions,
+    faceSupportsWaveform,
     faceSupportsHeroCollapse,
     getScrubberDensity,
+    getScrubberHeight,
     getPreferredCanvasPlacement,
     INITIAL_SURFACE_STATE,
     canEnterCanvas,
@@ -179,6 +182,7 @@ export type {
     AudioBackendCapabilities,
 } from "./core/audio/AudioBackend"
 export type { WaveformProgressProps } from "./components/WaveformProgress"
+export type { WaveformAdapterProps } from "./components/WaveformAdapter"
 export type { ComputedPeaks } from "./core/waveform/peaks"
 export type { AutomixPluginConfig } from "./plugins/AutomixPlugin"
 export type { AutoThemePluginConfig } from "./plugins/AutoThemePlugin"
