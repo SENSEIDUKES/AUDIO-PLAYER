@@ -9,6 +9,8 @@ import { SAPController } from "../components/SAPController"
 import { useShareTrack } from "../components/useShareTrack"
 import { formatTime } from "../utils/formatTime"
 import { defaultShowVolume } from "../utils/device"
+import { ScrubberCanvasHost } from "../surfaces/ScrubberCanvasHost"
+import { getScrubberDensity } from "../surfaces/faceCapabilities"
 import { buildThemeVars } from "./themeVars"
 import {
     Back10Icon,
@@ -46,7 +48,8 @@ export interface StickyBottomPlayerProps extends AudioPlayerTheme {
  * with `supportsContextualActions: false` — deep actions and queue access route
  * through its SAPController three-dot sheet instead of a radial menu, so it does
  * not render `PlayerSurfaceButtons`. `supportsSEICanvas: false` (no canvas
- * zone). Its inline ProgressBar serves as the scrubber.
+ * zone). Phase 3 wires its scrubber through `ScrubberCanvasHost` (compact
+ * density) so the timeline becomes a real plugin mount point.
  */
 export function StickyBottomPlayer({
     fixed = true,
@@ -192,16 +195,28 @@ export function StickyBottomPlayer({
                     </div>
                     <div className="ap-sb__scrub">
                         <span className="ap-sb__t" aria-hidden="true">{formatTime(s.currentTime)}</span>
-                        <ProgressBar
+                        {/* ScrubberCanvasHost (Phase 3): the timeline render zone /
+                            future plugin mount point. The bespoke ProgressBar is
+                            passed as children, so seeking is byte-identical. */}
+                        <ScrubberCanvasHost
+                            face="stickyBottom"
+                            density={getScrubberDensity("stickyBottom")}
                             currentTime={s.currentTime}
                             duration={s.duration}
-                            buffered={s.buffered}
-                            disabled={!s.hasAudio}
-                            isSeeking={s.isSeeking}
+                            progress={s.duration > 0 ? s.currentTime / s.duration : 0}
                             onSeek={s.seek}
-                            onSeekStart={() => s.setSeeking(true)}
-                            onSeekEnd={() => s.setSeeking(false)}
-                        />
+                        >
+                            <ProgressBar
+                                currentTime={s.currentTime}
+                                duration={s.duration}
+                                buffered={s.buffered}
+                                disabled={!s.hasAudio}
+                                isSeeking={s.isSeeking}
+                                onSeek={s.seek}
+                                onSeekStart={() => s.setSeeking(true)}
+                                onSeekEnd={() => s.setSeeking(false)}
+                            />
+                        </ScrubberCanvasHost>
                         <span className="ap-sb__t" aria-hidden="true">{formatTime(s.duration)}</span>
                     </div>
                 </div>

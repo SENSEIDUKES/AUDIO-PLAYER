@@ -4,6 +4,8 @@ import { useAudioSession } from "../session/AudioSessionContext"
 import { ProgressBar } from "../components/ProgressBar"
 import { formatTime } from "../utils/formatTime"
 import { trackKey } from "../utils/trackKey"
+import { ScrubberCanvasHost } from "../surfaces/ScrubberCanvasHost"
+import { getScrubberDensity } from "../surfaces/faceCapabilities"
 import { buildThemeVars } from "./themeVars"
 import { PauseIcon, PlayIcon, SpinnerIcon } from "./icons"
 import "./skins.css"
@@ -32,8 +34,9 @@ function sameTrack(a: Track, b: Track): boolean {
  * Capability-driven (`PLAYER_FACE_CAPABILITIES.vaultRow`): the most compact face.
  * `supportsSEICanvas: false` and `supportsContextualActions: false` — a list row
  * has no room for canvas or menu surfaces, so it renders neither the SEICanvas
- * host nor `PlayerSurfaceButtons`. Its inline ProgressBar is the scrubber, and
- * deep actions belong to whatever container hosts the row list.
+ * host nor `PlayerSurfaceButtons`. Deep actions belong to whatever container
+ * hosts the row list. Phase 3 wires the active row's scrubber through
+ * `ScrubberCanvasHost` (compact density); seeking is unchanged.
  */
 export function VaultRowPlayer({
     track,
@@ -81,16 +84,28 @@ export function VaultRowPlayer({
                 </span>
                 {isActive ? (
                     <span className="ap-vr__progress">
-                        <ProgressBar
+                        {/* ScrubberCanvasHost (Phase 3): compact timeline zone for
+                            the active row; ProgressBar passed through as children
+                            keeps seeking identical. */}
+                        <ScrubberCanvasHost
+                            face="vaultRow"
+                            density={getScrubberDensity("vaultRow")}
                             currentTime={s.currentTime}
                             duration={s.duration}
-                            buffered={s.buffered}
-                            disabled={!s.hasAudio}
-                            isSeeking={s.isSeeking}
+                            progress={s.duration > 0 ? s.currentTime / s.duration : 0}
                             onSeek={s.seek}
-                            onSeekStart={() => s.setSeeking(true)}
-                            onSeekEnd={() => s.setSeeking(false)}
-                        />
+                        >
+                            <ProgressBar
+                                currentTime={s.currentTime}
+                                duration={s.duration}
+                                buffered={s.buffered}
+                                disabled={!s.hasAudio}
+                                isSeeking={s.isSeeking}
+                                onSeek={s.seek}
+                                onSeekStart={() => s.setSeeking(true)}
+                                onSeekEnd={() => s.setSeeking(false)}
+                            />
+                        </ScrubberCanvasHost>
                     </span>
                 ) : (
                     <span className="ap-vr__artist" title={track.artist}>

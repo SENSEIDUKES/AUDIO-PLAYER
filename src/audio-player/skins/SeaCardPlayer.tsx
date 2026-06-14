@@ -3,6 +3,10 @@ import type { AudioPlayerTheme, Track } from "../types"
 import { useAudioSession } from "../session/AudioSessionContext"
 import { ProgressBar } from "../components/ProgressBar"
 import { trackKey } from "../utils/trackKey"
+import { usePlayerSurface } from "../surfaces/usePlayerSurface"
+import { ScrubberCanvasHost } from "../surfaces/ScrubberCanvasHost"
+import { SEICanvasHost } from "../surfaces/SEICanvasHost"
+import { getScrubberDensity } from "../surfaces/faceCapabilities"
 import { buildThemeVars } from "./themeVars"
 import { PauseIcon, PlayIcon, SpinnerIcon } from "./icons"
 import "./skins.css"
@@ -32,9 +36,10 @@ function sameTrack(a: Track, b: Track): boolean {
  *
  * Capability-driven (`PLAYER_FACE_CAPABILITIES.seaCard`): a marketplace card.
  * `supportsContextualActions: false`, so it renders no contextual menu — taps on
- * the card are about previewing/playing the track, not deep actions. It declares
- * an overlay SEICanvas placement for a future phase, but the card itself renders
- * only art + inline progress today; it does not mount the canvas/scrubber hosts.
+ * the card are about previewing/playing the track, not deep actions. Phase 3
+ * wires its active-card scrubber through `ScrubberCanvasHost` and mounts the
+ * declared overlay `SEICanvasHost` as a stable (collapsed) plugin target; the
+ * canvas has no opener yet by design (no contextual menu / card = play).
  */
 export function SeaCardPlayer({
     track,
@@ -45,6 +50,7 @@ export function SeaCardPlayer({
     ...theme
 }: SeaCardPlayerProps) {
     const s = useAudioSession()
+    const surface = usePlayerSurface("seaCard")
     const isActive = s.currentTrack ? sameTrack(s.currentTrack, track) : false
     const isPlayingThis = isActive && s.isPlaying
     // Engine gates `isBuffering` to active/pending playback; scope it to this
@@ -83,19 +89,43 @@ export function SeaCardPlayer({
                 <div className="ap-sea__artist" title={track.artist}>{track.artist}</div>
                 {isActive && (
                     <div className="ap-sea__progress">
-                        <ProgressBar
+                        {/* ScrubberCanvasHost (Phase 3): timeline zone for the
+                            active card; ProgressBar passed through as children so
+                            seeking is identical. */}
+                        <ScrubberCanvasHost
+                            face="seaCard"
+                            density={getScrubberDensity("seaCard")}
                             currentTime={s.currentTime}
                             duration={s.duration}
-                            buffered={s.buffered}
-                            disabled={!s.hasAudio}
-                            isSeeking={s.isSeeking}
+                            progress={s.duration > 0 ? s.currentTime / s.duration : 0}
                             onSeek={s.seek}
-                            onSeekStart={() => s.setSeeking(true)}
-                            onSeekEnd={() => s.setSeeking(false)}
-                        />
+                        >
+                            <ProgressBar
+                                currentTime={s.currentTime}
+                                duration={s.duration}
+                                buffered={s.buffered}
+                                disabled={!s.hasAudio}
+                                isSeeking={s.isSeeking}
+                                onSeek={s.seek}
+                                onSeekStart={() => s.setSeeking(true)}
+                                onSeekEnd={() => s.setSeeking(false)}
+                            />
+                        </ScrubberCanvasHost>
                     </div>
                 )}
             </div>
+
+            {/* SEICanvasHost (Phase 3): seaCard declares an overlay canvas, so we
+                render the stable mount point here. It stays collapsed (no opener:
+                the card itself is tap-to-play and this face has no contextual
+                menu by design), serving as the plugin mount target until a future
+                phase adds a card-level affordance to open it. */}
+            <SEICanvasHost
+                open={surface.isCanvasOpen}
+                face="seaCard"
+                supported={surface.canvasSupported}
+                activeSurfaceId={surface.mode === "default" ? undefined : surface.mode}
+            />
         </article>
     )
 }

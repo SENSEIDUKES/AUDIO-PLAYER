@@ -20,6 +20,15 @@
 .ap-sea__progress .ap-progress {
     flex: 1;
 }
+/* When a ScrubberCanvasHost wraps a skin's bespoke ProgressBar (Phase 3), the
+   host becomes the flex child that must grow; it then flexes its own child (the
+   ProgressBar via `.ap-scrubber-host > *`), so seek width stays identical. */
+.ap-vr__progress > .ap-scrubber-host,
+.ap-sb__scrub > .ap-scrubber-host,
+.ap-sea__progress > .ap-scrubber-host {
+    flex: 1;
+    min-width: 0;
+}
 
 
 /* ----------------------------- Art / hero sizing -----------------------------

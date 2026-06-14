@@ -135,6 +135,12 @@ class AudioPlayerErrorBoundary extends Component<
  * its canvas/scrubber host capabilities are forward-looking for a later phase.
  * Deep actions (queue, info, share, playback modes) live in the SAPController,
  * and mobile volume follows the Phase 1 `defaultShowVolume()` default.
+ *
+ * Phase 3 deliberately left this face unwired: its scrubber already supports an
+ * optional wavesurfer waveform (`showWaveform`) with bespoke seeking that the
+ * generic `ScrubberCanvasHost` fallback does not model, so wrapping it would
+ * risk regressing the standalone player. Retrofitting the hosts here is a
+ * dedicated follow-up, not a mechanical wrap like the session skins.
  */
 export function AudioPlayer(props: AudioPlayerProps) {
     return (
