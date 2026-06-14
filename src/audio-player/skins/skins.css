@@ -4,6 +4,7 @@
    Each skin sets the same --ap-* theme tokens on its root (see themeVars.ts),
    so the reused ProgressBar / VolumeControl inherit the right colors. */
 @import "../audio-player.css";
+@import "../surfaces/surfaces.css";
 
 /* Make a reused ProgressBar fill whatever flex container a skin puts it in
    (its inner track is absolutely positioned, so the host must supply width). */
