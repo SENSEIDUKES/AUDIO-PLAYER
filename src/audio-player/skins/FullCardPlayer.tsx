@@ -8,6 +8,9 @@ import { VolumeControl } from "../components/VolumeControl"
 import { SAPController } from "../components/SAPController"
 import { useShareTrack } from "../components/useShareTrack"
 import { formatTime } from "../utils/formatTime"
+import { defaultShowVolume } from "../utils/device"
+import { trackKey } from "../utils/trackKey"
+import { useMediaSessionObserver } from "../headless/useMediaSessionObserver"
 import { buildThemeVars } from "./themeVars"
 import { usePlayerSurface } from "../surfaces/usePlayerSurface"
 import { PlayerHero } from "../surfaces/PlayerHero"
@@ -30,7 +33,12 @@ import {
 import "./skins.css"
 
 export interface FullCardPlayerProps extends AudioPlayerTheme {
-    /** Show the volume slider. Defaults to true. */
+    /**
+     * Show the volume slider. Defaults to `true` on desktop and `false` on
+     * mobile/touch devices (e.g. iOS Safari), where programmatic volume is
+     * ignored and the mute button is the reliable control. Pass an explicit
+     * boolean to override the per-device default.
+     */
     showVolume?: boolean
     className?: string
     style?: CSSProperties
@@ -44,7 +52,7 @@ export interface FullCardPlayerProps extends AudioPlayerTheme {
  * users don't see five simultaneous prompts.
  */
 export function FullCardPlayer({
-    showVolume = true,
+    showVolume = defaultShowVolume(),
     className,
     style,
     ...theme
@@ -82,6 +90,17 @@ export function FullCardPlayer({
     // Engine gates `isBuffering` to active/pending playback (and clears it on
     // pause/ended), so the spinner can render straight from it.
     const showPlaySpinner = isBuffering
+
+    // Lock-screen / OS media controls. FullCardPlayer is the designated session
+    // owner of the autoplay prompt, so it also owns the Media Session wiring to
+    // avoid multiple session-based skins registering competing handlers.
+    useMediaSessionObserver(s, {
+        title: currentTrack?.title ?? "",
+        artist: currentTrack?.artist ?? "",
+        sourceKey: currentTrack ? `${currentIndex}:${trackKey(currentTrack)}` : "empty",
+        onNext: canNext ? s.next : undefined,
+        onPrevious: canPrevious ? s.previous : undefined,
+    })
 
     const handleOpenQueue = useCallback(() => setQueueDrawerOpen(true), [])
     const handleCloseQueue = useCallback(() => setQueueDrawerOpen(false), [])

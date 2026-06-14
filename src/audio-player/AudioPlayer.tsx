@@ -29,6 +29,7 @@ import { QueueDrawer } from "./components/QueueDrawer"
 import { SAPController } from "./components/SAPController"
 import { useShareTrack } from "./components/useShareTrack"
 import { formatTime } from "./utils/formatTime"
+import { defaultShowVolume } from "./utils/device"
 import { resolveTrackList } from "./utils/trackList"
 import { trackKey } from "./utils/trackKey"
 import "./audio-player.css"
@@ -149,7 +150,7 @@ function AudioPlayerInner(props: AudioPlayerProps) {
         blurSize = 20,
         darkenAmount = 0,
         showTracklist = false,
-        showVolume = true,
+        showVolume = defaultShowVolume(),
         showWaveform = false,
         waveformHeight = 48,
         titleFont,

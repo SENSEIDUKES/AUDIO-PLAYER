@@ -92,6 +92,12 @@ export interface AudioPlayerProps extends AudioPlayerTheme {
     /** Darken overlay over the background image, 0–100. */
     darkenAmount?: number
     showTracklist?: boolean
+    /**
+     * Show the volume slider. Defaults to `true` on desktop and `false` on
+     * mobile/touch devices (e.g. iOS Safari), where programmatic volume is
+     * ignored and the mute button is the reliable control. Pass an explicit
+     * boolean to override the per-device default.
+     */
     showVolume?: boolean
     /**
      * Render a wavesurfer.js waveform as the scrubber instead of the plain

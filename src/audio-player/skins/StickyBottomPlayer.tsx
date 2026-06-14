@@ -8,6 +8,7 @@ import { VolumeControl } from "../components/VolumeControl"
 import { SAPController } from "../components/SAPController"
 import { useShareTrack } from "../components/useShareTrack"
 import { formatTime } from "../utils/formatTime"
+import { defaultShowVolume } from "../utils/device"
 import { buildThemeVars } from "./themeVars"
 import {
     Back10Icon,
@@ -24,7 +25,12 @@ import "./skins.css"
 export interface StickyBottomPlayerProps extends AudioPlayerTheme {
     /** Use CSS `position: fixed` to pin to the viewport bottom. Defaults to true. */
     fixed?: boolean
-    /** Show the volume control (hidden on narrow layouts by default). */
+    /**
+     * Show the volume slider. Defaults to `true` on desktop and `false` on
+     * mobile/touch devices (e.g. iOS Safari), where programmatic volume is
+     * ignored and the mute button is the reliable control. Pass an explicit
+     * boolean to override the per-device default.
+     */
     showVolume?: boolean
     className?: string
     style?: CSSProperties
@@ -38,7 +44,7 @@ export interface StickyBottomPlayerProps extends AudioPlayerTheme {
  */
 export function StickyBottomPlayer({
     fixed = true,
-    showVolume = true,
+    showVolume = defaultShowVolume(),
     className,
     style,
     ...theme
