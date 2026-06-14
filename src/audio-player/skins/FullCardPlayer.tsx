@@ -9,6 +9,13 @@ import { SAPController } from "../components/SAPController"
 import { useShareTrack } from "../components/useShareTrack"
 import { formatTime } from "../utils/formatTime"
 import { buildThemeVars } from "./themeVars"
+import { usePlayerSurface } from "../surfaces/usePlayerSurface"
+import { PlayerHero } from "../surfaces/PlayerHero"
+import { SEICanvasHost } from "../surfaces/SEICanvasHost"
+import { ScrubberCanvasHost } from "../surfaces/ScrubberCanvasHost"
+import { PlayerSurfaceButtons } from "../surfaces/PlayerSurfaceButtons"
+import { QueueSurface } from "../surfaces/QueueSurface"
+import { getScrubberDensity } from "../surfaces/faceCapabilities"
 import {
     Back10Icon,
     DotsIcon,
@@ -43,6 +50,7 @@ export function FullCardPlayer({
     ...theme
 }: FullCardPlayerProps) {
     const s = useAudioSession()
+    const surface = usePlayerSurface("fullCard")
     const [queueDrawerOpen, setQueueDrawerOpen] = useState(false)
     const [controllerOpen, setControllerOpen] = useState(false)
     const {
@@ -198,31 +206,61 @@ export function FullCardPlayer({
                 </div>
             )}
 
-            <div className="ap-fc__info" role="group" aria-label="Track information">
-                <div className="ap-fc__title" title={currentTrack?.title}>
-                    {currentTrack?.title ?? "Nothing playing"}
-                </div>
-                <div className="ap-fc__artist" title={currentTrack?.artist}>
-                    {currentTrack?.artist ?? "—"}
-                </div>
-            </div>
+            <PlayerHero
+                face="fullCard"
+                collapsed={surface.isHeroCollapsed}
+                title={currentTrack?.title ?? "Nothing playing"}
+                artist={currentTrack?.artist ?? "—"}
+            />
 
-            <div className="ap-progress-group" role="group" aria-label="Playback progress">
-                <ProgressBar
-                    currentTime={currentTime}
-                    duration={duration}
-                    buffered={buffered}
-                    disabled={!hasAudio}
-                    isSeeking={isSeeking}
-                    onSeek={s.seek}
-                    onSeekStart={() => s.setSeeking(true)}
-                    onSeekEnd={() => s.setSeeking(false)}
-                />
-                <div className="ap-times" aria-hidden="true">
-                    <span>{formatTime(currentTime)}</span>
-                    <span>{formatTime(duration)}</span>
+            {/* Main visual surface region. Hidden by default; the left surface
+                button opens placeholder canvas content, the right opens the
+                in-region "Up Next" queue. */}
+            <SEICanvasHost
+                open={surface.isCanvasOpen || surface.isQueueOpen}
+                face="fullCard"
+                supported={surface.canvasSupported}
+                activeSurfaceId={surface.mode === "default" ? undefined : surface.mode}
+            >
+                {surface.isQueueOpen ? (
+                    <QueueSurface />
+                ) : (
+                    <div className="ap-sei-canvas-placeholder">
+                        <span className="ap-sei-canvas-placeholder__title">
+                            SEI Canvas
+                        </span>
+                        <span className="ap-sei-canvas-placeholder__hint">
+                            Placeholder visual area — plugins mount here later.
+                        </span>
+                    </div>
+                )}
+            </SEICanvasHost>
+
+            <ScrubberCanvasHost
+                face="fullCard"
+                density={getScrubberDensity("fullCard")}
+                currentTime={currentTime}
+                duration={duration}
+                progress={duration > 0 ? currentTime / duration : 0}
+                onSeek={s.seek}
+            >
+                <div className="ap-progress-group" role="group" aria-label="Playback progress">
+                    <ProgressBar
+                        currentTime={currentTime}
+                        duration={duration}
+                        buffered={buffered}
+                        disabled={!hasAudio}
+                        isSeeking={isSeeking}
+                        onSeek={s.seek}
+                        onSeekStart={() => s.setSeeking(true)}
+                        onSeekEnd={() => s.setSeeking(false)}
+                    />
+                    <div className="ap-times" aria-hidden="true">
+                        <span>{formatTime(currentTime)}</span>
+                        <span>{formatTime(duration)}</span>
+                    </div>
                 </div>
-            </div>
+            </ScrubberCanvasHost>
 
             <div className="ap-transport" role="group" aria-label="Playback controls">
                 <button
@@ -271,6 +309,8 @@ export function FullCardPlayer({
                     <NextIcon />
                 </button>
             </div>
+
+            <PlayerSurfaceButtons surface={surface} />
 
             {showVolume && (
                 <VolumeControl

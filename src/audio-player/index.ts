@@ -107,6 +107,45 @@ export { StickyBottomPlayer } from "./skins/StickyBottomPlayer"
 export { MiniSidebarPlayer } from "./skins/MiniSidebarPlayer"
 export { SeaCardPlayer } from "./skins/SeaCardPlayer"
 
+// Phase 1 surface infrastructure: render zones (SEICanvas, ScrubberCanvas), the
+// per-face capability model, shared surface buttons, and hero collapse.
+export {
+    PLAYER_FACE_CAPABILITIES,
+    getFaceCapability,
+    faceSupportsSEICanvas,
+    faceSupportsScrubberCanvas,
+    faceSupportsHeroCollapse,
+    getScrubberDensity,
+    getPreferredCanvasPlacement,
+    INITIAL_SURFACE_STATE,
+    canEnterCanvas,
+    deriveHeroCollapsed,
+    surfaceReducer,
+    usePlayerSurface,
+    SurfaceButton,
+    PlayerSurfaceButtons,
+    SEICanvasHost,
+    ScrubberCanvasHost,
+    PlayerHero,
+    QueueSurface,
+} from "./surfaces"
+
+export type {
+    PlayerFace,
+    PlayerFaceCapability,
+    ScrubberDensity,
+    PlayerSurfaceMode,
+    SurfaceAction,
+    SurfaceState,
+    UsePlayerSurfaceResult,
+    SurfaceButtonProps,
+    PlayerSurfaceButtonsProps,
+    SEICanvasHostProps,
+    ScrubberCanvasHostProps,
+    PlayerHeroProps,
+    QueueSurfaceProps,
+} from "./surfaces"
+
 export type {
     UseAutomixOptions,
     AutomixController,
