@@ -9,7 +9,7 @@ import { SAPController } from "../components/SAPController"
 import { useShareTrack } from "../components/useShareTrack"
 import { useMediaSessionObserver } from "../headless/useMediaSessionObserver"
 import { formatTime } from "../utils/formatTime"
-import { isMobileDevice } from "../utils/device"
+import { useIsMobileDevice } from "../utils/device"
 import { buildThemeVars } from "./themeVars"
 import {
     Back10Icon,
@@ -48,8 +48,9 @@ export function StickyBottomPlayer({
     style,
     ...theme
 }: StickyBottomPlayerProps) {
-    const shouldShowVolume = showVolume && (enableMobileVolume || !isMobileDevice())
     const s = useAudioSession()
+    const isMobile = useIsMobileDevice()
+    const shouldShowVolume = showVolume && (enableMobileVolume || !isMobile)
     const [queueDrawerOpen, setQueueDrawerOpen] = useState(false)
     const [controllerOpen, setControllerOpen] = useState(false)
 
@@ -69,6 +70,8 @@ export function StickyBottomPlayer({
         title: s.currentTrack?.title ?? "",
         artist: s.currentTrack?.artist ?? "",
         album: "",
+        onNext: s.next,
+        onPrevious: s.previous,
     })
 
     // All hooks run before this bail-out so the hook order stays stable when

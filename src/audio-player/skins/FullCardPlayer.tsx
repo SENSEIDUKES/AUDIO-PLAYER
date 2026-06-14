@@ -9,7 +9,7 @@ import { SAPController } from "../components/SAPController"
 import { useShareTrack } from "../components/useShareTrack"
 import { useMediaSessionObserver } from "../headless/useMediaSessionObserver"
 import { formatTime } from "../utils/formatTime"
-import { isMobileDevice } from "../utils/device"
+import { useIsMobileDevice } from "../utils/device"
 import { buildThemeVars } from "./themeVars"
 import {
     Back10Icon,
@@ -48,7 +48,8 @@ export function FullCardPlayer({
     ...theme
 }: FullCardPlayerProps) {
     const s = useAudioSession()
-    const shouldShowVolume = showVolume && (enableMobileVolume || !isMobileDevice())
+    const isMobile = useIsMobileDevice()
+    const shouldShowVolume = showVolume && (enableMobileVolume || !isMobile)
     const [queueDrawerOpen, setQueueDrawerOpen] = useState(false)
     const [controllerOpen, setControllerOpen] = useState(false)
     const {
@@ -94,6 +95,8 @@ export function FullCardPlayer({
         title: currentTrack?.title ?? "",
         artist: currentTrack?.artist ?? "",
         album: "",
+        onNext: s.next,
+        onPrevious: s.previous,
     })
 
     return (

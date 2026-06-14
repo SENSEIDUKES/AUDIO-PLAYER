@@ -26,7 +26,7 @@ import { useShareTrack } from "./components/useShareTrack"
 import { formatTime } from "./utils/formatTime"
 import { resolveTrackList } from "./utils/trackList"
 import { trackKey } from "./utils/trackKey"
-import { isMobileDevice } from "./utils/device"
+import { useIsMobileDevice } from "./utils/device"
 import "./audio-player.css"
 
 const DEFAULT_AUDIO =
@@ -182,7 +182,8 @@ function AudioPlayerInner(props: AudioPlayerProps) {
     const rootRef = useRef<HTMLDivElement>(null)
     const previousTracksSignatureRef = useRef(tracksSignature)
 
-    const shouldShowVolume = showVolume && (enableMobileVolume || !isMobileDevice())
+    const isMobile = useIsMobileDevice()
+    const shouldShowVolume = showVolume && (enableMobileVolume || !isMobile)
 
     // Sync localQueue only when the logical track list changes. Parent renders
     // often recreate the array instance; resetting on identity alone would wipe

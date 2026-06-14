@@ -1,3 +1,5 @@
+import { useState, useEffect } from "react"
+
 /**
  * Conservative mobile-browser detection for UI defaults that should differ from
  * desktop. This intentionally avoids relying on a single signal: older iOS Safari
@@ -20,4 +22,19 @@ export function isMobileDevice(): boolean {
         /Mobi|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua)
 
     return isIOS || isAndroid || isMobileUserAgent
+}
+
+/**
+ * React hook for SSR-safe mobile device detection.
+ * Returns false during initial render (server and client hydration) to avoid
+ * hydration mismatches, then updates to the real value after mount.
+ */
+export function useIsMobileDevice(): boolean {
+    const [isMobile, setIsMobile] = useState(false)
+
+    useEffect(() => {
+        setIsMobile(isMobileDevice())
+    }, [])
+
+    return isMobile
 }
