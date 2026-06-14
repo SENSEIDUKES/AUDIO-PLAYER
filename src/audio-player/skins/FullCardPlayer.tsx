@@ -209,122 +209,129 @@ export function FullCardPlayer({
                 </div>
             )}
 
-            <PlayerHero
-                face="fullCard"
-                collapsed={surface.isHeroCollapsed}
-                title={currentTrack?.title ?? "Nothing playing"}
-                artist={currentTrack?.artist ?? "—"}
-            />
-
-            {/* Main visual surface region. Hidden by default; the left surface
-                button opens placeholder canvas content, the right opens the
-                in-region "Up Next" queue. */}
-            <SEICanvasHost
-                open={surface.isCanvasOpen || surface.isQueueOpen}
-                face="fullCard"
-                supported={surface.canvasSupported}
-                activeSurfaceId={surface.mode === "default" ? undefined : surface.mode}
+            <div
+                className="ap-fc__stage"
+                data-surface-open={surface.mode === "default" ? "false" : "true"}
             >
-                {surface.isQueueOpen ? (
-                    <QueueSurface />
-                ) : (
-                    <div className="ap-sei-canvas-placeholder">
-                        <span className="ap-sei-canvas-placeholder__title">
-                            SEI Canvas
-                        </span>
-                        <span className="ap-sei-canvas-placeholder__hint">
-                            Placeholder visual area — plugins mount here later.
-                        </span>
-                    </div>
-                )}
-            </SEICanvasHost>
+                <PlayerHero
+                    face="fullCard"
+                    collapsed={surface.isHeroCollapsed}
+                    title={currentTrack?.title ?? "Nothing playing"}
+                    artist={currentTrack?.artist ?? "—"}
+                />
 
-            <ScrubberCanvasHost
-                face="fullCard"
-                density={getScrubberDensity("fullCard")}
-                currentTime={currentTime}
-                duration={duration}
-                progress={duration > 0 ? currentTime / duration : 0}
-                onSeek={s.seek}
-            >
-                <div className="ap-progress-group" role="group" aria-label="Playback progress">
-                    <ProgressBar
-                        currentTime={currentTime}
-                        duration={duration}
-                        buffered={buffered}
-                        disabled={!hasAudio}
-                        isSeeking={isSeeking}
-                        onSeek={s.seek}
-                        onSeekStart={() => s.setSeeking(true)}
-                        onSeekEnd={() => s.setSeeking(false)}
-                    />
-                    <div className="ap-times" aria-hidden="true">
-                        <span>{formatTime(currentTime)}</span>
-                        <span>{formatTime(duration)}</span>
-                    </div>
-                </div>
-            </ScrubberCanvasHost>
-
-            <div className="ap-transport" role="group" aria-label="Playback controls">
-                <button
-                    type="button"
-                    className="ap-btn ap-btn--ghost ap-btn--sm ap-tap"
-                    onClick={s.previous}
-                    disabled={!canPrevious}
-                    aria-label="Previous track"
+                {/* Main visual surface region. Hidden by default; the left surface
+                    button opens placeholder canvas content, the right opens the
+                    in-region "Up Next" queue. */}
+                <SEICanvasHost
+                    open={surface.isCanvasOpen || surface.isQueueOpen}
+                    face="fullCard"
+                    supported={surface.canvasSupported}
+                    activeSurfaceId={surface.mode === "default" ? undefined : surface.mode}
                 >
-                    <PrevIcon />
-                </button>
-                <button
-                    type="button"
-                    className="ap-btn ap-btn--ghost ap-tap"
-                    onClick={() => s.seekBy(-10)}
-                    disabled={!hasAudio}
-                    aria-label="Skip backward 10 seconds"
-                >
-                    <Back10Icon />
-                </button>
-                <button
-                    type="button"
-                    className={`ap-btn ap-btn--play ap-tap${isPlaying ? " ap-btn--play-active" : ""}`}
-                    onClick={s.toggle}
-                    disabled={!hasAudio}
-                    aria-label={showPlaySpinner ? "Buffering audio" : isPlaying ? "Pause" : "Play"}
-                >
-                    {showPlaySpinner ? <SpinnerIcon /> : isPlaying ? <PauseIcon /> : <PlayIcon />}
-                </button>
-                <button
-                    type="button"
-                    className="ap-btn ap-btn--ghost ap-tap"
-                    onClick={() => s.seekBy(10)}
-                    disabled={!hasAudio}
-                    aria-label="Skip forward 10 seconds"
-                >
-                    <Fwd10Icon />
-                </button>
-                <button
-                    type="button"
-                    className="ap-btn ap-btn--ghost ap-btn--sm ap-tap"
-                    onClick={s.next}
-                    disabled={!canNext}
-                    aria-label="Next track"
-                >
-                    <NextIcon />
-                </button>
+                    {surface.isQueueOpen ? (
+                        <QueueSurface />
+                    ) : (
+                        <div className="ap-sei-canvas-placeholder">
+                            <span className="ap-sei-canvas-placeholder__title">
+                                SEI Canvas
+                            </span>
+                            <span className="ap-sei-canvas-placeholder__hint">
+                                Placeholder visual area — plugins mount here later.
+                            </span>
+                        </div>
+                    )}
+                </SEICanvasHost>
             </div>
 
-            <PlayerSurfaceButtons surface={surface} />
+            <div className="ap-fc__control-dock">
+                <ScrubberCanvasHost
+                    face="fullCard"
+                    density={getScrubberDensity("fullCard")}
+                    currentTime={currentTime}
+                    duration={duration}
+                    progress={duration > 0 ? currentTime / duration : 0}
+                    onSeek={s.seek}
+                >
+                    <div className="ap-progress-group" role="group" aria-label="Playback progress">
+                        <ProgressBar
+                            currentTime={currentTime}
+                            duration={duration}
+                            buffered={buffered}
+                            disabled={!hasAudio}
+                            isSeeking={isSeeking}
+                            onSeek={s.seek}
+                            onSeekStart={() => s.setSeeking(true)}
+                            onSeekEnd={() => s.setSeeking(false)}
+                        />
+                        <div className="ap-times" aria-hidden="true">
+                            <span>{formatTime(currentTime)}</span>
+                            <span>{formatTime(duration)}</span>
+                        </div>
+                    </div>
+                </ScrubberCanvasHost>
 
-            {showVolume && (
-                <VolumeControl
-                    volume={volume}
-                    isMuted={isMuted}
-                    disabled={!hasAudio}
-                    volumeUnsupported={volumeUnsupported}
-                    onVolumeChange={s.setVolume}
-                    onToggleMute={s.toggleMute}
-                />
-            )}
+                <div className="ap-transport" role="group" aria-label="Playback controls">
+                    <button
+                        type="button"
+                        className="ap-btn ap-btn--ghost ap-btn--sm ap-tap"
+                        onClick={s.previous}
+                        disabled={!canPrevious}
+                        aria-label="Previous track"
+                    >
+                        <PrevIcon />
+                    </button>
+                    <button
+                        type="button"
+                        className="ap-btn ap-btn--ghost ap-tap"
+                        onClick={() => s.seekBy(-10)}
+                        disabled={!hasAudio}
+                        aria-label="Skip backward 10 seconds"
+                    >
+                        <Back10Icon />
+                    </button>
+                    <button
+                        type="button"
+                        className={`ap-btn ap-btn--play ap-tap${isPlaying ? " ap-btn--play-active" : ""}`}
+                        onClick={s.toggle}
+                        disabled={!hasAudio}
+                        aria-label={showPlaySpinner ? "Buffering audio" : isPlaying ? "Pause" : "Play"}
+                    >
+                        {showPlaySpinner ? <SpinnerIcon /> : isPlaying ? <PauseIcon /> : <PlayIcon />}
+                    </button>
+                    <button
+                        type="button"
+                        className="ap-btn ap-btn--ghost ap-tap"
+                        onClick={() => s.seekBy(10)}
+                        disabled={!hasAudio}
+                        aria-label="Skip forward 10 seconds"
+                    >
+                        <Fwd10Icon />
+                    </button>
+                    <button
+                        type="button"
+                        className="ap-btn ap-btn--ghost ap-btn--sm ap-tap"
+                        onClick={s.next}
+                        disabled={!canNext}
+                        aria-label="Next track"
+                    >
+                        <NextIcon />
+                    </button>
+                </div>
+
+                {showVolume && (
+                    <VolumeControl
+                        volume={volume}
+                        isMuted={isMuted}
+                        disabled={!hasAudio}
+                        volumeUnsupported={volumeUnsupported}
+                        onVolumeChange={s.setVolume}
+                        onToggleMute={s.toggleMute}
+                    />
+                )}
+
+                <PlayerSurfaceButtons surface={surface} />
+            </div>
         </div>
     )
 }
