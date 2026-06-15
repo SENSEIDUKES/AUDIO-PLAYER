@@ -515,6 +515,27 @@
 .ap-sea__progress {
     margin-top: 6px;
 }
+/* Phase 4: waveform overlay trigger (top-left of the art) + overlay body. */
+.ap-sea__wave-btn {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    background-color: rgba(0, 0, 0, 0.5);
+    color: #fff;
+}
+.ap-sea__wave-btn[aria-expanded="true"] {
+    background-color: var(--ap-accent, rgba(0, 0, 0, 0.65));
+    color: var(--ap-play-icon, #000);
+}
+.ap-sea__overlay {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 4px 14px 12px;
+}
 
 /* Sticky bar responsive behavior (container-based so it also works inside
    sidebars and demo frames, not just full-bleed at the viewport bottom). */

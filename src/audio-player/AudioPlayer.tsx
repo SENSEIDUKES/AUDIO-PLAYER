@@ -22,8 +22,9 @@ import {
 } from "./plugins/automixIntegration"
 import { useMediaSessionObserver } from "./headless/useMediaSessionObserver"
 import { usePluginManager } from "./core/plugins/usePluginManager"
-import { ProgressBar } from "./components/ProgressBar"
-import { WaveformProgress } from "./components/WaveformProgress"
+import { WaveformAdapter } from "./components/WaveformAdapter"
+import { ScrubberCanvasHost } from "./surfaces/ScrubberCanvasHost"
+import { getScrubberDensity } from "./surfaces/faceCapabilities"
 import { VolumeControl } from "./components/VolumeControl"
 import { QueueDrawer } from "./components/QueueDrawer"
 import { SAPController } from "./components/SAPController"
@@ -136,11 +137,11 @@ class AudioPlayerErrorBoundary extends Component<
  * Deep actions (queue, info, share, playback modes) live in the SAPController,
  * and mobile volume follows the Phase 1 `defaultShowVolume()` default.
  *
- * Phase 3 deliberately left this face unwired: its scrubber already supports an
- * optional wavesurfer waveform (`showWaveform`) with bespoke seeking that the
- * generic `ScrubberCanvasHost` fallback does not model, so wrapping it would
- * risk regressing the standalone player. Retrofitting the hosts here is a
- * dedicated follow-up, not a mechanical wrap like the session skins.
+ * Phase 4 wires its scrubber through the shared `ScrubberCanvasHost` +
+ * `WaveformAdapter`, the same path the session faces use. The standalone
+ * `showWaveform` prop drives the adapter's `waveform` override (instead of the
+ * face capability), so the previous opt-in waveform behavior is preserved while
+ * the player now shares the unified scrubber + plugin mount point.
  */
 export function AudioPlayer(props: AudioPlayerProps) {
     return (
@@ -905,8 +906,22 @@ function AudioPlayerInner(props: AudioPlayerProps) {
                 </div>
 
                 <div className="ap-progress-group" role="group" aria-label="Playback progress">
-                    {showWaveform ? (
-                        <WaveformProgress
+                    {/* ScrubberCanvasHost + WaveformAdapter (Phase 4): the same
+                        unified scrubber the session faces use. `waveform` is
+                        driven by the standalone `showWaveform` prop (not the face
+                        capability), preserving the previous opt-in behavior. */}
+                    <ScrubberCanvasHost
+                        face="portable"
+                        density={getScrubberDensity("portable")}
+                        currentTime={currentTime}
+                        duration={duration}
+                        progress={duration > 0 ? currentTime / duration : 0}
+                        onSeek={seekWithPlugins}
+                    >
+                        <WaveformAdapter
+                            face="portable"
+                            density={getScrubberDensity("portable")}
+                            waveform={showWaveform}
                             currentTime={currentTime}
                             duration={duration}
                             buffered={buffered}
@@ -931,18 +946,7 @@ function AudioPlayerInner(props: AudioPlayerProps) {
                             progressColor={progressColor}
                             cursorColor={accentColor}
                         />
-                    ) : (
-                        <ProgressBar
-                            currentTime={currentTime}
-                            duration={duration}
-                            buffered={buffered}
-                            disabled={!hasAudio}
-                            isSeeking={isSeeking}
-                            onSeek={seekWithPlugins}
-                            onSeekStart={() => setSeeking(true)}
-                            onSeekEnd={() => setSeeking(false)}
-                        />
-                    )}
+                    </ScrubberCanvasHost>
                     <div className="ap-times" aria-hidden="true">
                         <span>{formatTime(currentTime)}</span>
                         <span>{formatTime(duration)}</span>

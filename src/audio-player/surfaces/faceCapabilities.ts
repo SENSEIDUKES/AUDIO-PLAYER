@@ -24,6 +24,15 @@ export type PlayerFaceCapability = {
     /** May host the ScrubberCanvas timeline zone. Available on every face. */
     supportsScrubberCanvas: boolean
     /**
+     * The scrubber zone may render an interactive wavesurfer waveform (via
+     * `WaveformAdapter`) when peak data is available. Faces that opt out keep the
+     * plain `ProgressBar`. This is independent of `supportsScrubberCanvas` (the
+     * host always renders; this only decides waveform vs. progress content) and
+     * can be overridden per call site (e.g. the standalone player's
+     * `showWaveform` prop, or the seaCard overlay).
+     */
+    supportsWaveform: boolean
+    /**
      * Renders the contextual action menu (the bottom-arc SEI Canvas Action Menu /
      * "command wheel") via `PlayerSurfaceButtons`. This is the radial, in-context
      * affordance — distinct from the `SAPController` three-dot deep-action sheet,
@@ -44,27 +53,32 @@ export type PlayerFaceCapability = {
  *
  * Wiring status (what physically renders today vs. what is a forward-looking
  * declaration for later phases):
- * - `fullCard`     — fully wired: SEICanvas, ScrubberCanvas, contextual menu.
- * - `miniSidebar`  — wired: ScrubberCanvas + contextual menu (no SEICanvas).
- * - `portable`     — self-contained standalone; owns its own SAPController and
- *                    ProgressBar. Canvas/scrubber hosts are declared for a later
- *                    phase, so its host capabilities stay `false` until wired to
- *                    avoid implying zones that don't render.
- * - `seaCard`      — overlay-canvas declaration for a future phase; the card
- *                    itself renders only art + inline progress today.
- * - `stickyBottom` — compact bar; deep actions live in its SAPController, so it
- *                    declares no contextual (radial) menu.
- * - `vaultRow`     — slim list row; transport + inline progress only.
+ * - `fullCard`     — fully wired: SEICanvas, ScrubberCanvas (waveform),
+ *                    contextual menu.
+ * - `miniSidebar`  — wired: ScrubberCanvas (progress) + contextual menu.
+ * - `portable`     — standalone player; ScrubberCanvas wraps its own scrubber and
+ *                    renders the waveform when `showWaveform` is set.
+ * - `seaCard`      — inline progress + an overlay SEICanvas that shows the
+ *                    waveform behind a small trigger (Phase 4).
+ * - `stickyBottom` — compact bar; ScrubberCanvas (progress), deep actions in its
+ *                    SAPController, so it declares no contextual (radial) menu.
+ * - `vaultRow`     — slim list row; ScrubberCanvas (progress) on the active row.
  *
  * `supportsContextualActions` is the source of truth for the radial command-wheel
  * menu (`PlayerSurfaceButtons` → `SEICanvasActionMenu`). It is independent of the
  * three-dot `SAPController`, which any face may host for deep actions.
+ *
+ * `supportsWaveform` decides whether the scrubber zone draws an interactive
+ * waveform (when peaks exist) vs. the plain progress bar. Spacious faces opt in;
+ * compact list/bar faces stay on the progress bar for performance and legibility
+ * (flipping one of them on later is a single boolean here).
  */
 export const PLAYER_FACE_CAPABILITIES: Record<PlayerFace, PlayerFaceCapability> =
     {
         fullCard: {
             supportsSEICanvas: true,
             supportsScrubberCanvas: true,
+            supportsWaveform: true,
             supportsContextualActions: true,
             supportsHeroCollapse: true,
             preferredCanvasPlacement: "main",
@@ -73,6 +87,7 @@ export const PLAYER_FACE_CAPABILITIES: Record<PlayerFace, PlayerFaceCapability> 
         portable: {
             supportsSEICanvas: true,
             supportsScrubberCanvas: true,
+            supportsWaveform: true,
             // Standalone player draws its own transport/menu; no surface-button
             // contextual menu today.
             supportsContextualActions: false,
@@ -83,6 +98,7 @@ export const PLAYER_FACE_CAPABILITIES: Record<PlayerFace, PlayerFaceCapability> 
         seaCard: {
             supportsSEICanvas: true,
             supportsScrubberCanvas: true,
+            supportsWaveform: true,
             supportsContextualActions: false,
             supportsHeroCollapse: true,
             preferredCanvasPlacement: "overlay",
@@ -91,6 +107,7 @@ export const PLAYER_FACE_CAPABILITIES: Record<PlayerFace, PlayerFaceCapability> 
         miniSidebar: {
             supportsSEICanvas: false,
             supportsScrubberCanvas: true,
+            supportsWaveform: false,
             supportsContextualActions: true,
             supportsHeroCollapse: false,
             preferredCanvasPlacement: "none",
@@ -99,6 +116,7 @@ export const PLAYER_FACE_CAPABILITIES: Record<PlayerFace, PlayerFaceCapability> 
         stickyBottom: {
             supportsSEICanvas: false,
             supportsScrubberCanvas: true,
+            supportsWaveform: false,
             supportsContextualActions: false,
             supportsHeroCollapse: false,
             preferredCanvasPlacement: "none",
@@ -107,6 +125,7 @@ export const PLAYER_FACE_CAPABILITIES: Record<PlayerFace, PlayerFaceCapability> 
         vaultRow: {
             supportsSEICanvas: false,
             supportsScrubberCanvas: true,
+            supportsWaveform: false,
             supportsContextualActions: false,
             supportsHeroCollapse: false,
             preferredCanvasPlacement: "none",
@@ -128,6 +147,26 @@ export function faceSupportsScrubberCanvas(face: PlayerFace): boolean {
 
 export function faceSupportsContextualActions(face: PlayerFace): boolean {
     return getFaceCapability(face).supportsContextualActions
+}
+
+export function faceSupportsWaveform(face: PlayerFace): boolean {
+    return getFaceCapability(face).supportsWaveform
+}
+
+/**
+ * Pixel height for the waveform canvas at a given scrubber density. Compact
+ * faces draw a shorter wave; the standalone/expanded faces get the full height.
+ * Callers may still override with an explicit `height` prop.
+ */
+export function getScrubberHeight(density: ScrubberDensity): number {
+    switch (density) {
+        case "compact":
+            return 28
+        case "expanded":
+            return 64
+        default:
+            return 48
+    }
 }
 
 export function faceSupportsHeroCollapse(face: PlayerFace): boolean {

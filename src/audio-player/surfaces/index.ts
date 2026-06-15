@@ -4,8 +4,10 @@ export {
     faceSupportsSEICanvas,
     faceSupportsScrubberCanvas,
     faceSupportsContextualActions,
+    faceSupportsWaveform,
     faceSupportsHeroCollapse,
     getScrubberDensity,
+    getScrubberHeight,
     getPreferredCanvasPlacement,
 } from "./faceCapabilities"
 export type {

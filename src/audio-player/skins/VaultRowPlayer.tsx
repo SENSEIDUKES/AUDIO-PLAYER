@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react"
 import type { AudioPlayerTheme, Track } from "../types"
 import { useAudioSession } from "../session/AudioSessionContext"
-import { ProgressBar } from "../components/ProgressBar"
+import { WaveformAdapter } from "../components/WaveformAdapter"
 import { formatTime } from "../utils/formatTime"
 import { trackKey } from "../utils/trackKey"
 import { ScrubberCanvasHost } from "../surfaces/ScrubberCanvasHost"
@@ -95,7 +95,11 @@ export function VaultRowPlayer({
                             progress={s.duration > 0 ? s.currentTime / s.duration : 0}
                             onSeek={s.seek}
                         >
-                            <ProgressBar
+                            {/* Compact face: WaveformAdapter resolves to the plain
+                                ProgressBar (supportsWaveform: false). */}
+                            <WaveformAdapter
+                                face="vaultRow"
+                                density={getScrubberDensity("vaultRow")}
                                 currentTime={s.currentTime}
                                 duration={s.duration}
                                 buffered={s.buffered}

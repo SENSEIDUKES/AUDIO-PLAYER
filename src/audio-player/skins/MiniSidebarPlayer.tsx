@@ -5,6 +5,7 @@ import { buildThemeVars } from "./themeVars"
 import { NextIcon, PauseIcon, PlayIcon, SpinnerIcon } from "./icons"
 import { usePlayerSurface } from "../surfaces/usePlayerSurface"
 import { ScrubberCanvasHost } from "../surfaces/ScrubberCanvasHost"
+import { WaveformAdapter } from "../components/WaveformAdapter"
 import { PlayerSurfaceButtons } from "../surfaces/PlayerSurfaceButtons"
 import { QueueSurface } from "../surfaces/QueueSurface"
 import { getScrubberDensity } from "../surfaces/faceCapabilities"
@@ -89,7 +90,23 @@ export function MiniSidebarPlayer({
                 duration={duration}
                 progress={duration > 0 ? currentTime / duration : 0}
                 onSeek={s.seek}
-            />
+            >
+                {/* Compact face: WaveformAdapter resolves to the plain ProgressBar
+                    (supportsWaveform: false), now wired to the live session
+                    buffered/seeking state instead of the host's bare fallback. */}
+                <WaveformAdapter
+                    face="miniSidebar"
+                    density={getScrubberDensity("miniSidebar")}
+                    currentTime={currentTime}
+                    duration={duration}
+                    buffered={s.buffered}
+                    disabled={!s.hasAudio}
+                    isSeeking={s.isSeeking}
+                    onSeek={s.seek}
+                    onSeekStart={() => s.setSeeking(true)}
+                    onSeekEnd={() => s.setSeeking(false)}
+                />
+            </ScrubberCanvasHost>
 
             <div className="ap-ms__surface" data-open={surface.isQueueOpen ? "true" : "false"}>
                 {surface.isQueueOpen && <QueueSurface maxItems={6} />}
