@@ -154,12 +154,20 @@ export { VaultRowPlayer } from "./skins/VaultRowPlayer"
 export { StickyBottomPlayer } from "./skins/StickyBottomPlayer"
 export { MiniSidebarPlayer } from "./skins/MiniSidebarPlayer"
 export { SeaCardPlayer } from "./skins/SeaCardPlayer"
+export {
+    VAULT_CATEGORY_META,
+    getVaultCategoryMeta,
+} from "./skins/vaultCategories"
+export type { VaultCategoryMeta } from "./skins/vaultCategories"
 
 // Phase 1 surface infrastructure: render zones (SEICanvas, ScrubberCanvas), the
 // per-face capability model, shared surface buttons, and hero collapse.
 export {
     PLAYER_FACE_CAPABILITIES,
+    FAMILY_DEFAULTS,
     getFaceCapability,
+    getFaceFamily,
+    faceSupportsAction,
     faceSupportsSEICanvas,
     faceSupportsScrubberCanvas,
     faceSupportsContextualActions,
@@ -188,6 +196,7 @@ export {
 
 export type {
     PlayerFace,
+    PlayerFamily,
     PlayerFaceCapability,
     ScrubberDensity,
     PlayerSurfaceMode,
@@ -266,6 +275,7 @@ export type {
 export type { TransitionPlan } from "./automix/transitionPlanner"
 export type {
     Track,
+    VaultCategory,
     TrackTrims,
     TrackAnalysis,
     AudioPlayerProps,

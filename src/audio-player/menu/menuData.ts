@@ -7,8 +7,10 @@ import {
     CanvasIcon,
     CommentsIcon,
     LyricsIcon,
+    NextIcon,
     PlaybackIcon,
     PluginIcon,
+    PrevIcon,
     QueueIcon,
     RepeatIcon,
     VisualIcon,
@@ -39,6 +41,8 @@ export type MenuActionId =
     | "open-queue"
     | "activate-canvas"
     | "select-lyrics"
+    | "previous-track"
+    | "next-track"
     | (string & {})
 
 /**
@@ -72,6 +76,16 @@ export interface BuildMenuTreeOptions {
     canvasSupported: boolean
     /** Whether the canvas surface is currently open (marks Canvas as `active`). */
     isCanvasActive: boolean
+    /**
+     * Add Previous/Next transport leaves under Playback. Compact faces that drop
+     * their inline skip buttons (e.g. the mini sidebar) opt in so skip/next moves
+     * into the menu, freeing the row for title/artist. Defaults to off, so faces
+     * with their own transport controls (fullCard) keep the menu uncluttered.
+     */
+    includeTransport?: boolean
+    /** Whether previous/next are currently available (gates the transport leaves). */
+    canPrevious?: boolean
+    canNext?: boolean
 }
 
 /**
@@ -82,12 +96,34 @@ export interface BuildMenuTreeOptions {
 export function buildMenuTree({
     canvasSupported,
     isCanvasActive,
+    includeTransport = false,
+    canPrevious = false,
+    canNext = false,
 }: BuildMenuTreeOptions): MenuNode[] {
     const canvasState: MenuItemState = !canvasSupported
         ? "disabled"
         : isCanvasActive
           ? "active"
           : "available"
+
+    const transportNodes: MenuNode[] = includeTransport
+        ? [
+              {
+                  id: "previous-track",
+                  label: "Previous",
+                  icon: PrevIcon,
+                  state: canPrevious ? "available" : "disabled",
+                  actionId: "previous-track",
+              },
+              {
+                  id: "next-track",
+                  label: "Next",
+                  icon: NextIcon,
+                  state: canNext ? "available" : "disabled",
+                  actionId: "next-track",
+              },
+          ]
+        : []
 
     return [
         {
@@ -142,6 +178,7 @@ export function buildMenuTree({
             label: "Playback",
             icon: PlaybackIcon,
             children: [
+                ...transportNodes,
                 {
                     id: "up-next",
                     label: "Up Next",

@@ -11,17 +11,45 @@
 export type PlayerFace =
     | "fullCard" // FullCardPlayer — rich now-playing card (expanded)
     | "miniSidebar" // MiniSidebarPlayer — condensed sidebar widget (compact)
-    | "seaCard" // SeaCardPlayer — marketplace/album card
+    | "seaCard" // SeaCardPlayer — marketplace/album card (primary variant)
     | "stickyBottom" // StickyBottomPlayer — persistent bottom bar
     | "vaultRow" // VaultRowPlayer — slim list row
     | "portable" // default AudioPlayer — standalone portable player
 
+/**
+ * The two player families. Every face belongs to exactly one, and inherits that
+ * family's capability defaults (overriding only the few deltas it needs).
+ *
+ * - `primary` — rich release presentation: hero artwork, release metadata, the
+ *   SEICanvas + waveform ScrubberCanvas, queue surface, plugins. The faces that
+ *   feel "foundational" (fullCard flagship, the seaCard/marketplace variant, the
+ *   portable standalone player, and a future full-screen canvas mode).
+ * - `compact` — minimal transport: artwork, title/artist, play/pause, action
+ *   button. No SEICanvas/waveform, no per-instance scrubber (the stickyBottom
+ *   master owns the shared scrubber for the family). The list/bar/widget faces
+ *   (miniSidebar, stickyBottom, vaultRow, and a future queueRow).
+ */
+export type PlayerFamily = "primary" | "compact"
+
 export type ScrubberDensity = "compact" | "standard" | "expanded"
 
 export type PlayerFaceCapability = {
+    /** The family this face belongs to; its capability defaults flow from here. */
+    family: PlayerFamily
     /** May host the SEICanvas main visual area. Compact/mini faces are false. */
     supportsSEICanvas: boolean
-    /** May host the ScrubberCanvas timeline zone. Available on every face. */
+    /**
+     * Renders an action button — the per-face entry point into actions (the
+     * three-dot / row action affordance). Distinct from `supportsContextualActions`
+     * (the radial command wheel). Both families default this `true`; even the
+     * compact vault row gets an action button.
+     */
+    supportsAction: boolean
+    /**
+     * May host the ScrubberCanvas timeline zone. Primary faces and the compact
+     * master (stickyBottom) are true; other compact faces (rows, mini) are false
+     * by default and defer scrubbing to the shared master.
+     */
     supportsScrubberCanvas: boolean
     /**
      * The scrubber zone may render an interactive wavesurfer waveform (via
@@ -73,68 +101,99 @@ export type PlayerFaceCapability = {
  * compact list/bar faces stay on the progress bar for performance and legibility
  * (flipping one of them on later is a single boolean here).
  */
+/** A family's baseline capabilities — everything a face inherits before deltas. */
+type FamilyCapabilityDefaults = Omit<PlayerFaceCapability, "family">
+
+/**
+ * Family-level capability defaults. A face declares its `family` and overrides
+ * only the handful of fields where it diverges, so the contract lives in one
+ * place per family instead of being re-spelled per face.
+ */
+export const FAMILY_DEFAULTS: Record<PlayerFamily, FamilyCapabilityDefaults> = {
+    primary: {
+        supportsSEICanvas: true,
+        supportsAction: true,
+        supportsScrubberCanvas: true,
+        supportsWaveform: true,
+        supportsContextualActions: true,
+        supportsHeroCollapse: true,
+        preferredCanvasPlacement: "main",
+        scrubberDensity: "standard",
+    },
+    compact: {
+        supportsSEICanvas: false,
+        supportsAction: true,
+        // Compact faces don't mount their own scrubber by default — the
+        // stickyBottom master owns the shared scrubber for the family.
+        supportsScrubberCanvas: false,
+        supportsWaveform: false,
+        supportsContextualActions: false,
+        supportsHeroCollapse: false,
+        preferredCanvasPlacement: "none",
+        scrubberDensity: "compact",
+    },
+}
+
+/** Each face: its family plus the deltas it overrides from the family default. */
+const FACE_DEFINITIONS: Record<
+    PlayerFace,
+    { family: PlayerFamily } & Partial<FamilyCapabilityDefaults>
+> = {
+    // ---- PrimaryPlayer family --------------------------------------------
+    fullCard: { family: "primary" }, // flagship; pure family defaults
+    portable: {
+        family: "primary",
+        // Standalone player draws its own transport/menu; no surface-button
+        // contextual menu today.
+        supportsContextualActions: false,
+        scrubberDensity: "expanded",
+    },
+    seaCard: {
+        // Marketplace variant of the primary family — same rich contract, but
+        // its canvas lives in an overlay and it relies on tap-to-play, not the
+        // radial menu.
+        family: "primary",
+        supportsContextualActions: false,
+        preferredCanvasPlacement: "overlay",
+    },
+    // ---- CompactPlayer family --------------------------------------------
+    miniSidebar: {
+        family: "compact",
+        // The only compact face with the radial menu — its sole path to
+        // queue/transport actions since it has no three-dot SAPController.
+        supportsContextualActions: true,
+    },
+    stickyBottom: {
+        family: "compact",
+        // The compact family's master transport: it owns the shared scrubber.
+        supportsScrubberCanvas: true,
+    },
+    vaultRow: { family: "compact" }, // pure compact defaults (no own scrubber)
+}
+
 export const PLAYER_FACE_CAPABILITIES: Record<PlayerFace, PlayerFaceCapability> =
-    {
-        fullCard: {
-            supportsSEICanvas: true,
-            supportsScrubberCanvas: true,
-            supportsWaveform: true,
-            supportsContextualActions: true,
-            supportsHeroCollapse: true,
-            preferredCanvasPlacement: "main",
-            scrubberDensity: "standard",
-        },
-        portable: {
-            supportsSEICanvas: true,
-            supportsScrubberCanvas: true,
-            supportsWaveform: true,
-            // Standalone player draws its own transport/menu; no surface-button
-            // contextual menu today.
-            supportsContextualActions: false,
-            supportsHeroCollapse: true,
-            preferredCanvasPlacement: "main",
-            scrubberDensity: "expanded",
-        },
-        seaCard: {
-            supportsSEICanvas: true,
-            supportsScrubberCanvas: true,
-            supportsWaveform: true,
-            supportsContextualActions: false,
-            supportsHeroCollapse: true,
-            preferredCanvasPlacement: "overlay",
-            scrubberDensity: "standard",
-        },
-        miniSidebar: {
-            supportsSEICanvas: false,
-            supportsScrubberCanvas: true,
-            supportsWaveform: false,
-            supportsContextualActions: true,
-            supportsHeroCollapse: false,
-            preferredCanvasPlacement: "none",
-            scrubberDensity: "compact",
-        },
-        stickyBottom: {
-            supportsSEICanvas: false,
-            supportsScrubberCanvas: true,
-            supportsWaveform: false,
-            supportsContextualActions: false,
-            supportsHeroCollapse: false,
-            preferredCanvasPlacement: "none",
-            scrubberDensity: "compact",
-        },
-        vaultRow: {
-            supportsSEICanvas: false,
-            supportsScrubberCanvas: true,
-            supportsWaveform: false,
-            supportsContextualActions: false,
-            supportsHeroCollapse: false,
-            preferredCanvasPlacement: "none",
-            scrubberDensity: "compact",
-        },
-    }
+    Object.fromEntries(
+        Object.entries(FACE_DEFINITIONS).map(([face, def]) => {
+            const { family, ...overrides } = def
+            return [
+                face,
+                { family, ...FAMILY_DEFAULTS[family], ...overrides },
+            ]
+        })
+    ) as Record<PlayerFace, PlayerFaceCapability>
 
 export function getFaceCapability(face: PlayerFace): PlayerFaceCapability {
     return PLAYER_FACE_CAPABILITIES[face]
+}
+
+/** The family a face belongs to (primary | compact). */
+export function getFaceFamily(face: PlayerFace): PlayerFamily {
+    return getFaceCapability(face).family
+}
+
+/** Whether a face renders its own action button (the per-face action entry). */
+export function faceSupportsAction(face: PlayerFace): boolean {
+    return getFaceCapability(face).supportsAction
 }
 
 export function faceSupportsSEICanvas(face: PlayerFace): boolean {

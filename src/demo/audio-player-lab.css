@@ -1729,6 +1729,79 @@ body {
     }
 }
 
+/* ---- Two-family explainer + capability tags ---- */
+.showcase-families-section {
+    margin-top: 48px;
+}
+.showcase-families {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+}
+.showcase-family {
+    background: var(--lab-bg-card);
+    border: 1px solid var(--lab-border);
+    border-radius: var(--lab-radius);
+    border-top: 3px solid var(--lab-accent);
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.showcase-family--compact {
+    border-top-color: #22D3A6;
+}
+.showcase-family__badge {
+    align-self: flex-start;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--lab-text);
+}
+.showcase-family__role {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--lab-text-dim);
+}
+.showcase-family__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.showcase-family__list li {
+    font-size: 13px;
+    color: var(--lab-text);
+}
+.showcase-family__list li span {
+    margin-left: 6px;
+    font-size: 11px;
+    color: var(--lab-text-faint);
+}
+.showcase-family__list li.is-future {
+    color: var(--lab-text-faint);
+}
+.showcase-tags {
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.showcase-tag {
+    font-size: 11px;
+    line-height: 1;
+    padding: 4px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--lab-border);
+    color: var(--lab-text-dim);
+    background: rgba(255, 255, 255, 0.03);
+}
+
 /* ----------------------------- Workshop ----------------------------- */
 .workshop {
     display: grid;

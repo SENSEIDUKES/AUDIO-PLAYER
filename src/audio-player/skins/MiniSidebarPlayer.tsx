@@ -2,13 +2,10 @@ import type { CSSProperties } from "react"
 import type { AudioPlayerTheme } from "../types"
 import { useAudioSession } from "../session/AudioSessionContext"
 import { buildThemeVars } from "./themeVars"
-import { NextIcon, PauseIcon, PlayIcon, SpinnerIcon } from "./icons"
+import { PauseIcon, PlayIcon, SpinnerIcon } from "./icons"
 import { usePlayerSurface } from "../surfaces/usePlayerSurface"
-import { ScrubberCanvasHost } from "../surfaces/ScrubberCanvasHost"
-import { WaveformAdapter } from "../components/WaveformAdapter"
 import { PlayerSurfaceButtons } from "../surfaces/PlayerSurfaceButtons"
 import { QueueSurface } from "../surfaces/QueueSurface"
-import { getScrubberDensity } from "../surfaces/faceCapabilities"
 import { ExplicitBadge } from "../components/TrackMetadata"
 import {
     formatSecondaryLine,
@@ -25,16 +22,19 @@ export interface MiniSidebarPlayerProps extends AudioPlayerTheme {
 }
 
 /**
- * A condensed widget for a sidebar: small art, current track, play/pause + next.
- * Reads the shared session so it always shows what is globally playing.
+ * A condensed widget for a sidebar: small art, current track, play/pause, and
+ * the action menu. Reads the shared session so it always shows what is globally
+ * playing.
  *
- * Capability-driven (`PLAYER_FACE_CAPABILITIES.miniSidebar`): a compact face.
- * `supportsSEICanvas: false`, so the canvas zone and its left surface button are
- * auto-hidden. It keeps a compact ScrubberCanvas (`supportsScrubberCanvas`) and
- * the contextual radial menu (`supportsContextualActions`) — the latter is its
- * only path to "Up Next" / actions since it has no three-dot SAPController.
- * `PlayerSurfaceButtons` reads both flags from the model, so passing `surface`
- * alone yields the correct buttons without per-face overrides.
+ * Capability-driven (`PLAYER_FACE_CAPABILITIES.miniSidebar`, CompactPlayer
+ * family): a compact face. `supportsSEICanvas: false`, so the canvas zone and its
+ * left surface button are auto-hidden. `supportsScrubberCanvas: false` — the mini
+ * mounts **no** scrubber; seeking lives on the shared StickyBottom master. It is
+ * the only compact face with the contextual radial menu
+ * (`supportsContextualActions`), which is also where skip/next now live (via
+ * `showTransport`) — freeing the row for title/artist instead of a Next button.
+ * `PlayerSurfaceButtons` reads the capability flags from the model, so passing
+ * `surface` plus the transport wiring yields the correct menu.
  */
 export function MiniSidebarPlayer({
     art = "linear-gradient(135deg,#7C5CFF,#22D3A6)",
@@ -44,8 +44,7 @@ export function MiniSidebarPlayer({
 }: MiniSidebarPlayerProps) {
     const s = useAudioSession()
     const surface = usePlayerSurface("miniSidebar")
-    const { currentTrack, isPlaying, isBuffering, hasAudio, currentTime, duration } = s
-    const empty = !currentTrack
+    const { currentTrack, isPlaying, isBuffering, hasAudio } = s
     const msTitle = currentTrack
         ? formatVersionedTitle(currentTrack.title, currentTrack.versionLabel)
         : "Nothing playing"
@@ -80,43 +79,18 @@ export function MiniSidebarPlayer({
                 >
                     {isBuffering ? <SpinnerIcon /> : isPlaying ? <PauseIcon /> : <PlayIcon />}
                 </button>
-                <button
-                    type="button"
-                    className="ap-btn ap-btn--ghost ap-btn--sm ap-tap"
-                    onClick={s.next}
-                    disabled={empty || !s.canNext}
-                    aria-label="Next track"
-                >
-                    <NextIcon />
-                </button>
-                {/* Canvas button auto-hidden (mini doesn't support SEICanvas). */}
-                <PlayerSurfaceButtons surface={surface} />
-            </div>
-
-            <ScrubberCanvasHost
-                face="miniSidebar"
-                density={getScrubberDensity("miniSidebar")}
-                currentTime={currentTime}
-                duration={duration}
-                progress={duration > 0 ? currentTime / duration : 0}
-                onSeek={s.seek}
-            >
-                {/* Compact face: WaveformAdapter resolves to the plain ProgressBar
-                    (supportsWaveform: false), now wired to the live session
-                    buffered/seeking state instead of the host's bare fallback. */}
-                <WaveformAdapter
-                    face="miniSidebar"
-                    density={getScrubberDensity("miniSidebar")}
-                    currentTime={currentTime}
-                    duration={duration}
-                    buffered={s.buffered}
-                    disabled={!s.hasAudio}
-                    isSeeking={s.isSeeking}
-                    onSeek={s.seek}
-                    onSeekStart={() => s.setSeeking(true)}
-                    onSeekEnd={() => s.setSeeking(false)}
+                {/* Canvas button auto-hidden (mini doesn't support SEICanvas).
+                    Skip/next live inside the radial menu (`showTransport`) so the
+                    row keeps room for title/artist instead of an inline Next. */}
+                <PlayerSurfaceButtons
+                    surface={surface}
+                    showTransport
+                    canPrevious={s.canPrevious}
+                    canNext={s.canNext}
+                    onPrevious={s.previous}
+                    onNext={s.next}
                 />
-            </ScrubberCanvasHost>
+            </div>
 
             <div className="ap-ms__surface" data-open={surface.isQueueOpen ? "true" : "false"}>
                 {surface.isQueueOpen && <QueueSurface maxItems={6} />}

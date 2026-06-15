@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest"
 import {
     PLAYER_FACE_CAPABILITIES,
+    faceSupportsAction,
     faceSupportsContextualActions,
     faceSupportsHeroCollapse,
     faceSupportsSEICanvas,
     faceSupportsScrubberCanvas,
     faceSupportsWaveform,
+    getFaceFamily,
     getPreferredCanvasPlacement,
     getScrubberDensity,
     getScrubberHeight,
@@ -37,10 +39,31 @@ describe("PLAYER_FACE_CAPABILITIES", () => {
         expect(faceSupportsSEICanvas("vaultRow")).toBe(false)
     })
 
-    it("makes ScrubberCanvas available on every face", () => {
+    it("assigns each face to a family", () => {
+        expect(getFaceFamily("fullCard")).toBe("primary")
+        expect(getFaceFamily("seaCard")).toBe("primary")
+        expect(getFaceFamily("portable")).toBe("primary")
+        expect(getFaceFamily("miniSidebar")).toBe("compact")
+        expect(getFaceFamily("stickyBottom")).toBe("compact")
+        expect(getFaceFamily("vaultRow")).toBe("compact")
+    })
+
+    it("mounts ScrubberCanvas on primary faces and the compact master only", () => {
+        // Compact rows/mini defer to the shared StickyBottom master scrubber, so
+        // they declare no scrubber zone of their own.
+        expect(faceSupportsScrubberCanvas("fullCard")).toBe(true)
+        expect(faceSupportsScrubberCanvas("seaCard")).toBe(true)
+        expect(faceSupportsScrubberCanvas("portable")).toBe(true)
+        expect(faceSupportsScrubberCanvas("stickyBottom")).toBe(true)
+        expect(faceSupportsScrubberCanvas("miniSidebar")).toBe(false)
+        expect(faceSupportsScrubberCanvas("vaultRow")).toBe(false)
+    })
+
+    it("gives every face an action button (incl. the vault row)", () => {
         for (const face of ALL_FACES) {
-            expect(faceSupportsScrubberCanvas(face)).toBe(true)
+            expect(faceSupportsAction(face)).toBe(true)
         }
+        expect(faceSupportsAction("vaultRow")).toBe(true)
     })
 
     it("enables the contextual radial menu only on faces that render it", () => {
