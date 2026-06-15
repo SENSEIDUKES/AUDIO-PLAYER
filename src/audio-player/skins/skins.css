@@ -7,23 +7,22 @@
 @import "../surfaces/surfaces.css";
 
 /* Make a reused ProgressBar fill whatever flex container a skin puts it in
-   (its inner track is absolutely positioned, so the host must supply width). */
-.ap-vr__progress,
+   (its inner track is absolutely positioned, so the host must supply width).
+   The compact vault row and mini sidebar no longer mount a scrubber — seeking
+   lives on the shared StickyBottom master — so only the bar/sea faces remain. */
 .ap-sb__scrub,
 .ap-sea__progress {
     flex: 1;
     min-width: 0;
     display: flex;
 }
-.ap-vr__progress .ap-progress,
 .ap-sb__scrub .ap-progress,
 .ap-sea__progress .ap-progress {
     flex: 1;
 }
-/* When a ScrubberCanvasHost wraps a skin's bespoke ProgressBar (Phase 3), the
-   host becomes the flex child that must grow; it then flexes its own child (the
-   ProgressBar via `.ap-scrubber-host > *`), so seek width stays identical. */
-.ap-vr__progress > .ap-scrubber-host,
+/* When a ScrubberCanvasHost wraps a skin's bespoke ProgressBar, the host becomes
+   the flex child that must grow; it then flexes its own child (the ProgressBar
+   via `.ap-scrubber-host > *`), so seek width stays identical. */
 .ap-sb__scrub > .ap-scrubber-host,
 .ap-sea__progress > .ap-scrubber-host {
     flex: 1;
@@ -289,6 +288,23 @@
     font-size: 12px;
     opacity: 0.7;
     font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+}
+/* Vault category identity: a small accent dot derived from `Track.vaultCategory`
+   (via `--ap-vault-accent`). Cheap to render — no per-row artwork. */
+.ap-vr__cat {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background-color: var(--ap-vault-accent, var(--ap-accent));
+}
+/* When a category accent is present, the active row tints to it instead of the
+   generic theme accent, giving the list per-category visual identity. */
+.ap-vr[data-vault-category].ap-vr--active {
+    border-color: var(--ap-vault-accent, var(--ap-accent));
+}
+.ap-vr__action {
     flex-shrink: 0;
 }
 

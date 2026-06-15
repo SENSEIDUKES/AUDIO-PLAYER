@@ -24,6 +24,17 @@ export interface PlayerSurfaceButtonsProps {
      * faces without a drawer (e.g. mini sidebar) still reach their queue.
      */
     onOpenQueue?: () => void
+    /**
+     * Add Previous/Next leaves to the menu's Playback branch. Compact faces that
+     * drop their inline skip buttons (the mini sidebar) opt in and wire
+     * `onPrevious`/`onNext`, moving transport into the menu so the row has space
+     * for title/artist.
+     */
+    showTransport?: boolean
+    canPrevious?: boolean
+    canNext?: boolean
+    onPrevious?: () => void
+    onNext?: () => void
     className?: string
 }
 
@@ -38,6 +49,11 @@ export function PlayerSurfaceButtons({
     showCanvasButton = surface.canvasSupported,
     showQueueButton = surface.contextualSupported,
     onOpenQueue,
+    showTransport = false,
+    canPrevious = false,
+    canNext = false,
+    onPrevious,
+    onNext,
     className,
 }: PlayerSurfaceButtonsProps) {
     // Built only when the contextual menu is actually rendered, and memoized so
@@ -50,9 +66,29 @@ export function PlayerSurfaceButtons({
                 ? buildMenuTree({
                       canvasSupported: surface.canvasSupported,
                       isCanvasActive: surface.isCanvasOpen,
+                      includeTransport: showTransport,
+                      canPrevious,
+                      canNext,
                   })
                 : [],
-        [showQueueButton, surface.canvasSupported, surface.isCanvasOpen]
+        [
+            showQueueButton,
+            surface.canvasSupported,
+            surface.isCanvasOpen,
+            showTransport,
+            canPrevious,
+            canNext,
+        ]
+    )
+
+    // Resolve the transport leaves (no workspaceRoute, so they fall through to
+    // the menu's `onSelect`). Other unknown leaves are intentionally ignored.
+    const handleSelect = useCallback(
+        (node: MenuNode) => {
+            if (node.actionId === "previous-track") onPrevious?.()
+            else if (node.actionId === "next-track") onNext?.()
+        },
+        [onNext, onPrevious]
     )
 
     // The radial menu opens focused workspace routes in the shared SAP Controller
@@ -89,6 +125,7 @@ export function PlayerSurfaceButtons({
                     onActivateCanvas={surface.toggleCanvas}
                     onOpenQueue={onOpenQueue ?? surface.toggleQueue}
                     onOpenWorkspace={handleOpenWorkspace}
+                    onSelect={handleSelect}
                 />
             )}
             {/* Workspace shell hosting the route the radial menu chose. The

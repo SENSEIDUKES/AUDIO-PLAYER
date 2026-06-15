@@ -1,6 +1,9 @@
 export {
     PLAYER_FACE_CAPABILITIES,
+    FAMILY_DEFAULTS,
     getFaceCapability,
+    getFaceFamily,
+    faceSupportsAction,
     faceSupportsSEICanvas,
     faceSupportsScrubberCanvas,
     faceSupportsContextualActions,
@@ -12,6 +15,7 @@ export {
 } from "./faceCapabilities"
 export type {
     PlayerFace,
+    PlayerFamily,
     PlayerFaceCapability,
     ScrubberDensity,
 } from "./faceCapabilities"

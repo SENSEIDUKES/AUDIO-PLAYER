@@ -1,7 +1,6 @@
 import type { CSSProperties } from "react"
 import type { AudioPlayerTheme, Track } from "../types"
 import { useAudioSession } from "../session/AudioSessionContext"
-import { WaveformAdapter } from "../components/WaveformAdapter"
 import { ExplicitBadge } from "../components/TrackMetadata"
 import { formatTime } from "../utils/formatTime"
 import {
@@ -9,10 +8,10 @@ import {
     formatVersionedTitle,
 } from "../utils/formatMetadata"
 import { trackKey } from "../utils/trackKey"
-import { ScrubberCanvasHost } from "../surfaces/ScrubberCanvasHost"
-import { getScrubberDensity } from "../surfaces/faceCapabilities"
+import { faceSupportsAction } from "../surfaces/faceCapabilities"
+import { getVaultCategoryMeta } from "./vaultCategories"
 import { buildThemeVars } from "./themeVars"
-import { PauseIcon, PlayIcon, SpinnerIcon } from "./icons"
+import { DotsIcon, PauseIcon, PlayIcon, SpinnerIcon } from "./icons"
 import "./skins.css"
 
 export interface VaultRowPlayerProps extends AudioPlayerTheme {
@@ -20,6 +19,13 @@ export interface VaultRowPlayerProps extends AudioPlayerTheme {
     track: Track
     /** Optional 1-based number shown at the left of the row. */
     number?: number
+    /**
+     * Action entry point for this row (opens the host's row actions: add to
+     * playlist, share, edit, etc.). Deep actions belong to the container; the
+     * row only surfaces the affordance. The action button is part of the compact
+     * family contract (`faceSupportsAction("vaultRow")`).
+     */
+    onAction?: (track: Track) => void
     className?: string
     style?: CSSProperties
 }
@@ -32,20 +38,21 @@ function sameTrack(a: Track, b: Track): boolean {
 /**
  * A slim Vault list row. Each row controls the shared session: pressing play
  * starts this track in the one global engine (jumping if it's already queued,
- * else appending). When this row is the active track it shows live progress and
- * its play button mirrors the global play state — so it stays in sync with every
- * other skin.
+ * else appending). When this row is the active track its play button mirrors the
+ * global play state — so it stays in sync with every other skin.
  *
- * Capability-driven (`PLAYER_FACE_CAPABILITIES.vaultRow`): the most compact face.
- * `supportsSEICanvas: false` and `supportsContextualActions: false` — a list row
- * has no room for canvas or menu surfaces, so it renders neither the SEICanvas
- * host nor `PlayerSurfaceButtons`. Deep actions belong to whatever container
- * hosts the row list. Phase 3 wires the active row's scrubber through
- * `ScrubberCanvasHost` (compact density); seeking is unchanged.
+ * Capability-driven (`PLAYER_FACE_CAPABILITIES.vaultRow`, CompactPlayer family):
+ * the most compact face. `supportsSEICanvas: false`, `supportsContextualActions:
+ * false`, and `supportsScrubberCanvas: false` — a list row mounts **no** scrubber
+ * of its own; seeking lives on the shared StickyBottom master scrubber that
+ * follows the active song. It keeps `supportsAction: true`, so it renders a row
+ * action button. Visual identity comes from the track's `vaultCategory` (accent
+ * color + status label), not per-row artwork, keeping long lists fast to render.
  */
 export function VaultRowPlayer({
     track,
     number,
+    onAction,
     className,
     style,
     ...theme
@@ -56,6 +63,8 @@ export function VaultRowPlayer({
     // Engine gates `isBuffering` to active/pending playback; scope it to this
     // row so only the active track's button can spin.
     const isBufferingThis = isActive && s.isBuffering
+    const category = getVaultCategoryMeta(track.vaultCategory)
+    const showAction = faceSupportsAction("vaultRow")
 
     const handleToggle = () => {
         if (isActive) s.toggle()
@@ -65,9 +74,23 @@ export function VaultRowPlayer({
     return (
         <div
             className={`ap-vr${isActive ? " ap-vr--active" : ""}${className ? ` ${className}` : ""}`}
-            style={{ ...buildThemeVars(theme), ...style }}
+            style={{
+                ...buildThemeVars(theme),
+                ...(category
+                    ? ({ "--ap-vault-accent": category.color } as CSSProperties)
+                    : {}),
+                ...style,
+            }}
+            data-vault-category={track.vaultCategory}
             aria-current={isActive ? "true" : undefined}
         >
+            {category && (
+                <span
+                    className="ap-vr__cat"
+                    title={category.label}
+                    aria-label={category.label}
+                />
+            )}
             {number !== undefined && <span className="ap-vr__num">{number}</span>}
             <button
                 type="button"
@@ -91,43 +114,13 @@ export function VaultRowPlayer({
                     {formatVersionedTitle(track.title, track.versionLabel)}
                     {track.explicit && <ExplicitBadge />}
                 </span>
-                {isActive ? (
-                    <span className="ap-vr__progress">
-                        {/* ScrubberCanvasHost (Phase 3): compact timeline zone for
-                            the active row; ProgressBar passed through as children
-                            keeps seeking identical. */}
-                        <ScrubberCanvasHost
-                            face="vaultRow"
-                            density={getScrubberDensity("vaultRow")}
-                            currentTime={s.currentTime}
-                            duration={s.duration}
-                            progress={s.duration > 0 ? s.currentTime / s.duration : 0}
-                            onSeek={s.seek}
-                        >
-                            {/* Compact face: WaveformAdapter resolves to the plain
-                                ProgressBar (supportsWaveform: false). */}
-                            <WaveformAdapter
-                                face="vaultRow"
-                                density={getScrubberDensity("vaultRow")}
-                                currentTime={s.currentTime}
-                                duration={s.duration}
-                                buffered={s.buffered}
-                                disabled={!s.hasAudio}
-                                isSeeking={s.isSeeking}
-                                onSeek={s.seek}
-                                onSeekStart={() => s.setSeeking(true)}
-                                onSeekEnd={() => s.setSeeking(false)}
-                            />
-                        </ScrubberCanvasHost>
-                    </span>
-                ) : (
-                    <span
-                        className="ap-vr__artist"
-                        title={formatSecondaryLine(track)}
-                    >
-                        {formatSecondaryLine(track)}
-                    </span>
-                )}
+                <span
+                    className="ap-vr__artist"
+                    title={formatSecondaryLine(track)}
+                >
+                    {category ? `${category.label} · ` : ""}
+                    {formatSecondaryLine(track)}
+                </span>
             </div>
             {isActive && (
                 <span className="ap-vr__time" aria-hidden="true">
@@ -138,6 +131,17 @@ export function VaultRowPlayer({
                 <span className="ap-eq" aria-hidden="true">
                     <i /><i /><i />
                 </span>
+            )}
+            {showAction && (
+                <button
+                    type="button"
+                    className="ap-icon-btn ap-vr__action ap-tap"
+                    onClick={() => onAction?.(track)}
+                    aria-label={`More actions for ${track.title}`}
+                    aria-haspopup="menu"
+                >
+                    <DotsIcon />
+                </button>
             )}
         </div>
     )

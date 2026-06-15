@@ -2,6 +2,22 @@ import type { CSSProperties, ReactNode } from "react"
 import type { AudioPlayerPlugin } from "./core/plugins/PluginInterface"
 import type { AudioBackendInfo, AudioBackendKind } from "./core/audio/AudioBackend"
 
+/**
+ * Vault identity category. Drives a row's visual identity (accent color + label)
+ * in the Vault list — demos, beats, mixes, masters, memos, Arc Notes, tracks
+ * still being finished, and archived material. Display-only: it never affects
+ * playback. The category → color/label map lives in `skins/vaultCategories.ts`.
+ */
+export type VaultCategory =
+    | "demo"
+    | "beat"
+    | "mix"
+    | "master"
+    | "memo"
+    | "arcNote"
+    | "toFinish"
+    | "archived"
+
 /** A single playable track. */
 export interface Track {
     /**
@@ -42,6 +58,9 @@ export interface Track {
     /** Generic secondary-line fallback used when there's no album or featured
      *  artist to show. */
     subtitle?: string
+    /** Vault identity category. Gives a Vault row its accent color + status
+     *  label without depending on per-row artwork. Ignored by other faces. */
+    vaultCategory?: VaultCategory
 }
 
 /** Theme colors. Applied to the player root as CSS custom properties. */
