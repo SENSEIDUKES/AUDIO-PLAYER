@@ -32,5 +32,7 @@ export const VAULT_CATEGORY_META: Record<VaultCategory, VaultCategoryMeta> = {
 export function getVaultCategoryMeta(
     category: VaultCategory | undefined
 ): VaultCategoryMeta | null {
-    return category ? VAULT_CATEGORY_META[category] : null
+    // `|| null` guards against an unexpected runtime string (e.g. from external
+    // API data) that isn't a real key, keeping the declared return type honest.
+    return (category && VAULT_CATEGORY_META[category]) || null
 }

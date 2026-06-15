@@ -64,7 +64,9 @@ export function VaultRowPlayer({
     // row so only the active track's button can spin.
     const isBufferingThis = isActive && s.isBuffering
     const category = getVaultCategoryMeta(track.vaultCategory)
-    const showAction = faceSupportsAction("vaultRow")
+    // The capability allows the button, but only render it when there's a real
+    // handler — otherwise it would be an interactive yet non-functional control.
+    const showAction = faceSupportsAction("vaultRow") && !!onAction
 
     const handleToggle = () => {
         if (isActive) s.toggle()
@@ -87,6 +89,7 @@ export function VaultRowPlayer({
             {category && (
                 <span
                     className="ap-vr__cat"
+                    role="img"
                     title={category.label}
                     aria-label={category.label}
                 />
