@@ -48,31 +48,27 @@ function titleForRoute(route: WorkspaceRoute): string {
     }
 }
 
-/** Pick the placeholder workspace surface for a route. */
+/**
+ * Pick the placeholder workspace surface for a route. Switches on the full route
+ * string for known routes (parity with `titleForRoute`) so a future `library:*`
+ * or `playback:*` route can't silently fall through to the wrong surface; the
+ * `default` only parses for the genuinely dynamic `plugin-settings:<id>` case.
+ */
 function contentForRoute(route: WorkspaceRoute, lyrics?: string): ReactNode {
-    const parsed = parseWorkspaceRoute(route)
-    if (!parsed) return null
-    switch (parsed.category) {
-        case "library":
-            return parsed.target === "playlists" ? (
-                <LibraryPlaylistsWorkspace />
-            ) : (
-                <LibraryQueueWorkspace />
-            )
-        case "plugin-settings":
-            return parsed.target === "lyrics" ? (
-                <VisualLyricsWorkspace lyrics={lyrics} />
-            ) : (
-                <PluginSettingsWorkspace pluginId={parsed.target ?? ""} />
-            )
-        case "playback":
+    switch (route) {
+        case "library:playlists":
+            return <LibraryPlaylistsWorkspace />
+        case "library:queue":
+            return <LibraryQueueWorkspace />
+        case "plugin-settings:lyrics":
+        case "visual:lyrics":
+            return <VisualLyricsWorkspace lyrics={lyrics} />
+        case "playback:automix":
             return <PlaybackAutomixWorkspace />
-        case "agent":
+        case "agent:queue-director":
             return <AgentQueueDirectorWorkspace />
-        case "visual":
-            return parsed.target === "lyrics" ? (
-                <VisualLyricsWorkspace lyrics={lyrics} />
-            ) : (
+        case "visual:canvas":
+            return (
                 <div className="sap-ctl__workspace-empty">
                     <p className="sap-ctl__workspace-lead">Canvas</p>
                     <p className="sap-ctl__workspace-sub">
@@ -80,8 +76,14 @@ function contentForRoute(route: WorkspaceRoute, lyrics?: string): ReactNode {
                     </p>
                 </div>
             )
-        default:
+        default: {
+            // Dynamic plugin settings: render the generic stub keyed by id.
+            const parsed = parseWorkspaceRoute(route)
+            if (parsed?.category === "plugin-settings" && parsed.target) {
+                return <PluginSettingsWorkspace pluginId={parsed.target} />
+            }
             return null
+        }
     }
 }
 
