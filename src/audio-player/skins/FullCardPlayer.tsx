@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react"
+import { useState, useCallback, useMemo } from "react"
 import type { CSSProperties } from "react"
 import type { AudioPlayerTheme } from "../types"
 import { useAudioSession } from "../session/AudioSessionContext"
@@ -95,7 +95,7 @@ export function FullCardPlayer({
     } = s
 
     const themeVars = buildThemeVars(theme)
-    const identity = resolveTrackIdentity(currentTrack)
+    const identity = useMemo(() => resolveTrackIdentity(currentTrack), [currentTrack])
     const isEmpty = queue.length === 0
     // Spinner follows the explicit visual playback state, not raw media events.
     const showPlaySpinner = playbackVisualStateShowsSpinner(s.playbackVisualState)

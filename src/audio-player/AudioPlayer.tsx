@@ -252,7 +252,8 @@ function AudioPlayerInner(props: AudioPlayerProps) {
         audioFile,
         purchaseUrl,
         lyrics,
-        backgroundImage,
+        backgroundImage?.src,
+        backgroundImage?.alt,
     ])
 
     const src = currentTrack.audioFile?.trim() ?? ""
@@ -320,7 +321,7 @@ function AudioPlayerInner(props: AudioPlayerProps) {
         dismissAutoplayBlocked,
     } = engine
 
-    const identity = resolveTrackIdentity(currentTrack)
+    const identity = useMemo(() => resolveTrackIdentity(currentTrack), [currentTrack])
     const showPlaySpinner = playbackVisualStateShowsSpinner(engine.playbackVisualState)
 
     const goToTrack = useCallback(
