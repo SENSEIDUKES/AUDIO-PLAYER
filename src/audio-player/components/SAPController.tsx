@@ -15,6 +15,7 @@ import {
     RepeatOneIcon,
     ShareIcon,
     ShuffleIcon,
+    WaveIcon,
 } from "../skins/icons"
 import { WorkspaceShell } from "./workspace/WorkspaceShell"
 import type { WorkspaceRoute } from "./workspace/workspaceRoutes"
@@ -74,6 +75,12 @@ export interface SAPControllerProps extends AudioPlayerTheme {
     share?: SAPControllerShare
     /** Read-only list of active plugin names (standalone player for V1). */
     pluginNames?: readonly string[]
+    /**
+     * Waveform plugin settings. Provided only when the Waveform plugin is active;
+     * renders the "Show Waveform" toggle that switches the scrubber between the
+     * wavesurfer waveform and the basic progress bar.
+     */
+    waveform?: { enabled: boolean; onToggle: () => void }
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -131,6 +138,7 @@ export function SAPController({
     info,
     share,
     pluginNames,
+    waveform,
     accentColor,
     playIconColor,
     textColor,
@@ -381,6 +389,17 @@ export function SAPController({
                             </span>
                             {share.copied && <span className="sap-ctl__value">copied</span>}
                         </button>
+                    </Section>
+                )}
+
+                {waveform && (
+                    <Section title="Visual">
+                        <SwitchRow
+                            icon={<WaveIcon />}
+                            label="Show Waveform"
+                            on={waveform.enabled}
+                            onToggle={waveform.onToggle}
+                        />
                     </Section>
                 )}
 

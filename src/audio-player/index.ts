@@ -31,6 +31,10 @@ export {
     createSleepTimerPlugin,
 } from "./plugins/SleepTimerPlugin"
 export {
+    WaveformPlugin,
+    createWaveformPlugin,
+} from "./plugins/WaveformPlugin"
+export {
     ensureTrackAnalysis,
     getTrackTrims,
 } from "./automix/silenceAnalysis"
@@ -261,6 +265,7 @@ export type {
     SleepTimerPreset,
     SleepTimerState,
 } from "./plugins/SleepTimerPlugin"
+export type { WaveformPluginConfig } from "./plugins/WaveformPlugin"
 export {
     PluginRegistryProvider,
     usePluginRegistry,

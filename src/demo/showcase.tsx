@@ -162,6 +162,7 @@ export function Showcase() {
                         <AudioPlayer
                             tracks={noLuckTracks}
                             showTracklist
+                            showWaveform
                             repeatMode="all"
                             accentColor="#22D3A6"
                             progressColor="#22D3A6"

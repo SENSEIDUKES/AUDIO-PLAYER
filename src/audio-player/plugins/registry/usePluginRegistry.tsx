@@ -27,6 +27,9 @@ import {
 import {
     createAutoThemePlugin,
 } from "../AutoThemePlugin"
+import {
+    createWaveformPlugin,
+} from "../WaveformPlugin"
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -168,6 +171,18 @@ const availablePlugins: PluginRegistryEntry[] = [
             "text contrast, and ambient glow from the album artwork.",
         factory: () =>
             createAutoThemePlugin({ name: "registry-auto-theme" }),
+        defaultActive: false,
+        category: "ui",
+    },
+    {
+        id: "waveform",
+        label: "Waveform",
+        description:
+            "Replaces the progress bar with an interactive wavesurfer waveform " +
+            "on players that support it. Adds a Show Waveform toggle in the " +
+            "player's options.",
+        factory: () =>
+            createWaveformPlugin({ name: "registry-waveform" }),
         defaultActive: false,
         category: "ui",
     },

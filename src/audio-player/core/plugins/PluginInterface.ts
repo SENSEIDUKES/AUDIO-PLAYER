@@ -58,6 +58,12 @@ export interface AudioPlayerPlugin {
     name: string
     /** True when the plugin owns keyboard shortcut handling for this player. */
     handlesKeyboardShortcuts?: boolean
+    /**
+     * True for the Waveform plugin: tells a standalone player to render the
+     * wavesurfer waveform scrubber instead of the plain progress bar (subject to
+     * the player's "Show Waveform" toggle). Pure marker — no playback behavior.
+     */
+    providesWaveform?: boolean
     init: (playerInstance: PluginPlayerContext) => void | (() => void)
     destroy: () => void
     onTrackLoad?: (track: Track | null) => PluginHookResult
