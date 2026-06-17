@@ -48,6 +48,27 @@ export class HTML5AudioBackend implements AudioBackend {
         return this.audioRef.current
     }
 
+    /**
+     * Set the HTMLMediaElement `preload` attribute based on the current
+     * network connection type. Matches the recommendation from the HTML5
+     * backend preloading strategy:
+     *   slow-2g → 'none'   (avoid downloading any media)
+     *   2g      → 'metadata' (only fetch headers / metadata)
+     *   other   → 'auto'   (let the browser decide)
+     */
+    private _updatePreloadAttribute(): void {
+        const audio = this.audioRef.current
+        if (!audio) return
+
+        let preload: HTMLMediaElement["preload"] = "auto"
+        if (navigator.connection?.effectiveType === "slow-2g") {
+            preload = "none"
+        } else if (navigator.connection?.effectiveType === "2g") {
+            preload = "metadata"
+        }
+        audio.preload = preload
+    }
+
     isAttached(): boolean {
         return this.audio !== null
     }
@@ -57,12 +78,16 @@ export class HTML5AudioBackend implements AudioBackend {
     }
 
     load(): void {
-        this.audio?.load()
+        const audio = this.audio
+        if (!audio) return
+        this._updatePreloadAttribute()
+        audio.load()
     }
 
     clearSource(): void {
         const audio = this.audio
         if (!audio) return
+        this._updatePreloadAttribute()
         audio.removeAttribute("src")
         audio.load()
     }
@@ -74,6 +99,7 @@ export class HTML5AudioBackend implements AudioBackend {
             error.name = "NotSupportedError"
             return Promise.reject(error)
         }
+        this._updatePreloadAttribute()
         return audio.play()
     }
 
