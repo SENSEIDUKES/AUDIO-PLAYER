@@ -4,8 +4,47 @@ import {
     useRef,
     useState,
 } from "react"
+import { FixedSizeList } from "react-window"
+// @ts-ignore
+import { AutoSizer as _AutoSizer } from "react-virtualized-auto-sizer"
+
+const AutoSizer: any = _AutoSizer
 import type { Track } from "../types"
 import { trackKey } from "../utils/trackKey"
+
+const QueueRowWrapper = ({ index, style, data }: { index: number; style: React.CSSProperties; data: any }) => {
+    const {
+        visibleQueue,
+        upcomingStart,
+        currentIndex,
+        drag,
+        onPlayTrack,
+        onRemove,
+        isPlaying,
+    } = data
+
+    const actualIndex = upcomingStart + index
+    const track = visibleQueue[index]
+    if (!track) return null
+    const isActive = actualIndex === currentIndex
+    const isDragging = drag.drag !== null && drag.drag.index === actualIndex
+    const dragOffset = isDragging && drag.drag ? drag.drag.y : 0
+
+    return (
+        <QueueRow
+            style={style}
+            track={track}
+            index={actualIndex}
+            isActive={isActive}
+            isDragging={isDragging}
+            dragOffset={dragOffset}
+            dragHandlers={drag.getRowHandlers(actualIndex)}
+            onPlay={() => onPlayTrack(actualIndex)}
+            onRemove={() => onRemove(actualIndex)}
+            isPlaying={isPlaying}
+        />
+    )
+}
 
 /* ----------------------------- QueueDrawer props ----------------------------- */
 
@@ -47,22 +86,24 @@ interface DragState {
 function useQueueDrag(
     itemCount: number,
     onReorder: (from: number, to: number) => void,
-    rowHeight = 56
+    rowHeight = 56,
+    startIndexOffset = 0
 ) {
     const [drag, setDrag] = useState<DragState | null>(null)
     const dragRef = useRef<DragState | null>(null)
-    const containerRef = useRef<HTMLDivElement | null>(null)
+    const containerRef = useRef<HTMLElement | null>(null)
     const initialPointerRef = useRef(0)
 
     const computeTarget = useCallback(
         (pointerY: number, startIndex: number) => {
             if (!containerRef.current) return startIndex
             const rect = containerRef.current.getBoundingClientRect()
-            const offset = pointerY - rect.top
+            const offset = pointerY - rect.top + containerRef.current.scrollTop
             const rawIndex = Math.round(offset / rowHeight)
-            return Math.max(0, Math.min(itemCount - 1, rawIndex))
+            const target = rawIndex + startIndexOffset
+            return Math.max(startIndexOffset, Math.min(itemCount - 1, target))
         },
-        [itemCount, rowHeight]
+        [itemCount, rowHeight, startIndexOffset]
     )
 
     const handlePointerDown = useCallback(
@@ -171,6 +212,7 @@ interface QueueRowProps {
     onPlay: () => void
     onRemove: () => void
     isPlaying: boolean
+    style?: React.CSSProperties
 }
 
 function QueueRow({
@@ -183,6 +225,7 @@ function QueueRow({
     onPlay,
     onRemove,
     isPlaying,
+    style,
 }: QueueRowProps) {
     const rowRef = useRef<HTMLDivElement>(null)
 
@@ -200,7 +243,7 @@ function QueueRow({
             role="listitem"
             tabIndex={-1}
             aria-label={`${track.title} by ${track.artist}${isActive ? " (now playing)" : ""}`}
-            style={isDragging && dragOffset !== 0 ? { transform: `translateY(${dragOffset}px)` } : undefined}
+            style={{ ...style, ...(isDragging && dragOffset !== 0 ? { transform: `translateY(${dragOffset}px)` } : {}) }}
         >
             <span
                 className="ap-q-row__drag"
@@ -285,7 +328,10 @@ export function QueueDrawer({
     const [announcement, setAnnouncement] = useState("")
     const prevQueueRef = useRef(queue)
 
-    const drag = useQueueDrag(queue.length, onReorder)
+    const upcomingStart = currentIndex
+    const visibleQueue = queue.slice(upcomingStart)
+
+    const drag = useQueueDrag(queue.length, onReorder, 56, upcomingStart)
 
     // Lock body scroll when open.
     useEffect(() => {
@@ -320,9 +366,6 @@ export function QueueDrawer({
 
     if (!open) return null
 
-    // Upcoming tracks are everything after the current index.
-    const upcomingStart = currentIndex + 1
-
     return (
         <div className="ap-q-overlay" role="dialog" aria-modal="true" aria-label="Up next queue">
             {/* Backdrop */}
@@ -354,36 +397,37 @@ export function QueueDrawer({
                 {/* Queue list */}
                 <div
                     className="ap-q-list"
-                    ref={drag.setContainerRef}
                     role="list"
                     aria-label="Queue tracks"
                     style={{ touchAction: "pan-y" }}
                 >
-                    {queue.map((track, i) => {
-                        const isActive = i === currentIndex
-                        const isUpcoming = i >= upcomingStart
-                        const isDragging = drag.drag !== null && drag.drag.index === i
-                        const dragOffset = isDragging && drag.drag ? drag.drag.y : 0
-
-                        // We don't show the row if it's not active and not upcoming.
-                        // (Items before the current index are "already played" and hidden.)
-                        if (!isActive && !isUpcoming) return null
-
-                        return (
-                            <QueueRow
-                                key={`${i}:${trackKey(track)}`}
-                                track={track}
-                                index={i}
-                                isActive={isActive}
-                                isDragging={isDragging}
-                                dragOffset={dragOffset}
-                                dragHandlers={drag.getRowHandlers(i)}
-                                onPlay={() => onPlayTrack(i)}
-                                onRemove={() => onRemove(i)}
-                                isPlaying={isPlaying}
-                            />
-                        )
-                    })}
+                    <AutoSizer>
+                        {({ height, width }: { height: number; width: number }) => (
+                            <FixedSizeList
+                                outerRef={drag.setContainerRef}
+                                height={height}
+                                width={width}
+                                itemCount={visibleQueue.length}
+                                itemSize={56}
+                                itemData={{
+                                    visibleQueue,
+                                    upcomingStart,
+                                    currentIndex,
+                                    drag,
+                                    onPlayTrack,
+                                    onRemove,
+                                    isPlaying,
+                                }}
+                                itemKey={(index, data) => {
+                                    const actualIndex = data.upcomingStart + index
+                                    const track = data.visibleQueue[index]
+                                    return actualIndex + ":" + trackKey(track)
+                                }}
+                            >
+                                {QueueRowWrapper}
+                            </FixedSizeList>
+                        )}
+                    </AutoSizer>
                 </div>
 
                 {/* Empty state */}

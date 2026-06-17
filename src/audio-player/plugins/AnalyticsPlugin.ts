@@ -60,7 +60,7 @@ export class AnalyticsPlugin implements AudioPlayerPlugin {
         this.lastTimeUpdateBucket = -1
     }
 
-    onTrackLoad = () => {
+    onTrackLoad = (_track: Track | null) => {
         this.lastTimeUpdateBucket = -1
         this.emit("track_load")
     }

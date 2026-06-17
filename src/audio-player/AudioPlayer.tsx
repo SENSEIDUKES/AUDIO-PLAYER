@@ -40,6 +40,36 @@ import {
     formatVersionedTitle,
 } from "./utils/formatMetadata"
 import { defaultShowVolume } from "./utils/device"
+import { FixedSizeList } from "react-window"
+
+const TrackRow = ({ index, style, data }: { index: number; style: React.CSSProperties; data: any }) => {
+    const { localQueue, trackIndex, goToTrack, isPlaying } = data
+    const track = localQueue[index]
+    if (!track) return null
+    const active = index === trackIndex
+    return (
+        <div style={style} role="listitem">
+            <button
+                type="button"
+                className={"ap-tracklist__item" + (active ? " ap-tracklist__item--active" : "")}
+                onClick={() => goToTrack(index)}
+                aria-current={active ? "true" : undefined}
+                style={{ height: 'calc(100% - 4px)', width: '100%', boxSizing: 'border-box' }}
+            >
+                <span className="ap-tracklist__num">{index + 1}</span>
+                <span className="ap-tracklist__meta">
+                    <span className="ap-tracklist__title">{track.title}</span>
+                    <span className="ap-tracklist__artist">{track.artist}</span>
+                </span>
+                {active && isPlaying && (
+                    <span className="ap-eq" aria-hidden="true">
+                        <i /><i /><i />
+                    </span>
+                )}
+            </button>
+        </div>
+    )
+}
 import { resolveTrackList } from "./utils/trackList"
 import { trackKey } from "./utils/trackKey"
 import { getTrackSources, trackSourcesSignature } from "./utils/sources"
@@ -1185,31 +1215,22 @@ function AudioPlayerInner(props: AudioPlayerProps) {
                         className="ap-tracklist ap-anim-in"
                         role="list"
                         aria-label="Playlist tracks"
+                        style={{ overflowY: "hidden" }}
                     >
-                        {localQueue.map((track, index) => {
-                            const active = index === trackIndex
-                            return (
-                                <button
-                                    type="button"
-                                    key={`${track.audioFile}-${index}`}
-                                    role="listitem"
-                                    className={`ap-tracklist__item${active ? " ap-tracklist__item--active" : ""}`}
-                                    onClick={() => goToTrack(index)}
-                                    aria-current={active ? "true" : undefined}
-                                >
-                                    <span className="ap-tracklist__num">{index + 1}</span>
-                                    <span className="ap-tracklist__meta">
-                                        <span className="ap-tracklist__title">{track.title}</span>
-                                        <span className="ap-tracklist__artist">{track.artist}</span>
-                                    </span>
-                                    {active && isPlaying && (
-                                        <span className="ap-eq" aria-hidden="true">
-                                            <i /><i /><i />
-                                        </span>
-                                    )}
-                                </button>
-                            )
-                        })}
+                        <FixedSizeList
+                            height={Math.min(276, localQueue.length * 52)}
+                            itemCount={localQueue.length}
+                            itemSize={52}
+                            width="100%"
+                            itemData={{
+                                localQueue,
+                                trackIndex,
+                                goToTrack,
+                                isPlaying,
+                            }}
+                        >
+                            {TrackRow}
+                        </FixedSizeList>
                     </div>
                 )}
             </div>

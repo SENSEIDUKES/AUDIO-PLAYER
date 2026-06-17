@@ -58,61 +58,93 @@ Add optional canvas-based waveform visualization layer that runs parallel to exi
 
 ---
 
-## PHASE 2: PLUGIN ARCHITECTURE
+## PHASE 2: PLUGIN ARCHITECTURE ✅
 
 **CONCEPT:**
-Formalize existing modular patterns into standardized plugin interface. Extract features (automix, analytics, keyboard shortcuts) into swappable plugins. Plugins register hooks into player lifecycle (onLoad, onPlay, onPause, onStop).
+Formalize existing modular patterns into standardized plugin interface. Extract features (automix, analytics, keyboard shortcuts) into swappable plugins. Plugins register hooks into player lifecycle (onTrackLoad, onPlay, onPause, onStop, onSeek, onTimeUpdate, onTrackEnded). Structured error boundary system ensures plugin failures never crash playback.
 
 **IMPLEMENTATION PLAN FOR BUILDERS:**
 
-1. **Define Plugin Interface** (`src/core/plugins/PluginInterface.js`)
-   ```javascript
+1. **Define Plugin Interface** (`src/audio-player/core/plugins/PluginInterface.ts`)
+   ```typescript
    // Standard methods all plugins must implement:
-   init(playerInstance)
-   destroy()
+   init(playerInstance: PluginPlayerContext): void | (() => void)
+   destroy(): void
    // Optional hooks:
-   onTrackLoad(track)
-   onPlay()
-   onPause()
-   onStop()
-   onSeek(position)
+   onTrackLoad?(track: Track | null): PluginHookResult
+   onPlay?(): PluginHookResult
+   onPause?(): PluginHookResult
+   onStop?(): PluginHookResult
+   onSeek?(position: number): PluginHookResult
+   onTimeUpdate?(position: number): PluginHookResult
+   onTrackEnded?(track: Track | null): PluginHookResult
    ```
 
-2. **Create Plugin Manager** (`src/core/plugins/PluginManager.js`)
-   - Methods: `register(plugin)`, `unregister(name)`, `trigger(hook, data)`
+2. **Create Plugin Manager** (`src/audio-player/core/plugins/PluginManager.ts`)
+   - Methods: `register(plugin)`, `unregister(name)`, `replace(nextPlugins)`, `trigger(hook, ...args)`, `triggerUntilHandled(hook, ...args)`
    - Lifecycle integration: call hooks at appropriate player events
-   - Error isolation: one plugin failure doesn't crash player
+   - Error isolation via `PluginErrorBoundary` per plugin — one plugin failure doesn't crash player
+   - Debug status monitoring via `getDebugStatus()`, `isPluginDisabled()`, `enablePlugin()`
+   - React bridge via `usePluginManager` hook (`src/audio-player/core/plugins/usePluginManager.ts`)
 
-3. **Migrate useAutomix to Plugin** (`src/plugins/AutomixPlugin.js`)
+3. **Plugin Error Boundary System** (`src/audio-player/core/plugins/PluginErrorBoundary.ts`)
+   - `PluginError` custom error class with plugin context (pluginName, operation, cause, recoverable)
+   - `PluginErrorHandler` interface for host-app error interception
+   - `DefaultPluginErrorHandler` with configurable max-failures-before-disable
+   - `PluginErrorBoundary` wraps sync/async operations with structured recovery
+   - `GracefulDegradation` constants for safe fallback values
+   - Recovery actions: disable, skip_hook, fallback, retry, reset
+
+4. **Plugin Config Validation** (`src/audio-player/plugins/configValidators.ts`)
+   - Zod schemas for all built-in plugins
+   - `validateConfig()` helper: invalid config falls back to safe defaults with console warning
+
+5. **Plugin Debugger** (`src/audio-player/core/plugins/PluginDebugger.ts`)
+   - Performance measurement for hook execution times
+   - Memory usage tracking
+   - Enabled via `window.AUDIO_PLAYER_DEBUG = "1"`
+
+6. **Migrate useAutomix to Plugin** (`src/audio-player/plugins/AutomixPlugin.ts`)
    - Convert existing `useAutomix` logic into AutomixPlugin class
-   - Maintain exact same behavior
-   - Register via `player.plugins.register(new AutomixPlugin(config))`
+   - Maintain exact same behavior (two-deck crossfade)
+   - Returns `true` from `onTrackEnded` during handoff to prevent double-advancing
 
-4. **Build Example Plugins** (demonstrate extensibility)
-   - `KeyboardShortcutPlugin` - space=play/pause, arrows=seek
-   - `AnalyticsPlugin` - track play events, send to backend
-   - `LyricsPlugin` - sync lyrics display with playback position
+7. **Build Plugins** (demonstrate extensibility + real features)
+   - `KeyboardShortcutPlugin` — space/arrows/JKL play/pause/seek, N/P for next/previous
+   - `AnalyticsPlugin` — track play events, send via callback or sendBeacon/fetch endpoint
+   - `LyricsPlugin` — sync LRC-style lyrics with playback position
+   - `SleepTimerPlugin` — countdown presets + "until end of track" with scoped UI dropdown
+   - `AutoThemePlugin` — derive player palette from album artwork via Canvas API
+   - `WaveformPlugin` — marker plugin that activates wavesurfer scrubber + peaks pre-warming
 
-5. **Update Player Initialization** (`src/core/SEIPlayer.js`)
-   - Add `plugins: []` option to config
-   - Initialize PluginManager in constructor
-   - Trigger hooks at existing event points
+8. **Update Player Initialization** (`src/audio-player/AudioPlayer.tsx` / `useAudioPlayer.ts`)
+   - `plugins: []` prop on `<AudioPlayer>` and `<AudioSessionProvider>`
+   - PluginManager initialized via `usePluginManager` React hook
+   - Hooks triggered at existing lifecycle events
 
-6. **Documentation for Plugin Developers**
-   - Template for creating new plugins
-   - List of available hooks
-   - Examples of plugin use cases
+9. **Documentation and Examples**
+   - `PLUGIN_DEVELOPMENT_GUIDE.md` — interface, hooks, context API, built-in plugin docs, error isolation guide
+   - `ErrorBoundaryExample.ts` — comprehensive usage examples for host-app error handling
 
 **DELIVERABLES CHECKLIST:**
-- [ ] `src/core/plugins/PluginInterface.js` - interface definition
-- [ ] `src/core/plugins/PluginManager.js` - registration + hook system
-- [ ] `src/plugins/AutomixPlugin.js` - migrated from useAutomix
-- [ ] `src/plugins/KeyboardShortcutPlugin.js` - example plugin
-- [ ] `src/plugins/AnalyticsPlugin.js` - example plugin
-- [ ] Update `src/core/SEIPlayer.js` to initialize plugin system
-- [ ] Backward compatibility: existing `useAutomix` import still works (deprecated warning)
-- [ ] Demo: Load player with 0, 1, and 3 plugins to verify stability
-- [ ] Docs: `PLUGIN_DEVELOPMENT_GUIDE.md`
+- [x] `src/audio-player/core/plugins/PluginInterface.ts` — interface + context definition
+- [x] `src/audio-player/core/plugins/PluginManager.ts` — registration + hook dispatch + error boundary integration
+- [x] `src/audio-player/core/plugins/PluginErrorBoundary.ts` — structured error handling system
+- [x] `src/audio-player/core/plugins/PluginDebugger.ts` — performance monitoring
+- [x] `src/audio-player/core/plugins/usePluginManager.ts` — React bridge hook
+- [x] `src/audio-player/plugins/configValidators.ts` — Zod schemas for all built-in plugins
+- [x] `src/audio-player/plugins/AutomixPlugin.ts` — migrated from useAutomix
+- [x] `src/audio-player/plugins/KeyboardShortcutPlugin.ts` — keyboard controls plugin
+- [x] `src/audio-player/plugins/AnalyticsPlugin.ts` — event tracking plugin
+- [x] `src/audio-player/plugins/LyricsPlugin.ts` — lyric sync plugin
+- [x] `src/audio-player/plugins/SleepTimerPlugin.ts` — sleep timer plugin
+- [x] `src/audio-player/plugins/AutoThemePlugin.ts` — artwork palette plugin
+- [x] `src/audio-player/plugins/WaveformPlugin.ts` — waveform marker plugin
+- [x] `src/audio-player/plugins/ErrorBoundaryExample.ts` — usage examples
+- [x] Updated `src/audio-player/index.ts` to export plugin system + error boundary API
+- [x] Backward compatibility: existing `useAutomix` import still works (deprecated warning)
+- [x] Plugin test suites: AnalyticsPlugin, AutoThemePlugin, AutomixPlugin, KeyboardShortcutPlugin, LyricsPlugin, SleepTimerPlugin, PluginErrorBoundary
+- [x] Docs: `PLUGIN_DEVELOPMENT_GUIDE.md`
 
 **PRESERVATION GUARANTEES:**
 ✓ Existing automix behavior identical
@@ -261,7 +293,7 @@ Tie all phases together. Ensure interoperability. Add demos. Write documentation
 
 **Estimated Time per Phase:**
 - Phase 1: 4-8 hours
-- Phase 2: 6-10 hours  
+- Phase 2: ✅ Complete  
 - Phase 3: 6-10 hours
 - Phase 4: 4-6 hours
 

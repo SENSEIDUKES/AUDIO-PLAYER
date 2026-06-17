@@ -153,12 +153,12 @@ export class AutomixPlugin implements AudioPlayerPlugin {
         this.supervise()
     }
 
-    onSeek = () => {
+    onSeek = (_position: number) => {
         if (this.phase === "fading") this.cancel()
         else this.supervise()
     }
 
-    onTimeUpdate = () => {
+    onTimeUpdate = (_position: number) => {
         this.supervise()
     }
 

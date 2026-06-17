@@ -3,6 +3,8 @@ export { useAudioPlayer } from "./useAudioPlayer"
 export { useAutomix, AUTOMIX_FADE_MS } from "./automix/useAutomix"
 export { PluginManager, type PluginManagerOptions } from "./core/plugins/PluginManager"
 export { usePluginManager } from "./core/plugins/usePluginManager"
+// Phase 2 plugin error boundary: structured error handling, graceful degradation,
+// and recovery for plugins. Host apps can inject a custom PluginErrorHandler.
 export {
     PluginError,
     PluginErrorBoundary,

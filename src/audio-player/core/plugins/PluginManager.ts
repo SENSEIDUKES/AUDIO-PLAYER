@@ -292,14 +292,7 @@ export class PluginManager {
             })
     }
 
-    /**
-     * Safely retrieve the handler from a boundary. Uses the handler stored at
-     * construction time so callers never need to access private members.
-     */
-    private getBoundaryHandler(_boundary: PluginErrorBoundary): PluginErrorHandler {
-        // Every boundary created through the factory shares the factory's handler.
-        // We can obtain it through the boundary's getFailureCount method for
-        // DefaultPluginErrorHandler, or use the factory's stored reference.
-        return this.errorBoundaryFactory.getHandler()
+    private getBoundaryHandler(boundary: PluginErrorBoundary): PluginErrorHandler {
+        return boundary.getHandler()
     }
 }

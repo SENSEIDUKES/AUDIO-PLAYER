@@ -298,6 +298,10 @@ export class PluginErrorBoundary {
     this.handler = handler
   }
 
+  getHandler(): PluginErrorHandler {
+    return this.handler
+  }
+
   getPluginName(): string {
     return this.pluginName
   }
