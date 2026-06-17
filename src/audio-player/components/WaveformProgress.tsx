@@ -243,13 +243,35 @@ export function WaveformProgress({
     }, [sourceId, hasDuration, peaks, peaksDuration, url, getDecodedData])
 
     // Push playback position into the waveform (suppressed while dragging).
+    // Throttled to one requestAnimationFrame per display frame: the audio engine
+    // emits currentTime many times per second (timeupdate, rAF loops, etc.) and
+    // we must not call ws.setTime() more than once per frame to avoid redundant
+    // canvas repaints that would break 60fps on mid-range devices.
+    const rafIdRef = useRef<number>(0)
     const lastPushedRef = useRef(-1)
     useEffect(() => {
         const ws = wsRef.current
         if (!ws || status !== "ready" || draggingRef.current) return
+        // Skip tiny sub-centisecond jitter that wouldn't move the cursor visibly.
         if (Math.abs(currentTime - lastPushedRef.current) < 0.01) return
-        lastPushedRef.current = currentTime
-        ws.setTime(currentTime)
+
+        // Cancel any pending frame for an older time value.
+        if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current)
+
+        rafIdRef.current = requestAnimationFrame(() => {
+            rafIdRef.current = 0
+            const wsCurrent = wsRef.current
+            if (!wsCurrent || draggingRef.current) return
+            lastPushedRef.current = currentTime
+            wsCurrent.setTime(currentTime)
+        })
+
+        return () => {
+            if (rafIdRef.current) {
+                cancelAnimationFrame(rafIdRef.current)
+                rafIdRef.current = 0
+            }
+        }
     }, [currentTime, status])
 
     // Live theme/size updates without recreating the instance.

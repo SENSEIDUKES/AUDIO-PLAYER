@@ -1,5 +1,6 @@
 import {
     Component,
+    memo,
     useCallback,
     useEffect,
     useMemo,
@@ -42,7 +43,7 @@ import {
 import { defaultShowVolume } from "./utils/device"
 import { FixedSizeList } from "react-window"
 
-const TrackRow = ({ index, style, data }: { index: number; style: React.CSSProperties; data: any }) => {
+const TrackRow = memo(({ index, style, data }: { index: number; style: React.CSSProperties; data: any }) => {
     const { localQueue, trackIndex, goToTrack, isPlaying } = data
     const track = localQueue[index]
     if (!track) return null
@@ -69,7 +70,7 @@ const TrackRow = ({ index, style, data }: { index: number; style: React.CSSPrope
             </button>
         </div>
     )
-}
+})
 import { resolveTrackList } from "./utils/trackList"
 import { trackKey } from "./utils/trackKey"
 import { getTrackSources, trackSourcesSignature } from "./utils/sources"
@@ -354,8 +355,11 @@ function AudioPlayerInner(props: AudioPlayerProps) {
 
     const playbackOrder = useMemo(
         () => buildPlaybackOrder(localQueue.length, trackIndex, localShuffle),
+        // trackIndex is intentionally included: when shuffle is on, the active
+        // track is pinned to position 0 of the order, so switching tracks must
+        // regenerate the shuffle sequence.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [localQueue, localShuffle]
+        [localQueue.length, localShuffle, trackIndex]
     )
 
     const stepTrackIndex = useCallback(
@@ -517,19 +521,22 @@ function AudioPlayerInner(props: AudioPlayerProps) {
         nextTrackFn: nextTrack,
         previousTrackFn: previousTrack,
     })
-    pluginContextStateRef.current = {
-        engine,
-        currentTrack,
-        nextTrack: pluginNextTrack,
-        sourceKey,
-        tracks: localQueue,
-        trackIndex,
-        repeatMode: localRepeatMode,
-        shuffle: localShuffle,
-        requestAdvance,
-        nextTrackFn: nextTrack,
-        previousTrackFn: previousTrack,
-    }
+    // Memoized field-by-field update: only write each slot when the value
+    // actually changes so downstream reads always get a stable reference for
+    // unchanged fields (avoids spurious re-evaluations in plugins that cache
+    // individual getters on rAF-tick renders).
+    const _pcs = pluginContextStateRef.current
+    if (_pcs.engine !== engine) _pcs.engine = engine
+    if (_pcs.currentTrack !== currentTrack) _pcs.currentTrack = currentTrack
+    if (_pcs.nextTrack !== pluginNextTrack) _pcs.nextTrack = pluginNextTrack
+    if (_pcs.sourceKey !== sourceKey) _pcs.sourceKey = sourceKey
+    if (_pcs.tracks !== localQueue) _pcs.tracks = localQueue
+    if (_pcs.trackIndex !== trackIndex) _pcs.trackIndex = trackIndex
+    if (_pcs.repeatMode !== localRepeatMode) _pcs.repeatMode = localRepeatMode
+    if (_pcs.shuffle !== localShuffle) _pcs.shuffle = localShuffle
+    if (_pcs.requestAdvance !== requestAdvance) _pcs.requestAdvance = requestAdvance
+    if (_pcs.nextTrackFn !== nextTrack) _pcs.nextTrackFn = nextTrack
+    if (_pcs.previousTrackFn !== previousTrack) _pcs.previousTrackFn = previousTrack
 
     const pluginContext = useMemo<PluginPlayerContext>(
         () => ({
@@ -611,19 +618,11 @@ function AudioPlayerInner(props: AudioPlayerProps) {
         [engine, seekByWithPlugins, seekWithPlugins]
     )
 
-    pluginContextStateRef.current = {
-        engine: pluginAwareEngine,
-        currentTrack,
-        nextTrack: pluginNextTrack,
-        sourceKey,
-        tracks: localQueue,
-        trackIndex,
-        repeatMode: localRepeatMode,
-        shuffle: localShuffle,
-        requestAdvance,
-        nextTrackFn: nextTrack,
-        previousTrackFn: previousTrack,
-    }
+    // Second pass: update engine slot to the plugin-aware wrapper after it is
+    // constructed (pluginAwareEngine is derived from engine so it's always a
+    // new object, but the wrapper is stable once seekWithPlugins/seekByWithPlugins
+    // are stable — only write when it actually differs).
+    if (_pcs.engine !== pluginAwareEngine) _pcs.engine = pluginAwareEngine
 
     const handleAutoPlayToggle = useCallback(
         () => setLocalAutoPlay((v) => !v),
@@ -843,6 +842,14 @@ function AudioPlayerInner(props: AudioPlayerProps) {
         "--ap-glow": glowColor,
         "--ap-blur": `${blurSize}px`,
     } as CSSProperties
+
+    // Memoized data for the virtualized tracklist so React.memo on TrackRow
+    // can shallow-compare a stable reference instead of a fresh inline object
+    // every render.
+    const trackListData = useMemo(
+        () => ({ localQueue, trackIndex, goToTrack, isPlaying }),
+        [localQueue, trackIndex, goToTrack, isPlaying]
+    )
 
     return (
         <div
@@ -1222,12 +1229,7 @@ function AudioPlayerInner(props: AudioPlayerProps) {
                             itemCount={localQueue.length}
                             itemSize={52}
                             width="100%"
-                            itemData={{
-                                localQueue,
-                                trackIndex,
-                                goToTrack,
-                                isPlaying,
-                            }}
+                            itemData={trackListData}
                         >
                             {TrackRow}
                         </FixedSizeList>
