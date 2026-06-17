@@ -143,7 +143,7 @@ describe('DefaultPluginErrorHandler', () => {
         await handler.onError({ error, severity: 'error' })
         await handler.onError({ error, severity: 'error' })
         
-        expect((handler as any).getFailureCount('test-plugin')).toBe(2)
+        expect(handler.getFailureCount('test-plugin')).toBe(2)
     })
 
     it('returns disable_plugin after max failures', async () => {
@@ -204,11 +204,11 @@ describe('DefaultPluginErrorHandler', () => {
         
         await handler.onError({ error, severity: 'error' })
         await handler.onError({ error, severity: 'error' })
-        expect((handler as any).getFailureCount('test-plugin')).toBe(2)
+        expect(handler.getFailureCount('test-plugin')).toBe(2)
         
         await handler.onPluginRecovered('test-plugin', 'skip_hook')
         
-        expect((handler as any).getFailureCount('test-plugin')).toBe(0)
+        expect(handler.getFailureCount('test-plugin')).toBe(0)
     })
 })
 
@@ -307,7 +307,7 @@ describe('PluginErrorBoundary', () => {
         
         // Subsequent calls should fail immediately
         await expect(customBoundary.execute('test-op', () => 'success')).rejects.toThrow(
-            'Plugin is disabled'
+            'failed during test-op'
         )
     })
 

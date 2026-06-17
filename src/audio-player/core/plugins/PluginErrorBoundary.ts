@@ -298,17 +298,14 @@ export class PluginErrorBoundary {
     this.handler = handler
   }
 
- 
   getPluginName(): string {
     return this.pluginName
   }
 
- 
   isPluginDisabled(): boolean {
     return this.isDisabled
   }
 
- 
   async execute<T>(
     operation: string,
     fn: () => T | Promise<T>,
@@ -320,7 +317,7 @@ export class PluginErrorBoundary {
     } = {}
   ): Promise<T> {
     if (this.isDisabled) {
-      throw PluginError.fatal(this.pluginName, operation, new Error('Plugin is disabled'))
+      throw new PluginError(this.pluginName, operation, new Error('Plugin is disabled'), false)
     }
 
     const {
@@ -352,12 +349,16 @@ export class PluginErrorBoundary {
       switch (result.action) {
         case 'disable_plugin':
           this.isDisabled = true
-          await this.handler.onPluginDisabled(this.pluginName, 
-            (this.handler as DefaultPluginErrorHandler).getFailureCount?.(this.pluginName) || 1)
-          break
+          await this.handler.onPluginDisabled(
+            this.pluginName,
+            this.getFailureCount()
+          )
+          if (fallback !== undefined) {
+            return fallback
+          }
+          throw pluginError
 
         case 'skip_hook':
-          // Return undefined for void hooks, fallback for others
           return fallback as T
 
         case 'fallback':
@@ -380,86 +381,134 @@ export class PluginErrorBoundary {
         default:
           throw pluginError
       }
-
-      // If we get here with a fallback, return it
-      if (fallback !== undefined) {
-        return fallback
-      }
-
-      // Re-throw if no fallback
-      throw pluginError
     }
   }
 
- 
   executeSync<T>(
     operation: string,
     fn: () => T,
-    options?: Parameters<typeof this.execute>[2]
+    options: {
+      recoverable?: boolean
+      severity?: ErrorSeverity
+      context?: Record<string, unknown>
+      fallback?: T
+    } = {}
   ): T {
-    // For synchronous execution, we wrap in Promise and await immediately
-    // This allows using the same error handling logic
-    let result: T | undefined
-    let error: unknown
-    let hasError = false
-    
+    if (this.isDisabled) {
+      throw new PluginError(this.pluginName, operation, new Error('Plugin is disabled'), false)
+    }
+
+    const {
+      recoverable = true,
+      severity = 'error',
+      context,
+      fallback
+    } = options
+
     try {
-      result = fn()
-    } catch (e) {
-      error = e
-      hasError = true
+      return fn()
+    } catch (error) {
+      const pluginError = PluginError.fromError(
+        this.pluginName,
+        operation,
+        error,
+        recoverable
+      )
+
+      const info: PluginErrorInfo = {
+        error: pluginError,
+        severity,
+        context
+      }
+
+      // Try to get a synchronous result from the handler.
+      // If the handler is async, fall back to basic recoverable/fallback logic.
+      const handlerResult = this.handler.onError(info)
+
+      if (handlerResult instanceof Promise) {
+        // Async handler can't be awaited in a sync context.
+        // Fire the handler in the background for logging/reporting.
+        handlerResult.then(result => {
+          if (result.action === 'disable_plugin') {
+            this.isDisabled = true
+            this.handler.onPluginDisabled(this.pluginName, this.getFailureCount()).catch(() => {})
+          }
+        }).catch(() => {})
+
+        // Fall back to simple recoverable/fallback logic
+        if (!recoverable) {
+          throw pluginError
+        }
+        if (fallback !== undefined) {
+          return fallback
+        }
+        throw pluginError
+      }
+
+      // Synchronous handler result - apply recovery action.
+      // For sync execution, always aim to complete without throwing so the
+      // caller can continue iterating other plugins. Only throw for truly
+      // non-recoverable errors or the 'none' action.
+      switch (handlerResult.action) {
+        case 'disable_plugin':
+          this.isDisabled = true
+          // Fire async callback in background
+          Promise.resolve(
+            this.handler.onPluginDisabled(this.pluginName, this.getFailureCount())
+          ).catch(() => {})
+          if (fallback !== undefined) return fallback
+          // Return undefined as the result - the plugin is disabled but we don't
+          // want to crash the caller (e.g. trigger iterating over all plugins)
+          return undefined as unknown as T
+
+        case 'skip_hook':
+          return fallback as T
+
+        case 'fallback':
+          if (fallback !== undefined) return fallback
+          // No fallback available - return undefined gracefully
+          return undefined as unknown as T
+
+        default:
+          // For 'none' or unknown actions, throw
+          throw pluginError
+      }
     }
-    
-    if (!hasError) {
-      return result as T
-    }
-    
-    // For sync execution, we need to handle errors synchronously
-    // Create a plugin error and use the handler
-    const pluginError = PluginError.fromError(
-      this.pluginName,
-      operation,
-      error!,
-      options?.recoverable ?? true
-    )
-    
-    // Call handler synchronously (it may be async but we can't await here)
-    // We'll use a simplified sync path for executeSync
-    const fallback = options?.fallback
-    const recoverable = options?.recoverable ?? true
-    
-    if (!recoverable) {
-      throw pluginError
-    }
-    
-    if (fallback !== undefined) {
-      return fallback as T
-    }
-    
-    throw pluginError
   }
 
- 
   warn(message: string, context?: Record<string, unknown>): void {
     this.handler.onWarning(this.pluginName, message, context)
   }
 
- 
   enable(): void {
     this.isDisabled = false
   }
 
- 
   disable(): void {
     this.isDisabled = true
   }
 
- 
   reset(): void {
     this.isDisabled = false
+    // Try to reset failure count if the handler supports it
     if (this.handler instanceof DefaultPluginErrorHandler) {
       this.handler.resetFailureCount(this.pluginName)
+    } else if (typeof (this.handler as Record<string, unknown>).resetFailureCount === 'function') {
+      ;(this.handler as unknown as { resetFailureCount(name: string): void }).resetFailureCount(this.pluginName)
     }
+  }
+
+  /**
+   * Get failure count for this plugin from the handler (if supported)
+   */
+  getFailureCount(): number {
+    if (this.handler instanceof DefaultPluginErrorHandler) {
+      return this.handler.getFailureCount(this.pluginName)
+    }
+    if (typeof (this.handler as Record<string, unknown>).getFailureCount === 'function') {
+      return (this.handler as unknown as { getFailureCount(name: string): number }).getFailureCount(this.pluginName)
+    }
+    return 0
   }
 }
 
@@ -473,12 +522,10 @@ export class PluginErrorBoundaryFactory {
     this.handler = handler ?? new DefaultPluginErrorHandler()
   }
 
- 
   createBoundary(pluginName: string): PluginErrorBoundary {
     return new PluginErrorBoundary(pluginName, this.handler)
   }
 
- 
   getHandler(): PluginErrorHandler {
     return this.handler
   }
@@ -516,44 +563,47 @@ export function createPluginErrorBoundary(pluginName: string): PluginErrorBounda
  * Graceful degradation strategies for common plugin operations
  */
 export const GracefulDegradation = {
- 
   forInit: <T>(defaultValue: T) => defaultValue,
-
- 
   forHook: <T>(defaultValue: T) => defaultValue,
-
- 
   forTrackLoad: (track: unknown) => track,
-
- 
   forPlay: () => undefined,
-
- 
   forPause: () => undefined,
-
- 
   forSeek: (position: number) => position,
-
- 
   forTimeUpdate: (position: number) => position,
-
- 
   forTrackEnded: () => false,
-
- 
   forDestroy: () => undefined
 } as const
 
 /**
- * Helper to wrap a plugin with error boundary protection
+ * Helper to wrap a plugin with error boundary protection.
+ * Proxies method calls through the error boundary for structured error handling.
  */
-export function withErrorBoundary<P extends object>(
+export function withErrorBoundary<P extends Record<string, unknown>>(
   plugin: P,
   boundary: PluginErrorBoundary
 ): P & { _errorBoundary: PluginErrorBoundary } {
   const wrapped = { ...plugin } as P & { _errorBoundary: PluginErrorBoundary }
   wrapped._errorBoundary = boundary
-  return wrapped
+
+  return new Proxy(wrapped, {
+    get(target, prop, receiver) {
+      const value = Reflect.get(target, prop, receiver)
+      if (typeof value !== 'function' || prop === '_errorBoundary' || prop === 'constructor') {
+        return value
+      }
+
+      // Wrap functions to go through the error boundary
+      return function (this: unknown, ...args: unknown[]) {
+        const fn = value.bind(target)
+        // For async functions, use execute; for sync, use executeSync
+        const operation = `method:${String(prop)}`
+        if (fn.constructor.name === 'AsyncFunction') {
+          return boundary.execute(operation, () => fn(...args))
+        }
+        return boundary.executeSync(operation, () => fn(...args))
+      }
+    }
+  })
 }
 
 /**

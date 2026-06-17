@@ -7,14 +7,18 @@
 
 import type { AudioPlayerPlugin, PluginPlayerContext } from "../core/plugins/PluginInterface"
 import type { Track } from "../types"
-import {
+import type {
     PluginErrorHandler,
+    PluginErrorInfo,
+    ErrorHandlerResult,
+    RecoveryAction,
+} from "../core/plugins/PluginErrorBoundary"
+import {
     PluginErrorBoundary,
     PluginErrorBoundaryFactory,
     GracefulDegradation,
     setGlobalErrorHandler,
     isPluginError,
-    type RecoveryAction,
 } from "../core/plugins/PluginErrorBoundary"
 
 // ============================================================================
@@ -28,10 +32,15 @@ import {
 class HostAppErrorHandler implements PluginErrorHandler {
     private readonly errorLog: Array<{ plugin: string; error: Error; timestamp: Date }> = []
     private readonly disabledPlugins = new Set<string>()
+    private failureCounts = new Map<string, number>()
 
-    onError(info: { error: any; severity: string; context?: Record<string, unknown> }) {
+    onError(info: PluginErrorInfo): ErrorHandlerResult | Promise<ErrorHandlerResult> {
         const { error, severity, context } = info
         
+        // Track failure counts
+        const count = (this.failureCounts.get(error.pluginName) || 0) + 1
+        this.failureCounts.set(error.pluginName, count)
+
         // Log to host's error tracking service
         this.errorLog.push({
             plugin: error.pluginName,
