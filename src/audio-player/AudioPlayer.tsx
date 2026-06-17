@@ -843,6 +843,14 @@ function AudioPlayerInner(props: AudioPlayerProps) {
         "--ap-blur": `${blurSize}px`,
     } as CSSProperties
 
+    // Memoized data for the virtualized tracklist so React.memo on TrackRow
+    // can shallow-compare a stable reference instead of a fresh inline object
+    // every render.
+    const trackListData = useMemo(
+        () => ({ localQueue, trackIndex, goToTrack, isPlaying }),
+        [localQueue, trackIndex, goToTrack, isPlaying]
+    )
+
     return (
         <div
             ref={rootRef}
@@ -1221,12 +1229,7 @@ function AudioPlayerInner(props: AudioPlayerProps) {
                             itemCount={localQueue.length}
                             itemSize={52}
                             width="100%"
-                            itemData={{
-                                localQueue,
-                                trackIndex,
-                                goToTrack,
-                                isPlaying,
-                            }}
+                            itemData={trackListData}
                         >
                             {TrackRow}
                         </FixedSizeList>
