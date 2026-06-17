@@ -303,6 +303,32 @@ export type {
     InstalledPluginRecord,
     PluginRegistrySnapshot,
 } from "./plugins/registry/usePluginRegistry"
+
+// Plugin surface routing (Phase 1 foundation): declarative contract for where
+// each plugin's UI belongs (settings / SEI Canvas / both / headless), pure
+// helpers, and a default catalog for the built-in plugins. Metadata only — no
+// runtime menu/canvas behavior change.
+export {
+    hasSettingsSurface,
+    hasCanvasSurface,
+    isHeadlessPlugin,
+    getPluginSettingsRoute,
+    getPluginCanvasSurfaceId,
+    sortPluginSurfaceDefinitions,
+    DEFAULT_PLUGIN_SURFACES,
+    getPluginSurfaceDefinition,
+    getPluginSurfaceDefinitionsByCategory,
+    getPluginSurfaceDefinitionsForMenuBranch,
+} from "./plugins/surfaces"
+export type {
+    PluginSurfaceKind,
+    PluginSurfaceCategory,
+    PluginMenuBranch,
+    PluginSettingsSurface,
+    PluginCanvasSurface,
+    PluginMenuSurface,
+    PluginSurfaceDefinition,
+} from "./plugins/surfaces"
 export type { TransitionPlan } from "./automix/transitionPlanner"
 export type {
     Track,
