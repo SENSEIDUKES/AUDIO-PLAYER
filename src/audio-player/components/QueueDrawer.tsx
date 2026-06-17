@@ -10,6 +10,39 @@ import AutoSizer from "react-virtualized-auto-sizer"
 import type { Track } from "../types"
 import { trackKey } from "../utils/trackKey"
 
+const QueueRowWrapper = ({ index, style, data }: { index: number; style: React.CSSProperties; data: any }) => {
+    const {
+        visibleQueue,
+        upcomingStart,
+        currentIndex,
+        drag,
+        onPlayTrack,
+        onRemove,
+        isPlaying,
+    } = data
+
+    const actualIndex = upcomingStart + index
+    const track = visibleQueue[index]
+    const isActive = actualIndex === currentIndex
+    const isDragging = drag.drag !== null && drag.drag.index === actualIndex
+    const dragOffset = isDragging && drag.drag ? drag.drag.y : 0
+
+    return (
+        <QueueRow
+            style={style}
+            track={track}
+            index={actualIndex}
+            isActive={isActive}
+            isDragging={isDragging}
+            dragOffset={dragOffset}
+            dragHandlers={drag.getRowHandlers(actualIndex)}
+            onPlay={() => onPlayTrack(actualIndex)}
+            onRemove={() => onRemove(actualIndex)}
+            isPlaying={isPlaying}
+        />
+    )
+}
+
 /* ----------------------------- QueueDrawer props ----------------------------- */
 
 export interface QueueDrawerProps {
@@ -373,30 +406,22 @@ export function QueueDrawer({
                                 width={width}
                                 itemCount={visibleQueue.length}
                                 itemSize={56}
-                            >
-                                {({ index, style }: { index: number; style: React.CSSProperties }) => {
-                                    const actualIndex = upcomingStart + index
-                                    const track = visibleQueue[index]
-                                    const isActive = actualIndex === currentIndex
-                                    const isDragging = drag.drag !== null && drag.drag.index === actualIndex
-                                    const dragOffset = isDragging && drag.drag ? drag.drag.y : 0
-
-                                    return (
-                                        <QueueRow
-                                            key={`${actualIndex}:${trackKey(track)}`}
-                                            style={style}
-                                            track={track}
-                                            index={actualIndex}
-                                            isActive={isActive}
-                                            isDragging={isDragging}
-                                            dragOffset={dragOffset}
-                                            dragHandlers={drag.getRowHandlers(actualIndex)}
-                                            onPlay={() => onPlayTrack(actualIndex)}
-                                            onRemove={() => onRemove(actualIndex)}
-                                            isPlaying={isPlaying}
-                                        />
-                                    )
+                                itemData={{
+                                    visibleQueue,
+                                    upcomingStart,
+                                    currentIndex,
+                                    drag,
+                                    onPlayTrack,
+                                    onRemove,
+                                    isPlaying,
                                 }}
+                                itemKey={(index, data) => {
+                                    const actualIndex = data.upcomingStart + index
+                                    const track = data.visibleQueue[index]
+                                    return actualIndex + ":" + trackKey(track)
+                                }}
+                            >
+                                {QueueRowWrapper}
                             </FixedSizeList>
                         )}
                     </AutoSizer>
