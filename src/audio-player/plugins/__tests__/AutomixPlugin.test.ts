@@ -126,8 +126,7 @@ describe("AutomixPlugin", () => {
             vi.useFakeTimers()
             vi.spyOn(performance, "now").mockReturnValue(1000)
             
-            // @ts-ignore
-            global.Audio = MockAudio
+            vi.stubGlobal("Audio", MockAudio)
             mockMainAudio = new MockAudio()
             mockMainAudio.readyState = 4
             
@@ -154,6 +153,7 @@ describe("AutomixPlugin", () => {
         afterEach(() => {
             vi.useRealTimers()
             vi.clearAllMocks()
+            vi.unstubAllGlobals()
         })
 
         it("triggers analysis on track load", () => {

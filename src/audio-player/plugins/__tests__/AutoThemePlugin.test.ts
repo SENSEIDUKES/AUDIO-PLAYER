@@ -126,15 +126,17 @@ describe("AutoThemePlugin", () => {
                 configurable: true
             })
             
-            const plugin = createAutoThemePlugin()
-            plugin.init(mockContext)
-            await Promise.resolve()
-            
-            expect(colorExtraction.extractPalette).toHaveBeenCalledWith("mediasession.jpg", expect.any(Object))
-            
-            // Clean up
-            // @ts-ignore
-            delete navigator.mediaSession
+            try {
+                const plugin = createAutoThemePlugin()
+                plugin.init(mockContext)
+                await Promise.resolve()
+
+                expect(colorExtraction.extractPalette).toHaveBeenCalledWith("mediasession.jpg", expect.any(Object))
+            } finally {
+                // Clean up
+                // @ts-ignore
+                delete navigator.mediaSession
+            }
         })
     })
 

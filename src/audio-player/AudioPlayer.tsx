@@ -45,6 +45,7 @@ import { FixedSizeList } from "react-window"
 const TrackRow = ({ index, style, data }: { index: number; style: React.CSSProperties; data: any }) => {
     const { localQueue, trackIndex, goToTrack, isPlaying } = data
     const track = localQueue[index]
+    if (!track) return null
     const active = index === trackIndex
     return (
         <div style={style} role="listitem">

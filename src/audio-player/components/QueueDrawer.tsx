@@ -25,6 +25,7 @@ const QueueRowWrapper = ({ index, style, data }: { index: number; style: React.C
 
     const actualIndex = upcomingStart + index
     const track = visibleQueue[index]
+    if (!track) return null
     const isActive = actualIndex === currentIndex
     const isDragging = drag.drag !== null && drag.drag.index === actualIndex
     const dragOffset = isDragging && drag.drag ? drag.drag.y : 0

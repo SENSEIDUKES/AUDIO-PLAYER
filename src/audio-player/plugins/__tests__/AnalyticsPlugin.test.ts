@@ -214,15 +214,17 @@ describe("AnalyticsPlugin", () => {
             plugin.init(mockContext)
             
             const originalWindow = (globalThis as any).window
-            // @ts-ignore
-            delete (globalThis as any).window
-            
-            plugin.onPlay?.()
-            
-            expect(navigator.sendBeacon).not.toHaveBeenCalled()
-            expect(fetch).not.toHaveBeenCalled()
-            
-            ;(globalThis as any).window = originalWindow
+            try {
+                // @ts-ignore
+                delete (globalThis as any).window
+
+                plugin.onPlay?.()
+
+                expect(navigator.sendBeacon).not.toHaveBeenCalled()
+                expect(fetch).not.toHaveBeenCalled()
+            } finally {
+                ;(globalThis as any).window = originalWindow
+            }
         })
     })
 })

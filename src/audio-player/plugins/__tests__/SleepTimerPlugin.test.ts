@@ -93,25 +93,27 @@ describe("SleepTimerPlugin", () => {
             // mock Date.now manually
             let now = 1000
             const originalNow = Date.now
-            Date.now = () => now
-            
-            const p2 = new SleepTimerPlugin({ now: () => now })
-            p2.init(createPluginContext())
-            p2.setTimer("15m")
-            
-            expect(p2.getActiveTimer().remainingMs).toBe(15 * 60 * 1000)
-            
-            now += 5000 // jump 5 seconds
-            expect(p2.getActiveTimer().remainingMs).toBe(15 * 60 * 1000 - 5000)
-            
-            // Wait, we need to test early expire trigger. The setTimeout might trigger early.
-            // vi.advanceTimersByTime handles setTimeout internally.
-            vi.advanceTimersByTime(15 * 60 * 1000) // Trigger the expire. 
-            // since now is only +5000, deadline > now
-            expect(p2.getActiveTimer().preset).toBe("15m")
-            
-            Date.now = originalNow
-            vi.useRealTimers()
+            try {
+                Date.now = () => now
+
+                const p2 = new SleepTimerPlugin({ now: () => now })
+                p2.init(createPluginContext())
+                p2.setTimer("15m")
+
+                expect(p2.getActiveTimer().remainingMs).toBe(15 * 60 * 1000)
+
+                now += 5000 // jump 5 seconds
+                expect(p2.getActiveTimer().remainingMs).toBe(15 * 60 * 1000 - 5000)
+
+                // Wait, we need to test early expire trigger. The setTimeout might trigger early.
+                // vi.advanceTimersByTime handles setTimeout internally.
+                vi.advanceTimersByTime(15 * 60 * 1000) // Trigger the expire.
+                // since now is only +5000, deadline > now
+                expect(p2.getActiveTimer().preset).toBe("15m")
+            } finally {
+                Date.now = originalNow
+                vi.useRealTimers()
+            }
         })
     })
 })
