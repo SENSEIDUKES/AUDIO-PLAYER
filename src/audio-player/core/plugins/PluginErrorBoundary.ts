@@ -595,9 +595,10 @@ export function withErrorBoundary<P extends Record<string, unknown>>(
 
       // Wrap functions to go through the error boundary
       return function (this: unknown, ...args: unknown[]) {
-        const operation = "method:" + String(prop)
+        const fn = value.bind(target)
+        const operation = `method:${String(prop)}`
         try {
-          const result = Reflect.apply(value, receiver, args)
+          const result = fn(...args)
           if (result instanceof Promise || (result && typeof (result as any).then === 'function')) {
             return boundary.execute(operation, () => result)
           }

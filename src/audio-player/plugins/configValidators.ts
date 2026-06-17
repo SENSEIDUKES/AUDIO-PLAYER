@@ -23,7 +23,7 @@ export const SleepTimerPluginConfigSchema = z.object({
     label: z.string().optional().default("Sleep"),
     renderUi: z.boolean().optional().default(true),
     target: z.custom<HTMLElement | (() => HTMLElement | null) | null>().optional(),
-    now: z.function().optional()
+    now: z.custom<() => number>((val) => typeof val === 'function').optional()
 })
 
 export const LyricsPluginConfigSchema = z.object({
@@ -33,7 +33,7 @@ export const LyricsPluginConfigSchema = z.object({
         time: z.number(),
         text: z.string()
     })).optional(),
-    onLineChange: z.function().optional(),
+    onLineChange: z.custom<Function>((val) => typeof val === 'function').optional(),
     target: z.custom<HTMLElement | (() => HTMLElement | null) | null>().optional()
 })
 
@@ -51,20 +51,20 @@ export const AutoThemePluginConfigSchema = z.object({
     applyGradient: z.boolean().optional().default(true),
     sampleSize: z.number().positive().optional(),
     quantStep: z.number().positive().optional(),
-    onPaletteChange: z.function().optional()
+    onPaletteChange: z.custom<Function>((val) => typeof val === 'function').optional()
 })
 
 export const AutomixPluginConfigSchema = z.object({
     name: z.string().optional().default("automix"),
     enabled: z.boolean().optional().default(true),
     confidenceMin: z.number().min(0).max(1).optional().default(0.1),
-    onTransitionChange: z.function().optional()
+    onTransitionChange: z.custom<Function>((val) => typeof val === 'function').optional()
 })
 
 export const AnalyticsPluginConfigSchema = z.object({
     name: z.string().optional().default("analytics"),
     endpoint: z.union([z.string().url(), z.string().startsWith('/')]).optional(),
-    send: z.function().optional(),
+    send: z.custom<Function>((val) => typeof val === 'function').optional(),
     includeTimeUpdates: z.boolean().optional().default(false),
     timeUpdateIntervalSeconds: z.number().positive().optional().default(15),
 })
