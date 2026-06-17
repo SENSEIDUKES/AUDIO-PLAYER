@@ -3,6 +3,7 @@ import type {
     PluginPlayerContext,
 } from "../core/plugins/PluginInterface"
 import type { Track } from "../types"
+import { LyricsPluginConfigSchema, validateConfig } from "./configValidators"
 
 export interface TimedLyricLine {
     time: number
@@ -29,11 +30,12 @@ export class LyricsPlugin implements AudioPlayerPlugin {
     private activeIndex = -1
 
     constructor(config: LyricsPluginConfig = {}) {
-        this.name = config.name ?? "lyrics"
-        this.configuredLyrics = config.lyrics
-        this.configuredLines = config.lines
-        this.onLineChangeCallback = config.onLineChange
-        this.target = config.target
+        const valid = validateConfig(LyricsPluginConfigSchema, config, "lyrics")
+        this.name = valid.name
+        this.configuredLyrics = valid.lyrics
+        this.configuredLines = valid.lines
+        this.onLineChangeCallback = valid.onLineChange as LyricsPluginConfig["onLineChange"]
+        this.target = valid.target as LyricsPluginConfig["target"]
     }
 
     init(playerInstance: PluginPlayerContext) {

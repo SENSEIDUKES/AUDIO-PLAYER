@@ -235,16 +235,19 @@ prevent double-advancing.
 
 ---
 
-## Error isolation
+## Error Isolation and Graceful Degradation
 
-`PluginManager` wraps every plugin lifecycle call in `try/catch`:
+Plugins use a structured error boundary system (`PluginErrorBoundary`) to ensure failures do not crash the core audio player experience:
 
-- A failing `init` does not register the plugin.
-- A failing hook logs a warning and the manager continues with the next plugin.
-- A failing `destroy` or cleanup does not block other plugins from unloading.
+1. **Config Validation**: All built-in plugins validate their configuration at construction time using `zod`. Invalid config gracefully falls back to safe defaults, emitting a console warning.
+2. **Error Boundaries**: `PluginManager` wraps every plugin lifecycle call in an error boundary.
+3. **Structured Errors**: Failures are wrapped in a `PluginError` object that includes the `pluginName`, `operation`, `cause`, and whether the error is `recoverable`.
+4. **Graceful Degradation**: 
+   - A failing `init` disables the plugin and prevents registration.
+   - A failing hook (like `onTrackLoad`) uses a fallback value from `GracefulDegradation` to skip the action safely, allowing the player to continue.
+   - A failing `destroy` logs a warning but does not block memory cleanup.
 
-This means plugin authors should still handle expected errors locally, but a
-buggy plugin should not crash playback.
+Host applications can inject a custom `PluginErrorHandler` to intercept these errors, log them to tracking services, or notify users gracefully when a plugin fails repeatedly.
 
 ---
 

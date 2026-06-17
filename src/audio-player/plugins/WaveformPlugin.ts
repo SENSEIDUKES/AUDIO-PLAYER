@@ -5,6 +5,7 @@ import type {
 import type { Track } from "../types"
 import { computePeaksFromUrl } from "../core/waveform/peaks"
 import { getPrimaryTrackSource } from "../utils/sources"
+import { WaveformPluginConfigSchema, validateConfig } from "./configValidators"
 
 export interface WaveformPluginConfig {
     name?: string
@@ -33,8 +34,9 @@ export class WaveformPlugin implements AudioPlayerPlugin {
     private prewarmed: string | null = null
 
     constructor(config: WaveformPluginConfig = {}) {
-        this.name = config.name ?? "waveform"
-        this.prewarmPeaks = config.prewarmPeaks ?? true
+        const valid = validateConfig(WaveformPluginConfigSchema, config, "waveform")
+        this.name = valid.name
+        this.prewarmPeaks = valid.prewarmPeaks
     }
 
     init(playerInstance: PluginPlayerContext) {

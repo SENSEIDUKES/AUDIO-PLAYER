@@ -1,15 +1,23 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useMemo } from "react"
 import type { AudioPlayerPlugin, PluginPlayerContext } from "./PluginInterface"
-import { PluginManager } from "./PluginManager"
+import { PluginManager, type PluginManagerOptions } from "./PluginManager"
 
 /** React bridge that keeps a PluginManager stable while plugin arrays change. */
 export function usePluginManager(
     plugins: readonly AudioPlayerPlugin[],
-    context: PluginPlayerContext
+    context: PluginPlayerContext,
+    options?: PluginManagerOptions
 ): PluginManager {
     const managerRef = useRef<PluginManager | null>(null)
+    
+    // Memoize options to prevent recreation on every render
+    const memoizedOptions = useMemo(() => options, [
+        options?.errorHandler,
+        options?.maxFailuresBeforeDisable
+    ])
+    
     if (managerRef.current === null) {
-        managerRef.current = new PluginManager(context)
+        managerRef.current = new PluginManager(context, memoizedOptions)
     } else {
         managerRef.current.setContext(context)
     }

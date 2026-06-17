@@ -3,6 +3,7 @@ import type {
     PluginPlayerContext,
 } from "../core/plugins/PluginInterface"
 import type { Track } from "../types"
+import { AnalyticsPluginConfigSchema, validateConfig } from "./configValidators"
 
 export type AnalyticsEventType =
     | "track_load"
@@ -42,11 +43,12 @@ export class AnalyticsPlugin implements AudioPlayerPlugin {
     private lastTimeUpdateBucket = -1
 
     constructor(config: AnalyticsPluginConfig = {}) {
-        this.name = config.name ?? "analytics"
-        this.endpoint = config.endpoint
-        this.sendCallback = config.send
-        this.includeTimeUpdates = config.includeTimeUpdates ?? false
-        this.timeUpdateIntervalSeconds = config.timeUpdateIntervalSeconds ?? 15
+        const valid = validateConfig(AnalyticsPluginConfigSchema, config, "analytics")
+        this.name = valid.name
+        this.endpoint = valid.endpoint
+        this.sendCallback = valid.send as AnalyticsPluginConfig["send"]
+        this.includeTimeUpdates = valid.includeTimeUpdates
+        this.timeUpdateIntervalSeconds = valid.timeUpdateIntervalSeconds
     }
 
     init(playerInstance: PluginPlayerContext) {

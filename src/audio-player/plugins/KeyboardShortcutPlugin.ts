@@ -2,6 +2,7 @@ import type {
     AudioPlayerPlugin,
     PluginPlayerContext,
 } from "../core/plugins/PluginInterface"
+import { KeyboardShortcutPluginConfigSchema, validateConfig } from "./configValidators"
 
 export interface KeyboardShortcutPluginConfig {
     name?: string
@@ -24,11 +25,12 @@ export class KeyboardShortcutPlugin implements AudioPlayerPlugin {
     private context: PluginPlayerContext | null = null
 
     constructor(config: KeyboardShortcutPluginConfig = {}) {
-        this.name = config.name ?? "keyboard-shortcuts"
-        this.scope = config.scope ?? "root"
-        this.seekSeconds = config.seekSeconds ?? 10
-        this.enableJKL = config.enableJKL ?? true
-        this.enablePlaylistKeys = config.enablePlaylistKeys ?? true
+        const valid = validateConfig(KeyboardShortcutPluginConfigSchema, config, "keyboard-shortcuts")
+        this.name = valid.name
+        this.scope = valid.scope as "root" | "document"
+        this.seekSeconds = valid.seekSeconds
+        this.enableJKL = valid.enableJKL
+        this.enablePlaylistKeys = valid.enablePlaylistKeys
     }
 
     init(playerInstance: PluginPlayerContext) {

@@ -71,7 +71,7 @@ describe("PLAYER_FACE_CAPABILITIES", () => {
         // SAPController three-dot sheet (or have no menu room) and must opt out.
         expect(faceSupportsContextualActions("fullCard")).toBe(true)
         expect(faceSupportsContextualActions("miniSidebar")).toBe(true)
-        expect(faceSupportsContextualActions("portable")).toBe(false)
+        expect(faceSupportsContextualActions("portable")).toBe(true)
         expect(faceSupportsContextualActions("seaCard")).toBe(false)
         expect(faceSupportsContextualActions("stickyBottom")).toBe(false)
         expect(faceSupportsContextualActions("vaultRow")).toBe(false)

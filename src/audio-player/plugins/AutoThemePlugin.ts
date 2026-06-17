@@ -11,6 +11,7 @@ import {
     type ArtworkPalette,
     type ExtractPaletteOptions,
 } from "../utils/colorExtraction"
+import { AutoThemePluginConfigSchema, validateConfig } from "./configValidators"
 
 export interface AutoThemePluginConfig extends ExtractPaletteOptions {
     name?: string
@@ -53,14 +54,15 @@ export class AutoThemePlugin implements AudioPlayerPlugin {
     private generation = 0
 
     constructor(config: AutoThemePluginConfig = {}) {
-        this.name = config.name ?? "auto-theme"
-        this.applyGlow = config.applyGlow ?? true
-        this.applyGradient = config.applyGradient ?? true
+        const valid = validateConfig(AutoThemePluginConfigSchema, config, "auto-theme")
+        this.name = valid.name
+        this.applyGlow = valid.applyGlow
+        this.applyGradient = valid.applyGradient
         this.extractOptions = {
-            sampleSize: config.sampleSize,
-            quantStep: config.quantStep,
+            sampleSize: valid.sampleSize,
+            quantStep: valid.quantStep,
         }
-        this.onPaletteChange = config.onPaletteChange
+        this.onPaletteChange = valid.onPaletteChange as AutoThemePluginConfig["onPaletteChange"]
     }
 
     init(playerInstance: PluginPlayerContext) {

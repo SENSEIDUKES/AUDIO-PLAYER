@@ -3,6 +3,7 @@ import type {
     PluginPlayerContext,
 } from "../core/plugins/PluginInterface"
 import type { Track } from "../types"
+import { SleepTimerPluginConfigSchema, validateConfig } from "./configValidators"
 
 export type SleepTimerPreset = "off" | "15m" | "30m" | "45m" | "60m" | "track-end"
 
@@ -51,11 +52,12 @@ export class SleepTimerPlugin implements AudioPlayerPlugin {
     private select: HTMLSelectElement | null = null
 
     constructor(config: SleepTimerPluginConfig = {}) {
-        this.name = config.name ?? "sleep-timer"
-        this.label = config.label ?? "Sleep"
-        this.renderUi = config.renderUi ?? true
-        this.target = config.target
-        this.now = config.now ?? (() => Date.now())
+        const valid = validateConfig(SleepTimerPluginConfigSchema, config, "sleep-timer")
+        this.name = valid.name
+        this.label = valid.label
+        this.renderUi = valid.renderUi
+        this.target = valid.target as HTMLElement | (() => HTMLElement | null) | null
+        this.now = (valid.now as (() => number)) ?? (() => Date.now())
     }
 
     init(playerInstance: PluginPlayerContext) {

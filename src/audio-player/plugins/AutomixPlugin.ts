@@ -5,13 +5,10 @@ import type {
 import type { Track, TrackTrims } from "../types"
 import { ensureTrackAnalysis, getTrackTrims } from "../automix/silenceAnalysis"
 import { ensureProTrackAnalysis, getTrackAnalysis } from "../automix/trackAnalysis"
-import {
-    PRO_CONFIDENCE_MIN,
-    planTransition,
-    type TransitionPlan,
-} from "../automix/transitionPlanner"
+import { planTransition, type TransitionPlan } from "../automix/transitionPlanner"
 import { trackKey } from "../utils/trackKey"
 import { getPrimaryTrackSource } from "../utils/sources"
+import { AutomixPluginConfigSchema, validateConfig } from "./configValidators"
 
 /** Crossfade duration. Conservative fixed value for V1. */
 export const AUTOMIX_FADE_MS = 5500
@@ -85,10 +82,11 @@ export class AutomixPlugin implements AudioPlayerPlugin {
     private activeFadeMs = AUTOMIX_FADE_MS
 
     constructor(config: AutomixPluginConfig = {}) {
-        this.name = config.name ?? "automix"
-        this.enabled = config.enabled ?? true
-        this.confidenceMin = config.confidenceMin ?? PRO_CONFIDENCE_MIN
-        this.onTransitionChange = config.onTransitionChange
+        const valid = validateConfig(AutomixPluginConfigSchema, config, "automix")
+        this.name = valid.name
+        this.enabled = valid.enabled
+        this.confidenceMin = valid.confidenceMin
+        this.onTransitionChange = valid.onTransitionChange as AutomixPluginConfig["onTransitionChange"]
     }
 
     get isTransitioning() {

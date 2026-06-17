@@ -1,8 +1,27 @@
 export { AudioPlayer, default } from "./AudioPlayer"
 export { useAudioPlayer } from "./useAudioPlayer"
 export { useAutomix, AUTOMIX_FADE_MS } from "./automix/useAutomix"
-export { PluginManager } from "./core/plugins/PluginManager"
+export { PluginManager, type PluginManagerOptions } from "./core/plugins/PluginManager"
 export { usePluginManager } from "./core/plugins/usePluginManager"
+export {
+    PluginError,
+    PluginErrorBoundary,
+    PluginErrorBoundaryFactory,
+    DefaultPluginErrorHandler,
+    GracefulDegradation,
+    setGlobalErrorHandler,
+    getGlobalErrorBoundaryFactory,
+    createPluginErrorBoundary,
+    withErrorBoundary,
+    isPluginError,
+} from "./core/plugins/PluginErrorBoundary"
+export type {
+    PluginErrorHandler,
+    ErrorSeverity,
+    RecoveryAction,
+    ErrorHandlerResult,
+    PluginErrorInfo,
+} from "./core/plugins/PluginErrorBoundary"
 export { createAudioBackend } from "./core/audio/AudioBackendFactory"
 export { HTML5AudioBackend } from "./core/audio/HTML5AudioBackend"
 export { WebAudioBackend } from "./core/audio/WebAudioBackend"
