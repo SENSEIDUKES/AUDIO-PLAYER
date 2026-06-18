@@ -59,7 +59,12 @@ describe("AudioSpriteEngine", () => {
 
     beforeEach(() => {
         context = new FakeAudioContext()
-        ;(globalThis as any).window = { AudioContext: vi.fn(() => context) }
+        class TestAudioContext {
+            constructor() {
+                return context
+            }
+        }
+        ;(globalThis as any).window = { AudioContext: TestAudioContext }
         globalThis.fetch = vi.fn(async () => ({
             ok: true,
             arrayBuffer: async () => new ArrayBuffer(8),
