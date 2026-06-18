@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
     AudioStorageCache,
     HTML5AudioPool,
@@ -12,6 +12,36 @@ import { WebAudioBackend, WEBAUDIO_CAPABILITIES } from "../WebAudioBackend"
 function fakeBuffer(id: string): AudioBuffer {
     return { id } as unknown as AudioBuffer
 }
+
+const originalAudio = globalThis.Audio
+const originalCaches = globalThis.caches
+const originalFetch = globalThis.fetch
+const originalWindow = (globalThis as { window?: Window }).window
+
+afterEach(() => {
+    vi.restoreAllMocks()
+    Object.defineProperty(globalThis, "Audio", {
+        configurable: true,
+        writable: true,
+        value: originalAudio,
+    })
+    Object.defineProperty(globalThis, "caches", {
+        configurable: true,
+        writable: true,
+        value: originalCaches,
+    })
+    Object.defineProperty(globalThis, "fetch", {
+        configurable: true,
+        writable: true,
+        value: originalFetch,
+    })
+    Object.defineProperty(globalThis, "window", {
+        configurable: true,
+        writable: true,
+        value: originalWindow,
+    })
+    sharedAudioBufferCache.clear()
+})
 
 describe("LRUAudioCache", () => {
     it("moves cache hits to the most-recently-used position", () => {
@@ -54,20 +84,9 @@ describe("LRUAudioCache", () => {
 })
 
 describe("AudioStorageCache", () => {
-    const originalCaches = globalThis.caches
-
     it("provides the PersistentAudioCache implementation name from the Definition of Done", () => {
         expect(new PersistentAudioCache()).toBeInstanceOf(PersistentAudioCache)
         expect(new AudioStorageCache()).toBeInstanceOf(PersistentAudioCache)
-    })
-
-    beforeEach(() => {
-        vi.restoreAllMocks()
-        Object.defineProperty(globalThis, "caches", {
-            configurable: true,
-            writable: true,
-            value: originalCaches,
-        })
     })
 
     it("reads cached audio as an ArrayBuffer", async () => {
@@ -118,7 +137,6 @@ describe("HTML5AudioPool", () => {
             preload: "",
             src: "song.mp3",
         } as unknown as HTMLAudioElement
-        const OriginalAudio = globalThis.Audio
         Object.defineProperty(globalThis, "Audio", {
             configurable: true,
             writable: true,
@@ -136,11 +154,6 @@ describe("HTML5AudioPool", () => {
         expect(audio.removeAttribute).toHaveBeenCalledWith("src")
         expect(audio.load).toHaveBeenCalled()
 
-        Object.defineProperty(globalThis, "Audio", {
-            configurable: true,
-            writable: true,
-            value: OriginalAudio,
-        })
     })
 })
 
