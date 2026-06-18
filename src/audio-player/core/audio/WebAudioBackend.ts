@@ -1,4 +1,4 @@
-import type { BufferedRange } from "../../types"
+import type { BufferedRange, DistanceModelType } from "../../types"
 import type {
     AudioBackend,
     AudioBackendErrorCode,
@@ -27,6 +27,22 @@ type WebAudioState =
     | "paused"
     | "ended"
     | "error"
+
+/** Default spatial audio values matching Howler.js conventions. */
+const DEFAULT_SPATIAL = {
+    stereo: 0,
+    pos: [0, 0, 0] as [number, number, number],
+    orientation: [1, 0, 0] as [number, number, number],
+    rate: 1,
+    distanceModel: "inverse" as DistanceModelType,
+    refDistance: 1,
+    maxDistance: 10000,
+    rolloffFactor: 1,
+    coneInnerAngle: 360,
+    coneOuterAngle: 360,
+    coneOuterGain: 0,
+    liteMode: false,
+}
 
 function namedError(name: string, message: string): Error {
     const error = new Error(message)
@@ -78,7 +94,16 @@ function releaseSharedContext(ctx: AudioContext): void {
 
 /**
  * Web Audio playback backend: fetch + decodeAudioData into an AudioBuffer,
- * played through AudioBufferSourceNode → GainNode → destination.
+ * played through AudioBufferSourceNode → [PannerNode] → StereoPannerNode → GainNode → destination.
+ *
+ * Spatial audio features (Howler.js-style API):
+ * - Stereo panning via StereoPannerNode (-1 left to 1 right)
+ * - 3D positioning via PannerNode with HRTF (default) or equalpower (lite mode)
+ * - Source orientation for directional audio
+ * - Distance modeling (inverse/linear/exponential) with refDistance, maxDistance, rolloffFactor
+ * - Cone settings for directional audio (coneInnerAngle, coneOuterAngle, coneOuterGain)
+ * - Playback rate control (0.5 to 4.0)
+ * - Lite mode: skips 3D PannerNode, uses only StereoPannerNode for mobile/low-power
  *
  * Synthesizes the media-element events the engine hook expects, so the hook's
  * state machine is identical to the html5 path. Key semantic mappings:
@@ -98,6 +123,8 @@ export class WebAudioBackend implements AudioBackend {
     private info: AudioBackendInfo
     private ctx: AudioContext | null = null
     private gain: GainNode | null = null
+    private panner: PannerNode | null = null
+    private stereoPanner: StereoPannerNode | null = null
     private source: AudioBufferSourceNode | null = null
     private buffer: AudioBuffer | null = null
     private srcUrl: string | null = null
@@ -120,6 +147,20 @@ export class WebAudioBackend implements AudioBackend {
     private preloadPromises = new Map<string, Promise<AudioBuffer | null>>()
     private listeners = new Map<AudioBackendEvent, Set<() => void>>()
 
+    // Spatial audio state
+    private stereoPan = DEFAULT_SPATIAL.stereo
+    private position: [number, number, number] = [...DEFAULT_SPATIAL.pos]
+    private orientation: [number, number, number] = [...DEFAULT_SPATIAL.orientation]
+    private rate = DEFAULT_SPATIAL.rate
+    private distanceModel: DistanceModelType = DEFAULT_SPATIAL.distanceModel
+    private refDistance = DEFAULT_SPATIAL.refDistance
+    private maxDistance = DEFAULT_SPATIAL.maxDistance
+    private rolloffFactor = DEFAULT_SPATIAL.rolloffFactor
+    private coneInnerAngle = DEFAULT_SPATIAL.coneInnerAngle
+    private coneOuterAngle = DEFAULT_SPATIAL.coneOuterAngle
+    private coneOuterGain = DEFAULT_SPATIAL.coneOuterGain
+    private liteMode = DEFAULT_SPATIAL.liteMode
+
     constructor(info: AudioBackendInfo) {
         this.info = info
     }
@@ -133,9 +174,37 @@ export class WebAudioBackend implements AudioBackend {
     private ensureContext(): AudioContext {
         if (this.ctx && this.ctx.state !== "closed") return this.ctx
         this.ctx = retainSharedContext()
+
+        // Create spatial audio nodes: PannerNode → StereoPannerNode → GainNode
+        this.panner = this.ctx.createPanner()
+        this.panner.panningModel = this.liteMode ? "equalpower" : "HRTF"
+        this.panner.distanceModel = this.distanceModel
+        this.panner.refDistance = this.refDistance
+        this.panner.maxDistance = this.maxDistance
+        this.panner.rolloffFactor = this.rolloffFactor
+        this.panner.coneInnerAngle = this.coneInnerAngle
+        this.panner.coneOuterAngle = this.coneOuterAngle
+        this.panner.coneOuterGain = this.coneOuterGain
+        this.panner.positionX.value = this.position[0]
+        this.panner.positionY.value = this.position[1]
+        this.panner.positionZ.value = this.position[2]
+        this.panner.orientationX.value = this.orientation[0]
+        this.panner.orientationY.value = this.orientation[1]
+        this.panner.orientationZ.value = this.orientation[2]
+
         this.gain = this.ctx.createGain()
         this.gain.gain.value = this.muted ? 0 : this.volume
+
+        if (typeof this.ctx.createStereoPanner === "function") {
+            this.stereoPanner = this.ctx.createStereoPanner()
+            this.stereoPanner.pan.value = this.stereoPan
+            this.panner.connect(this.stereoPanner)
+            this.stereoPanner.connect(this.gain)
+        } else {
+            this.panner.connect(this.gain)
+        }
         this.gain.connect(this.ctx.destination)
+
         return this.ctx
     }
 
@@ -270,7 +339,8 @@ export class WebAudioBackend implements AudioBackend {
         const source = ctx.createBufferSource()
         source.buffer = buffer
         source.loop = this.loopFlag
-        source.connect(this.gain)
+        // Connect to panner (first node in chain), not directly to gain
+        source.connect(this.panner!)
         const token = (this.sourceToken += 1)
         source.onended = () => {
             // Only natural completion reaches here; manual stops bump the token.
@@ -573,6 +643,24 @@ export class WebAudioBackend implements AudioBackend {
         this.lastError = null
         this.loadPromise = null
         this.state = "idle"
+
+        // Disconnect spatial audio nodes
+        if (this.panner) {
+            try {
+                this.panner.disconnect()
+            } catch {
+                // Already disconnected.
+            }
+            this.panner = null
+        }
+        if (this.stereoPanner) {
+            try {
+                this.stereoPanner.disconnect()
+            } catch {
+                // Already disconnected.
+            }
+            this.stereoPanner = null
+        }
         if (this.gain) {
             try {
                 this.gain.disconnect()
@@ -587,5 +675,194 @@ export class WebAudioBackend implements AudioBackend {
         this.ctx = null
         // Revivable by design: the next load()/play() lazily recreates the
         // context (required for React StrictMode unmount/remount cycles).
+    }
+
+    // ===================== SPATIAL AUDIO METHODS =====================
+    // Full Web Audio API implementation with PannerNode + StereoPannerNode
+
+    supportsSpatial(): boolean {
+        return true
+    }
+
+    setStereo(pan: number): void {
+        this.stereoPan = Math.max(-1, Math.min(1, pan))
+        if (this.stereoPanner) {
+            this.stereoPanner.pan.value = this.stereoPan
+        }
+    }
+
+    getStereo(): number {
+        return this.stereoPan
+    }
+
+    setPos(x: number, y: number, z: number): void {
+        this.position = [x, y, z]
+        if (this.panner) {
+            this.panner.positionX.value = x
+            this.panner.positionY.value = y
+            this.panner.positionZ.value = z
+        }
+    }
+
+    getPos(): [number, number, number] {
+        return this.position
+    }
+
+    setOrientation(x: number, y: number, z: number): void {
+        this.orientation = [x, y, z]
+        if (this.panner) {
+            this.panner.orientationX.value = x
+            this.panner.orientationY.value = y
+            this.panner.orientationZ.value = z
+        }
+    }
+
+    getOrientation(): [number, number, number] {
+        return this.orientation
+    }
+
+    setRate(rate: number): void {
+        const clamped = Math.max(0.5, Math.min(4.0, rate))
+        this.rate = clamped
+        if (this.source) {
+            this.source.playbackRate.value = clamped
+        }
+    }
+
+    getRate(): number {
+        return this.rate
+    }
+
+    setDistanceModel(model: DistanceModelType): void {
+        this.distanceModel = model
+        if (this.panner) {
+            this.panner.distanceModel = model
+        }
+    }
+
+    getDistanceModel(): DistanceModelType {
+        return this.distanceModel
+    }
+
+    setRefDistance(distance: number): void {
+        this.refDistance = Math.max(0, distance)
+        if (this.panner) {
+            this.panner.refDistance = this.refDistance
+        }
+    }
+
+    getRefDistance(): number {
+        return this.refDistance
+    }
+
+    setMaxDistance(distance: number): void {
+        this.maxDistance = Math.max(0, distance)
+        if (this.panner) {
+            this.panner.maxDistance = this.maxDistance
+        }
+    }
+
+    getMaxDistance(): number {
+        return this.maxDistance
+    }
+
+    setRolloffFactor(factor: number): void {
+        this.rolloffFactor = Math.max(0, factor)
+        if (this.panner) {
+            this.panner.rolloffFactor = this.rolloffFactor
+        }
+    }
+
+    getRolloffFactor(): number {
+        return this.rolloffFactor
+    }
+
+    setConeInnerAngle(angle: number): void {
+        this.coneInnerAngle = Math.max(0, Math.min(360, angle))
+        if (this.panner) {
+            this.panner.coneInnerAngle = this.coneInnerAngle
+        }
+    }
+
+    getConeInnerAngle(): number {
+        return this.coneInnerAngle
+    }
+
+    setConeOuterAngle(angle: number): void {
+        this.coneOuterAngle = Math.max(0, Math.min(360, angle))
+        if (this.panner) {
+            this.panner.coneOuterAngle = this.coneOuterAngle
+        }
+    }
+
+    getConeOuterAngle(): number {
+        return this.coneOuterAngle
+    }
+
+    setConeOuterGain(gain: number): void {
+        this.coneOuterGain = Math.max(0, Math.min(1, gain))
+        if (this.panner) {
+            this.panner.coneOuterGain = this.coneOuterGain
+        }
+    }
+
+    getConeOuterGain(): number {
+        return this.coneOuterGain
+    }
+
+    setLiteMode(enabled: boolean): void {
+        if (enabled === this.liteMode) return
+        this.liteMode = enabled
+
+        // Recreate panner node with new panning model if it exists
+        if (this.panner && this.ctx) {
+            const oldPanner = this.panner
+            const newPanner = this.ctx.createPanner()
+            newPanner.panningModel = enabled ? "equalpower" : "HRTF"
+            newPanner.distanceModel = this.distanceModel
+            newPanner.refDistance = this.refDistance
+            newPanner.maxDistance = this.maxDistance
+            newPanner.rolloffFactor = this.rolloffFactor
+            newPanner.coneInnerAngle = this.coneInnerAngle
+            newPanner.coneOuterAngle = this.coneOuterAngle
+            newPanner.coneOuterGain = this.coneOuterGain
+            newPanner.positionX.value = this.position[0]
+            newPanner.positionY.value = this.position[1]
+            newPanner.positionZ.value = this.position[2]
+            newPanner.orientationX.value = this.orientation[0]
+            newPanner.orientationY.value = this.orientation[1]
+            newPanner.orientationZ.value = this.orientation[2]
+
+            // Reconnect: source → newPanner → stereoPanner → gain
+            if (this.source) {
+                try {
+                    this.source.disconnect(oldPanner)
+                } catch {
+                    // Already disconnected.
+                }
+                this.source.connect(newPanner)
+            }
+            try {
+                oldPanner.disconnect(this.stereoPanner!)
+            } catch {
+                // Already disconnected.
+            }
+            newPanner.connect(this.stereoPanner!)
+
+            this.panner = newPanner
+        }
+    }
+
+    isLiteMode(): boolean {
+        return this.liteMode
+    }
+
+    /**
+     * Get the shared AudioContext for global listener control.
+     * Returns null if the context hasn't been created yet.
+     * Use this to control the global listener position/orientation.
+     */
+    getAudioContext(): AudioContext | null {
+        return this.ctx
     }
 }

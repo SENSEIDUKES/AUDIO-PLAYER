@@ -25,6 +25,7 @@ export const WORKSPACE_ROUTES = [
     "agent:queue-director",
     "visual:canvas",
     "visual:lyrics",
+    "diagnostics:activity-log",
 ] as const
 
 /** A validated workspace destination. `"options"` is the legacy default. */
@@ -38,6 +39,7 @@ export type WorkspaceRouteCategory =
     | "playback"
     | "agent"
     | "visual"
+    | "diagnostics"
 
 /** A route broken into its category + target for the shell to dispatch on. */
 export interface ParsedWorkspaceRoute {

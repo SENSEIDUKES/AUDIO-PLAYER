@@ -1,4 +1,4 @@
-import type { BufferedRange } from "../../types"
+import type { BufferedRange, DistanceModelType } from "../../types"
 
 /** Available playback backend implementations. */
 export type AudioBackendKind = "html5" | "webaudio"
@@ -142,4 +142,79 @@ export interface AudioBackend {
     getMediaElement(): HTMLAudioElement | null
     getInfo(): AudioBackendInfo
     destroy(): void
+
+    // ===================== SPATIAL AUDIO METHODS =====================
+    // These methods control spatial audio behavior. HTML5 backend returns
+    // false/no-ops; WebAudioBackend provides full implementation.
+
+    /** Returns true if this backend supports spatial audio (webaudio only). */
+    supportsSpatial(): boolean
+
+    /** Set stereo pan from -1 (left) to 1 (right). */
+    setStereo(pan: number): void
+    /** Get current stereo pan value. */
+    getStereo(): number
+
+    /** Set 3D position of the audio source. */
+    setPos(x: number, y: number, z: number): void
+    /** Get current 3D position [x, y, z]. */
+    getPos(): [number, number, number]
+
+    /** Set orientation vector (direction sound is pointing). */
+    setOrientation(x: number, y: number, z: number): void
+    /** Get current orientation vector [x, y, z]. */
+    getOrientation(): [number, number, number]
+
+    /** Set playback rate (pitch) from 0.5 to 4.0. */
+    setRate(rate: number): void
+    /** Get current playback rate. */
+    getRate(): number
+
+    /** Set distance model algorithm. */
+    setDistanceModel(model: DistanceModelType): void
+    /** Get current distance model. */
+    getDistanceModel(): DistanceModelType
+
+    /** Set reference distance for attenuation calculations. */
+    setRefDistance(distance: number): void
+    /** Get current reference distance. */
+    getRefDistance(): number
+
+    /** Set maximum distance for attenuation calculations. */
+    setMaxDistance(distance: number): void
+    /** Get current maximum distance. */
+    getMaxDistance(): number
+
+    /** Set rolloff factor for distance attenuation. */
+    setRolloffFactor(factor: number): void
+    /** Get current rolloff factor. */
+    getRolloffFactor(): number
+
+    /** Set cone inner angle for directional audio. */
+    setConeInnerAngle(angle: number): void
+    /** Get current cone inner angle. */
+    getConeInnerAngle(): number
+
+    /** Set cone outer angle for directional audio. */
+    setConeOuterAngle(angle: number): void
+    /** Get current cone outer angle. */
+    getConeOuterAngle(): number
+
+    /** Set cone outer gain for directional audio. */
+    setConeOuterGain(gain: number): void
+    /** Get current cone outer gain. */
+    getConeOuterGain(): number
+
+    /** Enable/disable lite mode (stereo-only, no 3D panner). */
+    setLiteMode(enabled: boolean): void
+    /** Check if lite mode is active. */
+    isLiteMode(): boolean
+
+    /**
+     * Get the shared AudioContext for global listener control.
+     * Returns null if the context hasn't been created yet.
+     * WebAudioBackend only; HTML5AudioBackend returns undefined.
+     * Use this to control the global listener position/orientation.
+     */
+    getAudioContext?(): AudioContext | null
 }

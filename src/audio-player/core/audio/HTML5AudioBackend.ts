@@ -1,5 +1,5 @@
 import type { RefObject } from "react"
-import type { BufferedRange } from "../../types"
+import type { BufferedRange, DistanceModelType } from "../../types"
 import type {
     AudioBackend,
     AudioBackendErrorCode,
@@ -204,5 +204,145 @@ export class HTML5AudioBackend implements AudioBackend {
     destroy(): void {
         // The main element is JSX-owned; only release backend-owned resources.
         this.releasePreload()
+    }
+
+    // ===================== SPATIAL AUDIO METHODS =====================
+    // HTML5 backend does NOT support spatial audio. All methods are no-ops
+    // with console warnings. Use webaudio backend for spatial features.
+
+    supportsSpatial(): boolean {
+        return false
+    }
+
+    setStereo(_pan: number): void {
+        // No-op: HTML5 <audio> element has no spatial audio support
+        console.warn(
+            "[HTML5AudioBackend] setStereo() called but spatial audio is not supported. " +
+                "Use webaudio backend for spatial features."
+        )
+    }
+
+    getStereo(): number {
+        return 0
+    }
+
+    setPos(_x: number, _y: number, _z: number): void {
+        // No-op
+        console.warn(
+            "[HTML5AudioBackend] setPos() called but spatial audio is not supported. " +
+                "Use webaudio backend for spatial features."
+        )
+    }
+
+    getPos(): [number, number, number] {
+        return [0, 0, 0]
+    }
+
+    setOrientation(_x: number, _y: number, _z: number): void {
+        // No-op
+        console.warn(
+            "[HTML5AudioBackend] setOrientation() called but spatial audio is not supported."
+        )
+    }
+
+    getOrientation(): [number, number, number] {
+        return [1, 0, 0]
+    }
+
+    setRate(_rate: number): void {
+        // No-op: playbackRate would affect HTML5 element but we keep it simple
+        console.warn(
+            "[HTML5AudioBackend] setRate() called but rate control is not supported. " +
+                "Use webaudio backend for rate control."
+        )
+    }
+
+    getRate(): number {
+        return 1
+    }
+
+    setDistanceModel(_model: DistanceModelType): void {
+        // No-op
+        console.warn(
+            "[HTML5AudioBackend] setDistanceModel() called but spatial audio is not supported."
+        )
+    }
+
+    getDistanceModel(): DistanceModelType {
+        return "inverse"
+    }
+
+    setRefDistance(_distance: number): void {
+        // No-op
+        console.warn(
+            "[HTML5AudioBackend] setRefDistance() called but spatial audio is not supported."
+        )
+    }
+
+    getRefDistance(): number {
+        return 1
+    }
+
+    setMaxDistance(_distance: number): void {
+        // No-op
+        console.warn(
+            "[HTML5AudioBackend] setMaxDistance() called but spatial audio is not supported."
+        )
+    }
+
+    getMaxDistance(): number {
+        return 10000
+    }
+
+    setRolloffFactor(_factor: number): void {
+        // No-op
+        console.warn(
+            "[HTML5AudioBackend] setRolloffFactor() called but spatial audio is not supported."
+        )
+    }
+
+    getRolloffFactor(): number {
+        return 1
+    }
+
+    setConeInnerAngle(_angle: number): void {
+        // No-op
+        console.warn(
+            "[HTML5AudioBackend] setConeInnerAngle() called but spatial audio is not supported."
+        )
+    }
+
+    getConeInnerAngle(): number {
+        return 360
+    }
+
+    setConeOuterAngle(_angle: number): void {
+        // No-op
+        console.warn(
+            "[HTML5AudioBackend] setConeOuterAngle() called but spatial audio is not supported."
+        )
+    }
+
+    getConeOuterAngle(): number {
+        return 360
+    }
+
+    setConeOuterGain(_gain: number): void {
+        // No-op
+        console.warn(
+            "[HTML5AudioBackend] setConeOuterGain() called but spatial audio is not supported."
+        )
+    }
+
+    getConeOuterGain(): number {
+        return 0
+    }
+
+    setLiteMode(_enabled: boolean): void {
+        // No-op: already in "lite mode" by not supporting spatial at all
+    }
+
+    isLiteMode(): boolean {
+        return true
     }
 }

@@ -7,6 +7,7 @@ import { LibraryQueueWorkspace } from "./LibraryQueueWorkspace"
 import { PluginSettingsWorkspace } from "./PluginSettingsWorkspace"
 import { PlaybackAutomixWorkspace } from "./PlaybackAutomixWorkspace"
 import { AgentQueueDirectorWorkspace } from "./AgentQueueDirectorWorkspace"
+import { ActivityLogWorkspace } from "../../diagnostics/ActivityLogWorkspace"
 import { ControllerPanelRenderer } from "../../visual-slots/ControllerPanelRenderer"
 import { LYRIC_DISPLAY_ID } from "../../visual-slots/components/LyricDisplay"
 import { VisualSlotPicker } from "../../visual-slots/VisualSlotPicker"
@@ -44,6 +45,8 @@ function titleForRoute(route: WorkspaceRoute): string {
             return "Automix"
         case "agent:queue-director":
             return "Queue Director"
+        case "diagnostics:activity-log":
+            return "Activity Log"
         case "visual:canvas":
             return "Canvas"
         default:
@@ -107,6 +110,8 @@ function contentForRoute(route: WorkspaceRoute, lyrics?: string): ReactNode {
             return <PlaybackAutomixWorkspace />
         case "agent:queue-director":
             return <AgentQueueDirectorWorkspace />
+        case "diagnostics:activity-log":
+            return <ActivityLogWorkspace />
         case "visual:canvas":
             return <VisualCanvasWorkspace lyrics={lyrics} />
         default: {

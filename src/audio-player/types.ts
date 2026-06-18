@@ -340,6 +340,87 @@ export interface AudioPlayerEngine {
 /** How the global session behaves when a track ends. */
 export type RepeatMode = "off" | "all" | "one"
 
+/** Distance modeling algorithms for spatial audio (Web Audio API standard). */
+export type DistanceModelType = "linear" | "inverse" | "exponential"
+
+/** Spatial audio configuration options matching Howler.js-style API. */
+export interface SpatialAudioOptions {
+    /** Stereo panning from -1 (left) to 1 (right). */
+    stereo?: number
+
+    /** 3D position [x, y, z] for the audio source. */
+    pos?: [number, number, number]
+
+    /** Orientation vector [x, y, z] — direction the sound is pointing. */
+    orientation?: [number, number, number]
+
+    /** Playback rate (pitch) from 0.5 to 4.0. */
+    rate?: number
+
+    /** Distance model algorithm. Default: "inverse". */
+    distanceModel?: DistanceModelType
+
+    /** Reference distance for distance calculations. Default: 1. */
+    refDistance?: number
+
+    /** Maximum distance for distance calculations. Default: 10000. */
+    maxDistance?: number
+
+    /** Rolloff factor for distance attenuation. Default: 1. */
+    rolloffFactor?: number
+
+    /** Inner angle of the audio cone (directional audio). Default: 360. */
+    coneInnerAngle?: number
+
+    /** Outer angle of the audio cone. Default: 360. */
+    coneOuterAngle?: number
+
+    /** Gain applied outside the audio cone. Default: 0. */
+    coneOuterGain?: number
+}
+
+/** Current spatial audio state exposed to UI and plugins. */
+export interface SpatialAudioState {
+    /** Stereo pan value (-1 to 1). */
+    stereo: number
+
+    /** 3D position [x, y, z]. */
+    pos: [number, number, number]
+
+    /** Orientation vector [x, y, z]. */
+    orientation: [number, number, number]
+
+    /** Playback rate (0.5 to 4.0). */
+    rate: number
+
+    /** Distance model algorithm. */
+    distanceModel: DistanceModelType
+
+    /** Reference distance. */
+    refDistance: number
+
+    /** Maximum distance. */
+    maxDistance: number
+
+    /** Rolloff factor. */
+    rolloffFactor: number
+
+    /** Cone inner angle. */
+    coneInnerAngle: number
+
+    /** Cone outer angle. */
+    coneOuterAngle: number
+
+    /** Cone outer gain. */
+    coneOuterGain: number
+
+    /** Whether spatial audio is currently enabled. */
+    isSpatialEnabled: boolean
+
+    /** Whether lite mode (stereo-only, no 3D panner) is active. */
+    liteMode: boolean
+}
+
 /**
  * The global audio session. A superset of `AudioPlayerEngine`: anything that
  * accepts an `AudioPlayerEngine` (e.g. the presentational `ProgressBar` /
