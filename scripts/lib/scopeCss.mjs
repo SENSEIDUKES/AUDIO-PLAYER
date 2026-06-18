@@ -52,8 +52,9 @@ export function scopeCss(css, scopeClass, id) {
         const trimmed = line.trim()
 
         // Track brace depth
-        const opens = (line.match(/{/g) || []).length
-        const closes = (line.match(/}/g) || []).length
+        const noStringsLine = line.replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g, "")
+        const opens = (noStringsLine.match(/{/g) || []).length
+        const closes = (noStringsLine.match(/}/g) || []).length
 
         if (depth === 0 && trimmed === "") {
             output.push(line)
@@ -217,7 +218,7 @@ function scopeSingleSelector(selector, scopeClass, warnings) {
     const s = selector.trim()
 
     // :root, html, body (and combined selectors like body.dark or body[data-theme]) → scope root
-    if (/^(:root|html|body)(?:\b|(?=[.#\[:]))/i.test(s)) {
+    if (/^(:root|html|body)(?![a-zA-Z0-9_-])/i.test(s)) {
         return s.replace(/^(:root|html|body)/i, `.${scopeClass}`)
     }
 
@@ -253,7 +254,7 @@ function rewriteAnimationReferences(line, renames) {
     for (const [original, namespaced] of renames) {
         // Match animation-name or animation shorthand references
         // Use word-boundary matching to avoid false positives
-        const re = new RegExp(`(animation(?:-name)?\\s*:[^;]*?)\\b${escapeRegex(original)}\\b`, "g")
+        const re = new RegExp(`(animation(?:-name)?\\s*:[^;{}]*?)\\b${escapeRegex(original)}\\b`, "g")
         result = result.replace(re, `$1${namespaced}`)
     }
     return result

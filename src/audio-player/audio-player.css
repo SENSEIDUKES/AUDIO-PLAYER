@@ -698,15 +698,85 @@
     }
 }
 
-/* Touch devices: grow the hit area of the small controls to ~44px without
-   changing how they look. Buttons are position: relative so the inset
-   pseudo-element resolves against the button box. */
+/* Touch devices: grow the hit area to at least 44×44px without changing
+   the visual size. All interactive elements must ensure their total touch
+   target (visual size + pseudo-element expansion) meets 44×44px minimum.
+
+   Approach: expand via an absolutely-positioned ::after pseudo-element.
+   The parent must have position: relative for inset to resolve correctly.
+   Elements already ≥44px (e.g. .ap-btn--play at 60px) don't need expansion. */
 @media (pointer: coarse) {
+    /* Ensure all interactive elements have position context for ::after. */
+    .ap-btn,
+    .ap-btn--sm,
+    .ap-icon-btn,
+    .ap-menu__btn,
+    .ap-q-header__close,
+    .ap-q-row__play-btn,
+    .ap-q-row__remove,
+    .ap-wide-btn,
+    .ap-retry-btn {
+        position: relative;
+    }
+
+    /* Ghost buttons (40×40) need 2px extra per side → 44×44. */
+    .ap-btn--ghost::after {
+        content: "";
+        position: absolute;
+        inset: -2px;
+    }
+
+    /* Small ghost buttons (28×28) need 8px per side → 44×44. */
     .ap-btn--sm::after,
-    .ap-icon-btn::after {
+    /* Icon buttons (32×32) need 6px per side → 44×44. */
+    .ap-icon-btn::after,
+    /* Menu toggle (36×36) needs 4px per side → 44×44. */
+    .ap-menu__btn::after,
+    /* Queue header close (36×36) needs 4px per side → 44×44. */
+    .ap-q-header__close::after,
+    /* Queue row play (28×28) needs 8px per side → 44×44. */
+    .ap-q-row__play-btn::after {
         content: "";
         position: absolute;
         inset: -8px;
+    }
+
+    /* Queue row remove (24×24) needs 10px per side → 44×44. */
+    .ap-q-row__remove::after {
+        content: "";
+        position: absolute;
+        inset: -10px;
+    }
+    /* Retry button — content-sized, 8px per side is a generous cushion. */
+    .ap-retry-btn::after,
+    /* Wide button — content-sized, 4px per side works. */
+    .ap-wide-btn::after {
+        content: "";
+        position: absolute;
+        inset: -8px;
+    }
+
+    /* Progress bar thumb: the visual thumb is ~16px, but the touch target
+       must be 44px. Set the element size to 44px and scale its visual
+       appearance down so it still looks like a 16px dot. */
+    .ap-progress__thumb {
+        width: 44px;
+        height: 44px;
+        transform: translate(-50%, -50%) scale(0.36);
+        transform-origin: center center;
+    }
+    .ap-progress:hover .ap-progress__thumb,
+    .ap-progress--seeking .ap-progress__thumb {
+        transform: translate(-50%, -50%) scale(0.42);
+    }
+
+    /* Volume slider thumb: same approach — 44px touch target, scaled
+       visual to match the original ~12px appearance. */
+    .ap-volume__thumb {
+        width: 44px;
+        height: 44px;
+        transform: translate(-50%, -50%) scale(0.27);
+        transform-origin: center center;
     }
 }
 
