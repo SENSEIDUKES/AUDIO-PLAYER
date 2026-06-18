@@ -20,6 +20,9 @@ import { ScrubberCanvasHost } from "../surfaces/ScrubberCanvasHost"
 import { PlayerSurfaceButtons } from "../surfaces/PlayerSurfaceButtons"
 import { QueueSurface } from "../surfaces/QueueSurface"
 import { getScrubberDensity } from "../surfaces/faceCapabilities"
+import { VisualSlotsProvider } from "../visual-slots/VisualSlotsContext"
+import { SEICanvasRenderer } from "../visual-slots/SEICanvasRenderer"
+import { ScrubberCanvasRenderer } from "../visual-slots/ScrubberCanvasRenderer"
 import type { WorkspaceRoute } from "../components/workspace/workspaceRoutes"
 import {
     Back10Icon,
@@ -148,6 +151,7 @@ export function FullCardPlayer({
     }, [])
 
     return (
+        <VisualSlotsProvider>
         <div
             className={`ap-fc${className ? ` ${className}` : ""}`}
             style={{ ...themeVars, ...style }}
@@ -294,14 +298,11 @@ export function FullCardPlayer({
                     {surface.isQueueOpen ? (
                         <QueueSurface />
                     ) : (
-                        <div className="ap-sei-canvas-placeholder">
-                            <span className="ap-sei-canvas-placeholder__title">
-                                SEI Canvas
-                            </span>
-                            <span className="ap-sei-canvas-placeholder__hint">
-                                Placeholder visual area — plugins mount here later.
-                            </span>
-                        </div>
+                        <SEICanvasRenderer
+                            currentTime={currentTime}
+                            duration={duration}
+                            lyrics={currentTrack?.lyrics}
+                        />
                     )}
                 </SEICanvasHost>
             </div>
@@ -315,6 +316,11 @@ export function FullCardPlayer({
                     progress={duration > 0 ? currentTime / duration : 0}
                     onSeek={s.seek}
                 >
+                    <ScrubberCanvasRenderer
+                        currentTime={currentTime}
+                        duration={duration}
+                        onSeek={s.seek}
+                    >
                     <div className="ap-progress-group" role="group" aria-label="Playback progress">
                         {/* WaveformAdapter (Phase 4): renders the interactive
                             waveform when the track has peaks, else the progress
@@ -349,6 +355,7 @@ export function FullCardPlayer({
                             <span>{formatTime(duration)}</span>
                         </div>
                     </div>
+                    </ScrubberCanvasRenderer>
                 </ScrubberCanvasHost>
 
                 <div className="ap-transport" role="group" aria-label="Playback controls">
@@ -417,6 +424,7 @@ export function FullCardPlayer({
                 />
             </div>
         </div>
+        </VisualSlotsProvider>
     )
 }
 

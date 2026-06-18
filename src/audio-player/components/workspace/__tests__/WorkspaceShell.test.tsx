@@ -26,10 +26,15 @@ describe("WorkspaceShell", () => {
         expect(render("plugin-settings:waveform")).toContain("Waveform")
     })
 
-    it("renders the lyrics workspace and previews supplied lyrics", () => {
+    it("renders the real lyric settings panel for the lyrics route", () => {
+        // The lyrics route now surfaces the lyric display's settings panel
+        // (font, weight, size, line height, highlight color, animation mode)
+        // instead of the old placeholder lyrics preview.
         const html = render("plugin-settings:lyrics", "la la la")
-        expect(html).toContain('class="sap-ctl__lyrics"')
-        expect(html).toContain("la la la")
+        expect(html).toContain('class="sap-visual-settings"')
+        expect(html).toContain("Font family")
+        expect(html).toContain("Highlight color")
+        expect(html).toContain("Animation mode")
     })
 
     it("renders placeholder copy for stub workspaces", () => {
