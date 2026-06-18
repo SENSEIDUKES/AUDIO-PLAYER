@@ -63,6 +63,18 @@ describe("scopeCss", () => {
             const result = scopeCss(input, SCOPE, ID)
             expect(result).toContain(`.${SCOPE} .foo {`)
         })
+
+        it("rewrites body.dark-theme to scope class with class combined", () => {
+            const input = `body.dark-theme {\n  background: black;\n}`
+            const result = scopeCss(input, SCOPE, ID)
+            expect(result).toContain(`.${SCOPE}.dark-theme {`)
+        })
+
+        it("rewrites body[data-theme='dark'] to scope class with attribute combined", () => {
+            const input = `body[data-theme='dark'] {\n  background: black;\n}`
+            const result = scopeCss(input, SCOPE, ID)
+            expect(result).toContain(`.${SCOPE}[data-theme='dark'] {`)
+        })
     })
 
     describe("@keyframes namespacing", () => {
@@ -98,6 +110,25 @@ describe("scopeCss", () => {
             expect(result).toContain(`@keyframes sap-${ID}-fadeIn`)
             expect(result).toContain(`animation-name: sap-${ID}-fadeIn`)
         })
+
+        it("renames animation references when declaration spans multiple lines", () => {
+            const input = [
+                `@keyframes slide {`,
+                `  from { left: 0; }`,
+                `  to { left: 100px; }`,
+                `}`,
+                `.box {`,
+                `  animation:`,
+                `    slide`,
+                `    2s`,
+                `    ease;`,
+                `}`,
+            ].join("\n")
+
+            const result = scopeCss(input, SCOPE, ID)
+            expect(result).toContain(`@keyframes sap-${ID}-slide`)
+            expect(result).toContain(`sap-${ID}-slide`)
+        })
     })
 
     describe("@media blocks", () => {
@@ -132,6 +163,14 @@ describe("scopeCss", () => {
             const input = `@import url("reset.css");\n.a { color: red; }`
             const result = scopeCss(input, SCOPE, ID)
             expect(result).toContain("@import")
+        })
+    })
+
+    describe("comment stripping", () => {
+        it("ignores braces inside comments and scopes correctly", () => {
+            const input = `/* } */\n.foo {\n  color: red;\n}\n/* { */`
+            const result = scopeCss(input, SCOPE, ID)
+            expect(result).toContain(`.${SCOPE} .foo {`)
         })
     })
 })

@@ -26,16 +26,19 @@ export function scopeCss(css, scopeClass, id) {
     /** @type {Map<string, string>} */
     const keyframeRenames = new Map()
 
+    // Strip comments to prevent braces inside comments from breaking depth tracking
+    const cleanCss = css.replace(/\/\*[\s\S]*?\*\//g, "")
+
     // First pass: collect @keyframes names so we can rename them
     const keyframeRe = /@keyframes\s+([\w-]+)/g
     let kfMatch
-    while ((kfMatch = keyframeRe.exec(css)) !== null) {
+    while ((kfMatch = keyframeRe.exec(cleanCss)) !== null) {
         const original = kfMatch[1]
         const namespaced = `sap-${id}-${original}`
         keyframeRenames.set(original, namespaced)
     }
 
-    const lines = css.split("\n")
+    const lines = cleanCss.split("\n")
     /** @type {string[]} */
     const output = []
     let depth = 0
@@ -109,8 +112,7 @@ export function scopeCss(css, scopeClass, id) {
             // Regular selector at top level — scope it
             if (opens > 0 || trimmed.endsWith(",")) {
                 const scoped = scopeSelectors(trimmed, scopeClass, warnings)
-                const rewritten = rewriteAnimationReferences(scoped, keyframeRenames)
-                output.push(rewritten)
+                output.push(scoped)
                 depth += opens - closes
                 continue
             }
@@ -135,23 +137,20 @@ export function scopeCss(css, scopeClass, id) {
                     output.push(line)
                 } else if (opens > 0 || trimmed.endsWith(",")) {
                     const scoped = scopeSelectors(trimmed, scopeClass, warnings)
-                    const rewritten = rewriteAnimationReferences(scoped, keyframeRenames)
-                    output.push(rewritten)
+                    output.push(scoped)
                 } else if (trimmed && !trimmed.startsWith("}")) {
                     // Multi-line selector continuation inside @media
                     const scoped = scopeSelectors(trimmed, scopeClass, warnings)
                     output.push(scoped)
                 } else {
-                    const rewritten = rewriteAnimationReferences(line, keyframeRenames)
-                    output.push(rewritten)
+                    output.push(line)
                 }
             } else if (blockType === "keyframes") {
                 // Inside @keyframes — pass through as-is
                 output.push(line)
             } else {
-                // Inside a regular rule or other-at block — rewrite animation refs
-                const rewritten = rewriteAnimationReferences(line, keyframeRenames)
-                output.push(rewritten)
+                // Inside a regular rule or other-at block
+                output.push(line)
             }
 
             depth = newDepth
@@ -182,7 +181,8 @@ export function scopeCss(css, scopeClass, id) {
         header += ` */\n`
     }
 
-    return header + output.join("\n")
+    const finalCss = output.join("\n")
+    return header + rewriteAnimationReferences(finalCss, keyframeRenames)
 }
 
 /**
@@ -216,14 +216,9 @@ function scopeSelectors(selectorLine, scopeClass, warnings) {
 function scopeSingleSelector(selector, scopeClass, warnings) {
     const s = selector.trim()
 
-    // :root, html, body → scope root
-    if (/^(:root|html|body)$/i.test(s)) {
-        return `.${scopeClass}`
-    }
-
-    // :root <rest>, html <rest>, body <rest> → scope root <rest>
-    if (/^(:root|html|body)\s+/i.test(s)) {
-        return s.replace(/^(:root|html|body)\s+/i, `.${scopeClass} `)
+    // :root, html, body (and combined selectors like body.dark or body[data-theme]) → scope root
+    if (/^(:root|html|body)(?:\b|(?=[.#\[:]))/i.test(s)) {
+        return s.replace(/^(:root|html|body)/i, `.${scopeClass}`)
     }
 
     // Universal selector alone

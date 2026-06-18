@@ -405,6 +405,7 @@ function main() {
             )
         }
         console.log(`   ⚠️  Overwriting existing skin folder.`)
+        fs.rmSync(outDir, { recursive: true, force: true })
     }
     fs.mkdirSync(outDir, { recursive: true })
 
@@ -413,21 +414,18 @@ function main() {
     let hasCSS = false
 
     if (format === "react" || format === "tailwind") {
-        // Copy the source file as raw.tsx
+        // Copy the source file preserving its original extension
         const src = fs.readFileSync(resolvedIn, "utf-8")
-        const rawContent = `// Raw component copied from Sea-Workshop-Light export.\n// Do not edit — changes will be overwritten on re-import.\n\n${src}\n\nexport { default as RawComponent } from "./raw"\n`
-        // Actually, we need raw.tsx to re-export the default. Let's keep it simple:
-        // Copy the file verbatim as raw.tsx.
-        fs.writeFileSync(path.join(outDir, "raw.tsx"), src, "utf-8")
+        const ext = path.extname(resolvedIn).toLowerCase()
+        const rawFileName = `raw${ext}`
+        fs.writeFileSync(path.join(outDir, rawFileName), src, "utf-8")
 
-        // Look for a co-located CSS file
+        // Look specifically for a CSS file matching the base name of the input file
         const inputDir = path.dirname(resolvedIn)
-        const cssFiles = fs.readdirSync(inputDir).filter((f) => f.endsWith(".css"))
-        if (cssFiles.length > 0) {
-            const rawCSS = fs.readFileSync(
-                path.join(inputDir, cssFiles[0]),
-                "utf-8"
-            )
+        const baseName = path.basename(resolvedIn, path.extname(resolvedIn))
+        const expectedCssPath = path.join(inputDir, `${baseName}.css`)
+        if (fs.existsSync(expectedCssPath)) {
+            const rawCSS = fs.readFileSync(expectedCssPath, "utf-8")
             const scopedCSS = scopeCss(rawCSS, `sap-visual-${id}`, id)
             fs.writeFileSync(path.join(outDir, `${id}.css`), scopedCSS, "utf-8")
             hasCSS = true
