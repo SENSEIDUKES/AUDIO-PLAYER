@@ -30,6 +30,9 @@ import { usePlayerSurface } from "./surfaces/usePlayerSurface"
 import { PlayerSurfaceButtons } from "./surfaces/PlayerSurfaceButtons"
 import { SEICanvasHost } from "./surfaces/SEICanvasHost"
 import { QueueSurface } from "./surfaces/QueueSurface"
+import { VisualSlotsProvider } from "./visual-slots/VisualSlotsContext"
+import { SEICanvasRenderer } from "./visual-slots/SEICanvasRenderer"
+import { ScrubberCanvasRenderer } from "./visual-slots/ScrubberCanvasRenderer"
 import { VolumeControl } from "./components/VolumeControl"
 import { QueueDrawer } from "./components/QueueDrawer"
 import { SAPController } from "./components/SAPController"
@@ -852,6 +855,7 @@ function AudioPlayerInner(props: AudioPlayerProps) {
     )
 
     return (
+        <VisualSlotsProvider>
         <div
             ref={rootRef}
             className={`ap-root${className ? ` ${className}` : ""}${
@@ -1057,6 +1061,11 @@ function AudioPlayerInner(props: AudioPlayerProps) {
                         progress={duration > 0 ? currentTime / duration : 0}
                         onSeek={seekWithPlugins}
                     >
+                        <ScrubberCanvasRenderer
+                            currentTime={currentTime}
+                            duration={duration}
+                            onSeek={seekWithPlugins}
+                        >
                         <WaveformAdapter
                             face="portable"
                             density={getScrubberDensity("portable")}
@@ -1085,6 +1094,7 @@ function AudioPlayerInner(props: AudioPlayerProps) {
                             progressColor={progressColor}
                             cursorColor={accentColor}
                         />
+                        </ScrubberCanvasRenderer>
                     </ScrubberCanvasHost>
                     <div className="ap-times" aria-hidden="true">
                         <span>{formatTime(currentTime)}</span>
@@ -1185,14 +1195,7 @@ function AudioPlayerInner(props: AudioPlayerProps) {
                     {surface.isQueueOpen ? (
                         <QueueSurface />
                     ) : (
-                        <div className="ap-sei-canvas-placeholder">
-                            <span className="ap-sei-canvas-placeholder__title">
-                                SEI Canvas
-                            </span>
-                            <span className="ap-sei-canvas-placeholder__hint">
-                                Placeholder visual area — plugins mount here later.
-                            </span>
-                        </div>
+                        <SEICanvasRenderer />
                     )}
                 </SEICanvasHost>
 
@@ -1237,6 +1240,7 @@ function AudioPlayerInner(props: AudioPlayerProps) {
                 )}
             </div>
         </div>
+        </VisualSlotsProvider>
     )
 }
 

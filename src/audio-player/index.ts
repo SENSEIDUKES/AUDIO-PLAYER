@@ -154,6 +154,41 @@ export { AgentQueueDirectorWorkspace } from "./components/workspace/AgentQueueDi
 export { VisualLyricsWorkspace } from "./components/workspace/VisualLyricsWorkspace"
 export type { VisualLyricsWorkspaceProps } from "./components/workspace/VisualLyricsWorkspace"
 
+// Visual slot intake layer: a minimal registry + renderers that mount
+// Workshop-Light style React components into the player's three visual slots
+// (seiCanvas, scrubberCanvas, controllerPanel). Register a component into a slot
+// to extend the player without editing its core.
+export {
+    registerVisualComponent,
+    getVisualComponent,
+    getVisualComponentsForSlot,
+    getDefaultComponentForSlot,
+    getAllVisualComponents,
+    VisualSlotsProvider,
+    useVisualSlots,
+    SEICanvasRenderer,
+    ScrubberCanvasRenderer,
+    ControllerPanelRenderer,
+    BUILTIN_VISUAL_COMPONENTS,
+    LyricDisplay,
+    LyricSettingsPanel,
+    lyricDisplayDefinition,
+    lyricDefaultSettings,
+    LYRIC_DISPLAY_ID,
+} from "./visual-slots"
+export type {
+    VisualSlot,
+    VisualComponentProps,
+    VisualSettingsPanelProps,
+    VisualComponentDefinition,
+    AnyVisualComponentDefinition,
+    VisualSlotsContextValue,
+    VisualSlotsProviderProps,
+    ScrubberCanvasRendererProps,
+    ControllerPanelRendererProps,
+    LyricSettings,
+} from "./visual-slots"
+
 // Headless adapter layer: Downshift-style prop getters and utilities over an
 // existing engine/session — no styling, no second engine.
 export {

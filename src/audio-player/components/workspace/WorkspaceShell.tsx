@@ -7,7 +7,8 @@ import { LibraryQueueWorkspace } from "./LibraryQueueWorkspace"
 import { PluginSettingsWorkspace } from "./PluginSettingsWorkspace"
 import { PlaybackAutomixWorkspace } from "./PlaybackAutomixWorkspace"
 import { AgentQueueDirectorWorkspace } from "./AgentQueueDirectorWorkspace"
-import { VisualLyricsWorkspace } from "./VisualLyricsWorkspace"
+import { ControllerPanelRenderer } from "../../visual-slots/ControllerPanelRenderer"
+import { LYRIC_DISPLAY_ID } from "../../visual-slots/components/LyricDisplay"
 
 /* The body of the SAP Controller when it is in a focused-workspace route rather
    than the legacy "options" sheet. SAPController still owns the portal, backdrop,
@@ -62,7 +63,15 @@ function contentForRoute(route: WorkspaceRoute, lyrics?: string): ReactNode {
             return <LibraryQueueWorkspace />
         case "plugin-settings:lyrics":
         case "visual:lyrics":
-            return <VisualLyricsWorkspace lyrics={lyrics} />
+            // The lyric display is a seiCanvas visual that declares a settings
+            // panel; the lyrics route surfaces that panel through the renderer so
+            // edits flow straight back to the live canvas visual.
+            return (
+                <ControllerPanelRenderer
+                    componentId={LYRIC_DISPLAY_ID}
+                    lyrics={lyrics}
+                />
+            )
         case "playback:automix":
             return <PlaybackAutomixWorkspace />
         case "agent:queue-director":
