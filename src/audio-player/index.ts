@@ -352,6 +352,29 @@ export type {
     PluginRegistrySnapshot,
 } from "./plugins/registry/usePluginRegistry"
 
+// Diagnostics — Activity Log system for recording and viewing lifecycle events.
+// Lightweight, bounded, non-blocking. Any component can safely record events.
+export {
+    ActivityLogProvider,
+    useActivityLog,
+    useActivityLogRecording,
+    ActivityLogPanel,
+    ActivityLogWorkspace,
+    createActivityLogStore,
+    ActivityLogContext,
+} from "./diagnostics"
+export type {
+    ActivityArea,
+    ActivityStatus,
+    ActivityEvent,
+    ActivityLogEntry,
+    ActivityLogConfig,
+    ActivityLogApi,
+    ActivityLogProviderProps,
+    UseActivityLogRecordingOptions,
+} from "./diagnostics"
+export { DEFAULT_ACTIVITY_LOG_CONFIG } from "./diagnostics"
+
 // Plugin surface routing (Phase 1 foundation): declarative contract for where
 // each plugin's UI belongs (settings / SEI Canvas / both / headless), pure
 // helpers, and a default catalog for the built-in plugins. Metadata only — no

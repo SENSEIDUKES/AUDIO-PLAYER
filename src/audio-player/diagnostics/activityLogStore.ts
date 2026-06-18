@@ -1,0 +1,138 @@
+/**
+ * Activity Log Store — a lightweight, bounded, non-blocking ring buffer for
+ * lifecycle events. Designed to be safe to call from anywhere without ever
+ * throwing or crashing playback.
+ *
+ * The store is a synchronous ring buffer with O(1) append/truncate. It never
+ * allocates on the hot path beyond the initial buffer. Exports are O(n) but
+ * are user-initiated, not hot-path.
+ */
+
+import type {
+    ActivityEvent,
+    ActivityLogApi,
+    ActivityLogConfig,
+    ActivityLogEntry,
+} from "./activityTypes"
+import { DEFAULT_ACTIVITY_LOG_CONFIG } from "./activityTypes"
+
+/** Create a standalone activity log store. Callers can create multiple stores
+ *  (e.g. one for a session, one for a plugin) or share a single global one. */
+export function createActivityLogStore(
+    config?: Partial<ActivityLogConfig>
+): ActivityLogApi {
+    const { maxEntries } = { ...DEFAULT_ACTIVITY_LOG_CONFIG, ...config }
+    const buffer: ActivityEvent[] = []
+    let nextId = 1
+
+    /** Non-blocking record. Wraps the entire operation in a try-catch so no
+     *  caller ever has to worry about a bad entry crashing playback. */
+    function record(entry: ActivityLogEntry): void {
+        try {
+            const event: ActivityEvent = {
+                id: nextId++,
+                timestamp: Date.now(),
+                area: entry.area,
+                status: entry.status,
+                message: String(entry.message ?? ""),
+            }
+            if (entry.details != null) event.details = entry.details
+            if (entry.error != null) event.error = String(entry.error)
+
+            buffer.push(event)
+
+            // Trim oldest events when the buffer exceeds maxEntries.
+            if (buffer.length > maxEntries) {
+                buffer.splice(0, buffer.length - maxEntries)
+            }
+        } catch {
+            // Silently swallow — activity logging must never throw.
+        }
+    }
+
+    /** Clear all stored events. */
+    function clear(): void {
+        buffer.length = 0
+        nextId = 1
+    }
+
+    /** Export as JSON — newest first. */
+    function exportJson(): string {
+        try {
+            return JSON.stringify([...buffer].reverse(), null, 2)
+        } catch {
+            return "[]"
+        }
+    }
+
+    /** Export as plain text — one line per event, newest first. */
+    function exportText(): string {
+        try {
+            return [...buffer]
+                .reverse()
+                .map(formatLine)
+                .join("\n")
+        } catch {
+            return ""
+        }
+    }
+
+    return {
+        record,
+        get events(): readonly ActivityEvent[] {
+            return buffer
+        },
+        clear,
+        exportJson,
+        exportText,
+        maxEntries,
+        get count(): number {
+            return buffer.length
+        },
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Internal helpers                                                   */
+/* ------------------------------------------------------------------ */
+
+function pad2(n: number): string {
+    return n < 10 ? "0" + n : String(n)
+}
+
+function formatTimestamp(ts: number): string {
+    const d = new Date(ts)
+    return (
+        pad2(d.getHours()) +
+        ":" +
+        pad2(d.getMinutes()) +
+        ":" +
+        pad2(d.getSeconds()) +
+        "." +
+        String(d.getMilliseconds()).padStart(3, "0")
+    )
+}
+
+const STATUS_PAD = 5 // "error".length
+const AREA_PAD = 8 // "playback".length
+
+function formatLine(event: ActivityEvent): string {
+    const time = formatTimestamp(event.timestamp)
+    const status = event.status.padEnd(STATUS_PAD)
+    const area = event.area.padEnd(AREA_PAD)
+    let line = `[${time}] ${status} ${area} ${event.message}`
+    if (event.error) line += ` | error: ${event.error}`
+    if (event.details) {
+        try {
+            const detailStr = JSON.stringify(event.details)
+            if (detailStr.length > 200) {
+                line += ` | ${detailStr.slice(0, 200)}…`
+            } else {
+                line += ` | ${detailStr}`
+            }
+        } catch {
+            // skip un-stringifiable details
+        }
+    }
+    return line
+}
