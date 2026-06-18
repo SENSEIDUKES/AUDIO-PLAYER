@@ -6,10 +6,13 @@ import type {
     TrackSource,
     UseAudioPlayerOptions,
 } from "./types"
-import type { AudioBackend, AudioBackendErrorCode } from "./core/audio/AudioBackend"
+import type {
+    AudioBackend,
+    AudioBackendErrorCode,
+} from "./core/audio/AudioBackend"
 import { createAudioBackend } from "./core/audio/AudioBackendFactory"
 import { shouldEnterBuffering } from "./utils/buffering"
-import { getTrackSources } from "./utils/sources"
+import { getTrackSources, normalizeSourceUrl } from "./utils/sources"
 import { isRetryablePlaybackError } from "./utils/playbackRecovery"
 
 type ActiveSourceState = {
@@ -273,7 +276,10 @@ export function useAudioPlayer(
         ): boolean => {
             if (!isRetryablePlaybackError(error)) return false
 
-            const retryKey = `${sourceKeyRef.current}::${failedSource || currentSrcRef.current}`
+            const retrySource = normalizeSourceUrl(
+                failedSource || currentSrcRef.current
+            )
+            const retryKey = `${sourceKeyRef.current}::${retrySource}`
             const retryCounts = transientRetryCountsRef.current
             const previousAttempts = retryCounts.get(retryKey) ?? 0
             if (previousAttempts >= MAX_TRANSIENT_RETRIES_PER_SOURCE) return false
@@ -695,10 +701,13 @@ export function useAudioPlayer(
             const failedSource = currentSrcRef.current
             const shouldPlayFallback =
                 isPlayingRef.current || playPromiseRef.current !== null
-            if (consumeTransientRetry(failedSource, error)) {
-                setIsBuffering(shouldPlayFallback)
+            if (
+                shouldPlayFallback &&
+                consumeTransientRetry(failedSource, error)
+            ) {
+                setIsBuffering(true)
                 backend.load()
-                if (shouldPlayFallback) play(false)
+                play(false)
                 return
             }
             if (tryFallbackSource(failedSource, error, shouldPlayFallback)) {
