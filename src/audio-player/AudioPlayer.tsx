@@ -32,6 +32,8 @@ import { PlayerSurfaceButtons } from "./surfaces/PlayerSurfaceButtons"
 import { SEICanvasHost } from "./surfaces/SEICanvasHost"
 import { QueueSurface } from "./surfaces/QueueSurface"
 import { VisualSlotsProvider } from "./visual-slots/VisualSlotsContext"
+import { ActivityLogProvider } from "./diagnostics/ActivityLogProvider"
+import { useActivityLogRecording } from "./diagnostics/useActivityLogRecording"
 import { SEICanvasRenderer } from "./visual-slots/SEICanvasRenderer"
 import { ScrubberCanvasRenderer } from "./visual-slots/ScrubberCanvasRenderer"
 import { VolumeControl } from "./components/VolumeControl"
@@ -859,7 +861,15 @@ function AudioPlayerInner(props: AudioPlayerProps) {
     )
 
     return (
+        <ActivityLogProvider>
         <VisualSlotsProvider>
+        <ActivityLogRecorder
+            engine={engine}
+            currentTrack={currentTrack}
+            repeatMode={localRepeatMode}
+            shuffle={localShuffle}
+            trackLabel={currentTrack.title}
+        />
         <div
             ref={rootRef}
             className={`ap-root${className ? ` ${className}` : ""}${
@@ -1249,7 +1259,25 @@ function AudioPlayerInner(props: AudioPlayerProps) {
             </div>
         </div>
         </VisualSlotsProvider>
+        </ActivityLogProvider>
     )
+}
+
+function ActivityLogRecorder({
+    engine,
+    currentTrack,
+    repeatMode,
+    shuffle,
+    trackLabel,
+}: {
+    engine: ReturnType<typeof useAudioPlayer>
+    currentTrack: Track | null
+    repeatMode: RepeatMode
+    shuffle: boolean
+    trackLabel?: string
+}) {
+    useActivityLogRecording({ engine, currentTrack, repeatMode, shuffle, trackLabel })
+    return null
 }
 
 export default AudioPlayer

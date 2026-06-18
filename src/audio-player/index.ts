@@ -402,3 +402,21 @@ export type { VaultRowPlayerProps } from "./skins/VaultRowPlayer"
 export type { StickyBottomPlayerProps } from "./skins/StickyBottomPlayer"
 export type { MiniSidebarPlayerProps } from "./skins/MiniSidebarPlayer"
 export type { SeaCardPlayerProps } from "./skins/SeaCardPlayer"
+export {
+    ActivityLogProvider,
+    ActivityLogPanel,
+    ActivityLogWorkspace,
+    createActivityLogStore,
+    useActivityLog,
+    useActivityLogRecording,
+} from "./diagnostics"
+export type {
+    ActivityArea,
+    ActivityEvent,
+    ActivityLogApi,
+    ActivityLogConfig,
+    ActivityLogEntry,
+    ActivityLogProviderProps,
+    ActivityStatus,
+    UseActivityLogRecordingOptions,
+} from "./diagnostics"

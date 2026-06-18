@@ -43,6 +43,7 @@ export type MenuActionId =
     | "select-lyrics"
     | "previous-track"
     | "next-track"
+    | "open-activity-log"
     | (string & {})
 
 /**
@@ -170,6 +171,14 @@ export function buildMenuTree({
                     label: "Analytics",
                     icon: AnalyticsIcon,
                     state: "coming-soon",
+                },
+                {
+                    id: "activity-log",
+                    label: "Activity Log",
+                    icon: AnalyticsIcon,
+                    state: "available",
+                    actionId: "open-activity-log",
+                    workspaceRoute: "diagnostics:activity-log",
                 },
             ],
         },
