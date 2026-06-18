@@ -6,16 +6,19 @@ import type {
     TrackSource,
     UseAudioPlayerOptions,
 } from "./types"
-import type { AudioBackend } from "./core/audio/AudioBackend"
+import type { AudioBackend, AudioBackendErrorCode } from "./core/audio/AudioBackend"
 import { createAudioBackend } from "./core/audio/AudioBackendFactory"
 import { shouldEnterBuffering } from "./utils/buffering"
 import { getTrackSources } from "./utils/sources"
+import { isRetryablePlaybackError } from "./utils/playbackRecovery"
 
 type ActiveSourceState = {
     sourceKey: string
     signature: string
     index: number
 }
+
+const MAX_TRANSIENT_RETRIES_PER_SOURCE = 1
 
 function normalizeSource(source: TrackSource): TrackSource | null {
     const url = source.url?.trim() ?? ""
@@ -147,6 +150,7 @@ export function useAudioPlayer(
     const currentSourceIndexRef = useRef(currentSourceIndex)
     const currentSrcRef = useRef(currentSrc)
     const fallbackShouldPlayRef = useRef<boolean | null>(null)
+    const transientRetryCountsRef = useRef(new Map<string, number>())
     sourceListRef.current = resolvedSources
     sourceKeyRef.current = sourceKey
     sourcesSignatureRef.current = sourcesSignature
@@ -262,6 +266,30 @@ export function useAudioPlayer(
         [bumpToken, clearPendingPlay, stopLoop]
     )
 
+    const consumeTransientRetry = useCallback(
+        (
+            failedSource: string,
+            error: AudioBackendErrorCode | string | null | undefined
+        ): boolean => {
+            if (!isRetryablePlaybackError(error)) return false
+
+            const retryKey = `${sourceKeyRef.current}::${failedSource || currentSrcRef.current}`
+            const retryCounts = transientRetryCountsRef.current
+            const previousAttempts = retryCounts.get(retryKey) ?? 0
+            if (previousAttempts >= MAX_TRANSIENT_RETRIES_PER_SOURCE) return false
+
+            retryCounts.set(retryKey, previousAttempts + 1)
+            bumpToken()
+            clearPendingPlay()
+            stopLoop()
+            setHasError(false)
+            setErrorMessage("")
+            setAutoplayBlocked(false)
+            return true
+        },
+        [bumpToken, clearPendingPlay, stopLoop]
+    )
+
     const setSeeking = useCallback((active: boolean) => {
         isSeekingRef.current = active
         setIsSeekingState(active)
@@ -322,13 +350,16 @@ export function useAudioPlayer(
                         return
                     }
 
-                    if (
-                        tryFallbackSource(
-                            backend.getMediaElement()?.currentSrc || currentSrcRef.current,
-                            name || backend.getError() || "unknown",
-                            true
-                        )
-                    ) {
+                    const failedSource =
+                        backend.getMediaElement()?.currentSrc || currentSrcRef.current
+                    const playbackError = name || backend.getError() || "unknown"
+                    if (consumeTransientRetry(failedSource, playbackError)) {
+                        setIsBuffering(true)
+                        backend.load()
+                        play(false)
+                        return
+                    }
+                    if (tryFallbackSource(failedSource, playbackError, true)) {
                         return
                     }
 
@@ -344,7 +375,13 @@ export function useAudioPlayer(
                     }
                 })
         },
-        [bumpToken, clearPendingPlay, hasAudio, tryFallbackSource]
+        [
+            bumpToken,
+            clearPendingPlay,
+            hasAudio,
+            consumeTransientRetry,
+            tryFallbackSource,
+        ]
     )
 
     const pause = useCallback(() => {
@@ -658,6 +695,12 @@ export function useAudioPlayer(
             const failedSource = currentSrcRef.current
             const shouldPlayFallback =
                 isPlayingRef.current || playPromiseRef.current !== null
+            if (consumeTransientRetry(failedSource, error)) {
+                setIsBuffering(shouldPlayFallback)
+                backend.load()
+                if (shouldPlayFallback) play(false)
+                return
+            }
             if (tryFallbackSource(failedSource, error, shouldPlayFallback)) {
                 return
             }
@@ -733,7 +776,7 @@ export function useAudioPlayer(
             backend.removeEventListener("error", handleError)
             backend.removeEventListener("loadstart", handleLoadStart)
         }
-    }, [stopLoop, tryFallbackSource])
+    }, [consumeTransientRetry, play, stopLoop, tryFallbackSource])
 
     // Reset + load whenever the source changes. Continues playing across track
     // changes; the initial load only plays when autoPlay is requested.
@@ -755,6 +798,7 @@ export function useAudioPlayer(
         // Bump the token up front so any in-flight play() / error handlers
         // from the previous source become no-ops.
         const token = bumpToken()
+        transientRetryCountsRef.current.clear()
         clearPendingPlay()
         stopLoop()
         backend.pause()
