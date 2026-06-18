@@ -8,7 +8,11 @@ import type {
 } from "./types"
 import type { AudioBackend } from "./core/audio/AudioBackend"
 import { createAudioBackend } from "./core/audio/AudioBackendFactory"
-import { shouldEnterBuffering } from "./utils/buffering"
+import {
+    shouldEnterBuffering,
+    createBufferingDebounce,
+    type BufferingDebounce,
+} from "./utils/buffering"
 import { getTrackSources } from "./utils/sources"
 
 type ActiveSourceState = {
@@ -134,6 +138,14 @@ export function useAudioPlayer(
     const playPromiseRef = useRef<Promise<void> | null>(null)
     const animationFrameRef = useRef<number | null>(null)
     const fadeFrameRef = useRef<number | null>(null)
+    // Debounce for the buffering spinner. A `waiting`/`stalled` arms it; it
+    // flips `isBuffering` true only if the stall outlasts the threshold. Cleared
+    // by every buffering reset so a stale timer can never strand the spinner
+    // after playback resumes.
+    const bufferingDebounceRef = useRef<BufferingDebounce | null>(null)
+    if (bufferingDebounceRef.current === null) {
+        bufferingDebounceRef.current = createBufferingDebounce()
+    }
     const isFirstLoadRef = useRef(true)
     const previousVolumeRef = useRef(1)
     const pendingSeekRef = useRef<number | null>(null)
@@ -203,6 +215,13 @@ export function useAudioPlayer(
         }
     }, [])
 
+    // Cancel a pending debounced-spinner flip so it can't fire after the stall
+    // has already resolved. Always paired with a buffering reset
+    // (pause/ended/error/source-reset/canplay).
+    const clearBufferingTimer = useCallback(() => {
+        bufferingDebounceRef.current?.cancel()
+    }, [])
+
     const tryFallbackSource = useCallback(
         (
             failedSource: string,
@@ -241,6 +260,7 @@ export function useAudioPlayer(
             setHasError(false)
             setErrorMessage("")
             setAutoplayBlocked(false)
+            clearBufferingTimer()
             setIsBuffering(shouldPlayAfterSwitch)
             setActiveSourceState({
                 sourceKey: sourceKeyRef.current,
@@ -259,7 +279,7 @@ export function useAudioPlayer(
 
             return true
         },
-        [bumpToken, clearPendingPlay, stopLoop]
+        [bumpToken, clearPendingPlay, stopLoop, clearBufferingTimer]
     )
 
     const setSeeking = useCallback((active: boolean) => {
@@ -318,6 +338,7 @@ export function useAudioPlayer(
                             setAutoplayBlocked(true)
                         }
                         setIsPlaying(false)
+                        clearBufferingTimer()
                         setIsBuffering(false)
                         return
                     }
@@ -333,6 +354,7 @@ export function useAudioPlayer(
                     }
 
                     setIsPlaying(false)
+                    clearBufferingTimer()
                     setIsBuffering(false)
                     if (reportError) {
                         setHasError(true)
@@ -344,7 +366,7 @@ export function useAudioPlayer(
                     }
                 })
         },
-        [bumpToken, clearPendingPlay, hasAudio, tryFallbackSource]
+        [bumpToken, clearPendingPlay, hasAudio, tryFallbackSource, clearBufferingTimer]
     )
 
     const pause = useCallback(() => {
@@ -465,10 +487,11 @@ export function useAudioPlayer(
         setHasError(false)
         setErrorMessage("")
         setAutoplayBlocked(false)
+        clearBufferingTimer()
         setIsBuffering(true)
         backend.load()
         play(true)
-    }, [bumpToken, clearPendingPlay, hasAudio, play])
+    }, [bumpToken, clearPendingPlay, clearBufferingTimer, hasAudio, play])
 
     const loadAndPlay = useCallback(() => {
         const backend = backendRef.current!
@@ -505,6 +528,7 @@ export function useAudioPlayer(
         isPlayingRef.current = false
         setHasError(false)
         setErrorMessage("")
+        clearBufferingTimer()
         setIsBuffering(false)
         setAutoplayBlocked(false)
         pendingSeekRef.current = null
@@ -513,7 +537,7 @@ export function useAudioPlayer(
             fadeFrameRef.current = null
         }
         backend.releasePreload()
-    }, [bumpToken, clearPendingPlay, stopLoop])
+    }, [bumpToken, clearPendingPlay, stopLoop, clearBufferingTimer])
 
     const fade = useCallback((to: number, durationMs: number) => {
         const backend = backendRef.current!
@@ -606,6 +630,7 @@ export function useAudioPlayer(
         const handlePlay = () => {
             isPlayingRef.current = true
             setIsPlaying(true)
+            clearBufferingTimer()
             setIsBuffering(false)
             setAutoplayBlocked(false)
             if (animationFrameRef.current === null) {
@@ -616,7 +641,8 @@ export function useAudioPlayer(
             isPlayingRef.current = false
             setIsPlaying(false)
             // Pausing ends any active playback wait; never leave the spinner
-            // armed once playback has stopped.
+            // armed (or about to arm) once playback has stopped.
+            clearBufferingTimer()
             setIsBuffering(false)
             stopLoop()
             // Snap to the exact paused position (the throttled loop may lag).
@@ -626,6 +652,7 @@ export function useAudioPlayer(
         const handleEnded = () => {
             isPlayingRef.current = false
             setIsPlaying(false)
+            clearBufferingTimer()
             setIsBuffering(false)
             stopLoop()
             // Snap to exact duration so the progress bar reaches 100% even when
@@ -651,16 +678,24 @@ export function useAudioPlayer(
             // only treat them as buffering when playback is actually active or a
             // play attempt is pending, otherwise the spinner appears at idle/0:00.
             if (
-                shouldEnterBuffering({
+                !shouldEnterBuffering({
                     isPlaying: isPlayingRef.current,
                     isPaused: backend.isPaused(),
                     hasPendingPlay: playPromiseRef.current !== null,
                 })
             ) {
-                setIsBuffering(true)
+                return
             }
+            // Debounce: routine mid-playback blips and track-to-track handoffs
+            // also fire `waiting`. Only surface the spinner once the stall has
+            // outlasted the threshold; a resolution (`playing`/`canplay`/pause/
+            // ended/error/source-reset) cancels this pending flip first.
+            bufferingDebounceRef.current?.schedule(() => setIsBuffering(true))
         }
-        const clearBuffering = () => setIsBuffering(false)
+        const clearBuffering = () => {
+            clearBufferingTimer()
+            setIsBuffering(false)
+        }
         const handleError = () => {
             const error = backend.getError()
             const failedSource = currentSrcRef.current
@@ -670,6 +705,7 @@ export function useAudioPlayer(
                 return
             }
 
+            clearBufferingTimer()
             setIsBuffering(false)
             isPlayingRef.current = false
             setIsPlaying(false)
@@ -723,6 +759,7 @@ export function useAudioPlayer(
 
         return () => {
             stopLoop()
+            clearBufferingTimer()
             if (fadeFrameRef.current !== null) {
                 cancelAnimationFrame(fadeFrameRef.current)
                 fadeFrameRef.current = null
@@ -741,7 +778,7 @@ export function useAudioPlayer(
             backend.removeEventListener("error", handleError)
             backend.removeEventListener("loadstart", handleLoadStart)
         }
-    }, [stopLoop, tryFallbackSource])
+    }, [stopLoop, tryFallbackSource, clearBufferingTimer])
 
     // Reset + load whenever the source changes. Continues playing across track
     // changes; the initial load only plays when autoPlay is requested.
@@ -786,6 +823,7 @@ export function useAudioPlayer(
             setIsPlaying(false)
             setHasError(false)
             setErrorMessage("")
+            clearBufferingTimer()
             setIsBuffering(false)
             setAutoplayBlocked(false)
             pendingSeekRef.current = null
@@ -839,6 +877,7 @@ export function useAudioPlayer(
                                     setAutoplayBlocked(true)
                                 }
                                 setIsPlaying(false)
+                                clearBufferingTimer()
                                 setIsBuffering(false)
                                 return
                             }
