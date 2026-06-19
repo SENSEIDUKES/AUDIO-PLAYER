@@ -231,7 +231,7 @@ export function FullCardPlayer({
     return (
         <VisualSlotsProvider>
         <div
-            className={`ap-fc${className ? ` ${className}` : ""}`}
+            className={`ap-fc ap-glass-surface${className ? ` ${className}` : ""}`}
             style={{ ...themeVars, "--ap-blur": `${blurSize}px`, ...style } as CSSProperties}
             role="region"
             aria-label="Now playing"

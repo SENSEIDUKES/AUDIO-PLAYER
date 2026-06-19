@@ -64,7 +64,11 @@ export function MiniSidebarPlayer({
             className={`ap-ms-shell${className ? ` ${className}` : ""}`}
             style={{ ...buildThemeVars(theme), ...style }}
         >
-            <div className="ap-ms" role="region" aria-label="Mini player">
+            <div
+                className="ap-ms ap-glass-surface ap-glass-surface--compact"
+                role="region"
+                aria-label="Mini player"
+            >
                 <div
                     className={`ap-ms__art${isPlaying ? " ap-ms__art--playing" : ""}`}
                     style={

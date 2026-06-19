@@ -18,12 +18,21 @@
     height: 40px;
     flex-shrink: 0;
     border-radius: 12px;
-    border: 1px solid transparent;
+    border: 1px solid color-mix(in srgb, var(--ap-text, #fff) 16%, transparent);
     background-color: color-mix(in srgb, var(--ap-text, #fff) 8%, transparent);
     color: var(--ap-text, #fff);
     cursor: pointer;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 1px 3px rgba(0, 0, 0, 0.12);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
     transition: background-color 0.2s ease, border-color 0.2s ease,
-        color 0.2s ease, transform 0.1s ease;
+        color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
+}
+.ap-surface-btn:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--ap-text, #fff) 14%, transparent);
+}
+.ap-surface-btn:active:not(:disabled) {
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 .ap-surface-btn:disabled {
     opacity: 0.5;
@@ -33,6 +42,9 @@
     background-color: color-mix(in srgb, var(--ap-accent) 22%, transparent);
     border-color: var(--ap-accent);
     color: var(--ap-accent);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.25),
+        0 2px 8px -2px color-mix(in srgb, var(--ap-accent) 50%, transparent);
 }
 
 /* ----------------------------- SEICanvas host ----------------------------- */

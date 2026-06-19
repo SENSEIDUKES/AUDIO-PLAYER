@@ -70,11 +70,8 @@
     container: ap-fc / inline-size;
     padding: 24px;
     border-radius: 16px;
-    background-color: var(--ap-bg);
-    -webkit-backdrop-filter: blur(20px);
-    backdrop-filter: blur(20px);
-    box-shadow: inset 0 0.5px 0.5px rgba(255, 255, 255, 0.1),
-        0 1px 4px rgba(0, 0, 0, 0.08);
+    /* Surface visuals (fill, blur, border, shadow) come from `.ap-glass-surface`
+       on this same element — see audio-player.css. */
     color: var(--ap-text);
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     display: flex;
@@ -487,7 +484,9 @@
     width: 100%;
     padding: 10px 12px;
     border-radius: 12px;
-    background-color: var(--ap-bg);
+    /* Surface visuals (fill, blur, border, shadow) come from `.ap-glass-surface`
+       on the root element — bright/saturated --ap-bg colors stay legible
+       through a frosted scrim instead of being painted on flat. */
     color: var(--ap-text);
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
@@ -529,6 +528,9 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    /* Keeps the title readable over very bright/saturated surface colors,
+       independent of the chosen --ap-text value. */
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 .ap-ms__artist {
     font-size: 12px;
@@ -536,6 +538,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 .ap-ms__play {
     /* Anchor for the coarse-pointer hit-area pseudo-element. */
