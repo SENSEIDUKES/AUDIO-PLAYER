@@ -15,8 +15,12 @@ export const ActivityLogContext = createContext<ActivityLogApi | null>(null)
  * Read the Activity Log from context. Throws if used outside an
  * ActivityLogProvider.
  */
+export function useOptionalActivityLog(): ActivityLogApi | null {
+    return useContext(ActivityLogContext)
+}
+
 export function useActivityLog(): ActivityLogApi {
-    const ctx = useContext(ActivityLogContext)
+    const ctx = useOptionalActivityLog()
     if (!ctx) {
         throw new Error(
             "useActivityLog must be used within an <ActivityLogProvider>"

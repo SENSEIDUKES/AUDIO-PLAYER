@@ -9,8 +9,14 @@
 
 import { useCallback, useMemo, useRef, useState, useEffect } from "react"
 import type { ChangeEvent } from "react"
-import { useActivityLog } from "./useActivityLog"
-import type { ActivityArea, ActivityEvent, ActivityStatus } from "./activityTypes"
+import { useOptionalActivityLog } from "./useActivityLog"
+import { createActivityLogStore } from "./activityLogStore"
+import type {
+    ActivityArea,
+    ActivityEvent,
+    ActivityLogApi,
+    ActivityStatus,
+} from "./activityTypes"
 import { CheckIcon } from "../skins/icons"
 import "./activity-log.css"
 
@@ -48,12 +54,33 @@ const STATUS_CLASS: Record<ActivityStatus, string> = {
     success: "al-event--success",
 }
 
+const VALID_AREAS = new Set<ActivityArea>(
+    Object.keys(AREA_LABELS) as ActivityArea[]
+)
+const VALID_STATUSES = new Set<ActivityStatus>(
+    Object.keys(STATUS_CLASS) as ActivityStatus[]
+)
+
+type SafeActivityEvent = ActivityEvent & {
+    area: ActivityArea
+    status: ActivityStatus
+    message: string
+    error?: string
+}
+
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
 export function ActivityLogPanel() {
-    const log = useActivityLog()
+    const contextLog = useOptionalActivityLog()
+    const fallbackLogRef = useRef<ActivityLogApi | null>(null)
+
+    if (!fallbackLogRef.current) {
+        fallbackLogRef.current = createActivityLogStore()
+    }
+
+    const log = contextLog ?? fallbackLogRef.current
     const listRef = useRef<HTMLDivElement>(null)
     const [filters, setFilters] = useState<Filters>({
         status: "all",
@@ -69,7 +96,7 @@ export function ActivityLogPanel() {
 
     // Filtered events, newest first (the store already presents them newest first).
     const filtered = useMemo(() => {
-        let result = log.events as readonly ActivityEvent[]
+        let result = getSafeEvents(log.events)
 
         if (filters.status !== "all") {
             result = result.filter((e) => e.status === filters.status)
@@ -270,7 +297,7 @@ export function ActivityLogPanel() {
 /*  Single event row                                                   */
 /* ------------------------------------------------------------------ */
 
-function ActivityEventRow({ event }: { event: ActivityEvent }) {
+function ActivityEventRow({ event }: { event: SafeActivityEvent }) {
     const [expanded, setExpanded] = useState(false)
 
     const time = formatEventTime(event.timestamp)
@@ -351,6 +378,46 @@ function ActivityEventRow({ event }: { event: ActivityEvent }) {
 /*  Helpers                                                             */
 /* ------------------------------------------------------------------ */
 
+function getSafeEvents(events: readonly unknown[]): SafeActivityEvent[] {
+    if (!Array.isArray(events)) return []
+
+    return events
+        .map(toSafeEvent)
+        .filter((event): event is SafeActivityEvent => event != null)
+}
+
+function toSafeEvent(event: unknown): SafeActivityEvent | null {
+    if (event == null || typeof event !== "object") return null
+
+    const candidate = event as Partial<ActivityEvent>
+    const area = VALID_AREAS.has(candidate.area as ActivityArea)
+        ? (candidate.area as ActivityArea)
+        : "system"
+    const status = VALID_STATUSES.has(candidate.status as ActivityStatus)
+        ? (candidate.status as ActivityStatus)
+        : "warn"
+    const message = String(candidate.message ?? "Malformed activity event")
+    const timestamp =
+        typeof candidate.timestamp === "number" &&
+        Number.isFinite(candidate.timestamp)
+            ? candidate.timestamp
+            : Date.now()
+    const id =
+        typeof candidate.id === "number" && Number.isFinite(candidate.id)
+            ? candidate.id
+            : timestamp
+
+    return {
+        ...candidate,
+        id,
+        timestamp,
+        area,
+        status,
+        message,
+        error: candidate.error == null ? undefined : String(candidate.error),
+    }
+}
+
 function formatEventTime(ts: number): string {
     const d = new Date(ts)
     return (
@@ -366,7 +433,7 @@ function pad2(n: number): string {
     return n < 10 ? "0" + n : String(n)
 }
 
-function formatDetails(details: Record<string, unknown>): string {
+function formatDetails(details: unknown): string {
     try {
         return JSON.stringify(details, null, 2)
     } catch {

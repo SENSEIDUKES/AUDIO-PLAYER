@@ -21,7 +21,7 @@
 
 import { useEffect, useRef } from "react"
 import type { AudioPlayerEngine, RepeatMode, Track } from "../types"
-import { useActivityLog } from "./useActivityLog"
+import { useOptionalActivityLog } from "./useActivityLog"
 
 export interface UseActivityLogRecordingOptions {
     engine: AudioPlayerEngine
@@ -34,9 +34,7 @@ export interface UseActivityLogRecordingOptions {
 
 /**
  * Automatically records common lifecycle events to the activity log. Safe to
- * call from any component; does nothing if no ActivityLogProvider is mounted
- * (useActivityLog throws, but the error boundary catches it at the provider
- * level).
+ * call from any component; does nothing if no ActivityLogProvider is mounted.
  *
  * Designed for use inside AudioSessionProvider or a skin component.
  */
@@ -47,7 +45,7 @@ export function useActivityLogRecording({
     shuffle,
     trackLabel,
 }: UseActivityLogRecordingOptions): void {
-    const log = useActivityLog()
+    const log = useOptionalActivityLog()
 
     // Track identities for change detection
     const prevPlayingRef = useRef(engine.isPlaying)
@@ -57,6 +55,8 @@ export function useActivityLogRecording({
 
     // Play/pause transitions
     useEffect(() => {
+        if (!log) return
+
         const prev = prevPlayingRef.current
         if (prev === engine.isPlaying) return
         prevPlayingRef.current = engine.isPlaying
@@ -86,7 +86,7 @@ export function useActivityLogRecording({
 
     // Track changes
     useEffect(() => {
-        if (!currentTrack) return
+        if (!log || !currentTrack) return
         const key = currentTrack.id ?? `${currentTrack.title}:${currentTrack.artist}`
         if (prevTrackKeyRef.current === key) return
         prevTrackKeyRef.current = key
@@ -105,7 +105,7 @@ export function useActivityLogRecording({
 
     // Errors
     useEffect(() => {
-        if (!engine.hasError) return
+        if (!log || !engine.hasError) return
         log.record({
             area: "playback",
             status: "error",
@@ -121,6 +121,8 @@ export function useActivityLogRecording({
 
     // Volume changes above 5% threshold
     useEffect(() => {
+        if (!log) return
+
         const prevVol = prevVolumeRef.current
         const prevMuted = prevMutedRef.current
         prevVolumeRef.current = engine.volume
@@ -155,6 +157,8 @@ export function useActivityLogRecording({
     const prevShuffleRef = useRef(shuffle)
 
     useEffect(() => {
+        if (!log) return
+
         if (prevRepeatRef.current !== repeatMode) {
             prevRepeatRef.current = repeatMode
             log.record({
@@ -166,6 +170,8 @@ export function useActivityLogRecording({
     }, [repeatMode, log])
 
     useEffect(() => {
+        if (!log) return
+
         if (prevShuffleRef.current !== shuffle) {
             prevShuffleRef.current = shuffle
             log.record({

@@ -9,10 +9,12 @@
  */
 
 import type {
+    ActivityArea,
     ActivityEvent,
     ActivityLogApi,
     ActivityLogConfig,
     ActivityLogEntry,
+    ActivityStatus,
 } from "./activityTypes"
 import { DEFAULT_ACTIVITY_LOG_CONFIG } from "./activityTypes"
 
@@ -29,15 +31,16 @@ export function createActivityLogStore(
      *  caller ever has to worry about a bad entry crashing playback. */
     function record(entry: ActivityLogEntry): void {
         try {
+            const safeEntry = normalizeEntry(entry)
             const event: ActivityEvent = {
                 id: nextId++,
                 timestamp: Date.now(),
-                area: entry.area,
-                status: entry.status,
-                message: String(entry.message ?? ""),
+                area: safeEntry.area,
+                status: safeEntry.status,
+                message: safeEntry.message,
             }
-            if (entry.details != null) event.details = entry.details
-            if (entry.error != null) event.error = String(entry.error)
+            if (safeEntry.details != null) event.details = safeEntry.details
+            if (safeEntry.error != null) event.error = safeEntry.error
 
             buffer.push(event)
 
@@ -111,6 +114,41 @@ function formatTimestamp(ts: number): string {
         "." +
         String(d.getMilliseconds()).padStart(3, "0")
     )
+}
+
+const VALID_AREAS = new Set<ActivityArea>([
+    "plugin",
+    "player",
+    "canvas",
+    "agent",
+    "playback",
+    "session",
+    "system",
+])
+
+const VALID_STATUSES = new Set<ActivityStatus>([
+    "info",
+    "warn",
+    "error",
+    "success",
+])
+
+function normalizeEntry(entry: ActivityLogEntry): ActivityLogEntry {
+    const candidate =
+        entry != null && typeof entry === "object"
+            ? (entry as Partial<ActivityLogEntry>)
+            : {}
+    return {
+        area: VALID_AREAS.has(candidate.area as ActivityArea)
+            ? (candidate.area as ActivityArea)
+            : "system",
+        status: VALID_STATUSES.has(candidate.status as ActivityStatus)
+            ? (candidate.status as ActivityStatus)
+            : "warn",
+        message: String(candidate.message ?? "Malformed activity event"),
+        details: candidate.details,
+        error: candidate.error == null ? undefined : String(candidate.error),
+    }
 }
 
 const STATUS_PAD = 5 // "error".length
