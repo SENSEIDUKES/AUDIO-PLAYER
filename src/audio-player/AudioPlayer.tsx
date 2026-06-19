@@ -576,11 +576,15 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
         currentTrack.artwork ??
         backgroundMedia?.src ??
         backgroundImage?.src
+    const artwork = useMemo(
+        () => (artworkSrc ? buildMediaSessionArtwork(artworkSrc) : []),
+        [artworkSrc],
+    )
     useMediaSessionObserver(s, {
         title: currentTrack.title,
         artist: currentTrack.artist,
         album: currentTrack.albumTitle ?? "",
-        artwork: artworkSrc ? buildMediaSessionArtwork(artworkSrc) : [],
+        artwork,
         onNext: canNextTrack ? s.next : undefined,
         onPrevious: canPreviousTrack ? s.previous : undefined,
         sourceKey,

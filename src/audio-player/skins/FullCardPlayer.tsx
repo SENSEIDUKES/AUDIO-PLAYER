@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react"
+import { useState, useCallback, useMemo } from "react"
 import type { CSSProperties } from "react"
 import type { AudioPlayerTheme, BackgroundImage, MediaSource } from "../types"
 import { useAudioSession } from "../session/AudioSessionContext"
@@ -174,6 +174,14 @@ export function FullCardPlayer({
         backgroundMedia?.src ??
         backgroundImage?.src
 
+    const artwork = useMemo(
+        () =>
+            mediaSessionArtworkSrc
+                ? buildMediaSessionArtwork(mediaSessionArtworkSrc)
+                : [],
+        [mediaSessionArtworkSrc],
+    )
+
     // Lock-screen / OS media controls. FullCardPlayer is the designated session
     // owner of the autoplay prompt, so it also owns the Media Session wiring to
     // avoid multiple session-based skins registering competing handlers.
@@ -181,9 +189,7 @@ export function FullCardPlayer({
         title: currentTrack?.title ?? "",
         artist: currentTrack?.artist ?? "",
         album: currentTrack?.albumTitle ?? "",
-        artwork: mediaSessionArtworkSrc
-            ? buildMediaSessionArtwork(mediaSessionArtworkSrc)
-            : [],
+        artwork,
         sourceKey: currentTrack
             ? `${currentIndex}:${trackKey(currentTrack)}:${trackSourcesSignature(currentTrack)}`
             : "empty",
