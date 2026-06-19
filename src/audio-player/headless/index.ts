@@ -4,7 +4,11 @@ export {
 } from "./composeEventHandlers"
 export { mergeRefs } from "./mergeRefs"
 export { useSAPPropGetters, isSessionEngine } from "./useSAPPropGetters"
-export { useMediaSessionObserver } from "./useMediaSessionObserver"
+export {
+    useMediaSessionObserver,
+    buildMediaSessionArtwork,
+    extractUrlFromCss,
+} from "./useMediaSessionObserver"
 
 export type {
     SAPButtonProps,

@@ -12,7 +12,11 @@ import { formatTime } from "../utils/formatTime"
 import { defaultShowVolume } from "../utils/device"
 import { trackKey } from "../utils/trackKey"
 import { trackSourcesSignature } from "../utils/sources"
-import { useMediaSessionObserver } from "../headless/useMediaSessionObserver"
+import {
+    useMediaSessionObserver,
+    buildMediaSessionArtwork,
+    extractUrlFromCss,
+} from "../headless/useMediaSessionObserver"
 import { buildThemeVars } from "./themeVars"
 import { usePlayerSurface } from "../surfaces/usePlayerSurface"
 import { PlayerHero } from "../surfaces/PlayerHero"
@@ -157,12 +161,29 @@ export function FullCardPlayer({
     // pause/ended), so the spinner can render straight from it.
     const showPlaySpinner = isBuffering
 
+    // Media Session artwork source priority:
+    //   1. Per-track artwork from Track.artwork
+    //   2. artMedia (hero art) prop
+    //   3. Legacy art CSS value
+    //   4. backgroundMedia (full-bleed backdrop)
+    //   5. Legacy backgroundImage
+    const mediaSessionArtworkSrc =
+        currentTrack?.artwork ??
+        artMedia?.src ??
+        (art ? extractUrlFromCss(art) : null) ??
+        backgroundMedia?.src ??
+        backgroundImage?.src
+
     // Lock-screen / OS media controls. FullCardPlayer is the designated session
     // owner of the autoplay prompt, so it also owns the Media Session wiring to
     // avoid multiple session-based skins registering competing handlers.
     useMediaSessionObserver(s, {
         title: currentTrack?.title ?? "",
         artist: currentTrack?.artist ?? "",
+        album: currentTrack?.albumTitle ?? "",
+        artwork: mediaSessionArtworkSrc
+            ? buildMediaSessionArtwork(mediaSessionArtworkSrc)
+            : [],
         sourceKey: currentTrack
             ? `${currentIndex}:${trackKey(currentTrack)}:${trackSourcesSignature(currentTrack)}`
             : "empty",

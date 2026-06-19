@@ -18,7 +18,10 @@ import {
     AudioSessionProvider,
     useAudioSession,
 } from "./session/AudioSessionContext"
-import { useMediaSessionObserver } from "./headless/useMediaSessionObserver"
+import {
+    useMediaSessionObserver,
+    buildMediaSessionArtwork,
+} from "./headless/useMediaSessionObserver"
 import { WaveformAdapter } from "./components/WaveformAdapter"
 import { BackgroundMedia, resolveMedia } from "./components/BackgroundMedia"
 import { ScrubberCanvasHost } from "./surfaces/ScrubberCanvasHost"
@@ -567,15 +570,17 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
     }, [hasAudio])
 
     // ── Media Session API (progressive enhancement) ──
-    // Standalone skins own their own Media Session wiring (same as
-    // FullCardPlayer); the session provider does not register it.
+    // Artwork priority: track-level artwork > backgroundMedia > backgroundImage.
+    // Album info comes from the track when available.
+    const artworkSrc =
+        currentTrack.artwork ??
+        backgroundMedia?.src ??
+        backgroundImage?.src
     useMediaSessionObserver(s, {
         title: currentTrack.title,
         artist: currentTrack.artist,
-        album: "",
-        artwork: backgroundImage?.src
-            ? [{ src: backgroundImage.src, sizes: "512x512", type: "image/jpeg" }]
-            : [],
+        album: currentTrack.albumTitle ?? "",
+        artwork: artworkSrc ? buildMediaSessionArtwork(artworkSrc) : [],
         onNext: canNextTrack ? s.next : undefined,
         onPrevious: canPreviousTrack ? s.previous : undefined,
         sourceKey,
