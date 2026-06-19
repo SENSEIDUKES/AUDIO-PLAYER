@@ -93,6 +93,12 @@ export {
     gradient,
 } from "./utils/colorExtraction"
 export { ProgressBar } from "./components/ProgressBar"
+export { BackgroundMedia, ensureMuted, resolveMedia } from "./components/BackgroundMedia"
+export type {
+    BackgroundMediaProps,
+    ResolveMediaInput,
+    ResolvedMedia,
+} from "./components/BackgroundMedia"
 export { VolumeControl } from "./components/VolumeControl"
 export { WaveformProgress } from "./components/WaveformProgress"
 export { WaveformAdapter } from "./components/WaveformAdapter"
@@ -400,6 +406,28 @@ export type {
     PluginMenuSurface,
     PluginSurfaceDefinition,
 } from "./plugins/surfaces"
+// Shared property model: the single registry of editable properties (group,
+// control, default, per-face applicability) consumed by faces and the panel.
+export {
+    PROPERTY_REGISTRY,
+    PROPERTY_GROUPS,
+    PROPERTY_GROUP_LABELS,
+    MAJOR_FACES,
+    getPropertiesForFace,
+    getPropertiesForGroup,
+    getPropertyDefaults,
+    getByPropPath,
+    setByPropPath,
+} from "./properties"
+export type {
+    PropertyGroup,
+    PropertyControl,
+    PropertyDescriptor,
+    MediaKind,
+    MediaSource,
+    SelectOption,
+} from "./properties"
+
 export type { TransitionPlan } from "./automix/transitionPlanner"
 export type {
     Track,

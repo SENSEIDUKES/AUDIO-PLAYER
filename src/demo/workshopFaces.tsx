@@ -10,10 +10,13 @@ import {
 import type {
     AudioPlayerPlugin,
     AudioPlayerTheme,
+    MediaSource,
+    PlayerFace,
     RepeatMode,
     Track,
 } from "../audio-player"
-import { OG_DEFAULTS, NO_LUCK_COVER, NO_LUCK_ART, SEA_THEME } from "./data"
+import { getPropertyDefaults } from "../audio-player"
+import { NO_LUCK_COVER, NO_LUCK_ART } from "./data"
 
 export type WorkshopFaceId =
     | "audio-player"
@@ -37,6 +40,8 @@ export type WorkshopControlGroup =
 export interface WorkshopSettings {
     theme: Required<Omit<AudioPlayerTheme, "glowColor">>
     backgroundImageSrc: string
+    /** Unified background media (image/video). Supersedes backgroundImageSrc. */
+    backgroundMedia: MediaSource | null
     blurSize: number
     darkenAmount: number
     titleFont: CSSProperties
@@ -49,16 +54,22 @@ export interface WorkshopSettings {
     showWaveform: boolean
     /** CSS background-image value (url(...) or gradient) for skin art props. */
     art: string
+    /** Unified artwork media (image/video). Supersedes `art`. */
+    artMedia: MediaSource | null
 }
 
 export interface WorkshopFaceDefinition {
     id: WorkshopFaceId
     label: string
     description: string
+    /** The library `PlayerFace` this workshop face maps to — used to look up the
+        shared property registry that drives the panel. */
+    playerFace: PlayerFace
     /** Session faces render inside an AudioSessionProvider in the preview
         shell, which also receives the active plugins. */
     sessionBased: boolean
-    /** Which control-panel groups apply to this face. */
+    /** @deprecated Superseded by the shared property registry (per-property
+        `faces`). Retained so older code/presets keep type-checking. */
     controls: readonly WorkshopControlGroup[]
     /** Render the live preview. `plugins` is only consumed by the standalone
         AudioPlayer face — session faces get plugins via the provider. */
@@ -70,20 +81,37 @@ export interface WorkshopFaceDefinition {
 }
 
 export function defaultWorkshopSettings(): WorkshopSettings {
+    // Seed editor defaults from the shared registry so they always track the
+    // library. Demo-specific media (the No Luck cover/art) layer on top.
+    const d = getPropertyDefaults() as {
+        theme: WorkshopSettings["theme"]
+        blurSize: number
+        darkenAmount: number
+        titleFont: CSSProperties
+        artistFont: CSSProperties
+        autoPlay: boolean
+        shuffle: boolean
+        repeatMode: RepeatMode
+        showTracklist: boolean
+        showVolume: boolean
+        showWaveform: boolean
+    }
     return {
-        theme: { ...SEA_THEME },
+        theme: { ...d.theme },
         backgroundImageSrc: NO_LUCK_COVER,
-        blurSize: OG_DEFAULTS.blurSize ?? 20,
-        darkenAmount: OG_DEFAULTS.darkenAmount ?? 45,
-        titleFont: { ...(OG_DEFAULTS.titleFont as CSSProperties) },
-        artistFont: { ...(OG_DEFAULTS.artistFont as CSSProperties) },
-        autoPlay: false,
-        shuffle: false,
-        repeatMode: "off",
-        showTracklist: true,
-        showVolume: true,
-        showWaveform: false,
+        backgroundMedia: null,
+        blurSize: d.blurSize,
+        darkenAmount: d.darkenAmount,
+        titleFont: { ...d.titleFont },
+        artistFont: { ...d.artistFont },
+        autoPlay: d.autoPlay,
+        shuffle: d.shuffle,
+        repeatMode: d.repeatMode,
+        showTracklist: d.showTracklist,
+        showVolume: d.showVolume,
+        showWaveform: d.showWaveform,
         art: NO_LUCK_ART,
+        artMedia: null,
     }
 }
 
@@ -93,6 +121,7 @@ export const WORKSHOP_FACES: readonly WorkshopFaceDefinition[] = [
         label: "Main AudioPlayer",
         description:
             "The full release player — playlist, lyrics, background art, waveform, and every theme prop.",
+        playerFace: "portable",
         sessionBased: false,
         controls: ["theme", "background", "typography", "behavior", "display"],
         render: ({ settings, tracks, plugins }) => (
@@ -101,6 +130,7 @@ export const WORKSHOP_FACES: readonly WorkshopFaceDefinition[] = [
                 plugins={plugins}
                 {...settings.theme}
                 backgroundImage={{ src: settings.backgroundImageSrc }}
+                backgroundMedia={settings.backgroundMedia}
                 blurSize={settings.blurSize}
                 darkenAmount={settings.darkenAmount}
                 titleFont={settings.titleFont}
@@ -119,10 +149,20 @@ export const WORKSHOP_FACES: readonly WorkshopFaceDefinition[] = [
         label: "FullCardPlayer",
         description:
             "Rich now-playing card with core transport, progress, volume, and the SAP controller behind “…”.",
+        playerFace: "fullCard",
         sessionBased: true,
         controls: ["theme", "display"],
         render: ({ settings }) => (
-            <FullCardPlayer showVolume={settings.showVolume} {...settings.theme} />
+            <FullCardPlayer
+                showVolume={settings.showVolume}
+                backgroundMedia={settings.backgroundMedia}
+                blurSize={settings.blurSize}
+                darkenAmount={settings.darkenAmount}
+                artMedia={settings.artMedia}
+                titleFont={settings.titleFont}
+                artistFont={settings.artistFont}
+                {...settings.theme}
+            />
         ),
     },
     {
@@ -130,6 +170,7 @@ export const WORKSHOP_FACES: readonly WorkshopFaceDefinition[] = [
         label: "StickyBottomPlayer",
         description:
             "Persistent playback bar. Pinned to the viewport in production; previewed inline here.",
+        playerFace: "stickyBottom",
         sessionBased: true,
         controls: ["theme", "display"],
         render: ({ settings }) => (
@@ -144,10 +185,15 @@ export const WORKSHOP_FACES: readonly WorkshopFaceDefinition[] = [
         id: "mini-sidebar",
         label: "MiniSidebarPlayer",
         description: "Condensed sidebar widget: art block, track meta, play/next.",
+        playerFace: "miniSidebar",
         sessionBased: true,
         controls: ["theme", "art"],
         render: ({ settings }) => (
-            <MiniSidebarPlayer art={settings.art} {...settings.theme} />
+            <MiniSidebarPlayer
+                art={settings.art}
+                artMedia={settings.artMedia}
+                {...settings.theme}
+            />
         ),
     },
     {
@@ -155,6 +201,7 @@ export const WORKSHOP_FACES: readonly WorkshopFaceDefinition[] = [
         label: "VaultRowPlayer",
         description:
             "Slim Vault list rows — pressing play in any row drives the shared session.",
+        playerFace: "vaultRow",
         sessionBased: true,
         controls: ["theme"],
         render: ({ settings, tracks }) => (
@@ -175,6 +222,7 @@ export const WORKSHOP_FACES: readonly WorkshopFaceDefinition[] = [
         label: "SeaCardPlayer",
         description:
             "Embeddable SEA marketplace cards with overlaid play buttons.",
+        playerFace: "seaCard",
         sessionBased: true,
         controls: ["theme", "art"],
         render: ({ settings, tracks }) => (
@@ -184,7 +232,10 @@ export const WORKSHOP_FACES: readonly WorkshopFaceDefinition[] = [
                         key={t.id ?? t.title}
                         track={t}
                         art={settings.art}
+                        artMedia={settings.artMedia}
                         tag="SEA"
+                        titleFont={settings.titleFont}
+                        artistFont={settings.artistFont}
                         {...settings.theme}
                     />
                 ))}

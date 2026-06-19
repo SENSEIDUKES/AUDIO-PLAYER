@@ -20,6 +20,7 @@ import {
 } from "./session/AudioSessionContext"
 import { useMediaSessionObserver } from "./headless/useMediaSessionObserver"
 import { WaveformAdapter } from "./components/WaveformAdapter"
+import { BackgroundMedia, resolveMedia } from "./components/BackgroundMedia"
 import { ScrubberCanvasHost } from "./surfaces/ScrubberCanvasHost"
 import { getScrubberDensity } from "./surfaces/faceCapabilities"
 import { usePlayerSurface } from "./surfaces/usePlayerSurface"
@@ -303,6 +304,7 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
         lyrics = "",
         autoPlay = false,
         backgroundImage,
+        backgroundMedia,
         blurSize = 20,
         darkenAmount = 0,
         showTracklist = false,
@@ -696,20 +698,10 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
                 {announcement}
             </div>
 
-            {backgroundImage?.src && (
-                <div
-                    className="ap-bg-image"
-                    style={{ backgroundImage: `url("${backgroundImage.src}")` }}
-                    aria-hidden="true"
-                />
-            )}
-            {backgroundImage?.src && darkenAmount > 0 && (
-                <div
-                    className="ap-bg-darken"
-                    style={{ backgroundColor: `rgba(0,0,0,${darkenAmount / 100})` }}
-                    aria-hidden="true"
-                />
-            )}
+            <BackgroundMedia
+                {...resolveMedia({ media: backgroundMedia, legacyImage: backgroundImage })}
+                darkenAmount={darkenAmount}
+            />
 
             <div className="ap-content">
                 {!hasAudio && (

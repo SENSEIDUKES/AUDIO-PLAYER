@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react"
 import type { AudioPlayerPlugin } from "./core/plugins/PluginInterface"
+import type { MediaSource } from "./properties/propertyTypes"
 import type {
     AudioBackendErrorCode,
     AudioBackendInfo,
@@ -126,6 +127,10 @@ export interface BackgroundImage {
     alt?: string
 }
 
+// Re-export the unified media descriptor so consumers can import it from the
+// same module as the other player types.
+export type { MediaSource, MediaKind } from "./properties/propertyTypes"
+
 export interface AudioPlayerProps extends AudioPlayerTheme {
     /** Playlist. When non-empty, the player runs in playlist mode. */
     tracks?: Track[]
@@ -167,6 +172,12 @@ export interface AudioPlayerProps extends AudioPlayerTheme {
 
     /** Presentation. */
     backgroundImage?: BackgroundImage
+    /**
+     * Unified background media (image or video). Supersedes `backgroundImage`
+     * when set; falls back to it otherwise. Video renders muted/looping behind
+     * the player — the audio engine remains the sole source of sound.
+     */
+    backgroundMedia?: MediaSource | null
     /** Backdrop/background-image blur in px. */
     blurSize?: number
     /** Darken overlay over the background image, 0–100. */
@@ -351,7 +362,7 @@ export interface SpatialAudioOptions {
     /** 3D position [x, y, z] for the audio source. */
     pos?: [number, number, number]
 
-    /** Orientation vector [x, y, z] � direction the sound is pointing. */
+    /** Orientation vector [x, y, z] � direction the sound is pointing. */
     orientation?: [number, number, number]
 
     /** Playback rate (pitch) from 0.5 to 4.0. */

@@ -1,9 +1,10 @@
 import { useState, useCallback } from "react"
 import type { CSSProperties } from "react"
-import type { AudioPlayerTheme } from "../types"
+import type { AudioPlayerTheme, BackgroundImage, MediaSource } from "../types"
 import { useAudioSession } from "../session/AudioSessionContext"
 import { QueueDrawer } from "../components/QueueDrawer"
 import { WaveformAdapter } from "../components/WaveformAdapter"
+import { BackgroundMedia, ensureMuted, resolveMedia } from "../components/BackgroundMedia"
 import { VolumeControl } from "../components/VolumeControl"
 import { SAPController } from "../components/SAPController"
 import { useShareTrack } from "../components/useShareTrack"
@@ -45,6 +46,26 @@ export interface FullCardPlayerProps extends AudioPlayerTheme {
      * boolean to override the per-device default.
      */
     showVolume?: boolean
+    /**
+     * Optional full-bleed background media (image or video) behind the card.
+     * Off by default — the card looks unchanged unless this (or `backgroundImage`)
+     * is set. Video renders muted/looping; the engine owns audio.
+     */
+    backgroundMedia?: MediaSource | null
+    /** Legacy background image. Superseded by `backgroundMedia` when both set. */
+    backgroundImage?: BackgroundImage
+    /** Background blur in px (applied to the backdrop). Default 20. */
+    blurSize?: number
+    /** Darken overlay over the backdrop, 0–100. Default 0. */
+    darkenAmount?: number
+    /** Optional artwork media shown in the collapsed hero identity block. */
+    artMedia?: MediaSource | null
+    /** Legacy CSS background-image string for the hero art (url/gradient). */
+    art?: string
+    /** Inline typography for the title line. */
+    titleFont?: CSSProperties
+    /** Inline typography for the artist line. */
+    artistFont?: CSSProperties
     className?: string
     style?: CSSProperties
 }
@@ -66,6 +87,14 @@ export interface FullCardPlayerProps extends AudioPlayerTheme {
  */
 export function FullCardPlayer({
     showVolume = defaultShowVolume(),
+    backgroundMedia,
+    backgroundImage,
+    blurSize = 20,
+    darkenAmount = 0,
+    artMedia,
+    art,
+    titleFont,
+    artistFont,
     className,
     style,
     ...theme
@@ -100,6 +129,29 @@ export function FullCardPlayer({
     } = s
 
     const themeVars = buildThemeVars(theme)
+    const backdrop = resolveMedia({ media: backgroundMedia, legacyImage: backgroundImage })
+    const heroArt = resolveMedia({ media: artMedia, legacyCss: art })
+    // Small self-contained art node for the collapsed hero (fills its 36px box).
+    const heroArtNode =
+        heroArt.media?.kind === "video" ? (
+            <video
+                className="ap-fc__hero-art"
+                src={heroArt.media.src}
+                poster={heroArt.media.poster}
+                ref={ensureMuted}
+                muted
+                autoPlay
+                loop
+                playsInline
+                aria-hidden="true"
+            />
+        ) : heroArt.cssBackground ? (
+            <div
+                className="ap-fc__hero-art"
+                style={{ backgroundImage: heroArt.cssBackground }}
+                aria-hidden="true"
+            />
+        ) : undefined
     const isEmpty = queue.length === 0
     // Engine gates `isBuffering` to active/pending playback (and clears it on
     // pause/ended), so the spinner can render straight from it.
@@ -154,10 +206,20 @@ export function FullCardPlayer({
         <VisualSlotsProvider>
         <div
             className={`ap-fc${className ? ` ${className}` : ""}`}
-            style={{ ...themeVars, ...style }}
+            style={{ ...themeVars, "--ap-blur": `${blurSize}px`, ...style } as CSSProperties}
             role="region"
             aria-label="Now playing"
         >
+            {/* Optional full-bleed backdrop (image/video). Renders nothing unless
+                backgroundMedia/backgroundImage is set; content is lifted above it
+                via the `.ap-fc > *` z-index rule in skins.css. */}
+            <BackgroundMedia
+                media={backdrop.media}
+                cssBackground={backdrop.cssBackground}
+                darkenAmount={darkenAmount}
+                className="ap-fc__bg"
+            />
+
             {/* Queue drawer (Up Next) — reads session queue directly */}
             <QueueDrawer
                 queue={queue}
@@ -277,6 +339,7 @@ export function FullCardPlayer({
                     collapsed={surface.isHeroCollapsed}
                     title={currentTrack?.title ?? "Nothing playing"}
                     artist={currentTrack?.artist ?? "—"}
+                    art={heroArtNode}
                     album={currentTrack?.albumTitle}
                     featuredArtists={currentTrack?.featuredArtists}
                     versionLabel={currentTrack?.versionLabel}
@@ -284,6 +347,8 @@ export function FullCardPlayer({
                     releaseTitle={currentTrack?.releaseTitle}
                     subtitle={currentTrack?.subtitle}
                     marquee
+                    titleFont={titleFont}
+                    artistFont={artistFont}
                 />
 
                 {/* Main visual surface region. Hidden by default; the left surface

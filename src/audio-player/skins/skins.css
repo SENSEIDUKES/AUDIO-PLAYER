@@ -86,6 +86,29 @@
 .ap-fc *::after {
     box-sizing: border-box;
 }
+/* Optional full-bleed backdrop (image/video). The layers sit at z-index 0 with
+   the card's radius; the visible card content is lifted above them. We lift only
+   the known content blocks — not QueueDrawer/SAPController, which are their own
+   positioned overlays. */
+.ap-fc__bg {
+    border-radius: 16px;
+}
+.ap-fc__counter,
+.ap-fc__stage,
+.ap-fc__control-dock,
+.ap-fc > .ap-banner {
+    position: relative;
+    z-index: 1;
+}
+/* Collapsed-hero artwork fills the 36px hero art box. */
+.ap-fc__hero-art {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
 /* "…" trigger pinned to the card's top-right corner; the counter and title
    below pad around it so text never slides underneath. */
 .ap-fc__menu {
@@ -419,6 +442,8 @@
     box-sizing: border-box;
 }
 .ap-ms__art {
+    position: relative;
+    overflow: hidden;
     width: 44px;
     height: 44px;
     border-radius: 8px;
@@ -427,6 +452,11 @@
     background-position: center;
     background-repeat: no-repeat;
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+/* Video artwork layers fill the square art blocks (mini + sea). */
+.ap-ms__bg,
+.ap-sea__bg {
+    border-radius: inherit;
 }
 .ap-ms__art--playing {
     animation: ap-pulse 3s ease-in-out infinite;

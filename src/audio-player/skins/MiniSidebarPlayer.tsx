@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react"
-import type { AudioPlayerTheme } from "../types"
+import type { AudioPlayerTheme, MediaSource } from "../types"
 import { useAudioSession } from "../session/AudioSessionContext"
+import { BackgroundMedia, resolveMedia } from "../components/BackgroundMedia"
 import { buildThemeVars } from "./themeVars"
 import { PauseIcon, PlayIcon, SpinnerIcon } from "./icons"
 import { usePlayerSurface } from "../surfaces/usePlayerSurface"
@@ -17,6 +18,11 @@ export interface MiniSidebarPlayerProps extends AudioPlayerTheme {
     /** Optional CSS background image for the small art block (gradient or url).
         Applied as background-image so the cover/center sizing rules hold. */
     art?: string
+    /**
+     * Unified artwork media (image or video). Supersedes `art` when set; video
+     * renders muted/looping in the small art block.
+     */
+    artMedia?: MediaSource | null
     className?: string
     style?: CSSProperties
 }
@@ -38,12 +44,15 @@ export interface MiniSidebarPlayerProps extends AudioPlayerTheme {
  */
 export function MiniSidebarPlayer({
     art = "linear-gradient(135deg,#7C5CFF,#22D3A6)",
+    artMedia,
     className,
     style,
     ...theme
 }: MiniSidebarPlayerProps) {
     const s = useAudioSession()
     const surface = usePlayerSurface("miniSidebar")
+    // New media wins; gradient/url `art` remains the fallback.
+    const blockArt = resolveMedia({ media: artMedia, legacyCss: art })
     const { currentTrack, isPlaying, isBuffering, hasAudio } = s
     const msTitle = currentTrack
         ? formatVersionedTitle(currentTrack.title, currentTrack.versionLabel)
@@ -58,9 +67,17 @@ export function MiniSidebarPlayer({
             <div className="ap-ms" role="region" aria-label="Mini player">
                 <div
                     className={`ap-ms__art${isPlaying ? " ap-ms__art--playing" : ""}`}
-                    style={{ backgroundImage: art }}
+                    style={
+                        blockArt.cssBackground
+                            ? { backgroundImage: blockArt.cssBackground }
+                            : undefined
+                    }
                     aria-hidden="true"
-                />
+                >
+                    {blockArt.media && (
+                        <BackgroundMedia media={blockArt.media} className="ap-ms__bg" />
+                    )}
+                </div>
                 <div className="ap-ms__meta">
                     <span className="ap-ms__title" title={msTitle}>
                         {msTitle}

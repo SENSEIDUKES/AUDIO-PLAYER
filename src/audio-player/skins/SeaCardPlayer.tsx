@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react"
-import type { AudioPlayerTheme, Track } from "../types"
+import type { AudioPlayerTheme, MediaSource, Track } from "../types"
 import { useAudioSession } from "../session/AudioSessionContext"
+import { BackgroundMedia, resolveMedia } from "../components/BackgroundMedia"
 import { ProgressBar } from "../components/ProgressBar"
 import { WaveformAdapter } from "../components/WaveformAdapter"
 import { trackKey } from "../utils/trackKey"
@@ -24,8 +25,17 @@ export interface SeaCardPlayerProps extends AudioPlayerTheme {
     /** CSS background image for the card art (gradient or url). Applied as
         background-image so the cover/center sizing rules hold. */
     art?: string
+    /**
+     * Unified artwork media (image or video). Supersedes `art` when set; video
+     * renders muted/looping in the card art block.
+     */
+    artMedia?: MediaSource | null
     /** Optional price / tag chip. */
     tag?: string
+    /** Inline typography for the card title. */
+    titleFont?: CSSProperties
+    /** Inline typography for the card artist line. */
+    artistFont?: CSSProperties
     className?: string
     style?: CSSProperties
 }
@@ -52,7 +62,10 @@ function sameTrack(a: Track, b: Track): boolean {
 export function SeaCardPlayer({
     track,
     art = "linear-gradient(135deg,#FF7AC6,#7C5CFF)",
+    artMedia,
     tag,
+    titleFont,
+    artistFont,
     className,
     style,
     ...theme
@@ -74,6 +87,10 @@ export function SeaCardPlayer({
         else s.playNow(track)
     }
 
+    // New media wins; the gradient/url `art` string remains the fallback so
+    // existing callers render identically.
+    const cardArt = resolveMedia({ media: artMedia, legacyCss: art })
+
     return (
         <article
             className={`ap-sea${isActive ? " ap-sea--active" : ""}${className ? ` ${className}` : ""}`}
@@ -82,7 +99,17 @@ export function SeaCardPlayer({
             {/* No aria-hidden here: the container holds focusable controls (play +
                 wave trigger), which must stay in the accessibility tree. The art
                 itself is a decorative empty div with no accessible name. */}
-            <div className="ap-sea__art" style={{ backgroundImage: art }}>
+            <div
+                className="ap-sea__art"
+                style={
+                    cardArt.cssBackground
+                        ? { backgroundImage: cardArt.cssBackground }
+                        : undefined
+                }
+            >
+                {cardArt.media && (
+                    <BackgroundMedia media={cardArt.media} className="ap-sea__bg" />
+                )}
                 <button
                     type="button"
                     className="ap-btn ap-btn--play ap-sea__play ap-tap"
@@ -118,6 +145,7 @@ export function SeaCardPlayer({
                 <div
                     className="ap-sea__title"
                     title={formatVersionedTitle(track.title, track.versionLabel)}
+                    style={titleFont}
                 >
                     {formatVersionedTitle(track.title, track.versionLabel)}
                     {track.explicit && <ExplicitBadge />}
@@ -125,6 +153,7 @@ export function SeaCardPlayer({
                 <div
                     className="ap-sea__artist"
                     title={formatSecondaryLine(track)}
+                    style={artistFont}
                 >
                     {formatSecondaryLine(track)}
                 </div>
