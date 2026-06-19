@@ -14,7 +14,9 @@ import {
     formatSecondaryLine,
     formatVersionedTitle,
 } from "../utils/formatMetadata"
-import { getScrubberDensity } from "../surfaces/faceCapabilities"
+import { getScrubberDensity, faceSupportsAction } from "../surfaces/faceCapabilities"
+import { ArcActionButton } from "../surfaces/ArcActionButton"
+import type { ArcAction } from "../surfaces/ArcActionButton"
 import { buildThemeVars } from "./themeVars"
 import { PauseIcon, PlayIcon, SpinnerIcon, WaveIcon } from "./icons"
 import "./skins.css"
@@ -32,6 +34,13 @@ export interface SeaCardPlayerProps extends AudioPlayerTheme {
     artMedia?: MediaSource | null
     /** Optional price / tag chip. */
     tag?: string
+    /**
+     * Card actions surfaced through the Arc Action Button (the card's action
+     * surface). A plain, extensible list — append actions or nest `children`
+     * without touching the card. Mirrors the Vault row's `actions` API so Arc
+     * behavior stays consistent across faces.
+     */
+    actions?: ArcAction[]
     /** Inline typography for the card title. */
     titleFont?: CSSProperties
     /** Inline typography for the card artist line. */
@@ -64,6 +73,7 @@ export function SeaCardPlayer({
     art = "linear-gradient(135deg,#FF7AC6,#7C5CFF)",
     artMedia,
     tag,
+    actions,
     titleFont,
     artistFont,
     className,
@@ -81,6 +91,11 @@ export function SeaCardPlayer({
     // Engine gates `isBuffering` to active/pending playback; scope it to this
     // card so only the active track's button can spin.
     const isBufferingThis = isActive && s.isBuffering
+    // The capability allows the action button, but only render it when there are
+    // actions — otherwise it would be an interactive yet empty control. Unlike
+    // the wave trigger this is not gated on `isActive`: card actions (add to
+    // queue, share, buy…) are meaningful on any card in a marketplace grid.
+    const showAction = faceSupportsAction("seaCard") && (actions?.length ?? 0) > 0
 
     const handleToggle = () => {
         if (isActive) s.toggle()
@@ -142,20 +157,39 @@ export function SeaCardPlayer({
                 )}
             </div>
             <div className="ap-sea__body">
-                <div
-                    className="ap-sea__title"
-                    title={formatVersionedTitle(track.title, track.versionLabel)}
-                    style={titleFont}
-                >
-                    {formatVersionedTitle(track.title, track.versionLabel)}
-                    {track.explicit && <ExplicitBadge />}
-                </div>
-                <div
-                    className="ap-sea__artist"
-                    title={formatSecondaryLine(track)}
-                    style={artistFont}
-                >
-                    {formatSecondaryLine(track)}
+                {/* Title/artist sit in a row with the Arc action trigger on the
+                    right, so the card's action surface lives beside the metadata
+                    (not overlaid on the artwork). The text column flexes and
+                    truncates; the trigger keeps a fixed footprint on the right. */}
+                <div className="ap-sea__head">
+                    <div className="ap-sea__meta">
+                        <div
+                            className="ap-sea__title"
+                            title={formatVersionedTitle(track.title, track.versionLabel)}
+                            style={titleFont}
+                        >
+                            {formatVersionedTitle(track.title, track.versionLabel)}
+                            {track.explicit && <ExplicitBadge />}
+                        </div>
+                        <div
+                            className="ap-sea__artist"
+                            title={formatSecondaryLine(track)}
+                            style={artistFont}
+                        >
+                            {formatSecondaryLine(track)}
+                        </div>
+                    </div>
+                    {/* Arc Action Button: the card's action surface. Sits at the
+                        right of the title/artist row. The trigger is a single
+                        button when closed (cheap in a grid) and portals the arc
+                        overlay on tap. */}
+                    {showAction && (
+                        <ArcActionButton
+                            actions={actions!}
+                            ariaLabel={`Actions for ${track.title}`}
+                            className="ap-sea__action"
+                        />
+                    )}
                 </div>
                 {/* Hide the inline scrubber while the waveform overlay is open so
                     the card never shows two scrubbers at once. */}

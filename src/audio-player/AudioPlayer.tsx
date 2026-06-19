@@ -21,6 +21,7 @@ import {
 import {
     useMediaSessionObserver,
     buildMediaSessionArtwork,
+    resolveArtworkSrc,
 } from "./headless/useMediaSessionObserver"
 import { WaveformAdapter } from "./components/WaveformAdapter"
 import { BackgroundMedia, resolveMedia } from "./components/BackgroundMedia"
@@ -571,11 +572,22 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
 
     // ── Media Session API (progressive enhancement) ──
     // Artwork priority: track-level artwork > backgroundMedia > backgroundImage.
-    // Album info comes from the track when available.
-    const artworkSrc =
-        currentTrack.artwork ??
-        backgroundMedia?.src ??
-        backgroundImage?.src
+    // Album info comes from the track when available. Each candidate may be a
+    // plain URL or a CSS value (a `url("…")` wrapper, or a gradient): unwrap the
+    // former and reject the latter so a non-image background never produces a
+    // malformed Media Session artwork entry (which iOS would fail to render).
+    const artworkSrc = useMemo(() => {
+        const candidates = [
+            currentTrack.artwork,
+            backgroundMedia?.src,
+            backgroundImage?.src,
+        ]
+        for (const value of candidates) {
+            const resolved = resolveArtworkSrc(value)
+            if (resolved) return resolved
+        }
+        return undefined
+    }, [currentTrack.artwork, backgroundMedia?.src, backgroundImage?.src])
     const artwork = useMemo(
         () => (artworkSrc ? buildMediaSessionArtwork(artworkSrc) : []),
         [artworkSrc],
