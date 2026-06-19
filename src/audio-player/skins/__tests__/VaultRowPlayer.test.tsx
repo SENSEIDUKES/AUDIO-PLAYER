@@ -68,4 +68,16 @@ describe("VaultRowPlayer — classification color", () => {
         const html = render(<VaultRowPlayer track={TRACK} />)
         expect(html).not.toContain("ap-vr__chip")
     })
+
+    it("renders both chip placements (lead for desktop, inline for mobile) so the title keeps its line", () => {
+        const html = render(
+            <VaultRowPlayer track={{ ...TRACK, vaultCategory: "beat" }} />
+        )
+        // Leading pill (wide rows) + inline chip on the artist line (narrow rows);
+        // a container query shows exactly one at a time.
+        expect(html).toContain("ap-vr__chip--lead")
+        expect(html).toContain("ap-vr__chip--inline")
+        // Artist text lives in its own truncating wrapper alongside the inline chip.
+        expect(html).toContain("ap-vr__artist-text")
+    })
 })

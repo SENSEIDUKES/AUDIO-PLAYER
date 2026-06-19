@@ -108,7 +108,7 @@ export function VaultRowPlayer({
             aria-current={isActive ? "true" : undefined}
         >
             {category && (
-                <span className="ap-vr__chip" title={category.label}>
+                <span className="ap-vr__chip ap-vr__chip--lead" title={category.label}>
                     {category.label}
                 </span>
             )}
@@ -139,7 +139,14 @@ export function VaultRowPlayer({
                     className="ap-vr__artist"
                     title={formatSecondaryLine(track)}
                 >
-                    {formatSecondaryLine(track)}
+                    {category && (
+                        <span className="ap-vr__chip ap-vr__chip--inline">
+                            {category.label}
+                        </span>
+                    )}
+                    <span className="ap-vr__artist-text">
+                        {formatSecondaryLine(track)}
+                    </span>
                 </span>
             </div>
             {isActive && (
