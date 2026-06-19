@@ -93,7 +93,7 @@ export {
     gradient,
 } from "./utils/colorExtraction"
 export { ProgressBar } from "./components/ProgressBar"
-export { BackgroundMedia, resolveMedia } from "./components/BackgroundMedia"
+export { BackgroundMedia, ensureMuted, resolveMedia } from "./components/BackgroundMedia"
 export type {
     BackgroundMediaProps,
     ResolveMediaInput,

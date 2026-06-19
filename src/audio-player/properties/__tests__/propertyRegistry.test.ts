@@ -118,4 +118,11 @@ describe("path helpers", () => {
         // siblings preserved
         expect(next.blurSize).toBe(0)
     })
+
+    it("refuses to pollute the prototype chain", () => {
+        setByPropPath({}, "__proto__.polluted", "yes")
+        setByPropPath({}, "constructor.prototype.polluted", "yes")
+        expect(({} as Record<string, unknown>).polluted).toBeUndefined()
+        expect((Object.prototype as Record<string, unknown>).polluted).toBeUndefined()
+    })
 })

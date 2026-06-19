@@ -162,13 +162,14 @@ export function SchemaPanel({
 
     const handleCopy = async () => {
         try {
-            if (navigator.clipboard)
+            if (navigator.clipboard) {
                 await navigator.clipboard.writeText(buildJsx())
+                setCopied(true)
+                setTimeout(() => setCopied(false), 1500)
+            }
         } catch {
             /* ignore */
         }
-        setCopied(true)
-        setTimeout(() => setCopied(false), 1500)
     }
 
     return (

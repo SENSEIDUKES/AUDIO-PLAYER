@@ -263,10 +263,18 @@ export function setByPropPath<T extends Record<string, unknown>>(
     let cursor = next
     for (let i = 0; i < keys.length - 1; i++) {
         const key = keys[i]
+        // Guard against prototype pollution — never traverse/assign these keys.
+        if (key === "__proto__" || key === "constructor" || key === "prototype") {
+            return next as T
+        }
         cursor[key] = { ...(cursor[key] as Record<string, unknown>) }
         cursor = cursor[key] as Record<string, unknown>
     }
-    cursor[keys[keys.length - 1]] = value
+    const lastKey = keys[keys.length - 1]
+    if (lastKey === "__proto__" || lastKey === "constructor" || lastKey === "prototype") {
+        return next as T
+    }
+    cursor[lastKey] = value
     return next as T
 }
 

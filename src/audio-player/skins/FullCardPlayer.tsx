@@ -4,7 +4,7 @@ import type { AudioPlayerTheme, BackgroundImage, MediaSource } from "../types"
 import { useAudioSession } from "../session/AudioSessionContext"
 import { QueueDrawer } from "../components/QueueDrawer"
 import { WaveformAdapter } from "../components/WaveformAdapter"
-import { BackgroundMedia, resolveMedia } from "../components/BackgroundMedia"
+import { BackgroundMedia, ensureMuted, resolveMedia } from "../components/BackgroundMedia"
 import { VolumeControl } from "../components/VolumeControl"
 import { SAPController } from "../components/SAPController"
 import { useShareTrack } from "../components/useShareTrack"
@@ -138,6 +138,7 @@ export function FullCardPlayer({
                 className="ap-fc__hero-art"
                 src={heroArt.media.src}
                 poster={heroArt.media.poster}
+                ref={ensureMuted}
                 muted
                 autoPlay
                 loop

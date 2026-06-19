@@ -1,4 +1,5 @@
 import type { MediaKind, MediaSource } from "../../audio-player"
+import { ensureMuted } from "../../audio-player"
 import { NO_LUCK_COVER } from "../data"
 
 /* Demo presets so a creator can drop in a real asset with one click. */
@@ -47,6 +48,7 @@ export function MediaPicker({
                             className="ws-media__thumb-el"
                             src={src}
                             poster={value?.poster}
+                            ref={ensureMuted}
                             muted
                             loop
                             autoPlay
@@ -97,7 +99,7 @@ export function MediaPicker({
                     className="framer-panel__input"
                     value={src}
                     placeholder="https://…"
-                    onChange={(e) => patch({ src: e.target.value })}
+                    onChange={(e) => patch({ src: e.target.value.trim() })}
                 />
             </div>
 
@@ -108,7 +110,7 @@ export function MediaPicker({
                         className="framer-panel__input"
                         value={value?.poster ?? ""}
                         placeholder="Optional preview frame"
-                        onChange={(e) => patch({ poster: e.target.value })}
+                        onChange={(e) => patch({ poster: e.target.value.trim() })}
                     />
                 </div>
             )}

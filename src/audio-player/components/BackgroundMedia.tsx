@@ -40,6 +40,15 @@ export function resolveMedia(input: ResolveMediaInput): ResolvedMedia {
     return { media: null, cssBackground: null }
 }
 
+/**
+ * Force the `muted` DOM property on a `<video>`. React's `muted` prop is applied
+ * as a property and is unreliable on first paint, which can block autoplay; a ref
+ * that sets `el.muted = true` guarantees it before the browser evaluates autoplay.
+ */
+export function ensureMuted(el: HTMLVideoElement | null) {
+    if (el) el.muted = true
+}
+
 export interface BackgroundMediaProps {
     /** A resolved video layer. Use `resolveMedia` to produce it. */
     media?: MediaSource | null
@@ -83,8 +92,10 @@ export function BackgroundMedia({
                     className={`ap-bg-video${className ? ` ${className}` : ""}`}
                     src={media.src}
                     poster={media.poster}
+                    ref={ensureMuted}
                     // Background video is visual-only: always muted so the audio
-                    // engine remains the single source of sound.
+                    // engine remains the single source of sound. The `ensureMuted`
+                    // ref forces the muted property before autoplay is evaluated.
                     muted
                     autoPlay={media.autoPlay ?? true}
                     loop={media.loop ?? true}
