@@ -22,11 +22,33 @@ export interface UseMediaSessionObserverOptions {
 }
 
 /**
+ * Build a Media Session artwork array with multiple sizes from a single URL.
+ * The OS picks the best size for its display (e.g. iOS lock screen).
+ */
+export function buildMediaSessionArtwork(src: string): MediaImage[] {
+    const type = /\.png$/i.test(src) ? "image/png" : "image/jpeg"
+    return [
+        { src, sizes: "512x512", type },
+        { src, sizes: "1024x1024", type },
+    ]
+}
+
+/** Pull a bare URL out of a CSS `url("…")` value, if it is one. */
+export function extractUrlFromCss(css: string): string | null {
+    const m = css.match(/url\(["']?([^"')]+)["']?\)/)
+    return m ? m[1] : null
+}
+
+/**
  * Media Session API integration (progressive enhancement) as a reusable hook,
  * so any skin — the built-in `AudioPlayer` or a custom headless one — gets
  * lock-screen metadata and OS media controls from the same engine.
  *
  * Does nothing (silently) when the browser has no `navigator.mediaSession`.
+ *
+ * IMPORTANT: metadata is *not* cleared on dependency changes — doing so
+ * causes iOS to briefly lose artwork on track transitions. The new metadata
+ * overwrites the previous entry directly.
  */
 export function useMediaSessionObserver(
     engine: AudioPlayerEngine,
@@ -40,6 +62,8 @@ export function useMediaSessionObserver(
     // 1. Sync metadata whenever any of the displayed fields change so the OS
     //    media UI never shows stale information (e.g. after lazy loading or
     //    localization updates while the same track is active).
+    //    Crucially, we do NOT clear metadata to null on cleanup — doing so
+    //    causes iOS to flicker/clear artwork during track transitions.
     useEffect(() => {
         if (typeof navigator === "undefined" || !("mediaSession" in navigator))
             return
@@ -51,10 +75,6 @@ export function useMediaSessionObserver(
             album: options.album ?? "",
             artwork: options.artwork ?? [],
         })
-
-        return () => {
-            ms.metadata = null
-        }
     }, [options.title, options.artist, options.album, options.artwork])
 
     // 2. Register action handlers once on mount. All handlers read from the

@@ -101,6 +101,9 @@ export interface Track {
      *  Accepts the built-in `VaultCategory` values (with autocomplete) or any
      *  custom string registered via `registerVaultCategory`. */
     vaultCategory?: VaultCategory | (string & {})
+    /** Artwork URL for the lock screen / OS media UI. When set, this is
+     *  preferred over the player's background image for Media Session artwork. */
+    artwork?: string
 }
 
 /** Theme colors. Applied to the player root as CSS custom properties. */
