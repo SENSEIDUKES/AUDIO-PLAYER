@@ -40,6 +40,28 @@ export function extractUrlFromCss(css: string): string | null {
 }
 
 /**
+ * Resolve an artwork candidate (a track/background source) to a bare image URL
+ * usable as Media Session artwork, or `undefined` when it isn't a real image.
+ *
+ * Callers may pass a plain URL or a raw CSS value. A `url("…")` wrapper is
+ * unwrapped; a gradient (or any other CSS function) is rejected so a non-image
+ * background never yields a malformed `MediaImage` the OS can't render.
+ */
+export function resolveArtworkSrc(
+    value: string | null | undefined
+): string | undefined {
+    if (!value) return undefined
+    const trimmed = value.trim()
+    if (!trimmed) return undefined
+    // CSS `url("…")` wrapper → the bare URL inside it.
+    const fromCss = extractUrlFromCss(trimmed)
+    if (fromCss) return fromCss
+    // A gradient or any other CSS function isn't a usable image.
+    if (/[a-z-]+\(/i.test(trimmed)) return undefined
+    return trimmed
+}
+
+/**
  * Media Session API integration (progressive enhancement) as a reusable hook,
  * so any skin — the built-in `AudioPlayer` or a custom headless one — gets
  * lock-screen metadata and OS media controls from the same engine.

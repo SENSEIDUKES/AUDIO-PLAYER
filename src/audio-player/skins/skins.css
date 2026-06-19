@@ -631,6 +631,24 @@
     background-color: var(--ap-accent, rgba(0, 0, 0, 0.65));
     color: var(--ap-play-icon, #000);
 }
+/* Arc action trigger: bottom-right of the art, mirroring the wave trigger
+   (top-left). Round + dark-translucent to match the on-art overlay controls,
+   clear of the centered play button and the body progress bar. */
+.ap-sea__action {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    background-color: rgba(0, 0, 0, 0.5);
+    color: #fff;
+}
+.ap-sea__action.ap-surface-btn--active {
+    background-color: var(--ap-accent, rgba(0, 0, 0, 0.65));
+    border-color: var(--ap-accent);
+    color: var(--ap-play-icon, #000);
+}
 .ap-sea__overlay {
     display: flex;
     flex-direction: column;

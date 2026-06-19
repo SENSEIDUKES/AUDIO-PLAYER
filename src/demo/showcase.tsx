@@ -233,6 +233,7 @@ export function Showcase() {
                                         track={t}
                                         art={NO_LUCK_ART}
                                         tag="SEA"
+                                        actions={vaultActions(t)}
                                         {...SEA_THEME}
                                     />
                                 ))}
