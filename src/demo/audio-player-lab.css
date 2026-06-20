@@ -436,6 +436,19 @@ body {
     color: #ffcb6b;
     border-color: rgba(245, 158, 11, 0.3);
 }
+.framer-panel__swatch {
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid var(--lab-border);
+    cursor: pointer;
+    transition: transform 0.1s ease, border-color 0.15s ease;
+}
+.framer-panel__swatch:hover {
+    border-color: var(--lab-border-strong);
+    transform: scale(1.15);
+}
 .framer-panel__footer {
     padding: 10px 12px;
     border-top: 1px solid var(--lab-border);

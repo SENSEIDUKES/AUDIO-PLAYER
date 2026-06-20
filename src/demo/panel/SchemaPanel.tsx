@@ -13,7 +13,7 @@ import { PropertyControl } from "./PropertyControl"
 
 const THEME_PRESETS: {
     label: string
-    theme: Required<Omit<AudioPlayerTheme, "glowColor">>
+    theme: Partial<AudioPlayerTheme>
 }[] = [
     {
         label: "OG Glass",
@@ -129,9 +129,8 @@ export function SchemaPanel({
             ) as unknown as WorkshopSettings
         )
 
-    const applyThemePreset = (
-        theme: Required<Omit<AudioPlayerTheme, "glowColor">>
-    ) => onChange({ ...settings, theme: { ...settings.theme, ...theme } })
+    const applyThemePreset = (theme: Partial<AudioPlayerTheme>) =>
+        onChange({ ...settings, theme: { ...settings.theme, ...theme } })
 
     const buildJsx = (): string => {
         const t = settings.theme
@@ -144,6 +143,15 @@ export function SchemaPanel({
             `    progressColor={"${t.progressColor}"}`,
             `    trackColor={"${t.trackColor}"}`,
             `    backgroundColor={"${t.backgroundColor}"}`,
+            t.glowColor && t.glowColor !== "transparent"
+                ? `    glowColor={"${t.glowColor}"}`
+                : null,
+            t.glowIntensity !== undefined && t.glowIntensity !== 100
+                ? `    glowIntensity={${t.glowIntensity}}`
+                : null,
+            t.buttonOpacity !== undefined && t.buttonOpacity !== 0
+                ? `    buttonOpacity={${t.buttonOpacity}}`
+                : null,
             settings.backgroundMedia
                 ? `    backgroundMedia={${JSON.stringify(settings.backgroundMedia)}}`
                 : `    backgroundImage={{ src: "${settings.backgroundImageSrc}" }}`,
@@ -157,7 +165,7 @@ export function SchemaPanel({
             `    showWaveform={${settings.showWaveform}}`,
             "/>",
         ]
-        return lines.join("\n")
+        return lines.filter((l): l is string => l !== null).join("\n")
     }
 
     const handleCopy = async () => {

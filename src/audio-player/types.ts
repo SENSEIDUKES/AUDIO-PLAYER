@@ -125,6 +125,18 @@ export interface AudioPlayerTheme {
      * (no glow); the Auto Theme plugin sets it from the artwork.
      */
     glowColor?: string
+    /**
+     * Multiplier (0–150) on the ambient glow's size, independent of
+     * `glowColor`'s own alpha. 100 is the default size; 0 disables the glow
+     * entirely regardless of `glowColor`.
+     */
+    glowIntensity?: number
+    /**
+     * Delta (in percentage points, -20 to 40) applied to every shared
+     * button's fill translucency. 0 reproduces the default fill; negative
+     * values are more see-through, positive values are more solid.
+     */
+    buttonOpacity?: number
 }
 
 export interface BackgroundImage {

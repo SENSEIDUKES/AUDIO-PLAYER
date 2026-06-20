@@ -16,6 +16,8 @@ export function buildThemeVars(theme: AudioPlayerTheme = {}): CSSProperties {
         trackColor = "rgba(204, 204, 204, 0.35)",
         backgroundColor = "rgba(20, 20, 28, 0.6)",
         glowColor = "transparent",
+        glowIntensity = 100,
+        buttonOpacity = 0,
     } = theme
     return {
         "--ap-accent": accentColor,
@@ -25,5 +27,7 @@ export function buildThemeVars(theme: AudioPlayerTheme = {}): CSSProperties {
         "--ap-track": trackColor,
         "--ap-bg": backgroundColor,
         "--ap-glow": glowColor,
+        "--ap-glow-intensity": glowIntensity / 100,
+        "--ap-btn-opacity-delta": `${buttonOpacity}%`,
     } as CSSProperties
 }

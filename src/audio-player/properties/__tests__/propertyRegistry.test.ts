@@ -51,6 +51,14 @@ describe("per-face applicability", () => {
         }
     })
 
+    it("exposes glow and button-fill material controls on every face", () => {
+        const materialIds = ["glowColor", "glowIntensity", "buttonOpacity"]
+        for (const face of ALL_FACES) {
+            const ids = getPropertiesForFace(face).map((d) => d.id)
+            for (const id of materialIds) expect(ids).toContain(id)
+        }
+    })
+
     it("gives the major faces parity on media, typography, and core playback", () => {
         for (const face of MAJOR_FACES) {
             const ids = getPropertiesForFace(face).map((d) => d.id)
@@ -97,6 +105,9 @@ describe("defaults", () => {
     it("matches the long-standing literal defaults", () => {
         const d = getPropertyDefaults()
         expect(getByPropPath(d, "theme.accentColor")).toBe("#7C5CFF")
+        expect(getByPropPath(d, "theme.glowColor")).toBe("transparent")
+        expect(getByPropPath(d, "theme.glowIntensity")).toBe(100)
+        expect(getByPropPath(d, "theme.buttonOpacity")).toBe(0)
         expect(getByPropPath(d, "blurSize")).toBe(20)
         expect(getByPropPath(d, "darkenAmount")).toBe(45)
         expect(getByPropPath(d, "repeatMode")).toBe("off")

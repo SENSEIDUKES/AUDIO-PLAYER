@@ -41,7 +41,7 @@ export type WorkshopControlGroup =
 /* Flat, JSON-serializable settings superset shared by every face. Each face
    reads only the slices it supports, so switching faces keeps your edits. */
 export interface WorkshopSettings {
-    theme: Required<Omit<AudioPlayerTheme, "glowColor">>
+    theme: Required<AudioPlayerTheme>
     backgroundImageSrc: string
     /** Unified background media (image/video). Supersedes backgroundImageSrc. */
     backgroundMedia: MediaSource | null

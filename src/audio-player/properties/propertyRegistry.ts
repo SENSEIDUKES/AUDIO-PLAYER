@@ -127,6 +127,33 @@ export const PROPERTY_REGISTRY: readonly PropertyDescriptor[] = [
         propPath: "theme.backgroundColor",
         default: "rgba(20,20,28,0.6)",
     },
+    {
+        id: "glowColor",
+        label: "Glow Color",
+        description: "Ambient glow color around the player root. Transparent disables it.",
+        group: "appearance",
+        control: { kind: "color" },
+        propPath: "theme.glowColor",
+        default: "transparent",
+    },
+    {
+        id: "glowIntensity",
+        label: "Glow",
+        description: "Ambient glow strength. 0 turns the glow off regardless of Glow Color.",
+        group: "appearance",
+        control: { kind: "range", min: 0, max: 150, step: 5, unit: "%" },
+        propPath: "theme.glowIntensity",
+        default: 100,
+    },
+    {
+        id: "buttonOpacity",
+        label: "Button Fill",
+        description: "Translucency of button fills — lower is more see-through, higher is more solid.",
+        group: "appearance",
+        control: { kind: "range", min: -20, max: 40, step: 1, unit: "%" },
+        propPath: "theme.buttonOpacity",
+        default: 0,
+    },
     // Background adjustments — only faces that render a background layer.
     {
         id: "blurSize",

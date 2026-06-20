@@ -325,6 +325,8 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
         trackColor = "rgba(204, 204, 204, 0.35)",
         backgroundColor = "rgba(255, 255, 255, 0)",
         glowColor = "transparent",
+        glowIntensity = 100,
+        buttonOpacity = 0,
         plugins: externalPlugins = EMPTY_PLUGINS,
         className,
         style,
@@ -625,6 +627,8 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
         "--ap-track": trackColor,
         "--ap-bg": backgroundColor,
         "--ap-glow": glowColor,
+        "--ap-glow-intensity": glowIntensity / 100,
+        "--ap-btn-opacity-delta": `${buttonOpacity}%`,
         "--ap-blur": `${blurSize}px`,
     } as CSSProperties
 

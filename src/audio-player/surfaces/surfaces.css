@@ -23,7 +23,7 @@
        icon stays visible on yellow/green), while the --ap-text tint keeps it
        feeling glassy on dark surfaces. Edge is defined by a dark outer ring +
        drop shadow that show up regardless of how light the surface color is. */
-    background-color: color-mix(in srgb, var(--ap-text, #fff) 12%, rgba(8, 10, 16, 0.16));
+    background-color: color-mix(in srgb, var(--ap-text, #fff) calc(12% + var(--ap-btn-opacity-delta, 0%)), rgba(8, 10, 16, 0.16));
     color: var(--ap-text, #fff);
     cursor: pointer;
     box-shadow:
@@ -37,7 +37,7 @@
         color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
 }
 .ap-surface-btn:hover:not(:disabled):not(.ap-surface-btn--active) {
-    background-color: color-mix(in srgb, var(--ap-text, #fff) 20%, rgba(8, 10, 16, 0.16));
+    background-color: color-mix(in srgb, var(--ap-text, #fff) calc(20% + var(--ap-btn-opacity-delta, 0%)), rgba(8, 10, 16, 0.16));
     border-color: color-mix(in srgb, var(--ap-text, #fff) 30%, transparent);
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.24),

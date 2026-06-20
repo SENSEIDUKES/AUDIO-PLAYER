@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react"
 import type { CSSProperties } from "react"
 import type {
     MediaSource,
@@ -5,6 +6,7 @@ import type {
     RepeatMode,
 } from "../../audio-player"
 import { MediaPicker } from "./MediaPicker"
+import { getRecentColors, pushRecentColor, subscribeRecentColors } from "../recentColors"
 
 /* rgba/hex normalizer: <input type=color> only accepts 7-char hex, but the
    audio player uses hex AND rgba() strings. Fall back so the user still sees a
@@ -78,22 +80,48 @@ export function PropertyControl({
 }) {
     const { control, label, id, propPath } = descriptor
     const fieldId = `ws-${id}`
+    // Hooks must run unconditionally before the switch below (Rules of
+    // Hooks) — only the "color" case reads this state, but it has to be
+    // declared at the top level regardless of which control kind renders.
+    const [recentColors, setRecentColors] = useState<string[]>(getRecentColors)
+    useEffect(() => subscribeRecentColors(setRecentColors), [])
 
     switch (control.kind) {
         case "color": {
             const fallback = id === "textColor" || id === "backgroundColor" ? "#ffffff" : "#000000"
+            const applyColor = (hex: string) => {
+                onSet(propPath, hex)
+                setRecentColors(pushRecentColor(hex))
+            }
             return (
-                <div className="framer-panel__row">
-                    <label className="framer-panel__label" htmlFor={fieldId}>
-                        {label}
-                    </label>
-                    <input
-                        id={fieldId}
-                        className="framer-panel__color"
-                        type="color"
-                        value={normalizeColor(value as string, fallback)}
-                        onChange={(e) => onSet(propPath, e.target.value)}
-                    />
+                <div className="framer-panel__row framer-panel__row--col">
+                    <div className="framer-panel__row">
+                        <label className="framer-panel__label" htmlFor={fieldId}>
+                            {label}
+                        </label>
+                        <input
+                            id={fieldId}
+                            className="framer-panel__color"
+                            type="color"
+                            value={normalizeColor(value as string, fallback)}
+                            onChange={(e) => applyColor(e.target.value)}
+                        />
+                    </div>
+                    {recentColors.length > 0 && (
+                        <div className="framer-panel__preset-row" aria-label="Recently used colors">
+                            {recentColors.map((hex) => (
+                                <button
+                                    key={hex}
+                                    type="button"
+                                    className="framer-panel__swatch"
+                                    style={{ backgroundColor: hex }}
+                                    title={hex}
+                                    aria-label={`Use color ${hex}`}
+                                    onClick={() => applyColor(hex)}
+                                />
+                            ))}
+                        </div>
+                    )}
                 </div>
             )
         }
