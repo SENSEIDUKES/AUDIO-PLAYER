@@ -18,39 +18,35 @@
     height: 40px;
     flex-shrink: 0;
     border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    /* A solidly opaque neutral-dark glass base — NOT surface-tinted — so the
-       button always pops as its own raised control instead of blending into a
-       bright/saturated surface color. The icon (currentColor = --ap-text, light)
-       then has a stable home plate to sit on regardless of the surface hue. */
-    background-color: color-mix(in srgb, var(--ap-text, #fff) 10%, rgba(10, 12, 18, 0.5));
+    border: 1px solid color-mix(in srgb, var(--ap-text, #fff) 20%, transparent);
+    /* A neutral dark base keeps the chip darker than a bright surface (so its
+       icon stays visible on yellow/green), while the --ap-text tint keeps it
+       feeling glassy on dark surfaces. Edge is defined by a dark outer ring +
+       drop shadow that show up regardless of how light the surface color is. */
+    background-color: color-mix(in srgb, var(--ap-text, #fff) 12%, rgba(8, 10, 16, 0.16));
     color: var(--ap-text, #fff);
     cursor: pointer;
     box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.28),
-        inset 0 -1px 1px rgba(0, 0, 0, 0.18),
-        0 0 0 1px rgba(0, 0, 0, 0.16),
-        0 4px 10px -1px rgba(0, 0, 0, 0.32);
-    /* A gentle (not surface-boosting) saturate — high values here pull more of
-       the bright surface hue through the blur and re-camouflage the button. */
-    -webkit-backdrop-filter: blur(10px) saturate(110%);
-    backdrop-filter: blur(10px) saturate(110%);
+        inset 0 1px 0 rgba(255, 255, 255, 0.2),
+        inset 0 -1px 1px rgba(0, 0, 0, 0.1),
+        0 0 0 1px rgba(0, 0, 0, 0.1),
+        0 2px 6px rgba(0, 0, 0, 0.2);
+    -webkit-backdrop-filter: blur(8px) saturate(130%);
+    backdrop-filter: blur(8px) saturate(130%);
     transition: background-color 0.2s ease, border-color 0.2s ease,
         color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
 }
 .ap-surface-btn:hover:not(:disabled):not(.ap-surface-btn--active) {
-    background-color: color-mix(in srgb, var(--ap-text, #fff) 16%, rgba(10, 12, 18, 0.5));
-    border-color: rgba(255, 255, 255, 0.42);
+    background-color: color-mix(in srgb, var(--ap-text, #fff) 20%, rgba(8, 10, 16, 0.16));
+    border-color: color-mix(in srgb, var(--ap-text, #fff) 30%, transparent);
     box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.32),
-        inset 0 -1px 1px rgba(0, 0, 0, 0.18),
-        0 0 0 1px rgba(0, 0, 0, 0.16),
-        0 6px 14px -2px rgba(0, 0, 0, 0.38);
+        inset 0 1px 0 rgba(255, 255, 255, 0.24),
+        inset 0 -1px 1px rgba(0, 0, 0, 0.1),
+        0 0 0 1px rgba(0, 0, 0, 0.1),
+        0 3px 9px rgba(0, 0, 0, 0.24);
 }
 .ap-surface-btn:active:not(:disabled) {
-    box-shadow:
-        inset 0 2px 4px rgba(0, 0, 0, 0.3),
-        0 0 0 1px rgba(0, 0, 0, 0.16);
+    box-shadow: inset 0 1.5px 3px rgba(0, 0, 0, 0.22);
 }
 .ap-surface-btn:disabled {
     opacity: 0.5;
