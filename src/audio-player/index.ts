@@ -57,6 +57,19 @@ export {
     createWaveformPlugin,
 } from "./plugins/WaveformPlugin"
 export {
+    CueManifestPlugin,
+    createCueManifestPlugin,
+} from "./cues/CueManifestPlugin"
+export { validateCueManifest } from "./cues/cueManifestSchema"
+export { CueRuntime } from "./cues/cueRuntime"
+export {
+    useNarrativeCueController,
+} from "./cues/useNarrativeCueController"
+export type {
+    UseNarrativeCueControllerOptions,
+    NarrativeCueControllerState,
+} from "./cues/useNarrativeCueController"
+export {
     ensureTrackAnalysis,
     getTrackTrims,
 } from "./automix/silenceAnalysis"
@@ -366,6 +379,11 @@ export type {
     SleepTimerState,
 } from "./plugins/SleepTimerPlugin"
 export type { WaveformPluginConfig } from "./plugins/WaveformPlugin"
+export type {
+    CueAction,
+    CueEvent,
+    CueManifest,
+} from "./cues/cueTypes"
 export {
     PluginRegistryProvider,
     usePluginRegistry,

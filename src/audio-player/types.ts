@@ -6,6 +6,7 @@ import type {
     AudioBackendInfo,
     AudioBackendKind,
 } from "./core/audio/AudioBackend"
+import type { CueManifest } from "./cues/cueTypes"
 
 /**
  * Vault identity category. Drives a row's visual identity (accent color + label)
@@ -104,6 +105,13 @@ export interface Track {
     /** Artwork URL for the lock screen / OS media UI. When set, this is
      *  preferred over the player's background image for Media Session artwork. */
     artwork?: string
+
+    /** Generic JSON CueManifest containing time-based events */
+    cueManifest?: CueManifest
+    /** URL to fetch a generic CueManifest asynchronously */
+    cueManifestUrl?: string
+    /** Signatures for cue or metadata validation by plugins */
+    metadataSignatures?: string[]
 }
 
 /** Theme colors. Applied to the player root as CSS custom properties. */
