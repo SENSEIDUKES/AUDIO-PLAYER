@@ -23,7 +23,8 @@ export const SleepTimerPluginConfigSchema = z.object({
     label: z.string().optional().default("Sleep"),
     renderUi: z.boolean().optional().default(true),
     target: z.custom<HTMLElement | (() => HTMLElement | null) | null>().optional(),
-    now: z.custom<() => number>((val) => typeof val === 'function').optional()
+    now: z.custom<() => number>((val) => typeof val === 'function').optional(),
+    fadeOut: z.boolean().optional().default(true),
 })
 
 export const LyricsPluginConfigSchema = z.object({
