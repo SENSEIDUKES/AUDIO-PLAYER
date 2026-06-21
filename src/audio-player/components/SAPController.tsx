@@ -164,9 +164,16 @@ function KaraokeLyrics({ lyrics }: { lyrics: string }) {
 
     useEffect(() => {
         if (activeIndex >= 0 && containerRef.current) {
-            const el = containerRef.current.children[activeIndex] as HTMLElement
+            const container = containerRef.current
+            const el = container.children[activeIndex] as HTMLElement
             if (el) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                const containerRect = container.getBoundingClientRect()
+                const elRect = el.getBoundingClientRect()
+                const relativeTop = elRect.top - containerRect.top + container.scrollTop
+                container.scrollTo({
+                    top: relativeTop - containerRect.height / 2 + elRect.height / 2,
+                    behavior: "smooth",
+                })
             }
         }
     }, [activeIndex])

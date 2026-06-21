@@ -70,6 +70,9 @@ export { VaultRowPlayer } from './skins/VaultRowPlayer';
 export { StickyBottomPlayer } from './skins/StickyBottomPlayer';
 export { MiniSidebarPlayer } from './skins/MiniSidebarPlayer';
 export { SeaCardPlayer } from './skins/SeaCardPlayer';
+export { NarrativeFace } from './skins/NarrativeFace';
+export { useNarrativeAudio } from './narrative/useNarrativeAudio';
+export type { UseNarrativeAudioOptions, NarrativeAudioController, NarrationState, SoundscapeIndicatorState, } from './narrative/useNarrativeAudio';
 export { VAULT_CATEGORY_META, getVaultCategoryMeta, registerVaultCategory, clearCustomCategories, getAllVaultCategories, } from './skins/vaultCategories';
 export type { VaultCategoryMeta } from './skins/vaultCategories';
 export { PLAYER_FACE_CAPABILITIES, FAMILY_DEFAULTS, getFaceCapability, getFaceFamily, faceSupportsAction, faceSupportsSEICanvas, faceSupportsScrubberCanvas, faceSupportsContextualActions, faceSupportsWaveform, faceSupportsHeroCollapse, getScrubberDensity, getScrubberHeight, getPreferredCanvasPlacement, INITIAL_SURFACE_STATE, canEnterCanvas, deriveHeroCollapsed, surfaceReducer, usePlayerSurface, SurfaceButton, PlayerSurfaceButtons, SEICanvasActionMenu, arcOffsets, ARC_RADIUS, ArcActionButton, buildMenuTree, isNodeInteractive, SEICanvasHost, ScrubberCanvasHost, PlayerHero, QueueSurface, } from './surfaces';
@@ -106,4 +109,5 @@ export type { VaultRowPlayerProps } from './skins/VaultRowPlayer';
 export type { StickyBottomPlayerProps } from './skins/StickyBottomPlayer';
 export type { MiniSidebarPlayerProps } from './skins/MiniSidebarPlayer';
 export type { SeaCardPlayerProps } from './skins/SeaCardPlayer';
+export type { NarrativeFaceProps } from './skins/NarrativeFace';
 //# sourceMappingURL=index.d.ts.map

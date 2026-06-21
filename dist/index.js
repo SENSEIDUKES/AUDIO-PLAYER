@@ -7827,7 +7827,7 @@ function getAudioContextCtor() {
 	if (typeof window === "undefined") return void 0;
 	return window.AudioContext ?? window.webkitAudioContext;
 }
-function clamp01(value) {
+function clamp01$1(value) {
 	if (!Number.isFinite(value)) return 1;
 	return Math.max(0, Math.min(1, value));
 }
@@ -7856,14 +7856,32 @@ var AudioSpriteEngine = class {
 	loadPromise = null;
 	instances = /* @__PURE__ */ new Map();
 	generation = 0;
+	/**
+	* Desired master gain for the whole sprite layer (the "ambience volume"
+	* control points here). Stored so it survives context recreation, since
+	* `ensureContext` builds a fresh `output` GainNode at unity otherwise.
+	*/
+	masterVolume = 1;
 	ensureContext() {
 		if (this.ctx && this.ctx.state !== "closed") return this.ctx;
 		const Ctor = getAudioContextCtor();
 		if (!Ctor) throw new Error("Web Audio API unavailable for SAP sprites.");
 		this.ctx = new Ctor();
 		this.output = this.ctx.createGain();
+		this.output.gain.value = this.masterVolume;
 		this.output.connect(this.ctx.destination);
 		return this.ctx;
+	}
+	/**
+	* Set the master output level (0..1) for the whole sprite layer. Persisted
+	* across context recreation so a later (re)load doesn't silently reset it.
+	*/
+	setMasterVolume(value) {
+		this.masterVolume = clamp01$1(value);
+		if (this.output && this.ctx) this.output.gain.setValueAtTime(this.masterVolume, this.ctx.currentTime);
+	}
+	getMasterVolume() {
+		return this.masterVolume;
 	}
 	async load(manifest) {
 		const src = manifest.src.trim();
@@ -7879,7 +7897,7 @@ var AudioSpriteEngine = class {
 		this.buffer = null;
 		const abort = new AbortController();
 		this.loadAbort = abort;
-		this.loadPromise = (async () => {
+		const work = (async () => {
 			const response = await fetch(src, { signal: abort.signal });
 			if (!response.ok) throw new Error(`Audio sprite pack failed to load: ${response.status}`);
 			const data = await response.arrayBuffer();
@@ -7887,14 +7905,20 @@ var AudioSpriteEngine = class {
 			if (generation !== this.generation) return;
 			this.buffer = decoded;
 		})();
+		this.loadPromise = work.then(() => {}, () => {});
 		try {
-			await this.loadPromise;
+			await work;
 		} finally {
 			if (this.loadAbort === abort) this.loadAbort = null;
 		}
 	}
 	async ready() {
-		await this.loadPromise;
+		let pending = this.loadPromise;
+		while (pending) {
+			await pending;
+			if (pending === this.loadPromise) break;
+			pending = this.loadPromise;
+		}
 	}
 	play(clipName, options = {}) {
 		const manifest = this.manifest;
@@ -7910,7 +7934,7 @@ var AudioSpriteEngine = class {
 		const duration = Math.min(positiveSeconds(clip.duration), Math.max(0, buffer.duration - offset));
 		if (duration <= 0) return null;
 		const loop = options.loop ?? clip.loop ?? false;
-		const volume = clamp01(options.volume ?? clip.volume ?? 1);
+		const volume = clamp01$1(options.volume ?? clip.volume ?? 1);
 		const id = createInstanceId();
 		const source = ctx.createBufferSource();
 		const gain = ctx.createGain();
@@ -7950,14 +7974,35 @@ var AudioSpriteEngine = class {
 	fade(id, toVolume, durationMs) {
 		const instance = this.instances.get(id);
 		if (!instance || !this.ctx) return;
+		this.clearFadeStop(instance);
 		const gain = instance.gain.gain;
 		const now = this.ctx.currentTime;
 		const duration = Math.max(0, durationMs) / 1e3;
-		const target = clamp01(toVolume);
+		const target = clamp01$1(toVolume);
 		gain.cancelScheduledValues(now);
 		gain.setValueAtTime(gain.value, now);
 		gain.linearRampToValueAtTime(target, now + duration);
 		instance.volume = target;
+	}
+	/**
+	* Ramp an instance to silence and then stop it. Unlike `fade(id, 0, ms)`,
+	* this releases the underlying source when the ramp completes — essential
+	* for looping clips, which otherwise keep running silently forever (a leak
+	* that accumulates one node per ambience/mood crossfade).
+	*/
+	fadeOut(id, durationMs) {
+		const instance = this.instances.get(id);
+		if (!instance) return;
+		this.fade(id, 0, durationMs);
+		instance.fadeStopTimer = setTimeout(() => {
+			if (this.instances.get(id) === instance) this.stop(id);
+		}, Math.max(0, durationMs));
+	}
+	clearFadeStop(instance) {
+		if (instance.fadeStopTimer !== void 0) {
+			clearTimeout(instance.fadeStopTimer);
+			instance.fadeStopTimer = void 0;
+		}
 	}
 	stopAll() {
 		for (const id of [...this.instances.keys()]) this.stop(id);
@@ -7986,6 +8031,7 @@ var AudioSpriteEngine = class {
 	removeInstance(id) {
 		const instance = this.instances.get(id);
 		if (!instance) return;
+		this.clearFadeStop(instance);
 		this.instances.delete(id);
 		try {
 			instance.source.disconnect();
@@ -9889,6 +9935,16 @@ var FAMILY_DEFAULTS = {
 		supportsHeroCollapse: false,
 		preferredCanvasPlacement: "none",
 		scrubberDensity: "compact"
+	},
+	narrative: {
+		supportsSEICanvas: false,
+		supportsAction: false,
+		supportsScrubberCanvas: false,
+		supportsWaveform: false,
+		supportsContextualActions: false,
+		supportsHeroCollapse: false,
+		preferredCanvasPlacement: "none",
+		scrubberDensity: "compact"
 	}
 };
 var PLAYER_FACE_CAPABILITIES = Object.fromEntries(Object.entries({
@@ -9910,7 +9966,8 @@ var PLAYER_FACE_CAPABILITIES = Object.fromEntries(Object.entries({
 		family: "compact",
 		supportsScrubberCanvas: true
 	},
-	vaultRow: { family: "compact" }
+	vaultRow: { family: "compact" },
+	narrative: { family: "narrative" }
 }).map(([face, def]) => {
 	const { family, ...overrides } = def;
 	return [face, {
@@ -13780,6 +13837,58 @@ var CloseIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 		y2: "18"
 	})]
 });
+function KaraokeLyrics({ lyrics }) {
+	const { currentTime } = useAudioSession();
+	const parsed = useMemo(() => {
+		const lines = lyrics.split("\n");
+		const result = [];
+		for (const line of lines) {
+			const match = line.match(/^\[(\d{2}):(\d{2}(?:\.\d{1,3})?)\](.*)/);
+			if (match) {
+				const m = parseInt(match[1], 10);
+				const s = parseFloat(match[2]);
+				result.push({
+					time: m * 60 + s,
+					text: match[3].trim()
+				});
+			} else result.push({
+				time: -1,
+				text: line
+			});
+		}
+		return result;
+	}, [lyrics]);
+	const containerRef = useRef(null);
+	if (!parsed.some((l) => l.time >= 0)) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		className: "sap-ctl__lyrics",
+		children: lyrics
+	});
+	let activeIndex = -1;
+	for (let i = 0; i < parsed.length; i++) if (parsed[i].time >= 0 && currentTime >= parsed[i].time) activeIndex = i;
+	useEffect(() => {
+		if (activeIndex >= 0 && containerRef.current) {
+			const container = containerRef.current;
+			const el = container.children[activeIndex];
+			if (el) {
+				const containerRect = container.getBoundingClientRect();
+				const elRect = el.getBoundingClientRect();
+				const relativeTop = elRect.top - containerRect.top + container.scrollTop;
+				container.scrollTo({
+					top: relativeTop - containerRect.height / 2 + elRect.height / 2,
+					behavior: "smooth"
+				});
+			}
+		}
+	}, [activeIndex]);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		className: "sap-ctl__lyrics sap-ctl__lyrics--karaoke",
+		ref: containerRef,
+		children: parsed.map((line, idx) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			className: `sap-ctl__lyric-line ${idx === activeIndex ? "sap-ctl__lyric-line--active" : ""}`,
+			children: line.text || "\xA0"
+		}, idx))
+	});
+}
 function SAPController({ open, onClose, route = "options", playback, queue, info, share, pluginNames, waveform, accentColor, playIconColor, textColor, progressColor, trackColor, backgroundColor }) {
 	const sheetRef = useRef(null);
 	const closeRef = useRef(null);
@@ -13990,10 +14099,7 @@ function SAPController({ open, onClose, route = "options", playback, queue, info
 							className: "sap-ctl__value",
 							children: lyricsOpen ? "hide" : "show"
 						})]
-					}), lyricsOpen && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-						className: "sap-ctl__lyrics",
-						children: info.lyrics
-					})] })]
+					}), lyricsOpen && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(KaraokeLyrics, { lyrics: info.lyrics })] })]
 				}),
 				share && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Section, {
 					title: "Share",
@@ -14415,6 +14521,58 @@ function TrackMetadata({ track, variant = "compact", enableMarquee = false, show
 	});
 }
 //#endregion
+//#region src/audio-player/utils/useArtworkColor.ts
+/**
+* Extracts the average RGB color from an image URL using a hidden canvas.
+* Falls back to null if the image fails to load or CORS prevents extraction.
+*/
+function useArtworkColor(src) {
+	const [color, setColor] = useState(null);
+	useEffect(() => {
+		if (!src) {
+			setColor(null);
+			return;
+		}
+		let isMounted = true;
+		const img = new Image();
+		img.crossOrigin = "Anonymous";
+		img.onload = () => {
+			if (!isMounted) return;
+			try {
+				const canvas = document.createElement("canvas");
+				const ctx = canvas.getContext("2d");
+				if (!ctx) return;
+				canvas.width = 64;
+				canvas.height = 64;
+				ctx.drawImage(img, 0, 0, 64, 64);
+				const imageData = ctx.getImageData(0, 0, 64, 64).data;
+				let r = 0, g = 0, b = 0, totalAlpha = 0;
+				for (let i = 0; i < imageData.length; i += 4) {
+					const a = imageData[i + 3];
+					r += imageData[i] * a;
+					g += imageData[i + 1] * a;
+					b += imageData[i + 2] * a;
+					totalAlpha += a;
+				}
+				if (totalAlpha === 0) setColor(null);
+				else setColor(`rgb(${Math.round(r / totalAlpha)}, ${Math.round(g / totalAlpha)}, ${Math.round(b / totalAlpha)})`);
+			} catch (err) {
+				if (isMounted) setColor(null);
+			}
+		};
+		img.onerror = () => {
+			if (isMounted) setColor(null);
+		};
+		img.src = src;
+		return () => {
+			isMounted = false;
+			img.onload = null;
+			img.onerror = null;
+		};
+	}, [src]);
+	return color;
+}
+//#endregion
 //#region src/audio-player/utils/device.ts
 /**
 * Lightweight client device detection, used to decide UI defaults that depend
@@ -14809,6 +14967,7 @@ function AudioPlayerBody(props) {
 		backgroundImage?.src
 	]);
 	const artwork = useMemo(() => artworkSrc ? buildMediaSessionArtwork(artworkSrc) : [], [artworkSrc]);
+	const dynamicColor = useArtworkColor(artworkSrc);
 	useMediaSessionObserver(s, {
 		title: currentTrack.title,
 		artist: currentTrack.artist,
@@ -14826,13 +14985,13 @@ function AudioPlayerBody(props) {
 		return () => document.removeEventListener("visibilitychange", onVis);
 	}, []);
 	const themeVars = {
-		"--ap-accent": accentColor,
+		"--ap-accent": accentColor?.toUpperCase() === "#FFFFFF" && dynamicColor ? dynamicColor : accentColor,
 		"--ap-play-icon": playIconColor,
 		"--ap-text": textColor,
-		"--ap-progress": progressColor,
+		"--ap-progress": progressColor?.toUpperCase() === "#FFFFFF" && dynamicColor ? dynamicColor : progressColor,
 		"--ap-track": trackColor,
 		"--ap-bg": backgroundColor,
-		"--ap-glow": glowColor,
+		"--ap-glow": glowColor === "transparent" && dynamicColor ? dynamicColor : glowColor,
 		"--ap-glow-intensity": glowIntensity / 100,
 		"--ap-btn-opacity-delta": `${buttonOpacity}%`,
 		"--ap-blur": `${blurSize}px`
@@ -17732,6 +17891,261 @@ function SeaCardPlayer({ track, art = "linear-gradient(135deg,#FF7AC6,#7C5CFF)",
 	});
 }
 //#endregion
+//#region src/audio-player/narrative/useNarrativeAudio.ts
+function clamp01(value) {
+	if (!Number.isFinite(value)) return 0;
+	return Math.max(0, Math.min(1, value));
+}
+/**
+* Headless orchestrator for the Narrative face. It layers three audio sources
+* over existing SAP primitives without changing engine behavior:
+*
+* - **Narration / voice** → the shared global session (`useAudioSession`). The
+*   current session track is the narration; play/pause/mute/volume all route to
+*   it, so any other SAP face stays in sync.
+* - **Ambience loop + FX** → a private `AudioSpriteEngine`. The `ambientProfile`
+*   names a looping clip in `ambienceManifest`; `fxClip` is an optional extra
+*   layer.
+*
+* Behaviors it wires for story playback:
+* - **Ducking** — while narration plays, ambience fades to
+*   `ambienceVolume * (1 - duckAmount)` (scaled by `intensity`), and restores on
+*   pause.
+* - **Crossfade** — when `sceneMood`/`ambientProfile` changes, the old ambience
+*   instance fades out (and stops) while the new clip fades in.
+*
+* With no `ambienceManifest`, ambience is inert and the face is a narration-only
+* transport. The reader app feeds scene metadata in via the options; the UI does
+* not need to change.
+*/
+function useNarrativeAudio(options = {}) {
+	const { sceneMood, ambientProfile, fxClip, fxLoop = false, ambienceManifest, narrationState, intensity = 1, ambienceVolume: ambienceVolumeProp = .6, narrationVolume: narrationVolumeProp, duckAmount = .6, crossfadeMs = 1200 } = options;
+	const session = useAudioSession();
+	const engineRef = useRef(null);
+	const ambienceIdRef = useRef(null);
+	const fxIdRef = useRef(null);
+	const loadedSrcRef = useRef(null);
+	const [ambienceVolume, setAmbienceVolumeState] = useState(clamp01(ambienceVolumeProp));
+	useEffect(() => {
+		setAmbienceVolumeState(clamp01(ambienceVolumeProp));
+	}, [ambienceVolumeProp]);
+	const getEngine = useCallback(() => {
+		if (!engineRef.current) engineRef.current = createAudioSpriteEngine();
+		return engineRef.current;
+	}, []);
+	const targetAmbience = clamp01(ambienceVolume * clamp01(intensity));
+	const isNarrating = narrationState === "playing" || narrationState === void 0 && session.isPlaying;
+	const duckedAmbience = clamp01(targetAmbience * (1 - clamp01(duckAmount) * clamp01(intensity)));
+	const liveAmbienceTarget = isNarrating ? duckedAmbience : targetAmbience;
+	useEffect(() => {
+		const src = ambienceManifest?.src?.trim();
+		if (!src) {
+			const engine = engineRef.current;
+			if (engine) {
+				if (ambienceIdRef.current) engine.fadeOut(ambienceIdRef.current, crossfadeMs);
+				if (fxIdRef.current) engine.stop(fxIdRef.current);
+			}
+			ambienceIdRef.current = null;
+			fxIdRef.current = null;
+			loadedSrcRef.current = null;
+			return;
+		}
+		const engine = getEngine();
+		let cancelled = false;
+		const run = async () => {
+			if (loadedSrcRef.current !== src) {
+				loadedSrcRef.current = src;
+				try {
+					await engine.load(ambienceManifest);
+				} catch {
+					loadedSrcRef.current = null;
+					return;
+				}
+			} else await engine.ready();
+			if (cancelled) return;
+			engine.setMasterVolume(1);
+			if (ambientProfile) {
+				const previous = ambienceIdRef.current;
+				const next = engine.play(ambientProfile, {
+					loop: true,
+					volume: 0
+				});
+				if (next) {
+					ambienceIdRef.current = next;
+					engine.fade(next, liveAmbienceTarget, crossfadeMs);
+				} else ambienceIdRef.current = null;
+				if (previous) engine.fadeOut(previous, crossfadeMs);
+			} else if (ambienceIdRef.current) {
+				engine.fadeOut(ambienceIdRef.current, crossfadeMs);
+				ambienceIdRef.current = null;
+			}
+			if (fxIdRef.current) {
+				engine.stop(fxIdRef.current);
+				fxIdRef.current = null;
+			}
+			if (fxClip) fxIdRef.current = engine.play(fxClip, {
+				loop: fxLoop,
+				volume: liveAmbienceTarget
+			});
+		};
+		run();
+		return () => {
+			cancelled = true;
+		};
+	}, [
+		ambienceManifest?.src,
+		ambientProfile,
+		sceneMood,
+		fxClip,
+		fxLoop
+	]);
+	useEffect(() => {
+		const engine = engineRef.current;
+		if (!engine) return;
+		if (ambienceIdRef.current) engine.fade(ambienceIdRef.current, liveAmbienceTarget, 350);
+		if (fxIdRef.current) engine.fade(fxIdRef.current, liveAmbienceTarget, 350);
+	}, [liveAmbienceTarget]);
+	useEffect(() => {
+		if (narrationVolumeProp === void 0) return;
+		session.setVolume(clamp01(narrationVolumeProp));
+	}, [narrationVolumeProp, session]);
+	useEffect(() => {
+		return () => {
+			engineRef.current?.dispose();
+			engineRef.current = null;
+			ambienceIdRef.current = null;
+			fxIdRef.current = null;
+		};
+	}, []);
+	const setAmbienceVolume = useCallback((value) => {
+		setAmbienceVolumeState(clamp01(value));
+	}, []);
+	const setNarrationVolume = useCallback((value) => session.setVolume(clamp01(value)), [session]);
+	const hasAmbience = Boolean(ambienceManifest?.src?.trim()) && Boolean(ambientProfile);
+	const indicatorState = isNarrating ? "narrating" : hasAmbience ? "ambient" : "silent";
+	return {
+		isPlaying: session.isPlaying,
+		isMuted: session.isMuted,
+		hasNarration: session.hasAudio,
+		hasAmbience,
+		mood: sceneMood,
+		indicatorState,
+		ambienceVolume,
+		narrationVolume: session.volume,
+		togglePlay: session.toggle,
+		toggleMute: session.toggleMute,
+		setAmbienceVolume,
+		setNarrationVolume
+	};
+}
+//#endregion
+//#region src/audio-player/skins/NarrativeFace.tsx
+/**
+* A "faceless" SAP control surface for story/reader apps. It keeps the full SAP
+* audio engine underneath — narration on the shared session, ambience/FX on the
+* sprite layer (see {@link useNarrativeAudio}) — but presents only story-native
+* controls: a soundscape indicator, play/pause, mute, and ambience + narration
+* volume, with an optional expand/settings affordance.
+*
+* It deliberately renders none of the music-player chrome (no album art,
+* artwork, shuffle, repeat, queue, or waveform), per its `narrative`-family
+* capability declaration. Pass `embedded` to pin it as a tiny bottom overlay in
+* a reader. Scene metadata (`sceneMood`, `ambientProfile`, `intensity`, …) is
+* accepted as props so a host like the Light Novels app can feed scenes in
+* without the UI changing.
+*/
+function NarrativeFace({ chapterId, sceneMood, ambientProfile, fxClip, fxLoop, ambienceManifest, narrationState, intensity, ambienceVolume, narrationVolume, duckAmount, crossfadeMs, embedded = false, showExpand = false, onExpand, className, style, ...theme }) {
+	const session = useAudioSession();
+	const narrative = useNarrativeAudio({
+		chapterId,
+		sceneMood,
+		ambientProfile,
+		fxClip,
+		fxLoop,
+		ambienceManifest,
+		narrationState,
+		intensity,
+		ambienceVolume,
+		narrationVolume,
+		duckAmount,
+		crossfadeMs
+	});
+	const handleAmbienceChange = useCallback((e) => {
+		narrative.setAmbienceVolume(Number(e.target.value) / 100);
+	}, [narrative]);
+	const showSpinner = session.isBuffering;
+	const moodLabel = narrative.mood ?? "Ambience";
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: `ap-nf${embedded ? " ap-nf--embedded" : ""} ap-nf--${narrative.indicatorState}${className ? ` ${className}` : ""}`,
+		style: {
+			...buildThemeVars(theme),
+			...style
+		},
+		role: "region",
+		"aria-label": "Narration audio",
+		"data-chapter-id": chapterId,
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "ap-nf__scape",
+				title: `Soundscape: ${moodLabel}`,
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: "ap-nf__dot",
+					"aria-hidden": "true"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: "ap-nf__mood",
+					children: moodLabel
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+				type: "button",
+				className: `ap-btn ap-btn--play ap-nf__play ap-tap${narrative.isPlaying ? " ap-btn--play-active" : ""}`,
+				onClick: narrative.togglePlay,
+				disabled: !narrative.hasNarration,
+				"aria-label": showSpinner ? "Buffering narration" : narrative.isPlaying ? "Pause narration" : "Play narration",
+				children: showSpinner ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SpinnerIcon$1, {}) : narrative.isPlaying ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PauseIcon$1, {}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlayIcon$1, {})
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "ap-nf__vol ap-nf__vol--narration",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: "ap-nf__vol-label",
+					"aria-hidden": "true",
+					children: "Voice"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(VolumeControl, {
+					volume: narrative.narrationVolume,
+					isMuted: narrative.isMuted,
+					disabled: !narrative.hasNarration,
+					volumeUnsupported: session.volumeUnsupported,
+					onVolumeChange: narrative.setNarrationVolume,
+					onToggleMute: narrative.toggleMute
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+				className: "ap-nf__vol ap-nf__vol--ambience",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: "ap-nf__vol-label",
+					children: "Ambience"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+					className: "ap-nf__range",
+					type: "range",
+					min: 0,
+					max: 100,
+					value: Math.round(narrative.ambienceVolume * 100),
+					disabled: !narrative.hasAmbience,
+					onChange: handleAmbienceChange,
+					"aria-label": "Ambience volume"
+				})]
+			}),
+			showExpand && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+				type: "button",
+				className: "ap-icon-btn ap-nf__expand ap-tap",
+				onClick: onExpand,
+				"aria-label": "Soundscape settings",
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DotsIcon$1, {})
+			})
+		]
+	});
+}
+//#endregion
 //#region src/audio-player/plugins/registry/usePluginRegistry.tsx
 var availablePlugins = [
 	{
@@ -18728,6 +19142,6 @@ function getPropertyDefaults() {
 	return acc;
 }
 //#endregion
-export { ARC_RADIUS, AUTOMIX_FADE_MS, ActivityLogContext, ActivityLogPanel, ActivityLogProvider, ActivityLogWorkspace, AgentQueueDirectorWorkspace, AnalyticsPlugin, ArcActionButton, AudioPlayer, AudioPlayer as default, AudioSessionProvider, AudioSpriteEngine, AutoThemePlugin, AutomixPlugin, BUILTIN_VISUAL_COMPONENTS, BackgroundMedia, ControllerPanelRenderer, DEFAULT_ACTIVITY_LOG_CONFIG, DEFAULT_PLUGIN_SURFACES, DefaultPluginErrorHandler, ExplicitBadge, FAMILY_DEFAULTS, FullCardPlayer, GracefulDegradation, HTML5AudioBackend, INITIAL_SURFACE_STATE, KeyboardShortcutPlugin, LYRIC_DISPLAY_ID, LibraryPlaylistsWorkspace, LibraryQueueWorkspace, LyricDisplay, LyricSettingsPanel, LyricsPlugin, MAJOR_FACES, MiniSidebarPlayer, PLAYER_FACE_CAPABILITIES, PROPERTY_GROUPS, PROPERTY_GROUP_LABELS, PROPERTY_REGISTRY, PRO_CONFIDENCE_MIN, PlaybackAutomixWorkspace, PlayerHero, PlayerSurfaceButtons, PluginError, PluginErrorBoundary, PluginErrorBoundaryFactory, PluginManager, PluginManagerPanel, PluginRegistryProvider, PluginSettingsWorkspace, ProgressBar, QueueDrawer, QueueSurface, SAPController, SEICanvasActionMenu, SEICanvasHost, SEICanvasRenderer, ScrubberCanvasHost, ScrubberCanvasRenderer, SeaCardPlayer, SleepTimerPlugin, StickyBottomPlayer, SurfaceButton, TextMarquee, TrackMetadata, VAULT_CATEGORY_META, VaultRowPlayer, VisualLyricsWorkspace, VisualSlotPicker, VisualSlotsProvider, VolumeControl, WORKSPACE_ROUTES, WaveformAdapter, WaveformPlugin, WaveformProgress, WebAudioBackend, WorkspaceShell, arcOffsets, bpmCompatibility, buildMenuTree, canEnterCanvas, checkCodecSupport, clearCustomCategories, composeEventHandlers, computePeaksFromUrl, computeTransitionPoints, contrastText, createActivityLogStore, createAnalyticsPlugin, createAudioBackend, createAudioSpriteEngine, createAutoThemePlugin, createAutomixPlugin, createKeyboardShortcutPlugin, createLyricsPlugin, createPluginErrorBoundary, createSleepTimerPlugin, createWaveformPlugin, defaultShowVolume, deriveHeroCollapsed, deserializeSession, ensureMuted, ensureProTrackAnalysis, ensureTrackAnalysis, extractPalette, extractPeaks, faceSupportsAction, faceSupportsContextualActions, faceSupportsHeroCollapse, faceSupportsSEICanvas, faceSupportsScrubberCanvas, faceSupportsWaveform, formatFeatured, formatSecondaryLine, formatTime, formatVersionedTitle, getAllVaultCategories, getAllVisualComponents, getByPropPath, getDefaultComponentForSlot, getDisplayArtist, getDisplayTitle, getFaceCapability, getFaceFamily, getGlobalErrorBoundaryFactory, getPluginCanvasSurfaceId, getPluginSettingsRoute, getPluginSurfaceDefinition, getPluginSurfaceDefinitionsByCategory, getPluginSurfaceDefinitionsForMenuBranch, getPreferredCanvasPlacement, getPrimaryTrackSource, getPropertiesForFace, getPropertiesForGroup, getPropertyDefaults, getScrubberDensity, getScrubberHeight, getTrackAnalysis, getTrackSources, getTrackTrims, getVaultCategoryMeta, getVisualComponent, getVisualComponentsForSlot, gradient, hasCanvasSurface, hasSettingsSurface, isHeadlessPlugin, isIOS, isMobileDevice, isNodeInteractive, isPluginError, isSAPDefaultPrevented, isSessionEngine, isWorkspaceRoute, lyricDefaultSettings, lyricDisplayDefinition, mergeRefs, normalizeRhythmConfidence, parseWorkspaceRoute, planTransition, quantizePixels, registerVaultCategory, registerVisualComponent, relativeLuminance, resolveMedia, rgbToCss, serializeSession, setByPropPath, setGlobalErrorHandler, shouldEnableMarquee, snapToBeat, sortPluginSurfaceDefinitions, surfaceReducer, trackKey, trackSourcesSignature, useActivePluginInstances, useActivityLog, useActivityLogRecording, useAudioPlayer, useAudioSession, useAutomix, useMediaSessionObserver, usePlayerSurface, usePluginManager, usePluginRegistry, useReducedMotion, useSAPPropGetters, useShareTrack, useVisualSlots, validateTrackSource, withErrorBoundary };
+export { ARC_RADIUS, AUTOMIX_FADE_MS, ActivityLogContext, ActivityLogPanel, ActivityLogProvider, ActivityLogWorkspace, AgentQueueDirectorWorkspace, AnalyticsPlugin, ArcActionButton, AudioPlayer, AudioPlayer as default, AudioSessionProvider, AudioSpriteEngine, AutoThemePlugin, AutomixPlugin, BUILTIN_VISUAL_COMPONENTS, BackgroundMedia, ControllerPanelRenderer, DEFAULT_ACTIVITY_LOG_CONFIG, DEFAULT_PLUGIN_SURFACES, DefaultPluginErrorHandler, ExplicitBadge, FAMILY_DEFAULTS, FullCardPlayer, GracefulDegradation, HTML5AudioBackend, INITIAL_SURFACE_STATE, KeyboardShortcutPlugin, LYRIC_DISPLAY_ID, LibraryPlaylistsWorkspace, LibraryQueueWorkspace, LyricDisplay, LyricSettingsPanel, LyricsPlugin, MAJOR_FACES, MiniSidebarPlayer, NarrativeFace, PLAYER_FACE_CAPABILITIES, PROPERTY_GROUPS, PROPERTY_GROUP_LABELS, PROPERTY_REGISTRY, PRO_CONFIDENCE_MIN, PlaybackAutomixWorkspace, PlayerHero, PlayerSurfaceButtons, PluginError, PluginErrorBoundary, PluginErrorBoundaryFactory, PluginManager, PluginManagerPanel, PluginRegistryProvider, PluginSettingsWorkspace, ProgressBar, QueueDrawer, QueueSurface, SAPController, SEICanvasActionMenu, SEICanvasHost, SEICanvasRenderer, ScrubberCanvasHost, ScrubberCanvasRenderer, SeaCardPlayer, SleepTimerPlugin, StickyBottomPlayer, SurfaceButton, TextMarquee, TrackMetadata, VAULT_CATEGORY_META, VaultRowPlayer, VisualLyricsWorkspace, VisualSlotPicker, VisualSlotsProvider, VolumeControl, WORKSPACE_ROUTES, WaveformAdapter, WaveformPlugin, WaveformProgress, WebAudioBackend, WorkspaceShell, arcOffsets, bpmCompatibility, buildMenuTree, canEnterCanvas, checkCodecSupport, clearCustomCategories, composeEventHandlers, computePeaksFromUrl, computeTransitionPoints, contrastText, createActivityLogStore, createAnalyticsPlugin, createAudioBackend, createAudioSpriteEngine, createAutoThemePlugin, createAutomixPlugin, createKeyboardShortcutPlugin, createLyricsPlugin, createPluginErrorBoundary, createSleepTimerPlugin, createWaveformPlugin, defaultShowVolume, deriveHeroCollapsed, deserializeSession, ensureMuted, ensureProTrackAnalysis, ensureTrackAnalysis, extractPalette, extractPeaks, faceSupportsAction, faceSupportsContextualActions, faceSupportsHeroCollapse, faceSupportsSEICanvas, faceSupportsScrubberCanvas, faceSupportsWaveform, formatFeatured, formatSecondaryLine, formatTime, formatVersionedTitle, getAllVaultCategories, getAllVisualComponents, getByPropPath, getDefaultComponentForSlot, getDisplayArtist, getDisplayTitle, getFaceCapability, getFaceFamily, getGlobalErrorBoundaryFactory, getPluginCanvasSurfaceId, getPluginSettingsRoute, getPluginSurfaceDefinition, getPluginSurfaceDefinitionsByCategory, getPluginSurfaceDefinitionsForMenuBranch, getPreferredCanvasPlacement, getPrimaryTrackSource, getPropertiesForFace, getPropertiesForGroup, getPropertyDefaults, getScrubberDensity, getScrubberHeight, getTrackAnalysis, getTrackSources, getTrackTrims, getVaultCategoryMeta, getVisualComponent, getVisualComponentsForSlot, gradient, hasCanvasSurface, hasSettingsSurface, isHeadlessPlugin, isIOS, isMobileDevice, isNodeInteractive, isPluginError, isSAPDefaultPrevented, isSessionEngine, isWorkspaceRoute, lyricDefaultSettings, lyricDisplayDefinition, mergeRefs, normalizeRhythmConfidence, parseWorkspaceRoute, planTransition, quantizePixels, registerVaultCategory, registerVisualComponent, relativeLuminance, resolveMedia, rgbToCss, serializeSession, setByPropPath, setGlobalErrorHandler, shouldEnableMarquee, snapToBeat, sortPluginSurfaceDefinitions, surfaceReducer, trackKey, trackSourcesSignature, useActivePluginInstances, useActivityLog, useActivityLogRecording, useAudioPlayer, useAudioSession, useAutomix, useMediaSessionObserver, useNarrativeAudio, usePlayerSurface, usePluginManager, usePluginRegistry, useReducedMotion, useSAPPropGetters, useShareTrack, useVisualSlots, validateTrackSource, withErrorBoundary };
 
 //# sourceMappingURL=index.js.map

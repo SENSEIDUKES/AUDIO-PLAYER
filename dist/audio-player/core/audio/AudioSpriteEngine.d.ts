@@ -41,12 +41,32 @@ export declare class AudioSpriteEngine {
     private loadPromise;
     private instances;
     private generation;
+    /**
+     * Desired master gain for the whole sprite layer (the "ambience volume"
+     * control points here). Stored so it survives context recreation, since
+     * `ensureContext` builds a fresh `output` GainNode at unity otherwise.
+     */
+    private masterVolume;
     private ensureContext;
+    /**
+     * Set the master output level (0..1) for the whole sprite layer. Persisted
+     * across context recreation so a later (re)load doesn't silently reset it.
+     */
+    setMasterVolume(value: number): void;
+    getMasterVolume(): number;
     load(manifest: AudioSpriteManifest): Promise<void>;
     ready(): Promise<void>;
     play(clipName: string, options?: AudioSpritePlayOptions): AudioSpriteInstanceId | null;
     stop(id: AudioSpriteInstanceId): void;
     fade(id: AudioSpriteInstanceId, toVolume: number, durationMs: number): void;
+    /**
+     * Ramp an instance to silence and then stop it. Unlike `fade(id, 0, ms)`,
+     * this releases the underlying source when the ramp completes — essential
+     * for looping clips, which otherwise keep running silently forever (a leak
+     * that accumulates one node per ambience/mood crossfade).
+     */
+    fadeOut(id: AudioSpriteInstanceId, durationMs: number): void;
+    private clearFadeStop;
     stopAll(): void;
     getActiveInstances(): AudioSpriteInstanceInfo[];
     dispose(): void;

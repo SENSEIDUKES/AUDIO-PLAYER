@@ -1002,6 +1002,21 @@ select.sap-visual-input {
     white-space: pre-wrap;
     max-height: 220px;
     overflow-y: auto;
+    scroll-behavior: smooth;
+}
+
+.sap-ctl__lyric-line {
+    transition: opacity 0.3s var(--ap-spring), transform 0.3s var(--ap-spring), font-weight 0.3s var(--ap-spring);
+    opacity: 0.4;
+    transform: scale(0.98);
+    transform-origin: left center;
+}
+
+.sap-ctl__lyric-line--active {
+    opacity: 1;
+    font-weight: 700;
+    transform: scale(1);
+    color: var(--ap-text);
 }
 
 /* Plugins list (read-only for V1). */
@@ -1236,6 +1251,7 @@ select.sap-visual-input {
        fallbacks below reproduce the original hardcoded look exactly. */
     --ap-glow-intensity: 1;
     --ap-btn-opacity-delta: 0%;
+    --ap-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
 
     position: relative;
     width: 100%;
@@ -1433,8 +1449,8 @@ select.sap-visual-input {
     -webkit-backdrop-filter: blur(10px) saturate(140%);
     backdrop-filter: blur(10px) saturate(140%);
     padding: 0;
-    transition: transform 0.12s ease, box-shadow 0.18s ease, background-color 0.18s ease,
-        border-color 0.18s ease;
+    transition: transform 0.12s var(--ap-spring), box-shadow 0.18s var(--ap-spring), background-color 0.18s var(--ap-spring),
+        border-color 0.18s var(--ap-spring);
 }
 .ap-menu__btn:hover:not(:disabled) {
     background-color: color-mix(in srgb, var(--ap-accent) calc(28% + var(--ap-btn-opacity-delta, 0%)), var(--ap-bg));
@@ -1539,7 +1555,7 @@ select.sap-visual-input {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
     transform: translate(-50%, -50%);
     pointer-events: none;
-    transition: transform 0.15s ease;
+    transition: transform 0.15s var(--ap-spring);
 }
 .ap-progress:hover .ap-progress__thumb,
 .ap-progress--seeking .ap-progress__thumb {
@@ -1625,8 +1641,11 @@ select.sap-visual-input {
     cursor: pointer;
     flex-shrink: 0;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-    transition: transform 0.12s ease, box-shadow 0.18s ease,
-        background-color 0.18s ease, border-color 0.18s ease;
+    transition: transform 0.12s var(--ap-spring), box-shadow 0.18s var(--ap-spring),
+        background-color 0.18s var(--ap-spring), border-color 0.18s var(--ap-spring);
+}
+.ap-btn svg {
+    animation: ap-pop-in 0.35s var(--ap-spring);
 }
 .ap-btn:disabled {
     cursor: not-allowed;
@@ -1746,8 +1765,11 @@ select.sap-visual-input {
         0 1px 4px rgba(0, 0, 0, 0.16);
     -webkit-backdrop-filter: blur(8px) saturate(130%);
     backdrop-filter: blur(8px) saturate(130%);
-    transition: transform 0.12s ease, box-shadow 0.18s ease, background-color 0.18s ease,
-        border-color 0.18s ease;
+    transition: transform 0.12s var(--ap-spring), box-shadow 0.18s var(--ap-spring), background-color 0.18s var(--ap-spring),
+        border-color 0.18s var(--ap-spring);
+}
+.ap-icon-btn svg {
+    animation: ap-pop-in 0.35s var(--ap-spring);
 }
 .ap-icon-btn:hover:not(:disabled) {
     background-color: color-mix(in srgb, var(--ap-text, #fff) calc(18% + var(--ap-btn-opacity-delta, 0%)), transparent);
@@ -1937,7 +1959,7 @@ select.sap-visual-input {
 /* ----------------------------- Animations ----------------------------- */
 
 .ap-tap {
-    transition: transform 0.1s ease;
+    transition: transform 0.1s var(--ap-spring);
 }
 .ap-tap:active:not(:disabled) {
     transform: scale(0.92);
@@ -2001,6 +2023,16 @@ select.sap-visual-input {
     50% {
         opacity: 1;
         transform: scaleY(1);
+    }
+}
+@keyframes ap-pop-in {
+    0% {
+        transform: scale(0.6) rotate(-10deg);
+        opacity: 0;
+    }
+    100% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
     }
 }
 
@@ -2632,6 +2664,7 @@ select.sap-visual-input {
        fallbacks below reproduce the original hardcoded look exactly. */
     --ap-glow-intensity: 1;
     --ap-btn-opacity-delta: 0%;
+    --ap-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
 
     position: relative;
     width: 100%;
@@ -2818,8 +2851,8 @@ select.sap-visual-input {
     -webkit-backdrop-filter: blur(10px) saturate(140%);
     backdrop-filter: blur(10px) saturate(140%);
     padding: 0;
-    transition: transform 0.12s ease, box-shadow 0.18s ease, background-color 0.18s ease,
-        border-color 0.18s ease;
+    transition: transform 0.12s var(--ap-spring), box-shadow 0.18s var(--ap-spring), background-color 0.18s var(--ap-spring),
+        border-color 0.18s var(--ap-spring);
 }
 .ap-menu__btn:hover:not(:disabled) {
     background-color: color-mix(in srgb, var(--ap-accent) calc(28% + var(--ap-btn-opacity-delta, 0%)), var(--ap-bg));
@@ -2920,7 +2953,7 @@ select.sap-visual-input {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
     transform: translate(-50%, -50%);
     pointer-events: none;
-    transition: transform 0.15s ease;
+    transition: transform 0.15s var(--ap-spring);
 }
 .ap-progress:hover .ap-progress__thumb,
 .ap-progress--seeking .ap-progress__thumb {
@@ -3001,8 +3034,11 @@ select.sap-visual-input {
     cursor: pointer;
     flex-shrink: 0;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-    transition: transform 0.12s ease, box-shadow 0.18s ease,
-        background-color 0.18s ease, border-color 0.18s ease;
+    transition: transform 0.12s var(--ap-spring), box-shadow 0.18s var(--ap-spring),
+        background-color 0.18s var(--ap-spring), border-color 0.18s var(--ap-spring);
+}
+.ap-btn svg {
+    animation: ap-pop-in 0.35s var(--ap-spring);
 }
 .ap-btn:disabled {
     cursor: not-allowed;
@@ -3120,8 +3156,11 @@ select.sap-visual-input {
         0 1px 4px rgba(0, 0, 0, 0.16);
     -webkit-backdrop-filter: blur(8px) saturate(130%);
     backdrop-filter: blur(8px) saturate(130%);
-    transition: transform 0.12s ease, box-shadow 0.18s ease, background-color 0.18s ease,
-        border-color 0.18s ease;
+    transition: transform 0.12s var(--ap-spring), box-shadow 0.18s var(--ap-spring), background-color 0.18s var(--ap-spring),
+        border-color 0.18s var(--ap-spring);
+}
+.ap-icon-btn svg {
+    animation: ap-pop-in 0.35s var(--ap-spring);
 }
 .ap-icon-btn:hover:not(:disabled) {
     background-color: color-mix(in srgb, var(--ap-text, #fff) calc(18% + var(--ap-btn-opacity-delta, 0%)), transparent);
@@ -3302,7 +3341,7 @@ select.sap-visual-input {
 }
 /* ----------------------------- Animations ----------------------------- */
 .ap-tap {
-    transition: transform 0.1s ease;
+    transition: transform 0.1s var(--ap-spring);
 }
 .ap-tap:active:not(:disabled) {
     transform: scale(0.92);
@@ -3362,6 +3401,16 @@ select.sap-visual-input {
     50% {
         opacity: 1;
         transform: scaleY(1);
+    }
+}
+@keyframes ap-pop-in {
+    0% {
+        transform: scale(0.6) rotate(-10deg);
+        opacity: 0;
+    }
+    100% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
     }
 }
 /* Real mobile viewports (full-bleed player on a phone). */
@@ -4926,5 +4975,129 @@ select.sap-visual-input {
         content: "";
         position: absolute;
         inset: -8px;
+    }
+}
+/* =====================================================================
+   NarrativeFace (narrative family) — a faceless story/reader surface.
+   Minimal by design: a soundscape indicator, play/pause, mute + voice
+   level, ambience level, and an optional expand control. No artwork,
+   scrubber, or music chrome. Themed via the shared --ap-* vars.
+   ===================================================================== */
+.ap-nf {
+    box-sizing: border-box;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 14px;
+    border-radius: 12px;
+    background-color: var(--ap-bg);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--ap-text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.ap-nf *,
+.ap-nf *::before,
+.ap-nf *::after {
+    box-sizing: border-box;
+}
+.ap-nf--embedded {
+    position: fixed;
+    left: 50%;
+    bottom: 16px;
+    transform: translateX(-50%);
+    width: min(560px, calc(100% - 24px));
+    z-index: 50;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+}
+/* Soundscape indicator — a quiet pulse dot + mood label. */
+.ap-nf__scape {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex: 0 1 auto;
+}
+.ap-nf__dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--ap-accent);
+    opacity: 0.35;
+    flex: none;
+}
+.ap-nf--ambient .ap-nf__dot {
+    opacity: 0.7;
+}
+.ap-nf--narrating .ap-nf__dot {
+    opacity: 1;
+    animation: ap-nf-pulse 1.8s ease-in-out infinite;
+}
+@keyframes ap-nf-pulse {
+    0%, 100% { transform: scale(1); opacity: 0.55; }
+    50% { transform: scale(1.35); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .ap-nf--narrating .ap-nf__dot { animation: none; }
+}
+.ap-nf__mood {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    text-transform: capitalize;
+    opacity: 0.85;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 120px;
+}
+.ap-nf__play {
+    flex: none;
+}
+/* Volume blocks — a small label sitting above the reused control/slider. */
+.ap-nf__vol {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+.ap-nf__vol--narration {
+    flex: 1 1 auto;
+}
+.ap-nf__vol--ambience {
+    flex: 1 1 auto;
+}
+.ap-nf__vol-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    opacity: 0.55;
+    flex: none;
+}
+.ap-nf__range {
+    width: 100%;
+    min-width: 60px;
+    accent-color: var(--ap-accent);
+    cursor: pointer;
+}
+.ap-nf__range:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+.ap-nf__expand {
+    flex: none;
+}
+/* Stack the two level controls on narrow embeds. */
+@media (max-width: 460px) {
+    .ap-nf {
+        flex-wrap: wrap;
+        gap: 8px 12px;
+    }
+    .ap-nf__vol--narration,
+    .ap-nf__vol--ambience {
+        flex: 1 1 100%;
     }
 }

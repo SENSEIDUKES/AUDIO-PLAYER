@@ -625,10 +625,10 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
     }, [])
 
     const themeVars = {
-        "--ap-accent": accentColor === "#FFFFFF" && dynamicColor ? dynamicColor : accentColor,
+        "--ap-accent": accentColor?.toUpperCase() === "#FFFFFF" && dynamicColor ? dynamicColor : accentColor,
         "--ap-play-icon": playIconColor,
         "--ap-text": textColor,
-        "--ap-progress": progressColor === "#FFFFFF" && dynamicColor ? dynamicColor : progressColor,
+        "--ap-progress": progressColor?.toUpperCase() === "#FFFFFF" && dynamicColor ? dynamicColor : progressColor,
         "--ap-track": trackColor,
         "--ap-bg": backgroundColor,
         "--ap-glow": glowColor === "transparent" && dynamicColor ? dynamicColor : glowColor,

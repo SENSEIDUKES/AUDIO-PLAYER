@@ -36,21 +36,26 @@ export function useArtworkColor(src: string | undefined): string | null {
 
                 let r = 0,
                     g = 0,
-                    b = 0
+                    b = 0,
+                    totalAlpha = 0
 
                 for (let i = 0; i < imageData.length; i += 4) {
-                    r += imageData[i]
-                    g += imageData[i + 1]
-                    b += imageData[i + 2]
+                    const a = imageData[i + 3]
+                    r += imageData[i] * a
+                    g += imageData[i + 1] * a
+                    b += imageData[i + 2] * a
+                    totalAlpha += a
                 }
 
-                const pixelCount = imageData.length / 4
-                setColor(
-                    `rgb(${Math.round(r / pixelCount)}, ${Math.round(g / pixelCount)}, ${Math.round(b / pixelCount)})`
-                )
+                if (totalAlpha === 0) {
+                    setColor(null)
+                } else {
+                    setColor(
+                        `rgb(${Math.round(r / totalAlpha)}, ${Math.round(g / totalAlpha)}, ${Math.round(b / totalAlpha)})`
+                    )
+                }
             } catch (err) {
                 // Ignore CORS errors (canvas tainted)
-                console.warn("[useArtworkColor] Could not extract color:", err)
                 if (isMounted) setColor(null)
             }
         }

@@ -7,7 +7,7 @@
  * face, not of the current viewport.
  */
 /** Every player face the library ships. */
-export type PlayerFace = "fullCard" | "miniSidebar" | "seaCard" | "stickyBottom" | "vaultRow" | "portable";
+export type PlayerFace = "fullCard" | "miniSidebar" | "seaCard" | "stickyBottom" | "vaultRow" | "portable" | "narrative";
 /**
  * The two player families. Every face belongs to exactly one, and inherits that
  * family's capability defaults (overriding only the few deltas it needs).
@@ -20,8 +20,14 @@ export type PlayerFace = "fullCard" | "miniSidebar" | "seaCard" | "stickyBottom"
  *   button. No SEICanvas/waveform, no per-instance scrubber (the stickyBottom
  *   master owns the shared scrubber for the family). The list/bar/widget faces
  *   (miniSidebar, stickyBottom, vaultRow, and a future queueRow).
+ * - `narrative` — a "faceless" control surface for story/reader apps. It keeps
+ *   the full SAP audio engine underneath (narration on the shared session,
+ *   ambience/FX on the sprite layer) but exposes only story-native controls:
+ *   a soundscape indicator, play/pause, mute, and ambience/narration volume.
+ *   Every music-player capability is off (no SEICanvas, scrubber, waveform,
+ *   contextual/action menus, or hero), so it embeds as a tiny inline overlay.
  */
-export type PlayerFamily = "primary" | "compact";
+export type PlayerFamily = "primary" | "compact" | "narrative";
 export type ScrubberDensity = "compact" | "standard" | "expanded";
 export type PlayerFaceCapability = {
     /** The family this face belongs to; its capability defaults flow from here. */
