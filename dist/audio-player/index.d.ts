@@ -16,6 +16,11 @@ export { AnalyticsPlugin, createAnalyticsPlugin, } from './plugins/AnalyticsPlug
 export { LyricsPlugin, createLyricsPlugin, } from './plugins/LyricsPlugin';
 export { SleepTimerPlugin, createSleepTimerPlugin, } from './plugins/SleepTimerPlugin';
 export { WaveformPlugin, createWaveformPlugin, } from './plugins/WaveformPlugin';
+export { CueManifestPlugin, createCueManifestPlugin, } from './cues/CueManifestPlugin';
+export { validateCueManifest } from './cues/cueManifestSchema';
+export { CueRuntime } from './cues/cueRuntime';
+export { useNarrativeCueController, } from './cues/useNarrativeCueController';
+export type { UseNarrativeCueControllerOptions, NarrativeCueControllerState, } from './cues/useNarrativeCueController';
 export { ensureTrackAnalysis, getTrackTrims, } from './automix/silenceAnalysis';
 export { ensureProTrackAnalysis, getTrackAnalysis, } from './automix/trackAnalysis';
 export { PRO_CONFIDENCE_MIN, bpmCompatibility, computeTransitionPoints, normalizeRhythmConfidence, planTransition, snapToBeat, } from './automix/transitionPlanner';
@@ -92,6 +97,7 @@ export type { AnalyticsEventPayload, AnalyticsEventType, AnalyticsPluginConfig, 
 export type { LyricsPluginConfig, TimedLyricLine, } from './plugins/LyricsPlugin';
 export type { SleepTimerPluginConfig, SleepTimerPreset, SleepTimerState, } from './plugins/SleepTimerPlugin';
 export type { WaveformPluginConfig } from './plugins/WaveformPlugin';
+export type { CueAction, CueEvent, CueManifest, } from './cues/cueTypes';
 export { PluginRegistryProvider, usePluginRegistry, useActivePluginInstances, } from './plugins/registry/usePluginRegistry';
 export { PluginManagerPanel } from './plugins/registry/PluginManagerPanel';
 export type { PluginRegistryEntry, InstalledPluginRecord, PluginRegistrySnapshot, } from './plugins/registry/usePluginRegistry';

@@ -2,6 +2,7 @@ import { CSSProperties, ReactNode } from 'react';
 import { AudioPlayerPlugin } from './core/plugins/PluginInterface';
 import { MediaSource } from './properties/propertyTypes';
 import { AudioBackendErrorCode, AudioBackendInfo, AudioBackendKind } from './core/audio/AudioBackend';
+import { CueManifest } from './cues/cueTypes';
 /**
  * Vault identity category. Drives a row's visual identity (accent color + label)
  * in the Vault list — demos, beats, mixes, masters, memos, Arc Notes, tracks
@@ -83,6 +84,12 @@ export interface Track {
     /** Artwork URL for the lock screen / OS media UI. When set, this is
      *  preferred over the player's background image for Media Session artwork. */
     artwork?: string;
+    /** Generic JSON CueManifest containing time-based events */
+    cueManifest?: CueManifest;
+    /** URL to fetch a generic CueManifest asynchronously */
+    cueManifestUrl?: string;
+    /** Signatures for cue or metadata validation by plugins */
+    metadataSignatures?: string[];
 }
 /** Theme colors. Applied to the player root as CSS custom properties. */
 export interface AudioPlayerTheme {

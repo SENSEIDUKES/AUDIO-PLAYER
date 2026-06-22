@@ -4091,6 +4091,10 @@ var $ZodBoolean = /*@__PURE__*/ $constructor("$ZodBoolean", (inst, def) => {
 		return payload;
 	};
 });
+var $ZodAny = /*@__PURE__*/ $constructor("$ZodAny", (inst, def) => {
+	$ZodType.init(inst, def);
+	inst._zod.parse = (payload) => payload;
+});
 var $ZodUnknown = /*@__PURE__*/ $constructor("$ZodUnknown", (inst, def) => {
 	$ZodType.init(inst, def);
 	inst._zod.parse = (payload) => payload;
@@ -4435,6 +4439,62 @@ var $ZodUnion = /*@__PURE__*/ $constructor("$ZodUnion", (inst, def) => {
 		});
 	};
 });
+var $ZodDiscriminatedUnion = /*@__PURE__*/ $constructor("$ZodDiscriminatedUnion", (inst, def) => {
+	def.inclusive = false;
+	$ZodUnion.init(inst, def);
+	const _super = inst._zod.parse;
+	defineLazy(inst._zod, "propValues", () => {
+		const propValues = {};
+		for (const option of def.options) {
+			const pv = option._zod.propValues;
+			if (!pv || Object.keys(pv).length === 0) throw new Error(`Invalid discriminated union option at index "${def.options.indexOf(option)}"`);
+			for (const [k, v] of Object.entries(pv)) {
+				if (!propValues[k]) propValues[k] = /* @__PURE__ */ new Set();
+				for (const val of v) propValues[k].add(val);
+			}
+		}
+		return propValues;
+	});
+	const disc = cached(() => {
+		const opts = def.options;
+		const map = /* @__PURE__ */ new Map();
+		for (const o of opts) {
+			const values = o._zod.propValues?.[def.discriminator];
+			if (!values || values.size === 0) throw new Error(`Invalid discriminated union option at index "${def.options.indexOf(o)}"`);
+			for (const v of values) {
+				if (map.has(v)) throw new Error(`Duplicate discriminator value "${String(v)}"`);
+				map.set(v, o);
+			}
+		}
+		return map;
+	});
+	inst._zod.parse = (payload, ctx) => {
+		const input = payload.value;
+		if (!isObject(input)) {
+			payload.issues.push({
+				code: "invalid_type",
+				expected: "object",
+				input,
+				inst
+			});
+			return payload;
+		}
+		const opt = disc.value.get(input?.[def.discriminator]);
+		if (opt) return opt._zod.run(payload, ctx);
+		if (def.unionFallback || ctx.direction === "backward") return _super(payload, ctx);
+		payload.issues.push({
+			code: "invalid_union",
+			errors: [],
+			note: "No matching discriminator",
+			discriminator: def.discriminator,
+			options: Array.from(disc.value.keys()),
+			input,
+			path: [def.discriminator],
+			inst
+		});
+		return payload;
+	};
+});
 var $ZodIntersection = /*@__PURE__*/ $constructor("$ZodIntersection", (inst, def) => {
 	$ZodType.init(inst, def);
 	inst._zod.parse = (payload, ctx) => {
@@ -4534,6 +4594,115 @@ function handleIntersectionResults(result, left, right) {
 	result.value = merged.data;
 	return result;
 }
+var $ZodRecord = /*@__PURE__*/ $constructor("$ZodRecord", (inst, def) => {
+	$ZodType.init(inst, def);
+	inst._zod.parse = (payload, ctx) => {
+		const input = payload.value;
+		if (!isPlainObject(input)) {
+			payload.issues.push({
+				expected: "record",
+				code: "invalid_type",
+				input,
+				inst
+			});
+			return payload;
+		}
+		const proms = [];
+		const values = def.keyType._zod.values;
+		if (values) {
+			payload.value = {};
+			const recordKeys = /* @__PURE__ */ new Set();
+			for (const key of values) if (typeof key === "string" || typeof key === "number" || typeof key === "symbol") {
+				recordKeys.add(typeof key === "number" ? key.toString() : key);
+				const keyResult = def.keyType._zod.run({
+					value: key,
+					issues: []
+				}, ctx);
+				if (keyResult instanceof Promise) throw new Error("Async schemas not supported in object keys currently");
+				if (keyResult.issues.length) {
+					payload.issues.push({
+						code: "invalid_key",
+						origin: "record",
+						issues: keyResult.issues.map((iss) => finalizeIssue(iss, ctx, config())),
+						input: key,
+						path: [key],
+						inst
+					});
+					continue;
+				}
+				const outKey = keyResult.value;
+				const result = def.valueType._zod.run({
+					value: input[key],
+					issues: []
+				}, ctx);
+				if (result instanceof Promise) proms.push(result.then((result) => {
+					if (result.issues.length) payload.issues.push(...prefixIssues(key, result.issues));
+					payload.value[outKey] = result.value;
+				}));
+				else {
+					if (result.issues.length) payload.issues.push(...prefixIssues(key, result.issues));
+					payload.value[outKey] = result.value;
+				}
+			}
+			let unrecognized;
+			for (const key in input) if (!recordKeys.has(key)) {
+				unrecognized = unrecognized ?? [];
+				unrecognized.push(key);
+			}
+			if (unrecognized && unrecognized.length > 0) payload.issues.push({
+				code: "unrecognized_keys",
+				input,
+				inst,
+				keys: unrecognized
+			});
+		} else {
+			payload.value = {};
+			for (const key of Reflect.ownKeys(input)) {
+				if (key === "__proto__") continue;
+				if (!Object.prototype.propertyIsEnumerable.call(input, key)) continue;
+				let keyResult = def.keyType._zod.run({
+					value: key,
+					issues: []
+				}, ctx);
+				if (keyResult instanceof Promise) throw new Error("Async schemas not supported in object keys currently");
+				if (typeof key === "string" && number$1.test(key) && keyResult.issues.length) {
+					const retryResult = def.keyType._zod.run({
+						value: Number(key),
+						issues: []
+					}, ctx);
+					if (retryResult instanceof Promise) throw new Error("Async schemas not supported in object keys currently");
+					if (retryResult.issues.length === 0) keyResult = retryResult;
+				}
+				if (keyResult.issues.length) {
+					if (def.mode === "loose") payload.value[key] = input[key];
+					else payload.issues.push({
+						code: "invalid_key",
+						origin: "record",
+						issues: keyResult.issues.map((iss) => finalizeIssue(iss, ctx, config())),
+						input: key,
+						path: [key],
+						inst
+					});
+					continue;
+				}
+				const result = def.valueType._zod.run({
+					value: input[key],
+					issues: []
+				}, ctx);
+				if (result instanceof Promise) proms.push(result.then((result) => {
+					if (result.issues.length) payload.issues.push(...prefixIssues(key, result.issues));
+					payload.value[keyResult.value] = result.value;
+				}));
+				else {
+					if (result.issues.length) payload.issues.push(...prefixIssues(key, result.issues));
+					payload.value[keyResult.value] = result.value;
+				}
+			}
+		}
+		if (proms.length) return Promise.all(proms).then(() => payload);
+		return payload;
+	};
+});
 var $ZodEnum = /*@__PURE__*/ $constructor("$ZodEnum", (inst, def) => {
 	$ZodType.init(inst, def);
 	const values = getEnumValues(def.entries);
@@ -4546,6 +4715,24 @@ var $ZodEnum = /*@__PURE__*/ $constructor("$ZodEnum", (inst, def) => {
 		payload.issues.push({
 			code: "invalid_value",
 			values,
+			input,
+			inst
+		});
+		return payload;
+	};
+});
+var $ZodLiteral = /*@__PURE__*/ $constructor("$ZodLiteral", (inst, def) => {
+	$ZodType.init(inst, def);
+	if (def.values.length === 0) throw new Error("Cannot create literal schema with no valid values");
+	const values = new Set(def.values);
+	inst._zod.values = values;
+	inst._zod.pattern = new RegExp(`^(${def.values.map((o) => typeof o === "string" ? escapeRegex(o) : o ? escapeRegex(o.toString()) : String(o)).join("|")})$`);
+	inst._zod.parse = (payload, _ctx) => {
+		const input = payload.value;
+		if (values.has(input)) return payload;
+		payload.issues.push({
+			code: "invalid_value",
+			values: def.values,
 			input,
 			inst
 		});
@@ -5130,6 +5317,10 @@ function _boolean(Class, params) {
 	});
 }
 // @__NO_SIDE_EFFECTS__
+function _any(Class) {
+	return new Class({ type: "any" });
+}
+// @__NO_SIDE_EFFECTS__
 function _unknown(Class) {
 	return new Class({ type: "unknown" });
 }
@@ -5699,6 +5890,27 @@ var enumProcessor = (schema, _ctx, json, _params) => {
 	if (values.every((v) => typeof v === "string")) json.type = "string";
 	json.enum = values;
 };
+var literalProcessor = (schema, ctx, json, _params) => {
+	const def = schema._zod.def;
+	const vals = [];
+	for (const val of def.values) if (val === void 0) {
+		if (ctx.unrepresentable === "throw") throw new Error("Literal `undefined` cannot be represented in JSON Schema");
+	} else if (typeof val === "bigint") if (ctx.unrepresentable === "throw") throw new Error("BigInt literals cannot be represented in JSON Schema");
+	else vals.push(Number(val));
+	else vals.push(val);
+	if (vals.length === 0) {} else if (vals.length === 1) {
+		const val = vals[0];
+		json.type = val === null ? "null" : typeof val;
+		if (ctx.target === "draft-04" || ctx.target === "openapi-3.0") json.enum = [val];
+		else json.const = val;
+	} else {
+		if (vals.every((v) => typeof v === "number")) json.type = "number";
+		if (vals.every((v) => typeof v === "string")) json.type = "string";
+		if (vals.every((v) => typeof v === "boolean")) json.type = "boolean";
+		if (vals.every((v) => v === null)) json.type = "null";
+		json.enum = vals;
+	}
+};
 var customProcessor = (_schema, ctx, _json, _params) => {
 	if (ctx.unrepresentable === "throw") throw new Error("Custom types cannot be represented in JSON Schema");
 };
@@ -5780,6 +5992,39 @@ var intersectionProcessor = (schema, ctx, json, params) => {
 	});
 	const isSimpleIntersection = (val) => "allOf" in val && Object.keys(val).length === 1;
 	json.allOf = [...isSimpleIntersection(a) ? a.allOf : [a], ...isSimpleIntersection(b) ? b.allOf : [b]];
+};
+var recordProcessor = (schema, ctx, _json, params) => {
+	const json = _json;
+	const def = schema._zod.def;
+	json.type = "object";
+	const keyType = def.keyType;
+	const patterns = keyType._zod.bag?.patterns;
+	if (def.mode === "loose" && patterns && patterns.size > 0) {
+		const valueSchema = process$1(def.valueType, ctx, {
+			...params,
+			path: [
+				...params.path,
+				"patternProperties",
+				"*"
+			]
+		});
+		json.patternProperties = {};
+		for (const pattern of patterns) json.patternProperties[pattern.source] = valueSchema;
+	} else {
+		if (ctx.target === "draft-07" || ctx.target === "draft-2020-12") json.propertyNames = process$1(def.keyType, ctx, {
+			...params,
+			path: [...params.path, "propertyNames"]
+		});
+		json.additionalProperties = process$1(def.valueType, ctx, {
+			...params,
+			path: [...params.path, "additionalProperties"]
+		});
+	}
+	const keyValues = keyType._zod.values;
+	if (keyValues) {
+		const validKeyValues = [...keyValues].filter((v) => typeof v === "string" || typeof v === "number");
+		if (validKeyValues.length > 0) json.required = validKeyValues;
+	}
 };
 var nullableProcessor = (schema, ctx, json, params) => {
 	const def = schema._zod.def;
@@ -6325,6 +6570,14 @@ var ZodBoolean = /*@__PURE__*/ $constructor("ZodBoolean", (inst, def) => {
 function boolean(params) {
 	return /* @__PURE__ */ _boolean(ZodBoolean, params);
 }
+var ZodAny = /*@__PURE__*/ $constructor("ZodAny", (inst, def) => {
+	$ZodAny.init(inst, def);
+	ZodType.init(inst, def);
+	inst._zod.processJSONSchema = (ctx, json, params) => void 0;
+});
+function any() {
+	return /* @__PURE__ */ _any(ZodAny);
+}
 var ZodUnknown = /*@__PURE__*/ $constructor("ZodUnknown", (inst, def) => {
 	$ZodUnknown.init(inst, def);
 	ZodType.init(inst, def);
@@ -6451,6 +6704,18 @@ function union(options, params) {
 		...normalizeParams(params)
 	});
 }
+var ZodDiscriminatedUnion = /*@__PURE__*/ $constructor("ZodDiscriminatedUnion", (inst, def) => {
+	ZodUnion.init(inst, def);
+	$ZodDiscriminatedUnion.init(inst, def);
+});
+function discriminatedUnion(discriminator, options, params) {
+	return new ZodDiscriminatedUnion({
+		type: "union",
+		options,
+		discriminator,
+		...normalizeParams(params)
+	});
+}
 var ZodIntersection = /*@__PURE__*/ $constructor("ZodIntersection", (inst, def) => {
 	$ZodIntersection.init(inst, def);
 	ZodType.init(inst, def);
@@ -6461,6 +6726,27 @@ function intersection(left, right) {
 		type: "intersection",
 		left,
 		right
+	});
+}
+var ZodRecord = /*@__PURE__*/ $constructor("ZodRecord", (inst, def) => {
+	$ZodRecord.init(inst, def);
+	ZodType.init(inst, def);
+	inst._zod.processJSONSchema = (ctx, json, params) => recordProcessor(inst, ctx, json, params);
+	inst.keyType = def.keyType;
+	inst.valueType = def.valueType;
+});
+function record(keyType, valueType, params) {
+	if (!valueType || !valueType._zod) return new ZodRecord({
+		type: "record",
+		keyType: string(),
+		valueType: keyType,
+		...normalizeParams(valueType)
+	});
+	return new ZodRecord({
+		type: "record",
+		keyType,
+		valueType,
+		...normalizeParams(params)
 	});
 }
 var ZodEnum = /*@__PURE__*/ $constructor("ZodEnum", (inst, def) => {
@@ -6497,6 +6783,23 @@ function _enum(values, params) {
 	return new ZodEnum({
 		type: "enum",
 		entries: Array.isArray(values) ? Object.fromEntries(values.map((v) => [v, v])) : values,
+		...normalizeParams(params)
+	});
+}
+var ZodLiteral = /*@__PURE__*/ $constructor("ZodLiteral", (inst, def) => {
+	$ZodLiteral.init(inst, def);
+	ZodType.init(inst, def);
+	inst._zod.processJSONSchema = (ctx, json, params) => literalProcessor(inst, ctx, json, params);
+	inst.values = new Set(def.values);
+	Object.defineProperty(inst, "value", { get() {
+		if (def.values.length > 1) throw new Error("This schema contains multiple valid literal values. Use `.values` instead.");
+		return def.values[0];
+	} });
+});
+function literal(value, params) {
+	return new ZodLiteral({
+		type: "literal",
+		values: Array.isArray(value) ? value : [value],
 		...normalizeParams(params)
 	});
 }
@@ -16498,6 +16801,412 @@ function createWaveformPlugin(config = {}) {
 	return new WaveformPlugin(config);
 }
 //#endregion
+//#region src/audio-player/cues/cueRuntime.ts
+var CueRuntime = class {
+	context;
+	firedCueIds = /* @__PURE__ */ new Set();
+	timeCues;
+	cueMap = /* @__PURE__ */ new Map();
+	triggerMap = /* @__PURE__ */ new Map();
+	lastTime = 0;
+	activeSprites = /* @__PURE__ */ new Map();
+	constructor(context, manifest) {
+		this.context = context;
+		this.timeCues = manifest.cues.filter((c) => c.trigger.kind === "time").sort((a, b) => {
+			return (a.trigger.kind === "time" ? a.trigger.at : 0) - (b.trigger.kind === "time" ? b.trigger.at : 0);
+		});
+		for (const cue of manifest.cues) {
+			if (cue.id) this.cueMap.set(cue.id, cue);
+			if (cue.trigger.kind !== "time") {
+				const triggerKey = `${cue.trigger.kind}:${cue.trigger.value}`;
+				if (!this.triggerMap.has(triggerKey)) this.triggerMap.set(triggerKey, []);
+				this.triggerMap.get(triggerKey).push(cue);
+			}
+		}
+		if (manifest.assets?.spritePacks && this.context.sounds) {
+			const packToLoad = manifest.assets.spritePacks["default"] || Object.values(manifest.assets.spritePacks)[0];
+			if (packToLoad) this.context.sounds.loadSpritePack(packToLoad).catch((e) => {
+				console.warn("SAP Cues: Failed to load sprite pack", e);
+			});
+		}
+	}
+	reset() {
+		this.firedCueIds.clear();
+		this.lastTime = 0;
+		if (this.context.sounds) for (const ids of this.activeSprites.values()) for (const id of ids) this.context.sounds.stopSprite(id);
+		this.activeSprites.clear();
+	}
+	handleTimeUpdate(currentTime, isSeeking = false) {
+		for (const cue of this.timeCues) {
+			if (cue.trigger.kind !== "time") continue;
+			const hasFired = this.firedCueIds.has(cue.id);
+			const triggerTime = cue.trigger.at;
+			if (isSeeking && currentTime < triggerTime) {
+				if (cue.replayable) this.firedCueIds.delete(cue.id);
+				continue;
+			}
+			if (!hasFired && currentTime >= triggerTime) {
+				if (isSeeking && !cue.fireOnSeek) {
+					this.firedCueIds.add(cue.id);
+					continue;
+				}
+				if (isSeeking || this.lastTime <= triggerTime && currentTime >= triggerTime) {
+					this.firedCueIds.add(cue.id);
+					this.executeActions(cue.actions);
+				}
+			}
+		}
+		this.lastTime = currentTime;
+	}
+	/** Manually execute a cue by its ID, ignoring time checks. */
+	executeCueById(id) {
+		const cue = this.cueMap.get(id);
+		if (cue) this.executeActions(cue.actions);
+	}
+	/** Execute any cues matching the given trigger kind and value. */
+	executeCueByTrigger(kind, value) {
+		const triggerKey = `${kind}:${value}`;
+		const cues = this.triggerMap.get(triggerKey);
+		if (cues) for (const cue of cues) this.executeActions(cue.actions);
+	}
+	executeActions(actions) {
+		for (const action of actions) try {
+			switch (action.command) {
+				case "sprite.play":
+					if (this.context.sounds) {
+						const id = this.context.sounds.playSprite(action.clip, {
+							loop: action.loop,
+							volume: action.volume
+						});
+						if (id) {
+							const key = `${action.pack || "default"}:${action.clip}`;
+							if (!this.activeSprites.has(key)) this.activeSprites.set(key, []);
+							this.activeSprites.get(key).push(id);
+						}
+					}
+					break;
+				case "sprite.stop":
+					if (this.context.sounds) if (action.clip) {
+						const key = `${action.pack || "default"}:${action.clip}`;
+						const ids = this.activeSprites.get(key);
+						if (ids) {
+							for (const id of ids) this.context.sounds.stopSprite(id);
+							this.activeSprites.delete(key);
+						}
+					} else {
+						for (const ids of this.activeSprites.values()) for (const id of ids) this.context.sounds.stopSprite(id);
+						this.activeSprites.clear();
+					}
+					break;
+				case "sprite.fade":
+					if (this.context.sounds) {
+						const key = `${action.pack || "default"}:${action.clip}`;
+						const ids = this.activeSprites.get(key);
+						if (ids) for (const id of ids) this.context.sounds.fadeSprite(id, action.volume, action.durationMs);
+					}
+					break;
+				case "player.seek":
+					this.context.getEngine().seek(action.time);
+					break;
+				case "player.pause":
+					this.context.getEngine().pause();
+					break;
+				case "event.emit":
+					(this.context.getRootElement() || window).dispatchEvent(new CustomEvent(action.eventName, {
+						detail: action.detail,
+						bubbles: true
+					}));
+					break;
+				case "ambience.crossfade":
+				case "duck.set":
+				case "volume.fadeNarration":
+				case "layer.set":
+				case "spatial.pan":
+					(this.context.getRootElement() || window).dispatchEvent(new CustomEvent("sap-narrative-cue", {
+						detail: action,
+						bubbles: true
+					}));
+					break;
+			}
+		} catch (e) {
+			console.error("SAP Cues: Failed to execute cue action", action, e);
+		}
+	}
+};
+var cueTriggerSchema = union([object({
+	kind: literal("time"),
+	at: number()
+}), object({
+	kind: _enum([
+		"scene",
+		"paragraph",
+		"chapter",
+		"metadata",
+		"tension",
+		"powerShift",
+		"emotion",
+		"relationshipShift",
+		"danger",
+		"element",
+		"signature",
+		"intensity"
+	]),
+	value: union([string(), number()])
+})]);
+var cueActionSchema = discriminatedUnion("command", [
+	object({
+		command: literal("sprite.play"),
+		pack: string(),
+		clip: string(),
+		loop: boolean().optional(),
+		fadeInMs: number().optional(),
+		volume: number().optional()
+	}),
+	object({
+		command: literal("sprite.stop"),
+		pack: string().optional(),
+		clip: string().optional(),
+		fadeOutMs: number().optional()
+	}),
+	object({
+		command: literal("sprite.fade"),
+		pack: string(),
+		clip: string(),
+		volume: number(),
+		durationMs: number()
+	}),
+	object({
+		command: literal("ambience.crossfade"),
+		profile: string(),
+		durationMs: number().optional()
+	}),
+	object({
+		command: literal("duck.set"),
+		amount: number()
+	}),
+	object({
+		command: literal("volume.fadeNarration"),
+		volume: number(),
+		durationMs: number()
+	}),
+	object({
+		command: literal("player.seek"),
+		time: number()
+	}),
+	object({ command: literal("player.pause") }),
+	object({
+		command: literal("event.emit"),
+		eventName: string(),
+		detail: unknown().optional()
+	}),
+	object({
+		command: literal("layer.set"),
+		layer: string(),
+		state: union([string(), number()])
+	}),
+	object({
+		command: literal("spatial.pan"),
+		pack: string().optional(),
+		clip: string().optional(),
+		x: number(),
+		y: number(),
+		z: number(),
+		durationMs: number().optional()
+	})
+]);
+var cueEventSchema = object({
+	id: string().optional().transform((val) => val || `cue-${Math.random().toString(36).slice(2, 9)}`),
+	trigger: cueTriggerSchema,
+	actions: array(any().transform((val) => {
+		const parsed = cueActionSchema.safeParse(val);
+		if (!parsed.success) {
+			console.warn("SAP Cues: Ignoring invalid action:", parsed.error);
+			return null;
+		}
+		return parsed.data;
+	})).transform((actions) => actions.filter((a) => a !== null)),
+	replayable: boolean().optional(),
+	fireOnSeek: boolean().optional()
+});
+var audioSpriteClipSchema = object({
+	offset: number(),
+	duration: number(),
+	volume: number().optional(),
+	loop: boolean().optional()
+});
+var audioSpriteManifestSchema = object({
+	src: string(),
+	clips: record(string(), audioSpriteClipSchema)
+});
+var cueManifestSchema = object({
+	version: literal("sap-cues/1"),
+	id: string().optional(),
+	metadata: record(string(), unknown()).optional(),
+	assets: object({ spritePacks: record(string(), audioSpriteManifestSchema).optional() }).optional(),
+	cues: array(any().transform((val, _ctx) => {
+		const parsed = cueEventSchema.safeParse(val);
+		if (!parsed.success) {
+			console.warn("SAP Cues: Ignoring invalid cue:", parsed.error);
+			return null;
+		}
+		return parsed.data;
+	})).transform((cues) => cues.filter((c) => c !== null))
+});
+function validateCueManifest(json) {
+	try {
+		const parsed = cueManifestSchema.safeParse(json);
+		if (parsed.success) return parsed.data;
+		console.warn("SAP Cues: Manifest validation failed entirely.", parsed.error);
+		return null;
+	} catch (e) {
+		console.error("SAP Cues: Validation threw an exception", e);
+		return null;
+	}
+}
+//#endregion
+//#region src/audio-player/cues/CueManifestPlugin.ts
+var CueManifestPlugin = class {
+	name = "cueManifest";
+	context = null;
+	runtime = null;
+	abortController = null;
+	init(context) {
+		this.context = context;
+		this.handleDispatchCue = this.handleDispatchCue.bind(this);
+		(this.context.getRootElement() || window).addEventListener("sap-dispatch-cue", this.handleDispatchCue);
+	}
+	destroy() {
+		if (this.context) (this.context.getRootElement() || window).removeEventListener("sap-dispatch-cue", this.handleDispatchCue);
+		this.cleanup();
+		this.context = null;
+	}
+	handleDispatchCue(e) {
+		if (!this.runtime) return;
+		const detail = e.detail;
+		if (!detail) return;
+		if (detail.id) this.runtime.executeCueById(detail.id);
+		else if (detail.kind && detail.value !== void 0) this.runtime.executeCueByTrigger(detail.kind, detail.value);
+	}
+	cleanup() {
+		if (this.abortController) {
+			this.abortController.abort();
+			this.abortController = null;
+		}
+		if (this.runtime) {
+			this.runtime.reset();
+			this.runtime = null;
+		}
+	}
+	onTrackLoad(track) {
+		this.cleanup();
+		if (!track || !this.context) return;
+		if (track.cueManifest) {
+			const manifest = validateCueManifest(track.cueManifest);
+			if (manifest) this.runtime = new CueRuntime(this.context, manifest);
+		} else if (track.cueManifestUrl) {
+			this.abortController = new AbortController();
+			fetch(track.cueManifestUrl, { signal: this.abortController.signal }).then((res) => {
+				if (!res.ok) throw new Error(`Failed to fetch cue manifest: ${res.status} ${res.statusText}`);
+				return res.json();
+			}).then((data) => {
+				const manifest = validateCueManifest(data);
+				if (manifest && this.context) this.runtime = new CueRuntime(this.context, manifest);
+			}).catch((e) => {
+				if (e.name !== "AbortError") console.warn("Failed to fetch cue manifest from URL:", e);
+			});
+		}
+	}
+	onTimeUpdate(position) {
+		if (this.runtime && this.context) this.runtime.handleTimeUpdate(position, false);
+	}
+	onSeek(position) {
+		if (this.runtime) this.runtime.handleTimeUpdate(position, true);
+	}
+	onStop() {
+		this.cleanup();
+	}
+};
+function createCueManifestPlugin() {
+	return new CueManifestPlugin();
+}
+//#endregion
+//#region src/audio-player/cues/useNarrativeCueController.ts
+/**
+* A host-facing React hook that acts as the bridge between generic Cue Manifest
+* events and the SAP narrative audio engine.
+*/
+function useNarrativeCueController(options = {}) {
+	const { eventTarget } = options;
+	const [state, setState] = useState({
+		sceneMood: void 0,
+		ambientProfile: void 0,
+		fxClip: void 0,
+		fxLoop: false,
+		duckAmount: .6,
+		intensity: 1,
+		chapterId: void 0
+	});
+	useEffect(() => {
+		const target = eventTarget || (typeof window !== "undefined" ? window : null);
+		if (!target) return;
+		const handler = (e) => {
+			const action = e.detail;
+			if (!action || !action.command) return;
+			setState((s) => {
+				const next = { ...s };
+				switch (action.command) {
+					case "ambience.crossfade":
+						next.ambientProfile = action.profile;
+						break;
+					case "duck.set":
+						next.duckAmount = action.amount;
+						break;
+				}
+				return next;
+			});
+		};
+		target.addEventListener("sap-narrative-cue", handler);
+		return () => target.removeEventListener("sap-narrative-cue", handler);
+	}, [eventTarget]);
+	const dispatchCueEvent = useCallback((trigger) => {
+		const target = eventTarget || (typeof window !== "undefined" ? window : null);
+		if (!target) return;
+		target.dispatchEvent(new CustomEvent("sap-dispatch-cue", {
+			detail: trigger,
+			bubbles: true
+		}));
+	}, [eventTarget]);
+	return {
+		/** Options to spread into `useNarrativeAudio`. */
+		narrativeOptions: state,
+		dispatchCueEvent,
+		enterScene: useCallback((sceneId) => {
+			dispatchCueEvent({
+				kind: "scene",
+				value: sceneId
+			});
+		}, [dispatchCueEvent]),
+		enterParagraph: useCallback((paragraphId) => {
+			dispatchCueEvent({
+				kind: "paragraph",
+				value: paragraphId
+			});
+		}, [dispatchCueEvent]),
+		enterChapter: useCallback((chapterId) => {
+			dispatchCueEvent({
+				kind: "chapter",
+				value: chapterId
+			});
+		}, [dispatchCueEvent]),
+		applyMetadataSignature: useCallback((signature) => {
+			dispatchCueEvent({
+				kind: "signature",
+				value: signature
+			});
+		}, [dispatchCueEvent])
+	};
+}
+//#endregion
 //#region src/audio-player/utils/checkCodecSupport.ts
 /**
 * Check if the browser supports a given audio MIME type.
@@ -19142,6 +19851,6 @@ function getPropertyDefaults() {
 	return acc;
 }
 //#endregion
-export { ARC_RADIUS, AUTOMIX_FADE_MS, ActivityLogContext, ActivityLogPanel, ActivityLogProvider, ActivityLogWorkspace, AgentQueueDirectorWorkspace, AnalyticsPlugin, ArcActionButton, AudioPlayer, AudioPlayer as default, AudioSessionProvider, AudioSpriteEngine, AutoThemePlugin, AutomixPlugin, BUILTIN_VISUAL_COMPONENTS, BackgroundMedia, ControllerPanelRenderer, DEFAULT_ACTIVITY_LOG_CONFIG, DEFAULT_PLUGIN_SURFACES, DefaultPluginErrorHandler, ExplicitBadge, FAMILY_DEFAULTS, FullCardPlayer, GracefulDegradation, HTML5AudioBackend, INITIAL_SURFACE_STATE, KeyboardShortcutPlugin, LYRIC_DISPLAY_ID, LibraryPlaylistsWorkspace, LibraryQueueWorkspace, LyricDisplay, LyricSettingsPanel, LyricsPlugin, MAJOR_FACES, MiniSidebarPlayer, NarrativeFace, PLAYER_FACE_CAPABILITIES, PROPERTY_GROUPS, PROPERTY_GROUP_LABELS, PROPERTY_REGISTRY, PRO_CONFIDENCE_MIN, PlaybackAutomixWorkspace, PlayerHero, PlayerSurfaceButtons, PluginError, PluginErrorBoundary, PluginErrorBoundaryFactory, PluginManager, PluginManagerPanel, PluginRegistryProvider, PluginSettingsWorkspace, ProgressBar, QueueDrawer, QueueSurface, SAPController, SEICanvasActionMenu, SEICanvasHost, SEICanvasRenderer, ScrubberCanvasHost, ScrubberCanvasRenderer, SeaCardPlayer, SleepTimerPlugin, StickyBottomPlayer, SurfaceButton, TextMarquee, TrackMetadata, VAULT_CATEGORY_META, VaultRowPlayer, VisualLyricsWorkspace, VisualSlotPicker, VisualSlotsProvider, VolumeControl, WORKSPACE_ROUTES, WaveformAdapter, WaveformPlugin, WaveformProgress, WebAudioBackend, WorkspaceShell, arcOffsets, bpmCompatibility, buildMenuTree, canEnterCanvas, checkCodecSupport, clearCustomCategories, composeEventHandlers, computePeaksFromUrl, computeTransitionPoints, contrastText, createActivityLogStore, createAnalyticsPlugin, createAudioBackend, createAudioSpriteEngine, createAutoThemePlugin, createAutomixPlugin, createKeyboardShortcutPlugin, createLyricsPlugin, createPluginErrorBoundary, createSleepTimerPlugin, createWaveformPlugin, defaultShowVolume, deriveHeroCollapsed, deserializeSession, ensureMuted, ensureProTrackAnalysis, ensureTrackAnalysis, extractPalette, extractPeaks, faceSupportsAction, faceSupportsContextualActions, faceSupportsHeroCollapse, faceSupportsSEICanvas, faceSupportsScrubberCanvas, faceSupportsWaveform, formatFeatured, formatSecondaryLine, formatTime, formatVersionedTitle, getAllVaultCategories, getAllVisualComponents, getByPropPath, getDefaultComponentForSlot, getDisplayArtist, getDisplayTitle, getFaceCapability, getFaceFamily, getGlobalErrorBoundaryFactory, getPluginCanvasSurfaceId, getPluginSettingsRoute, getPluginSurfaceDefinition, getPluginSurfaceDefinitionsByCategory, getPluginSurfaceDefinitionsForMenuBranch, getPreferredCanvasPlacement, getPrimaryTrackSource, getPropertiesForFace, getPropertiesForGroup, getPropertyDefaults, getScrubberDensity, getScrubberHeight, getTrackAnalysis, getTrackSources, getTrackTrims, getVaultCategoryMeta, getVisualComponent, getVisualComponentsForSlot, gradient, hasCanvasSurface, hasSettingsSurface, isHeadlessPlugin, isIOS, isMobileDevice, isNodeInteractive, isPluginError, isSAPDefaultPrevented, isSessionEngine, isWorkspaceRoute, lyricDefaultSettings, lyricDisplayDefinition, mergeRefs, normalizeRhythmConfidence, parseWorkspaceRoute, planTransition, quantizePixels, registerVaultCategory, registerVisualComponent, relativeLuminance, resolveMedia, rgbToCss, serializeSession, setByPropPath, setGlobalErrorHandler, shouldEnableMarquee, snapToBeat, sortPluginSurfaceDefinitions, surfaceReducer, trackKey, trackSourcesSignature, useActivePluginInstances, useActivityLog, useActivityLogRecording, useAudioPlayer, useAudioSession, useAutomix, useMediaSessionObserver, useNarrativeAudio, usePlayerSurface, usePluginManager, usePluginRegistry, useReducedMotion, useSAPPropGetters, useShareTrack, useVisualSlots, validateTrackSource, withErrorBoundary };
+export { ARC_RADIUS, AUTOMIX_FADE_MS, ActivityLogContext, ActivityLogPanel, ActivityLogProvider, ActivityLogWorkspace, AgentQueueDirectorWorkspace, AnalyticsPlugin, ArcActionButton, AudioPlayer, AudioPlayer as default, AudioSessionProvider, AudioSpriteEngine, AutoThemePlugin, AutomixPlugin, BUILTIN_VISUAL_COMPONENTS, BackgroundMedia, ControllerPanelRenderer, CueManifestPlugin, CueRuntime, DEFAULT_ACTIVITY_LOG_CONFIG, DEFAULT_PLUGIN_SURFACES, DefaultPluginErrorHandler, ExplicitBadge, FAMILY_DEFAULTS, FullCardPlayer, GracefulDegradation, HTML5AudioBackend, INITIAL_SURFACE_STATE, KeyboardShortcutPlugin, LYRIC_DISPLAY_ID, LibraryPlaylistsWorkspace, LibraryQueueWorkspace, LyricDisplay, LyricSettingsPanel, LyricsPlugin, MAJOR_FACES, MiniSidebarPlayer, NarrativeFace, PLAYER_FACE_CAPABILITIES, PROPERTY_GROUPS, PROPERTY_GROUP_LABELS, PROPERTY_REGISTRY, PRO_CONFIDENCE_MIN, PlaybackAutomixWorkspace, PlayerHero, PlayerSurfaceButtons, PluginError, PluginErrorBoundary, PluginErrorBoundaryFactory, PluginManager, PluginManagerPanel, PluginRegistryProvider, PluginSettingsWorkspace, ProgressBar, QueueDrawer, QueueSurface, SAPController, SEICanvasActionMenu, SEICanvasHost, SEICanvasRenderer, ScrubberCanvasHost, ScrubberCanvasRenderer, SeaCardPlayer, SleepTimerPlugin, StickyBottomPlayer, SurfaceButton, TextMarquee, TrackMetadata, VAULT_CATEGORY_META, VaultRowPlayer, VisualLyricsWorkspace, VisualSlotPicker, VisualSlotsProvider, VolumeControl, WORKSPACE_ROUTES, WaveformAdapter, WaveformPlugin, WaveformProgress, WebAudioBackend, WorkspaceShell, arcOffsets, bpmCompatibility, buildMenuTree, canEnterCanvas, checkCodecSupport, clearCustomCategories, composeEventHandlers, computePeaksFromUrl, computeTransitionPoints, contrastText, createActivityLogStore, createAnalyticsPlugin, createAudioBackend, createAudioSpriteEngine, createAutoThemePlugin, createAutomixPlugin, createCueManifestPlugin, createKeyboardShortcutPlugin, createLyricsPlugin, createPluginErrorBoundary, createSleepTimerPlugin, createWaveformPlugin, defaultShowVolume, deriveHeroCollapsed, deserializeSession, ensureMuted, ensureProTrackAnalysis, ensureTrackAnalysis, extractPalette, extractPeaks, faceSupportsAction, faceSupportsContextualActions, faceSupportsHeroCollapse, faceSupportsSEICanvas, faceSupportsScrubberCanvas, faceSupportsWaveform, formatFeatured, formatSecondaryLine, formatTime, formatVersionedTitle, getAllVaultCategories, getAllVisualComponents, getByPropPath, getDefaultComponentForSlot, getDisplayArtist, getDisplayTitle, getFaceCapability, getFaceFamily, getGlobalErrorBoundaryFactory, getPluginCanvasSurfaceId, getPluginSettingsRoute, getPluginSurfaceDefinition, getPluginSurfaceDefinitionsByCategory, getPluginSurfaceDefinitionsForMenuBranch, getPreferredCanvasPlacement, getPrimaryTrackSource, getPropertiesForFace, getPropertiesForGroup, getPropertyDefaults, getScrubberDensity, getScrubberHeight, getTrackAnalysis, getTrackSources, getTrackTrims, getVaultCategoryMeta, getVisualComponent, getVisualComponentsForSlot, gradient, hasCanvasSurface, hasSettingsSurface, isHeadlessPlugin, isIOS, isMobileDevice, isNodeInteractive, isPluginError, isSAPDefaultPrevented, isSessionEngine, isWorkspaceRoute, lyricDefaultSettings, lyricDisplayDefinition, mergeRefs, normalizeRhythmConfidence, parseWorkspaceRoute, planTransition, quantizePixels, registerVaultCategory, registerVisualComponent, relativeLuminance, resolveMedia, rgbToCss, serializeSession, setByPropPath, setGlobalErrorHandler, shouldEnableMarquee, snapToBeat, sortPluginSurfaceDefinitions, surfaceReducer, trackKey, trackSourcesSignature, useActivePluginInstances, useActivityLog, useActivityLogRecording, useAudioPlayer, useAudioSession, useAutomix, useMediaSessionObserver, useNarrativeAudio, useNarrativeCueController, usePlayerSurface, usePluginManager, usePluginRegistry, useReducedMotion, useSAPPropGetters, useShareTrack, useVisualSlots, validateCueManifest, validateTrackSource, withErrorBoundary };
 
 //# sourceMappingURL=index.js.map
