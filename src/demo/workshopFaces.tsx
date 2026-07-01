@@ -7,6 +7,7 @@ import {
     MiniSidebarPlayer,
     SeaCardPlayer,
     NarrativeFace,
+    ScriptureFace,
 } from "../audio-player"
 import type {
     ArcAction,
@@ -30,6 +31,7 @@ export type WorkshopFaceId =
     | "vault-row"
     | "sea-card"
     | "narrative"
+    | "scripture"
 
 /** Control groups the panel can render; a face opts into the ones that apply. */
 export type WorkshopControlGroup =
@@ -298,6 +300,28 @@ export const WORKSHOP_FACES: readonly WorkshopFaceDefinition[] = [
                 sceneMood="rain"
                 ambientProfile="rain-loop"
                 intensity={0.6}
+                showExpand
+                onExpand={() => console.log("open soundscape settings")}
+                {...settings.theme}
+            />
+        ),
+    },
+    {
+        id: "scripture",
+        label: "ScriptureFace",
+        description:
+            "The SEIHOUSE-branded reading-chamber face for the Light Novels app — same narrative-family engine as NarrativeFace, dressed in the Scripture Meridian Chamber's own chrome: an Alegreya SC eyebrow, a holographic glass panel, and a soundscape rune that bleeds from portal turquoise to crimson as `danger` rises.",
+        playerFace: "scripture",
+        sessionBased: true,
+        controls: ["theme"],
+        render: ({ settings }) => (
+            <ScriptureFace
+                chapterId="ch-12"
+                chapterLabel="Chapter 12 · Trial of Ashes"
+                sceneMood="battle"
+                ambientProfile="storm-loop"
+                intensity={0.7}
+                danger={0.65}
                 showExpand
                 onExpand={() => console.log("open soundscape settings")}
                 {...settings.theme}

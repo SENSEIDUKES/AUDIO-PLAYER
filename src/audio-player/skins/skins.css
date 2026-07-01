@@ -859,3 +859,189 @@
         flex: 1 1 100%;
     }
 }
+
+/* =====================================================================
+   ScriptureFace (narrative family) — the SEIHOUSE-branded reading-chamber
+   face for the Light Novels app. Same headless narration/ambience engine as
+   NarrativeFace (useNarrativeAudio); the chrome is built for the Scripture
+   Meridian Chamber reader instead of a generic dark-glass player: an
+   Alegreya SC eyebrow, a holographic glass panel that echoes the reader's
+   own `.holographic-panel` treatment, and a soundscape rune that bleeds from
+   portal turquoise to the brand's crimson as `danger` rises. Themed via the
+   shared --ap-* vars; the component itself supplies SEIHOUSE-brand defaults
+   for them so a host doesn't have to re-declare its palette to use it.
+   ===================================================================== */
+.ap-sf {
+    /* One glow token derived from the theme accent (portal turquoise by
+       default) and the brand crimson, mixed by --ap-sf-danger (0..1, set
+       inline from the `danger` prop). Every accent-colored detail below
+       reads this instead of --ap-accent directly, so the whole face shifts
+       together as a scene turns tense. */
+    --ap-sf-glow: color-mix(
+        in srgb,
+        var(--ap-accent) calc(100% - (var(--ap-sf-danger, 0) * 100%)),
+        #ff3333 calc(var(--ap-sf-danger, 0) * 100%)
+    );
+    box-sizing: border-box;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background-color: var(--ap-bg);
+    -webkit-backdrop-filter: blur(14px) saturate(1.15);
+    backdrop-filter: blur(14px) saturate(1.15);
+    border: 1px solid color-mix(in srgb, var(--ap-sf-glow) 35%, transparent);
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--ap-sf-glow) 12%, transparent),
+        0 8px 24px rgba(0, 0, 0, 0.35);
+    color: var(--ap-text);
+    font-family: "Rubik", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    transition: border-color 0.4s ease, box-shadow 0.4s ease;
+}
+.ap-sf *,
+.ap-sf *::before,
+.ap-sf *::after {
+    box-sizing: border-box;
+}
+.ap-sf--embedded {
+    position: fixed;
+    left: 50%;
+    bottom: 16px;
+    transform: translateX(-50%);
+    width: min(560px, calc(100% - 24px));
+    z-index: 50;
+}
+
+.ap-sf__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+.ap-sf__eyebrow {
+    font-family: "Alegreya SC", Georgia, "Times New Roman", serif;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ap-sf-glow);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ap-sf__scape {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex: none;
+}
+
+/* Soundscape rune — a small glyph dot with a ring that brightens with
+   activity and pulses while narrating, same three-state language as
+   NarrativeFace's dot (silent / ambient / narrating). */
+.ap-sf__rune {
+    position: relative;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--ap-sf-glow);
+    flex: none;
+}
+.ap-sf__rune::before {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 1px solid var(--ap-sf-glow);
+    opacity: 0.45;
+}
+.ap-sf--ambient .ap-sf__rune::before {
+    opacity: 0.75;
+}
+.ap-sf--narrating .ap-sf__rune::before {
+    opacity: 0.9;
+    animation: ap-sf-pulse 1.8s ease-in-out infinite;
+}
+@keyframes ap-sf-pulse {
+    0%, 100% { transform: scale(1); opacity: 0.55; }
+    50% { transform: scale(1.5); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .ap-sf--narrating .ap-sf__rune::before { animation: none; }
+}
+.ap-sf__mood {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    text-transform: capitalize;
+    opacity: 0.75;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 120px;
+}
+
+.ap-sf__body {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+/* The play seal picks up the same glow token as a soft halo, so it reads as
+   the panel's focal point instead of a generic transport button. */
+.ap-sf__play {
+    flex: none;
+    box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--ap-sf-glow) 55%, transparent),
+        0 0 16px color-mix(in srgb, var(--ap-sf-glow) 45%, transparent);
+}
+.ap-sf__levels {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+.ap-sf__vol {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+.ap-sf__vol-label {
+    font-family: "Alegreya SC", Georgia, serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.6;
+    flex: none;
+    width: 58px;
+}
+.ap-sf__range {
+    width: 100%;
+    min-width: 60px;
+    accent-color: var(--ap-sf-glow);
+    cursor: pointer;
+}
+.ap-sf__range:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+.ap-sf__expand {
+    flex: none;
+}
+
+/* Stack the levels under the transport row on narrow embeds, mirroring
+   NarrativeFace's own breakpoint. */
+@media (max-width: 420px) {
+    .ap-sf__body {
+        flex-wrap: wrap;
+    }
+    .ap-sf__levels {
+        flex: 1 1 100%;
+        order: 3;
+    }
+}

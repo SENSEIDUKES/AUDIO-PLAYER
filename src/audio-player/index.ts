@@ -248,6 +248,9 @@ export { StickyBottomPlayer } from "./skins/StickyBottomPlayer"
 export { MiniSidebarPlayer } from "./skins/MiniSidebarPlayer"
 export { SeaCardPlayer } from "./skins/SeaCardPlayer"
 export { NarrativeFace } from "./skins/NarrativeFace"
+// SEIHOUSE-branded reading-chamber face for the Light Novels app — same
+// narrative-family engine/contract as NarrativeFace, brand-specific chrome.
+export { ScriptureFace } from "./skins/ScriptureFace"
 // Narrative family: the headless layer orchestrator behind NarrativeFace,
 // exposed so reader apps can drive narration/ambience/FX without the UI.
 export { useNarrativeAudio } from "./narrative/useNarrativeAudio"
@@ -492,3 +495,4 @@ export type { StickyBottomPlayerProps } from "./skins/StickyBottomPlayer"
 export type { MiniSidebarPlayerProps } from "./skins/MiniSidebarPlayer"
 export type { SeaCardPlayerProps } from "./skins/SeaCardPlayer"
 export type { NarrativeFaceProps } from "./skins/NarrativeFace"
+export type { ScriptureFaceProps } from "./skins/ScriptureFace"

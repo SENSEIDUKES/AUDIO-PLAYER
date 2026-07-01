@@ -16,6 +16,7 @@ export type PlayerFace =
     | "vaultRow" // VaultRowPlayer — slim list row
     | "portable" // default AudioPlayer — standalone portable player
     | "narrative" // NarrativeFace — faceless narration/ambience surface for reader apps
+    | "scripture" // ScriptureFace — SEIHOUSE-branded reading-chamber face for Light Novels
 
 /**
  * The two player families. Every face belongs to exactly one, and inherits that
@@ -35,6 +36,8 @@ export type PlayerFace =
  *   a soundscape indicator, play/pause, mute, and ambience/narration volume.
  *   Every music-player capability is off (no SEICanvas, scrubber, waveform,
  *   contextual/action menus, or hero), so it embeds as a tiny inline overlay.
+ *   Both NarrativeFace and the SEIHOUSE-branded ScriptureFace belong here —
+ *   same engine contract, different chrome.
  */
 export type PlayerFamily = "primary" | "compact" | "narrative"
 
@@ -190,6 +193,7 @@ const FACE_DEFINITIONS: Record<
     vaultRow: { family: "compact" }, // pure compact defaults (no own scrubber)
     // ---- NarrativeFace family --------------------------------------------
     narrative: { family: "narrative" }, // pure narrative defaults (faceless)
+    scripture: { family: "narrative" }, // ScriptureFace: pure narrative defaults, SEIHOUSE chrome
 }
 
 export const PLAYER_FACE_CAPABILITIES: Record<PlayerFace, PlayerFaceCapability> =
