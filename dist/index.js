@@ -1,12 +1,6 @@
 import { Component, PureComponent, createContext, createElement, memo, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
+import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 import { createPortal } from "react-dom";
-//#region \0rolldown/runtime.js
-var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod), cb = null), mod.exports);
-var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x, { get: (a, b) => (typeof require !== "undefined" ? require : a)[b] }) : x)(function(x) {
-	if (typeof require !== "undefined") return require.apply(this, arguments);
-	throw Error("Calling `require` for \"" + x + "\" in an environment that doesn't expose the `require` function. See https://rolldown.rs/in-depth/bundling-cjs#require-external-modules for more details.");
-});
-//#endregion
 //#region src/audio-player/core/audio/audioCaches.ts
 /** Shared decoded-buffer LRU cache for Web Audio playback. */
 var LRUAudioCache = class {
@@ -4091,6 +4085,10 @@ var $ZodBoolean = /*@__PURE__*/ $constructor("$ZodBoolean", (inst, def) => {
 		return payload;
 	};
 });
+var $ZodAny = /*@__PURE__*/ $constructor("$ZodAny", (inst, def) => {
+	$ZodType.init(inst, def);
+	inst._zod.parse = (payload) => payload;
+});
 var $ZodUnknown = /*@__PURE__*/ $constructor("$ZodUnknown", (inst, def) => {
 	$ZodType.init(inst, def);
 	inst._zod.parse = (payload) => payload;
@@ -4435,6 +4433,62 @@ var $ZodUnion = /*@__PURE__*/ $constructor("$ZodUnion", (inst, def) => {
 		});
 	};
 });
+var $ZodDiscriminatedUnion = /*@__PURE__*/ $constructor("$ZodDiscriminatedUnion", (inst, def) => {
+	def.inclusive = false;
+	$ZodUnion.init(inst, def);
+	const _super = inst._zod.parse;
+	defineLazy(inst._zod, "propValues", () => {
+		const propValues = {};
+		for (const option of def.options) {
+			const pv = option._zod.propValues;
+			if (!pv || Object.keys(pv).length === 0) throw new Error(`Invalid discriminated union option at index "${def.options.indexOf(option)}"`);
+			for (const [k, v] of Object.entries(pv)) {
+				if (!propValues[k]) propValues[k] = /* @__PURE__ */ new Set();
+				for (const val of v) propValues[k].add(val);
+			}
+		}
+		return propValues;
+	});
+	const disc = cached(() => {
+		const opts = def.options;
+		const map = /* @__PURE__ */ new Map();
+		for (const o of opts) {
+			const values = o._zod.propValues?.[def.discriminator];
+			if (!values || values.size === 0) throw new Error(`Invalid discriminated union option at index "${def.options.indexOf(o)}"`);
+			for (const v of values) {
+				if (map.has(v)) throw new Error(`Duplicate discriminator value "${String(v)}"`);
+				map.set(v, o);
+			}
+		}
+		return map;
+	});
+	inst._zod.parse = (payload, ctx) => {
+		const input = payload.value;
+		if (!isObject(input)) {
+			payload.issues.push({
+				code: "invalid_type",
+				expected: "object",
+				input,
+				inst
+			});
+			return payload;
+		}
+		const opt = disc.value.get(input?.[def.discriminator]);
+		if (opt) return opt._zod.run(payload, ctx);
+		if (def.unionFallback || ctx.direction === "backward") return _super(payload, ctx);
+		payload.issues.push({
+			code: "invalid_union",
+			errors: [],
+			note: "No matching discriminator",
+			discriminator: def.discriminator,
+			options: Array.from(disc.value.keys()),
+			input,
+			path: [def.discriminator],
+			inst
+		});
+		return payload;
+	};
+});
 var $ZodIntersection = /*@__PURE__*/ $constructor("$ZodIntersection", (inst, def) => {
 	$ZodType.init(inst, def);
 	inst._zod.parse = (payload, ctx) => {
@@ -4534,6 +4588,115 @@ function handleIntersectionResults(result, left, right) {
 	result.value = merged.data;
 	return result;
 }
+var $ZodRecord = /*@__PURE__*/ $constructor("$ZodRecord", (inst, def) => {
+	$ZodType.init(inst, def);
+	inst._zod.parse = (payload, ctx) => {
+		const input = payload.value;
+		if (!isPlainObject(input)) {
+			payload.issues.push({
+				expected: "record",
+				code: "invalid_type",
+				input,
+				inst
+			});
+			return payload;
+		}
+		const proms = [];
+		const values = def.keyType._zod.values;
+		if (values) {
+			payload.value = {};
+			const recordKeys = /* @__PURE__ */ new Set();
+			for (const key of values) if (typeof key === "string" || typeof key === "number" || typeof key === "symbol") {
+				recordKeys.add(typeof key === "number" ? key.toString() : key);
+				const keyResult = def.keyType._zod.run({
+					value: key,
+					issues: []
+				}, ctx);
+				if (keyResult instanceof Promise) throw new Error("Async schemas not supported in object keys currently");
+				if (keyResult.issues.length) {
+					payload.issues.push({
+						code: "invalid_key",
+						origin: "record",
+						issues: keyResult.issues.map((iss) => finalizeIssue(iss, ctx, config())),
+						input: key,
+						path: [key],
+						inst
+					});
+					continue;
+				}
+				const outKey = keyResult.value;
+				const result = def.valueType._zod.run({
+					value: input[key],
+					issues: []
+				}, ctx);
+				if (result instanceof Promise) proms.push(result.then((result) => {
+					if (result.issues.length) payload.issues.push(...prefixIssues(key, result.issues));
+					payload.value[outKey] = result.value;
+				}));
+				else {
+					if (result.issues.length) payload.issues.push(...prefixIssues(key, result.issues));
+					payload.value[outKey] = result.value;
+				}
+			}
+			let unrecognized;
+			for (const key in input) if (!recordKeys.has(key)) {
+				unrecognized = unrecognized ?? [];
+				unrecognized.push(key);
+			}
+			if (unrecognized && unrecognized.length > 0) payload.issues.push({
+				code: "unrecognized_keys",
+				input,
+				inst,
+				keys: unrecognized
+			});
+		} else {
+			payload.value = {};
+			for (const key of Reflect.ownKeys(input)) {
+				if (key === "__proto__") continue;
+				if (!Object.prototype.propertyIsEnumerable.call(input, key)) continue;
+				let keyResult = def.keyType._zod.run({
+					value: key,
+					issues: []
+				}, ctx);
+				if (keyResult instanceof Promise) throw new Error("Async schemas not supported in object keys currently");
+				if (typeof key === "string" && number$1.test(key) && keyResult.issues.length) {
+					const retryResult = def.keyType._zod.run({
+						value: Number(key),
+						issues: []
+					}, ctx);
+					if (retryResult instanceof Promise) throw new Error("Async schemas not supported in object keys currently");
+					if (retryResult.issues.length === 0) keyResult = retryResult;
+				}
+				if (keyResult.issues.length) {
+					if (def.mode === "loose") payload.value[key] = input[key];
+					else payload.issues.push({
+						code: "invalid_key",
+						origin: "record",
+						issues: keyResult.issues.map((iss) => finalizeIssue(iss, ctx, config())),
+						input: key,
+						path: [key],
+						inst
+					});
+					continue;
+				}
+				const result = def.valueType._zod.run({
+					value: input[key],
+					issues: []
+				}, ctx);
+				if (result instanceof Promise) proms.push(result.then((result) => {
+					if (result.issues.length) payload.issues.push(...prefixIssues(key, result.issues));
+					payload.value[keyResult.value] = result.value;
+				}));
+				else {
+					if (result.issues.length) payload.issues.push(...prefixIssues(key, result.issues));
+					payload.value[keyResult.value] = result.value;
+				}
+			}
+		}
+		if (proms.length) return Promise.all(proms).then(() => payload);
+		return payload;
+	};
+});
 var $ZodEnum = /*@__PURE__*/ $constructor("$ZodEnum", (inst, def) => {
 	$ZodType.init(inst, def);
 	const values = getEnumValues(def.entries);
@@ -4546,6 +4709,24 @@ var $ZodEnum = /*@__PURE__*/ $constructor("$ZodEnum", (inst, def) => {
 		payload.issues.push({
 			code: "invalid_value",
 			values,
+			input,
+			inst
+		});
+		return payload;
+	};
+});
+var $ZodLiteral = /*@__PURE__*/ $constructor("$ZodLiteral", (inst, def) => {
+	$ZodType.init(inst, def);
+	if (def.values.length === 0) throw new Error("Cannot create literal schema with no valid values");
+	const values = new Set(def.values);
+	inst._zod.values = values;
+	inst._zod.pattern = new RegExp(`^(${def.values.map((o) => typeof o === "string" ? escapeRegex(o) : o ? escapeRegex(o.toString()) : String(o)).join("|")})$`);
+	inst._zod.parse = (payload, _ctx) => {
+		const input = payload.value;
+		if (values.has(input)) return payload;
+		payload.issues.push({
+			code: "invalid_value",
+			values: def.values,
 			input,
 			inst
 		});
@@ -5130,6 +5311,10 @@ function _boolean(Class, params) {
 	});
 }
 // @__NO_SIDE_EFFECTS__
+function _any(Class) {
+	return new Class({ type: "any" });
+}
+// @__NO_SIDE_EFFECTS__
 function _unknown(Class) {
 	return new Class({ type: "unknown" });
 }
@@ -5699,6 +5884,27 @@ var enumProcessor = (schema, _ctx, json, _params) => {
 	if (values.every((v) => typeof v === "string")) json.type = "string";
 	json.enum = values;
 };
+var literalProcessor = (schema, ctx, json, _params) => {
+	const def = schema._zod.def;
+	const vals = [];
+	for (const val of def.values) if (val === void 0) {
+		if (ctx.unrepresentable === "throw") throw new Error("Literal `undefined` cannot be represented in JSON Schema");
+	} else if (typeof val === "bigint") if (ctx.unrepresentable === "throw") throw new Error("BigInt literals cannot be represented in JSON Schema");
+	else vals.push(Number(val));
+	else vals.push(val);
+	if (vals.length === 0) {} else if (vals.length === 1) {
+		const val = vals[0];
+		json.type = val === null ? "null" : typeof val;
+		if (ctx.target === "draft-04" || ctx.target === "openapi-3.0") json.enum = [val];
+		else json.const = val;
+	} else {
+		if (vals.every((v) => typeof v === "number")) json.type = "number";
+		if (vals.every((v) => typeof v === "string")) json.type = "string";
+		if (vals.every((v) => typeof v === "boolean")) json.type = "boolean";
+		if (vals.every((v) => v === null)) json.type = "null";
+		json.enum = vals;
+	}
+};
 var customProcessor = (_schema, ctx, _json, _params) => {
 	if (ctx.unrepresentable === "throw") throw new Error("Custom types cannot be represented in JSON Schema");
 };
@@ -5780,6 +5986,39 @@ var intersectionProcessor = (schema, ctx, json, params) => {
 	});
 	const isSimpleIntersection = (val) => "allOf" in val && Object.keys(val).length === 1;
 	json.allOf = [...isSimpleIntersection(a) ? a.allOf : [a], ...isSimpleIntersection(b) ? b.allOf : [b]];
+};
+var recordProcessor = (schema, ctx, _json, params) => {
+	const json = _json;
+	const def = schema._zod.def;
+	json.type = "object";
+	const keyType = def.keyType;
+	const patterns = keyType._zod.bag?.patterns;
+	if (def.mode === "loose" && patterns && patterns.size > 0) {
+		const valueSchema = process$1(def.valueType, ctx, {
+			...params,
+			path: [
+				...params.path,
+				"patternProperties",
+				"*"
+			]
+		});
+		json.patternProperties = {};
+		for (const pattern of patterns) json.patternProperties[pattern.source] = valueSchema;
+	} else {
+		if (ctx.target === "draft-07" || ctx.target === "draft-2020-12") json.propertyNames = process$1(def.keyType, ctx, {
+			...params,
+			path: [...params.path, "propertyNames"]
+		});
+		json.additionalProperties = process$1(def.valueType, ctx, {
+			...params,
+			path: [...params.path, "additionalProperties"]
+		});
+	}
+	const keyValues = keyType._zod.values;
+	if (keyValues) {
+		const validKeyValues = [...keyValues].filter((v) => typeof v === "string" || typeof v === "number");
+		if (validKeyValues.length > 0) json.required = validKeyValues;
+	}
 };
 var nullableProcessor = (schema, ctx, json, params) => {
 	const def = schema._zod.def;
@@ -6325,6 +6564,14 @@ var ZodBoolean = /*@__PURE__*/ $constructor("ZodBoolean", (inst, def) => {
 function boolean(params) {
 	return /* @__PURE__ */ _boolean(ZodBoolean, params);
 }
+var ZodAny = /*@__PURE__*/ $constructor("ZodAny", (inst, def) => {
+	$ZodAny.init(inst, def);
+	ZodType.init(inst, def);
+	inst._zod.processJSONSchema = (ctx, json, params) => void 0;
+});
+function any() {
+	return /* @__PURE__ */ _any(ZodAny);
+}
 var ZodUnknown = /*@__PURE__*/ $constructor("ZodUnknown", (inst, def) => {
 	$ZodUnknown.init(inst, def);
 	ZodType.init(inst, def);
@@ -6451,6 +6698,18 @@ function union(options, params) {
 		...normalizeParams(params)
 	});
 }
+var ZodDiscriminatedUnion = /*@__PURE__*/ $constructor("ZodDiscriminatedUnion", (inst, def) => {
+	ZodUnion.init(inst, def);
+	$ZodDiscriminatedUnion.init(inst, def);
+});
+function discriminatedUnion(discriminator, options, params) {
+	return new ZodDiscriminatedUnion({
+		type: "union",
+		options,
+		discriminator,
+		...normalizeParams(params)
+	});
+}
 var ZodIntersection = /*@__PURE__*/ $constructor("ZodIntersection", (inst, def) => {
 	$ZodIntersection.init(inst, def);
 	ZodType.init(inst, def);
@@ -6461,6 +6720,27 @@ function intersection(left, right) {
 		type: "intersection",
 		left,
 		right
+	});
+}
+var ZodRecord = /*@__PURE__*/ $constructor("ZodRecord", (inst, def) => {
+	$ZodRecord.init(inst, def);
+	ZodType.init(inst, def);
+	inst._zod.processJSONSchema = (ctx, json, params) => recordProcessor(inst, ctx, json, params);
+	inst.keyType = def.keyType;
+	inst.valueType = def.valueType;
+});
+function record(keyType, valueType, params) {
+	if (!valueType || !valueType._zod) return new ZodRecord({
+		type: "record",
+		keyType: string(),
+		valueType: keyType,
+		...normalizeParams(valueType)
+	});
+	return new ZodRecord({
+		type: "record",
+		keyType,
+		valueType,
+		...normalizeParams(params)
 	});
 }
 var ZodEnum = /*@__PURE__*/ $constructor("ZodEnum", (inst, def) => {
@@ -6497,6 +6777,23 @@ function _enum(values, params) {
 	return new ZodEnum({
 		type: "enum",
 		entries: Array.isArray(values) ? Object.fromEntries(values.map((v) => [v, v])) : values,
+		...normalizeParams(params)
+	});
+}
+var ZodLiteral = /*@__PURE__*/ $constructor("ZodLiteral", (inst, def) => {
+	$ZodLiteral.init(inst, def);
+	ZodType.init(inst, def);
+	inst._zod.processJSONSchema = (ctx, json, params) => literalProcessor(inst, ctx, json, params);
+	inst.values = new Set(def.values);
+	Object.defineProperty(inst, "value", { get() {
+		if (def.values.length > 1) throw new Error("This schema contains multiple valid literal values. Use `.values` instead.");
+		return def.values[0];
+	} });
+});
+function literal(value, params) {
+	return new ZodLiteral({
+		type: "literal",
+		values: Array.isArray(value) ? value : [value],
 		...normalizeParams(params)
 	});
 }
@@ -7827,7 +8124,7 @@ function getAudioContextCtor() {
 	if (typeof window === "undefined") return void 0;
 	return window.AudioContext ?? window.webkitAudioContext;
 }
-function clamp01$1(value) {
+function clamp01$2(value) {
 	if (!Number.isFinite(value)) return 1;
 	return Math.max(0, Math.min(1, value));
 }
@@ -7877,7 +8174,7 @@ var AudioSpriteEngine = class {
 	* across context recreation so a later (re)load doesn't silently reset it.
 	*/
 	setMasterVolume(value) {
-		this.masterVolume = clamp01$1(value);
+		this.masterVolume = clamp01$2(value);
 		if (this.output && this.ctx) this.output.gain.setValueAtTime(this.masterVolume, this.ctx.currentTime);
 	}
 	getMasterVolume() {
@@ -7934,7 +8231,7 @@ var AudioSpriteEngine = class {
 		const duration = Math.min(positiveSeconds(clip.duration), Math.max(0, buffer.duration - offset));
 		if (duration <= 0) return null;
 		const loop = options.loop ?? clip.loop ?? false;
-		const volume = clamp01$1(options.volume ?? clip.volume ?? 1);
+		const volume = clamp01$2(options.volume ?? clip.volume ?? 1);
 		const id = createInstanceId();
 		const source = ctx.createBufferSource();
 		const gain = ctx.createGain();
@@ -7978,7 +8275,7 @@ var AudioSpriteEngine = class {
 		const gain = instance.gain.gain;
 		const now = this.ctx.currentTime;
 		const duration = Math.max(0, durationMs) / 1e3;
-		const target = clamp01$1(toVolume);
+		const target = clamp01$2(toVolume);
 		gain.cancelScheduledValues(now);
 		gain.setValueAtTime(gain.value, now);
 		gain.linearRampToValueAtTime(target, now + duration);
@@ -8066,739 +8363,7 @@ function usePluginSoundLayer() {
 	}), []);
 }
 //#endregion
-//#region node_modules/react/cjs/react-jsx-runtime.production.min.js
-/**
-* @license React
-* react-jsx-runtime.production.min.js
-*
-* Copyright (c) Facebook, Inc. and its affiliates.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-var require_react_jsx_runtime_production_min = /* @__PURE__ */ __commonJSMin(((exports) => {
-	var f = __require("react"), k = Symbol.for("react.element"), l = Symbol.for("react.fragment"), m$1 = Object.prototype.hasOwnProperty, n = f.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentOwner, p = {
-		key: !0,
-		ref: !0,
-		__self: !0,
-		__source: !0
-	};
-	function q(c, a, g) {
-		var b, d = {}, e = null, h = null;
-		void 0 !== g && (e = "" + g);
-		void 0 !== a.key && (e = "" + a.key);
-		void 0 !== a.ref && (h = a.ref);
-		for (b in a) m$1.call(a, b) && !p.hasOwnProperty(b) && (d[b] = a[b]);
-		if (c && c.defaultProps) for (b in a = c.defaultProps, a) void 0 === d[b] && (d[b] = a[b]);
-		return {
-			$$typeof: k,
-			type: c,
-			key: e,
-			ref: h,
-			props: d,
-			_owner: n.current
-		};
-	}
-	exports.Fragment = l;
-	exports.jsx = q;
-	exports.jsxs = q;
-}));
-//#endregion
-//#region node_modules/react/cjs/react-jsx-runtime.development.js
-/**
-* @license React
-* react-jsx-runtime.development.js
-*
-* Copyright (c) Facebook, Inc. and its affiliates.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-var require_react_jsx_runtime_development = /* @__PURE__ */ __commonJSMin(((exports) => {
-	if (process.env.NODE_ENV !== "production") (function() {
-		"use strict";
-		var React = __require("react");
-		var REACT_ELEMENT_TYPE = Symbol.for("react.element");
-		var REACT_PORTAL_TYPE = Symbol.for("react.portal");
-		var REACT_FRAGMENT_TYPE = Symbol.for("react.fragment");
-		var REACT_STRICT_MODE_TYPE = Symbol.for("react.strict_mode");
-		var REACT_PROFILER_TYPE = Symbol.for("react.profiler");
-		var REACT_PROVIDER_TYPE = Symbol.for("react.provider");
-		var REACT_CONTEXT_TYPE = Symbol.for("react.context");
-		var REACT_FORWARD_REF_TYPE = Symbol.for("react.forward_ref");
-		var REACT_SUSPENSE_TYPE = Symbol.for("react.suspense");
-		var REACT_SUSPENSE_LIST_TYPE = Symbol.for("react.suspense_list");
-		var REACT_MEMO_TYPE = Symbol.for("react.memo");
-		var REACT_LAZY_TYPE = Symbol.for("react.lazy");
-		var REACT_OFFSCREEN_TYPE = Symbol.for("react.offscreen");
-		var MAYBE_ITERATOR_SYMBOL = Symbol.iterator;
-		var FAUX_ITERATOR_SYMBOL = "@@iterator";
-		function getIteratorFn(maybeIterable) {
-			if (maybeIterable === null || typeof maybeIterable !== "object") return null;
-			var maybeIterator = MAYBE_ITERATOR_SYMBOL && maybeIterable[MAYBE_ITERATOR_SYMBOL] || maybeIterable[FAUX_ITERATOR_SYMBOL];
-			if (typeof maybeIterator === "function") return maybeIterator;
-			return null;
-		}
-		var ReactSharedInternals = React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
-		function error(format) {
-			for (var _len2 = arguments.length, args = new Array(_len2 > 1 ? _len2 - 1 : 0), _key2 = 1; _key2 < _len2; _key2++) args[_key2 - 1] = arguments[_key2];
-			printWarning("error", format, args);
-		}
-		function printWarning(level, format, args) {
-			var stack = ReactSharedInternals.ReactDebugCurrentFrame.getStackAddendum();
-			if (stack !== "") {
-				format += "%s";
-				args = args.concat([stack]);
-			}
-			var argsWithFormat = args.map(function(item) {
-				return String(item);
-			});
-			argsWithFormat.unshift("Warning: " + format);
-			Function.prototype.apply.call(console[level], console, argsWithFormat);
-		}
-		var enableScopeAPI = false;
-		var enableCacheElement = false;
-		var enableTransitionTracing = false;
-		var enableLegacyHidden = false;
-		var enableDebugTracing = false;
-		var REACT_MODULE_REFERENCE = Symbol.for("react.module.reference");
-		function isValidElementType(type) {
-			if (typeof type === "string" || typeof type === "function") return true;
-			if (type === REACT_FRAGMENT_TYPE || type === REACT_PROFILER_TYPE || enableDebugTracing || type === REACT_STRICT_MODE_TYPE || type === REACT_SUSPENSE_TYPE || type === REACT_SUSPENSE_LIST_TYPE || enableLegacyHidden || type === REACT_OFFSCREEN_TYPE || enableScopeAPI || enableCacheElement || enableTransitionTracing) return true;
-			if (typeof type === "object" && type !== null) {
-				if (type.$$typeof === REACT_LAZY_TYPE || type.$$typeof === REACT_MEMO_TYPE || type.$$typeof === REACT_PROVIDER_TYPE || type.$$typeof === REACT_CONTEXT_TYPE || type.$$typeof === REACT_FORWARD_REF_TYPE || type.$$typeof === REACT_MODULE_REFERENCE || type.getModuleId !== void 0) return true;
-			}
-			return false;
-		}
-		function getWrappedName(outerType, innerType, wrapperName) {
-			var displayName = outerType.displayName;
-			if (displayName) return displayName;
-			var functionName = innerType.displayName || innerType.name || "";
-			return functionName !== "" ? wrapperName + "(" + functionName + ")" : wrapperName;
-		}
-		function getContextName(type) {
-			return type.displayName || "Context";
-		}
-		function getComponentNameFromType(type) {
-			if (type == null) return null;
-			if (typeof type.tag === "number") error("Received an unexpected object in getComponentNameFromType(). This is likely a bug in React. Please file an issue.");
-			if (typeof type === "function") return type.displayName || type.name || null;
-			if (typeof type === "string") return type;
-			switch (type) {
-				case REACT_FRAGMENT_TYPE: return "Fragment";
-				case REACT_PORTAL_TYPE: return "Portal";
-				case REACT_PROFILER_TYPE: return "Profiler";
-				case REACT_STRICT_MODE_TYPE: return "StrictMode";
-				case REACT_SUSPENSE_TYPE: return "Suspense";
-				case REACT_SUSPENSE_LIST_TYPE: return "SuspenseList";
-			}
-			if (typeof type === "object") switch (type.$$typeof) {
-				case REACT_CONTEXT_TYPE: return getContextName(type) + ".Consumer";
-				case REACT_PROVIDER_TYPE: return getContextName(type._context) + ".Provider";
-				case REACT_FORWARD_REF_TYPE: return getWrappedName(type, type.render, "ForwardRef");
-				case REACT_MEMO_TYPE:
-					var outerName = type.displayName || null;
-					if (outerName !== null) return outerName;
-					return getComponentNameFromType(type.type) || "Memo";
-				case REACT_LAZY_TYPE:
-					var lazyComponent = type;
-					var payload = lazyComponent._payload;
-					var init = lazyComponent._init;
-					try {
-						return getComponentNameFromType(init(payload));
-					} catch (x) {
-						return null;
-					}
-			}
-			return null;
-		}
-		var assign = Object.assign;
-		var disabledDepth = 0;
-		var prevLog;
-		var prevInfo;
-		var prevWarn;
-		var prevError;
-		var prevGroup;
-		var prevGroupCollapsed;
-		var prevGroupEnd;
-		function disabledLog() {}
-		disabledLog.__reactDisabledLog = true;
-		function disableLogs() {
-			if (disabledDepth === 0) {
-				prevLog = console.log;
-				prevInfo = console.info;
-				prevWarn = console.warn;
-				prevError = console.error;
-				prevGroup = console.group;
-				prevGroupCollapsed = console.groupCollapsed;
-				prevGroupEnd = console.groupEnd;
-				var props = {
-					configurable: true,
-					enumerable: true,
-					value: disabledLog,
-					writable: true
-				};
-				Object.defineProperties(console, {
-					info: props,
-					log: props,
-					warn: props,
-					error: props,
-					group: props,
-					groupCollapsed: props,
-					groupEnd: props
-				});
-			}
-			disabledDepth++;
-		}
-		function reenableLogs() {
-			disabledDepth--;
-			if (disabledDepth === 0) {
-				var props = {
-					configurable: true,
-					enumerable: true,
-					writable: true
-				};
-				Object.defineProperties(console, {
-					log: assign({}, props, { value: prevLog }),
-					info: assign({}, props, { value: prevInfo }),
-					warn: assign({}, props, { value: prevWarn }),
-					error: assign({}, props, { value: prevError }),
-					group: assign({}, props, { value: prevGroup }),
-					groupCollapsed: assign({}, props, { value: prevGroupCollapsed }),
-					groupEnd: assign({}, props, { value: prevGroupEnd })
-				});
-			}
-			if (disabledDepth < 0) error("disabledDepth fell below zero. This is a bug in React. Please file an issue.");
-		}
-		var ReactCurrentDispatcher = ReactSharedInternals.ReactCurrentDispatcher;
-		var prefix;
-		function describeBuiltInComponentFrame(name, source, ownerFn) {
-			if (prefix === void 0) try {
-				throw Error();
-			} catch (x) {
-				var match = x.stack.trim().match(/\n( *(at )?)/);
-				prefix = match && match[1] || "";
-			}
-			return "\n" + prefix + name;
-		}
-		var reentry = false;
-		var componentFrameCache = new (typeof WeakMap === "function" ? WeakMap : Map)();
-		function describeNativeComponentFrame(fn, construct) {
-			if (!fn || reentry) return "";
-			var frame = componentFrameCache.get(fn);
-			if (frame !== void 0) return frame;
-			var control;
-			reentry = true;
-			var previousPrepareStackTrace = Error.prepareStackTrace;
-			Error.prepareStackTrace = void 0;
-			var previousDispatcher = ReactCurrentDispatcher.current;
-			ReactCurrentDispatcher.current = null;
-			disableLogs();
-			try {
-				if (construct) {
-					var Fake = function() {
-						throw Error();
-					};
-					Object.defineProperty(Fake.prototype, "props", { set: function() {
-						throw Error();
-					} });
-					if (typeof Reflect === "object" && Reflect.construct) {
-						try {
-							Reflect.construct(Fake, []);
-						} catch (x) {
-							control = x;
-						}
-						Reflect.construct(fn, [], Fake);
-					} else {
-						try {
-							Fake.call();
-						} catch (x) {
-							control = x;
-						}
-						fn.call(Fake.prototype);
-					}
-				} else {
-					try {
-						throw Error();
-					} catch (x) {
-						control = x;
-					}
-					fn();
-				}
-			} catch (sample) {
-				if (sample && control && typeof sample.stack === "string") {
-					var sampleLines = sample.stack.split("\n");
-					var controlLines = control.stack.split("\n");
-					var s = sampleLines.length - 1;
-					var c = controlLines.length - 1;
-					while (s >= 1 && c >= 0 && sampleLines[s] !== controlLines[c]) c--;
-					for (; s >= 1 && c >= 0; s--, c--) if (sampleLines[s] !== controlLines[c]) {
-						if (s !== 1 || c !== 1) do {
-							s--;
-							c--;
-							if (c < 0 || sampleLines[s] !== controlLines[c]) {
-								var _frame = "\n" + sampleLines[s].replace(" at new ", " at ");
-								if (fn.displayName && _frame.includes("<anonymous>")) _frame = _frame.replace("<anonymous>", fn.displayName);
-								if (typeof fn === "function") componentFrameCache.set(fn, _frame);
-								return _frame;
-							}
-						} while (s >= 1 && c >= 0);
-						break;
-					}
-				}
-			} finally {
-				reentry = false;
-				ReactCurrentDispatcher.current = previousDispatcher;
-				reenableLogs();
-				Error.prepareStackTrace = previousPrepareStackTrace;
-			}
-			var name = fn ? fn.displayName || fn.name : "";
-			var syntheticFrame = name ? describeBuiltInComponentFrame(name) : "";
-			if (typeof fn === "function") componentFrameCache.set(fn, syntheticFrame);
-			return syntheticFrame;
-		}
-		function describeFunctionComponentFrame(fn, source, ownerFn) {
-			return describeNativeComponentFrame(fn, false);
-		}
-		function shouldConstruct(Component) {
-			var prototype = Component.prototype;
-			return !!(prototype && prototype.isReactComponent);
-		}
-		function describeUnknownElementTypeFrameInDEV(type, source, ownerFn) {
-			if (type == null) return "";
-			if (typeof type === "function") return describeNativeComponentFrame(type, shouldConstruct(type));
-			if (typeof type === "string") return describeBuiltInComponentFrame(type);
-			switch (type) {
-				case REACT_SUSPENSE_TYPE: return describeBuiltInComponentFrame("Suspense");
-				case REACT_SUSPENSE_LIST_TYPE: return describeBuiltInComponentFrame("SuspenseList");
-			}
-			if (typeof type === "object") switch (type.$$typeof) {
-				case REACT_FORWARD_REF_TYPE: return describeFunctionComponentFrame(type.render);
-				case REACT_MEMO_TYPE: return describeUnknownElementTypeFrameInDEV(type.type, source, ownerFn);
-				case REACT_LAZY_TYPE:
-					var lazyComponent = type;
-					var payload = lazyComponent._payload;
-					var init = lazyComponent._init;
-					try {
-						return describeUnknownElementTypeFrameInDEV(init(payload), source, ownerFn);
-					} catch (x) {}
-			}
-			return "";
-		}
-		var hasOwnProperty = Object.prototype.hasOwnProperty;
-		var loggedTypeFailures = {};
-		var ReactDebugCurrentFrame = ReactSharedInternals.ReactDebugCurrentFrame;
-		function setCurrentlyValidatingElement(element) {
-			if (element) {
-				var owner = element._owner;
-				var stack = describeUnknownElementTypeFrameInDEV(element.type, element._source, owner ? owner.type : null);
-				ReactDebugCurrentFrame.setExtraStackFrame(stack);
-			} else ReactDebugCurrentFrame.setExtraStackFrame(null);
-		}
-		function checkPropTypes(typeSpecs, values, location, componentName, element) {
-			var has = Function.call.bind(hasOwnProperty);
-			for (var typeSpecName in typeSpecs) if (has(typeSpecs, typeSpecName)) {
-				var error$1 = void 0;
-				try {
-					if (typeof typeSpecs[typeSpecName] !== "function") {
-						var err = Error((componentName || "React class") + ": " + location + " type `" + typeSpecName + "` is invalid; it must be a function, usually from the `prop-types` package, but received `" + typeof typeSpecs[typeSpecName] + "`.This often happens because of typos such as `PropTypes.function` instead of `PropTypes.func`.");
-						err.name = "Invariant Violation";
-						throw err;
-					}
-					error$1 = typeSpecs[typeSpecName](values, typeSpecName, componentName, location, null, "SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED");
-				} catch (ex) {
-					error$1 = ex;
-				}
-				if (error$1 && !(error$1 instanceof Error)) {
-					setCurrentlyValidatingElement(element);
-					error("%s: type specification of %s `%s` is invalid; the type checker function must return `null` or an `Error` but returned a %s. You may have forgotten to pass an argument to the type checker creator (arrayOf, instanceOf, objectOf, oneOf, oneOfType, and shape all require an argument).", componentName || "React class", location, typeSpecName, typeof error$1);
-					setCurrentlyValidatingElement(null);
-				}
-				if (error$1 instanceof Error && !(error$1.message in loggedTypeFailures)) {
-					loggedTypeFailures[error$1.message] = true;
-					setCurrentlyValidatingElement(element);
-					error("Failed %s type: %s", location, error$1.message);
-					setCurrentlyValidatingElement(null);
-				}
-			}
-		}
-		var isArrayImpl = Array.isArray;
-		function isArray(a) {
-			return isArrayImpl(a);
-		}
-		function typeName(value) {
-			return typeof Symbol === "function" && Symbol.toStringTag && value[Symbol.toStringTag] || value.constructor.name || "Object";
-		}
-		function willCoercionThrow(value) {
-			try {
-				testStringCoercion(value);
-				return false;
-			} catch (e) {
-				return true;
-			}
-		}
-		function testStringCoercion(value) {
-			return "" + value;
-		}
-		function checkKeyStringCoercion(value) {
-			if (willCoercionThrow(value)) {
-				error("The provided key is an unsupported type %s. This value must be coerced to a string before before using it here.", typeName(value));
-				return testStringCoercion(value);
-			}
-		}
-		var ReactCurrentOwner = ReactSharedInternals.ReactCurrentOwner;
-		var RESERVED_PROPS = {
-			key: true,
-			ref: true,
-			__self: true,
-			__source: true
-		};
-		var specialPropKeyWarningShown;
-		var specialPropRefWarningShown;
-		var didWarnAboutStringRefs = {};
-		function hasValidRef(config) {
-			if (hasOwnProperty.call(config, "ref")) {
-				var getter = Object.getOwnPropertyDescriptor(config, "ref").get;
-				if (getter && getter.isReactWarning) return false;
-			}
-			return config.ref !== void 0;
-		}
-		function hasValidKey(config) {
-			if (hasOwnProperty.call(config, "key")) {
-				var getter = Object.getOwnPropertyDescriptor(config, "key").get;
-				if (getter && getter.isReactWarning) return false;
-			}
-			return config.key !== void 0;
-		}
-		function warnIfStringRefCannotBeAutoConverted(config, self) {
-			if (typeof config.ref === "string" && ReactCurrentOwner.current && self && ReactCurrentOwner.current.stateNode !== self) {
-				var componentName = getComponentNameFromType(ReactCurrentOwner.current.type);
-				if (!didWarnAboutStringRefs[componentName]) {
-					error("Component \"%s\" contains the string ref \"%s\". Support for string refs will be removed in a future major release. This case cannot be automatically converted to an arrow function. We ask you to manually fix this case by using useRef() or createRef() instead. Learn more about using refs safely here: https://reactjs.org/link/strict-mode-string-ref", getComponentNameFromType(ReactCurrentOwner.current.type), config.ref);
-					didWarnAboutStringRefs[componentName] = true;
-				}
-			}
-		}
-		function defineKeyPropWarningGetter(props, displayName) {
-			var warnAboutAccessingKey = function() {
-				if (!specialPropKeyWarningShown) {
-					specialPropKeyWarningShown = true;
-					error("%s: `key` is not a prop. Trying to access it will result in `undefined` being returned. If you need to access the same value within the child component, you should pass it as a different prop. (https://reactjs.org/link/special-props)", displayName);
-				}
-			};
-			warnAboutAccessingKey.isReactWarning = true;
-			Object.defineProperty(props, "key", {
-				get: warnAboutAccessingKey,
-				configurable: true
-			});
-		}
-		function defineRefPropWarningGetter(props, displayName) {
-			var warnAboutAccessingRef = function() {
-				if (!specialPropRefWarningShown) {
-					specialPropRefWarningShown = true;
-					error("%s: `ref` is not a prop. Trying to access it will result in `undefined` being returned. If you need to access the same value within the child component, you should pass it as a different prop. (https://reactjs.org/link/special-props)", displayName);
-				}
-			};
-			warnAboutAccessingRef.isReactWarning = true;
-			Object.defineProperty(props, "ref", {
-				get: warnAboutAccessingRef,
-				configurable: true
-			});
-		}
-		/**
-		* Factory method to create a new React element. This no longer adheres to
-		* the class pattern, so do not use new to call it. Also, instanceof check
-		* will not work. Instead test $$typeof field against Symbol.for('react.element') to check
-		* if something is a React Element.
-		*
-		* @param {*} type
-		* @param {*} props
-		* @param {*} key
-		* @param {string|object} ref
-		* @param {*} owner
-		* @param {*} self A *temporary* helper to detect places where `this` is
-		* different from the `owner` when React.createElement is called, so that we
-		* can warn. We want to get rid of owner and replace string `ref`s with arrow
-		* functions, and as long as `this` and owner are the same, there will be no
-		* change in behavior.
-		* @param {*} source An annotation object (added by a transpiler or otherwise)
-		* indicating filename, line number, and/or other information.
-		* @internal
-		*/
-		var ReactElement = function(type, key, ref, self, source, owner, props) {
-			var element = {
-				$$typeof: REACT_ELEMENT_TYPE,
-				type,
-				key,
-				ref,
-				props,
-				_owner: owner
-			};
-			element._store = {};
-			Object.defineProperty(element._store, "validated", {
-				configurable: false,
-				enumerable: false,
-				writable: true,
-				value: false
-			});
-			Object.defineProperty(element, "_self", {
-				configurable: false,
-				enumerable: false,
-				writable: false,
-				value: self
-			});
-			Object.defineProperty(element, "_source", {
-				configurable: false,
-				enumerable: false,
-				writable: false,
-				value: source
-			});
-			if (Object.freeze) {
-				Object.freeze(element.props);
-				Object.freeze(element);
-			}
-			return element;
-		};
-		/**
-		* https://github.com/reactjs/rfcs/pull/107
-		* @param {*} type
-		* @param {object} props
-		* @param {string} key
-		*/
-		function jsxDEV(type, config, maybeKey, source, self) {
-			var propName;
-			var props = {};
-			var key = null;
-			var ref = null;
-			if (maybeKey !== void 0) {
-				checkKeyStringCoercion(maybeKey);
-				key = "" + maybeKey;
-			}
-			if (hasValidKey(config)) {
-				checkKeyStringCoercion(config.key);
-				key = "" + config.key;
-			}
-			if (hasValidRef(config)) {
-				ref = config.ref;
-				warnIfStringRefCannotBeAutoConverted(config, self);
-			}
-			for (propName in config) if (hasOwnProperty.call(config, propName) && !RESERVED_PROPS.hasOwnProperty(propName)) props[propName] = config[propName];
-			if (type && type.defaultProps) {
-				var defaultProps = type.defaultProps;
-				for (propName in defaultProps) if (props[propName] === void 0) props[propName] = defaultProps[propName];
-			}
-			if (key || ref) {
-				var displayName = typeof type === "function" ? type.displayName || type.name || "Unknown" : type;
-				if (key) defineKeyPropWarningGetter(props, displayName);
-				if (ref) defineRefPropWarningGetter(props, displayName);
-			}
-			return ReactElement(type, key, ref, self, source, ReactCurrentOwner.current, props);
-		}
-		var ReactCurrentOwner$1 = ReactSharedInternals.ReactCurrentOwner;
-		var ReactDebugCurrentFrame$1 = ReactSharedInternals.ReactDebugCurrentFrame;
-		function setCurrentlyValidatingElement$1(element) {
-			if (element) {
-				var owner = element._owner;
-				var stack = describeUnknownElementTypeFrameInDEV(element.type, element._source, owner ? owner.type : null);
-				ReactDebugCurrentFrame$1.setExtraStackFrame(stack);
-			} else ReactDebugCurrentFrame$1.setExtraStackFrame(null);
-		}
-		var propTypesMisspellWarningShown = false;
-		/**
-		* Verifies the object is a ReactElement.
-		* See https://reactjs.org/docs/react-api.html#isvalidelement
-		* @param {?object} object
-		* @return {boolean} True if `object` is a ReactElement.
-		* @final
-		*/
-		function isValidElement(object) {
-			return typeof object === "object" && object !== null && object.$$typeof === REACT_ELEMENT_TYPE;
-		}
-		function getDeclarationErrorAddendum() {
-			if (ReactCurrentOwner$1.current) {
-				var name = getComponentNameFromType(ReactCurrentOwner$1.current.type);
-				if (name) return "\n\nCheck the render method of `" + name + "`.";
-			}
-			return "";
-		}
-		function getSourceInfoErrorAddendum(source) {
-			if (source !== void 0) {
-				var fileName = source.fileName.replace(/^.*[\\\/]/, "");
-				var lineNumber = source.lineNumber;
-				return "\n\nCheck your code at " + fileName + ":" + lineNumber + ".";
-			}
-			return "";
-		}
-		/**
-		* Warn if there's no key explicitly set on dynamic arrays of children or
-		* object keys are not valid. This allows us to keep track of children between
-		* updates.
-		*/
-		var ownerHasKeyUseWarning = {};
-		function getCurrentComponentErrorInfo(parentType) {
-			var info = getDeclarationErrorAddendum();
-			if (!info) {
-				var parentName = typeof parentType === "string" ? parentType : parentType.displayName || parentType.name;
-				if (parentName) info = "\n\nCheck the top-level render call using <" + parentName + ">.";
-			}
-			return info;
-		}
-		/**
-		* Warn if the element doesn't have an explicit key assigned to it.
-		* This element is in an array. The array could grow and shrink or be
-		* reordered. All children that haven't already been validated are required to
-		* have a "key" property assigned to it. Error statuses are cached so a warning
-		* will only be shown once.
-		*
-		* @internal
-		* @param {ReactElement} element Element that requires a key.
-		* @param {*} parentType element's parent's type.
-		*/
-		function validateExplicitKey(element, parentType) {
-			if (!element._store || element._store.validated || element.key != null) return;
-			element._store.validated = true;
-			var currentComponentErrorInfo = getCurrentComponentErrorInfo(parentType);
-			if (ownerHasKeyUseWarning[currentComponentErrorInfo]) return;
-			ownerHasKeyUseWarning[currentComponentErrorInfo] = true;
-			var childOwner = "";
-			if (element && element._owner && element._owner !== ReactCurrentOwner$1.current) childOwner = " It was passed a child from " + getComponentNameFromType(element._owner.type) + ".";
-			setCurrentlyValidatingElement$1(element);
-			error("Each child in a list should have a unique \"key\" prop.%s%s See https://reactjs.org/link/warning-keys for more information.", currentComponentErrorInfo, childOwner);
-			setCurrentlyValidatingElement$1(null);
-		}
-		/**
-		* Ensure that every element either is passed in a static location, in an
-		* array with an explicit keys property defined, or in an object literal
-		* with valid key property.
-		*
-		* @internal
-		* @param {ReactNode} node Statically passed child of any type.
-		* @param {*} parentType node's parent's type.
-		*/
-		function validateChildKeys(node, parentType) {
-			if (typeof node !== "object") return;
-			if (isArray(node)) for (var i = 0; i < node.length; i++) {
-				var child = node[i];
-				if (isValidElement(child)) validateExplicitKey(child, parentType);
-			}
-			else if (isValidElement(node)) {
-				if (node._store) node._store.validated = true;
-			} else if (node) {
-				var iteratorFn = getIteratorFn(node);
-				if (typeof iteratorFn === "function") {
-					if (iteratorFn !== node.entries) {
-						var iterator = iteratorFn.call(node);
-						var step;
-						while (!(step = iterator.next()).done) if (isValidElement(step.value)) validateExplicitKey(step.value, parentType);
-					}
-				}
-			}
-		}
-		/**
-		* Given an element, validate that its props follow the propTypes definition,
-		* provided by the type.
-		*
-		* @param {ReactElement} element
-		*/
-		function validatePropTypes(element) {
-			var type = element.type;
-			if (type === null || type === void 0 || typeof type === "string") return;
-			var propTypes;
-			if (typeof type === "function") propTypes = type.propTypes;
-			else if (typeof type === "object" && (type.$$typeof === REACT_FORWARD_REF_TYPE || type.$$typeof === REACT_MEMO_TYPE)) propTypes = type.propTypes;
-			else return;
-			if (propTypes) {
-				var name = getComponentNameFromType(type);
-				checkPropTypes(propTypes, element.props, "prop", name, element);
-			} else if (type.PropTypes !== void 0 && !propTypesMisspellWarningShown) {
-				propTypesMisspellWarningShown = true;
-				error("Component %s declared `PropTypes` instead of `propTypes`. Did you misspell the property assignment?", getComponentNameFromType(type) || "Unknown");
-			}
-			if (typeof type.getDefaultProps === "function" && !type.getDefaultProps.isReactClassApproved) error("getDefaultProps is only used on classic React.createClass definitions. Use a static property named `defaultProps` instead.");
-		}
-		/**
-		* Given a fragment, validate that it can only be provided with fragment props
-		* @param {ReactElement} fragment
-		*/
-		function validateFragmentProps(fragment) {
-			var keys = Object.keys(fragment.props);
-			for (var i = 0; i < keys.length; i++) {
-				var key = keys[i];
-				if (key !== "children" && key !== "key") {
-					setCurrentlyValidatingElement$1(fragment);
-					error("Invalid prop `%s` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.", key);
-					setCurrentlyValidatingElement$1(null);
-					break;
-				}
-			}
-			if (fragment.ref !== null) {
-				setCurrentlyValidatingElement$1(fragment);
-				error("Invalid attribute `ref` supplied to `React.Fragment`.");
-				setCurrentlyValidatingElement$1(null);
-			}
-		}
-		var didWarnAboutKeySpread = {};
-		function jsxWithValidation(type, props, key, isStaticChildren, source, self) {
-			var validType = isValidElementType(type);
-			if (!validType) {
-				var info = "";
-				if (type === void 0 || typeof type === "object" && type !== null && Object.keys(type).length === 0) info += " You likely forgot to export your component from the file it's defined in, or you might have mixed up default and named imports.";
-				var sourceInfo = getSourceInfoErrorAddendum(source);
-				if (sourceInfo) info += sourceInfo;
-				else info += getDeclarationErrorAddendum();
-				var typeString;
-				if (type === null) typeString = "null";
-				else if (isArray(type)) typeString = "array";
-				else if (type !== void 0 && type.$$typeof === REACT_ELEMENT_TYPE) {
-					typeString = "<" + (getComponentNameFromType(type.type) || "Unknown") + " />";
-					info = " Did you accidentally export a JSX literal instead of a component?";
-				} else typeString = typeof type;
-				error("React.jsx: type is invalid -- expected a string (for built-in components) or a class/function (for composite components) but got: %s.%s", typeString, info);
-			}
-			var element = jsxDEV(type, props, key, source, self);
-			if (element == null) return element;
-			if (validType) {
-				var children = props.children;
-				if (children !== void 0) if (isStaticChildren) if (isArray(children)) {
-					for (var i = 0; i < children.length; i++) validateChildKeys(children[i], type);
-					if (Object.freeze) Object.freeze(children);
-				} else error("React.jsx: Static children should always be an array. You are likely explicitly calling React.jsxs or React.jsxDEV. Use the Babel transform instead.");
-				else validateChildKeys(children, type);
-			}
-			if (hasOwnProperty.call(props, "key")) {
-				var componentName = getComponentNameFromType(type);
-				var keys = Object.keys(props).filter(function(k) {
-					return k !== "key";
-				});
-				var beforeExample = keys.length > 0 ? "{key: someKey, " + keys.join(": ..., ") + ": ...}" : "{key: someKey}";
-				if (!didWarnAboutKeySpread[componentName + beforeExample]) {
-					error("A props object containing a \"key\" prop is being spread into JSX:\n  let props = %s;\n  <%s {...props} />\nReact keys must be passed directly to JSX without using spread:\n  let props = %s;\n  <%s key={someKey} {...props} />", beforeExample, componentName, keys.length > 0 ? "{" + keys.join(": ..., ") + ": ...}" : "{}", componentName);
-					didWarnAboutKeySpread[componentName + beforeExample] = true;
-				}
-			}
-			if (type === REACT_FRAGMENT_TYPE) validateFragmentProps(element);
-			else validatePropTypes(element);
-			return element;
-		}
-		function jsxWithValidationStatic(type, props, key) {
-			return jsxWithValidation(type, props, key, true);
-		}
-		function jsxWithValidationDynamic(type, props, key) {
-			return jsxWithValidation(type, props, key, false);
-		}
-		var jsx = jsxWithValidationDynamic;
-		var jsxs = jsxWithValidationStatic;
-		exports.Fragment = REACT_FRAGMENT_TYPE;
-		exports.jsx = jsx;
-		exports.jsxs = jsxs;
-	})();
-}));
-//#endregion
 //#region src/audio-player/session/AudioSessionContext.tsx
-var import_jsx_runtime = (/* @__PURE__ */ __commonJSMin(((exports, module) => {
-	if (process.env.NODE_ENV === "production") module.exports = require_react_jsx_runtime_production_min();
-	else module.exports = require_react_jsx_runtime_development();
-})))();
 var AudioSessionContext = createContext(null);
 var EMPTY_PLUGINS$1 = [];
 /**
@@ -9278,9 +8843,9 @@ function AudioSessionProvider({ children, initialQueue = [], initialIndex = 0, a
 		pruneAudioCache,
 		setCacheLimit
 	]);
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(AudioSessionContext.Provider, {
+	return /* @__PURE__ */ jsxs(AudioSessionContext.Provider, {
 		value,
-		children: [engine.getBackendInfo().active === "html5" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("audio", {
+		children: [engine.getBackendInfo().active === "html5" && /* @__PURE__ */ jsx("audio", {
 			ref: engine.audioRef,
 			src: engine.currentSrc || void 0
 		}), children]
@@ -9551,7 +9116,7 @@ function ProgressBar({ currentTime, duration, buffered, disabled, isSeeking, onS
 	const progressPct = clampPct(rawProgressPct);
 	const bufferedPct = clampPct(rawBufferedPct);
 	const ariaValueNow = Number.isFinite(displayTime) && displayTime > 0 ? Math.round(displayTime * 10) / 10 : 0;
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsxs("div", {
 		ref: trackRef,
 		className: `ap-progress${isSeeking ? " ap-progress--seeking" : ""}`,
 		role: "slider",
@@ -9568,16 +9133,16 @@ function ProgressBar({ currentTime, duration, buffered, disabled, isSeeking, onS
 		onPointerCancel: handlePointerUp,
 		onKeyDown: handleKeyDown,
 		children: [
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ap-progress__track" }),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			/* @__PURE__ */ jsx("div", { className: "ap-progress__track" }),
+			/* @__PURE__ */ jsx("div", {
 				className: "ap-progress__buffered",
 				style: { width: `${bufferedPct}%` }
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			/* @__PURE__ */ jsx("div", {
 				className: "ap-progress__fill",
 				style: { width: `${progressPct}%` }
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			/* @__PURE__ */ jsx("div", {
 				className: "ap-progress__thumb",
 				style: { left: `${progressPct}%` }
 			})
@@ -9870,11 +9435,11 @@ function WaveformProgress({ currentTime, duration, buffered, disabled, isSeeking
 	const ariaValueNow = Number.isFinite(currentTime) && currentTime > 0 ? Math.round(currentTime * 10) / 10 : 0;
 	const clampPct = (v) => Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : 0;
 	const bufferedPct = clampPct(duration > 0 ? buffered / duration * 100 : 0);
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsxs("div", {
 		ref: wrapperRef,
 		className: `ap-waveform${isSeeking ? " ap-waveform--seeking" : ""}`,
 		style: { height: `${height}px` },
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		children: [/* @__PURE__ */ jsxs("div", {
 			className: "ap-waveform__surface",
 			role: "slider",
 			tabIndex: showWave ? 0 : -1,
@@ -9886,16 +9451,16 @@ function WaveformProgress({ currentTime, duration, buffered, disabled, isSeeking
 			"aria-disabled": disabled,
 			onKeyDown: handleKeyDown,
 			style: { visibility: showWave ? "visible" : "hidden" },
-			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			children: [/* @__PURE__ */ jsx("div", {
 				ref: containerRef,
 				className: "ap-waveform__canvas"
-			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			}), /* @__PURE__ */ jsx("div", {
 				className: "ap-waveform__buffered",
 				style: { width: `${bufferedPct}%` }
 			})]
-		}), !showWave && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		}), !showWave && /* @__PURE__ */ jsx("div", {
 			className: "ap-waveform__fallback",
-			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ProgressBar, {
+			children: /* @__PURE__ */ jsx(ProgressBar, {
 				currentTime,
 				duration,
 				buffered,
@@ -10034,7 +9599,7 @@ function getPreferredCanvasPlacement(face) {
 * can be produced, so the timeline always works and never shifts layout.
 */
 function WaveformAdapter({ face, density, currentTime, duration, buffered, disabled, isSeeking, onSeek, onSeekStart, onSeekEnd, peaks, peaksDuration, getDecodedData, url, sourceKey, height, waveColor, progressColor, cursorColor, waveform }) {
-	if (!(waveform ?? faceSupportsWaveform(face))) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ProgressBar, {
+	if (!(waveform ?? faceSupportsWaveform(face))) return /* @__PURE__ */ jsx(ProgressBar, {
 		currentTime,
 		duration,
 		buffered,
@@ -10044,7 +9609,7 @@ function WaveformAdapter({ face, density, currentTime, duration, buffered, disab
 		onSeekStart,
 		onSeekEnd
 	});
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(WaveformProgress, {
+	return /* @__PURE__ */ jsx(WaveformProgress, {
 		currentTime,
 		duration,
 		buffered,
@@ -10109,14 +9674,14 @@ function ensureMuted(el) {
 * Returns `null` when there is nothing to render.
 */
 function BackgroundMedia({ media, cssBackground, darkenAmount = 0, className }) {
-	const darken = darkenAmount > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+	const darken = darkenAmount > 0 ? /* @__PURE__ */ jsx("div", {
 		className: "ap-bg-darken",
 		style: { backgroundColor: `rgba(0,0,0,${darkenAmount / 100})` },
 		"aria-hidden": "true"
 	}) : null;
 	if (media && media.kind === "video") {
 		const style = media.fit === "contain" ? { objectFit: "contain" } : void 0;
-		return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("video", {
+		return /* @__PURE__ */ jsxs(Fragment, { children: [/* @__PURE__ */ jsx("video", {
 			className: `ap-bg-video${className ? ` ${className}` : ""}`,
 			src: media.src,
 			poster: media.poster,
@@ -10130,7 +9695,7 @@ function BackgroundMedia({ media, cssBackground, darkenAmount = 0, className }) 
 			style
 		}), darken] });
 	}
-	if (cssBackground) return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+	if (cssBackground) return /* @__PURE__ */ jsxs(Fragment, { children: [/* @__PURE__ */ jsx("div", {
 		className: `ap-bg-image${className ? ` ${className}` : ""}`,
 		style: { backgroundImage: cssBackground },
 		"aria-hidden": "true"
@@ -10147,14 +9712,14 @@ function BackgroundMedia({ media, cssBackground, darkenAmount = 0, className }) 
 * The stable `[data-scrubber-host]` container is the future plugin mount point.
 */
 function ScrubberCanvasHost({ face, density, currentTime, duration, progress, onSeek, activeSurfaceId, children }) {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+	return /* @__PURE__ */ jsx("div", {
 		className: "ap-scrubber-host",
 		"data-scrubber-host": "",
 		"data-density": density,
 		"data-face": face,
 		"data-surface-id": activeSurfaceId,
 		"data-progress": Math.round(progress * 100),
-		children: children ?? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FallbackScrubber, {
+		children: children ?? /* @__PURE__ */ jsx(FallbackScrubber, {
 			currentTime,
 			duration,
 			onSeek
@@ -10168,7 +9733,7 @@ function ScrubberCanvasHost({ face, density, currentTime, duration, progress, on
 */
 function FallbackScrubber({ currentTime, duration, onSeek }) {
 	const [isSeeking, setIsSeeking] = useState(false);
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ProgressBar, {
+	return /* @__PURE__ */ jsx(ProgressBar, {
 		currentTime,
 		duration,
 		buffered: 0,
@@ -10245,33 +9810,33 @@ function usePlayerSurface(face) {
 }
 //#endregion
 //#region src/audio-player/skins/icons.tsx
-var PlayIcon$1 = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", {
+var PlayIcon$1 = () => /* @__PURE__ */ jsx("svg", {
 	width: "24",
 	height: "24",
 	viewBox: "0 0 24 24",
 	fill: "currentColor",
 	"aria-hidden": "true",
-	children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M8 5v14l12-7z" })
+	children: /* @__PURE__ */ jsx("path", { d: "M8 5v14l12-7z" })
 });
-var PauseIcon$1 = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var PauseIcon$1 = () => /* @__PURE__ */ jsxs("svg", {
 	width: "24",
 	height: "24",
 	viewBox: "0 0 24 24",
 	fill: "currentColor",
 	"aria-hidden": "true",
-	children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", {
+	children: [/* @__PURE__ */ jsx("rect", {
 		x: "6",
 		y: "4",
 		width: "4",
 		height: "16"
-	}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", {
+	}), /* @__PURE__ */ jsx("rect", {
 		x: "14",
 		y: "4",
 		width: "4",
 		height: "16"
 	})]
 });
-var SpinnerIcon$1 = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var SpinnerIcon$1 = () => /* @__PURE__ */ jsxs("svg", {
 	className: "ap-spin",
 	width: "24",
 	height: "24",
@@ -10280,37 +9845,37 @@ var SpinnerIcon$1 = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 	stroke: "currentColor",
 	strokeWidth: "2",
 	"aria-hidden": "true",
-	children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+	children: [/* @__PURE__ */ jsx("circle", {
 		cx: "12",
 		cy: "12",
 		r: "10",
 		opacity: "0.25"
-	}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", {
+	}), /* @__PURE__ */ jsx("path", {
 		d: "M12 2a10 10 0 0 1 10 10",
 		strokeLinecap: "round"
 	})]
 });
-var PrevIcon$1 = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var PrevIcon$1 = () => /* @__PURE__ */ jsxs("svg", {
 	width: "16",
 	height: "16",
 	viewBox: "0 0 24 24",
 	fill: "currentColor",
 	"aria-hidden": "true",
-	children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", {
+	children: [/* @__PURE__ */ jsx("rect", {
 		x: "5",
 		y: "4",
 		width: "2.5",
 		height: "16",
 		rx: "0.5"
-	}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M20 5v14L9 12z" })]
+	}), /* @__PURE__ */ jsx("path", { d: "M20 5v14L9 12z" })]
 });
-var NextIcon$1 = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var NextIcon$1 = () => /* @__PURE__ */ jsxs("svg", {
 	width: "16",
 	height: "16",
 	viewBox: "0 0 24 24",
 	fill: "currentColor",
 	"aria-hidden": "true",
-	children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M4 5v14l11-7z" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", {
+	children: [/* @__PURE__ */ jsx("path", { d: "M4 5v14l11-7z" }), /* @__PURE__ */ jsx("rect", {
 		x: "16.5",
 		y: "4",
 		width: "2.5",
@@ -10318,7 +9883,7 @@ var NextIcon$1 = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 		rx: "0.5"
 	})]
 });
-var ShuffleIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var ShuffleIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "16",
 	height: "16",
 	viewBox: "0 0 24 24",
@@ -10329,21 +9894,21 @@ var ShuffleIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 	strokeLinejoin: "round",
 	"aria-hidden": "true",
 	children: [
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("polyline", { points: "16 3 21 3 21 8" }),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+		/* @__PURE__ */ jsx("polyline", { points: "16 3 21 3 21 8" }),
+		/* @__PURE__ */ jsx("line", {
 			x1: "4",
 			y1: "20",
 			x2: "21",
 			y2: "3"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("polyline", { points: "21 16 21 21 16 21" }),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+		/* @__PURE__ */ jsx("polyline", { points: "21 16 21 21 16 21" }),
+		/* @__PURE__ */ jsx("line", {
 			x1: "15",
 			y1: "15",
 			x2: "21",
 			y2: "21"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+		/* @__PURE__ */ jsx("line", {
 			x1: "4",
 			y1: "4",
 			x2: "9",
@@ -10351,7 +9916,7 @@ var ShuffleIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 		})
 	]
 });
-var RepeatIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var RepeatIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "16",
 	height: "16",
 	viewBox: "0 0 24 24",
@@ -10362,13 +9927,13 @@ var RepeatIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 	strokeLinejoin: "round",
 	"aria-hidden": "true",
 	children: [
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("polyline", { points: "17 1 21 5 17 9" }),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M3 11V9a4 4 0 0 1 4-4h14" }),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("polyline", { points: "7 23 3 19 7 15" }),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M21 13v2a4 4 0 0 1-4 4H3" })
+		/* @__PURE__ */ jsx("polyline", { points: "17 1 21 5 17 9" }),
+		/* @__PURE__ */ jsx("path", { d: "M3 11V9a4 4 0 0 1 4-4h14" }),
+		/* @__PURE__ */ jsx("polyline", { points: "7 23 3 19 7 15" }),
+		/* @__PURE__ */ jsx("path", { d: "M21 13v2a4 4 0 0 1-4 4H3" })
 	]
 });
-var RepeatOneIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var RepeatOneIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "16",
 	height: "16",
 	viewBox: "0 0 24 24",
@@ -10379,11 +9944,11 @@ var RepeatOneIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 	strokeLinejoin: "round",
 	"aria-hidden": "true",
 	children: [
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("polyline", { points: "17 1 21 5 17 9" }),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M3 11V9a4 4 0 0 1 4-4h14" }),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("polyline", { points: "7 23 3 19 7 15" }),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M21 13v2a4 4 0 0 1-4 4H3" }),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", {
+		/* @__PURE__ */ jsx("polyline", { points: "17 1 21 5 17 9" }),
+		/* @__PURE__ */ jsx("path", { d: "M3 11V9a4 4 0 0 1 4-4h14" }),
+		/* @__PURE__ */ jsx("polyline", { points: "7 23 3 19 7 15" }),
+		/* @__PURE__ */ jsx("path", { d: "M21 13v2a4 4 0 0 1-4 4H3" }),
+		/* @__PURE__ */ jsx("text", {
 			x: "12",
 			y: "15",
 			textAnchor: "middle",
@@ -10396,7 +9961,7 @@ var RepeatOneIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 		})
 	]
 });
-var AutomixIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var AutomixIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "16",
 	height: "16",
 	viewBox: "0 0 24 24",
@@ -10406,9 +9971,9 @@ var AutomixIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 	strokeLinecap: "round",
 	strokeLinejoin: "round",
 	"aria-hidden": "true",
-	children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M3 7c6 0 6 10 12 10h6" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M3 17c6 0 6-10 12-10h6" })]
+	children: [/* @__PURE__ */ jsx("path", { d: "M3 7c6 0 6 10 12 10h6" }), /* @__PURE__ */ jsx("path", { d: "M3 17c6 0 6-10 12-10h6" })]
 });
-var ErrorIcon$1 = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var ErrorIcon$1 = () => /* @__PURE__ */ jsxs("svg", {
 	width: "18",
 	height: "18",
 	viewBox: "0 0 24 24",
@@ -10417,18 +9982,18 @@ var ErrorIcon$1 = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 	strokeWidth: "2",
 	"aria-hidden": "true",
 	children: [
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("circle", {
 			cx: "12",
 			cy: "12",
 			r: "10"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+		/* @__PURE__ */ jsx("line", {
 			x1: "12",
 			y1: "8",
 			x2: "12",
 			y2: "12"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+		/* @__PURE__ */ jsx("line", {
 			x1: "12",
 			y1: "16",
 			x2: "12.01",
@@ -10436,31 +10001,31 @@ var ErrorIcon$1 = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 		})
 	]
 });
-var DotsIcon$1 = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var DotsIcon$1 = () => /* @__PURE__ */ jsxs("svg", {
 	width: "18",
 	height: "18",
 	viewBox: "0 0 24 24",
 	fill: "currentColor",
 	"aria-hidden": "true",
 	children: [
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("circle", {
 			cx: "5",
 			cy: "12",
 			r: "1.8"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("circle", {
 			cx: "12",
 			cy: "12",
 			r: "1.8"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("circle", {
 			cx: "19",
 			cy: "12",
 			r: "1.8"
 		})
 	]
 });
-var QueueIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var QueueIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "16",
 	height: "16",
 	viewBox: "0 0 24 24",
@@ -10471,37 +10036,37 @@ var QueueIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 	strokeLinejoin: "round",
 	"aria-hidden": "true",
 	children: [
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+		/* @__PURE__ */ jsx("line", {
 			x1: "8",
 			y1: "6",
 			x2: "21",
 			y2: "6"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+		/* @__PURE__ */ jsx("line", {
 			x1: "8",
 			y1: "12",
 			x2: "21",
 			y2: "12"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+		/* @__PURE__ */ jsx("line", {
 			x1: "8",
 			y1: "18",
 			x2: "21",
 			y2: "18"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+		/* @__PURE__ */ jsx("line", {
 			x1: "3",
 			y1: "6",
 			x2: "3.01",
 			y2: "6"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+		/* @__PURE__ */ jsx("line", {
 			x1: "3",
 			y1: "12",
 			x2: "3.01",
 			y2: "12"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+		/* @__PURE__ */ jsx("line", {
 			x1: "3",
 			y1: "18",
 			x2: "3.01",
@@ -10509,7 +10074,7 @@ var QueueIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 		})
 	]
 });
-var CanvasIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var CanvasIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "16",
 	height: "16",
 	viewBox: "0 0 24 24",
@@ -10520,22 +10085,22 @@ var CanvasIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 	strokeLinejoin: "round",
 	"aria-hidden": "true",
 	children: [
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", {
+		/* @__PURE__ */ jsx("rect", {
 			x: "3",
 			y: "4",
 			width: "18",
 			height: "14",
 			rx: "2"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("circle", {
 			cx: "8.5",
 			cy: "9",
 			r: "1.6"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M21 15l-5-4-7 6" })
+		/* @__PURE__ */ jsx("path", { d: "M21 15l-5-4-7 6" })
 	]
 });
-var WaveIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", {
+var WaveIcon = () => /* @__PURE__ */ jsx("svg", {
 	width: "16",
 	height: "16",
 	viewBox: "0 0 24 24",
@@ -10545,9 +10110,9 @@ var WaveIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", {
 	strokeLinecap: "round",
 	strokeLinejoin: "round",
 	"aria-hidden": "true",
-	children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M4 12v0M8 8v8M12 4v16M16 8v8M20 12v0" })
+	children: /* @__PURE__ */ jsx("path", { d: "M4 12v0M8 8v8M12 4v16M16 8v8M20 12v0" })
 });
-var ShareIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var ShareIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "16",
 	height: "16",
 	viewBox: "0 0 24 24",
@@ -10558,28 +10123,28 @@ var ShareIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 	strokeLinejoin: "round",
 	"aria-hidden": "true",
 	children: [
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("circle", {
 			cx: "18",
 			cy: "5",
 			r: "3"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("circle", {
 			cx: "6",
 			cy: "12",
 			r: "3"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("circle", {
 			cx: "18",
 			cy: "19",
 			r: "3"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+		/* @__PURE__ */ jsx("line", {
 			x1: "8.59",
 			y1: "13.51",
 			x2: "15.42",
 			y2: "17.49"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+		/* @__PURE__ */ jsx("line", {
 			x1: "15.41",
 			y1: "6.51",
 			x2: "8.59",
@@ -10587,7 +10152,7 @@ var ShareIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 		})
 	]
 });
-var CheckIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", {
+var CheckIcon = () => /* @__PURE__ */ jsx("svg", {
 	width: "16",
 	height: "16",
 	viewBox: "0 0 24 24",
@@ -10597,9 +10162,9 @@ var CheckIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", {
 	strokeLinecap: "round",
 	strokeLinejoin: "round",
 	"aria-hidden": "true",
-	children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("polyline", { points: "20 6 9 17 4 12" })
+	children: /* @__PURE__ */ jsx("polyline", { points: "20 6 9 17 4 12" })
 });
-var LyricsIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var LyricsIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "16",
 	height: "16",
 	viewBox: "0 0 24 24",
@@ -10610,20 +10175,20 @@ var LyricsIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 	strokeLinejoin: "round",
 	"aria-hidden": "true",
 	children: [
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M9 18V5l12-2v13" }),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("path", { d: "M9 18V5l12-2v13" }),
+		/* @__PURE__ */ jsx("circle", {
 			cx: "6",
 			cy: "18",
 			r: "3"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("circle", {
 			cx: "18",
 			cy: "16",
 			r: "3"
 		})
 	]
 });
-var AutoPlayIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", {
+var AutoPlayIcon = () => /* @__PURE__ */ jsx("svg", {
 	width: "16",
 	height: "16",
 	viewBox: "0 0 24 24",
@@ -10633,13 +10198,13 @@ var AutoPlayIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", {
 	strokeLinecap: "round",
 	strokeLinejoin: "round",
 	"aria-hidden": "true",
-	children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("polygon", {
+	children: /* @__PURE__ */ jsx("polygon", {
 		points: "6 4 20 12 6 20 6 4",
 		fill: "currentColor",
 		stroke: "none"
 	})
 });
-var PluginIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var PluginIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "16",
 	height: "16",
 	viewBox: "0 0 24 24",
@@ -10650,13 +10215,13 @@ var PluginIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 	strokeLinejoin: "round",
 	"aria-hidden": "true",
 	children: [
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M12 2v6" }),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M8 8h8v4a4 4 0 0 1-8 0z" }),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M9 2v4M15 2v4" }),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M12 16v6" })
+		/* @__PURE__ */ jsx("path", { d: "M12 2v6" }),
+		/* @__PURE__ */ jsx("path", { d: "M8 8h8v4a4 4 0 0 1-8 0z" }),
+		/* @__PURE__ */ jsx("path", { d: "M9 2v4M15 2v4" }),
+		/* @__PURE__ */ jsx("path", { d: "M12 16v6" })
 	]
 });
-var ChevronLeftIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", {
+var ChevronLeftIcon = () => /* @__PURE__ */ jsx("svg", {
 	width: "18",
 	height: "18",
 	viewBox: "0 0 24 24",
@@ -10666,9 +10231,9 @@ var ChevronLeftIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", {
 	strokeLinecap: "round",
 	strokeLinejoin: "round",
 	"aria-hidden": "true",
-	children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("polyline", { points: "15 18 9 12 15 6" })
+	children: /* @__PURE__ */ jsx("polyline", { points: "15 18 9 12 15 6" })
 });
-var CloseIcon$2 = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var CloseIcon$2 = () => /* @__PURE__ */ jsxs("svg", {
 	width: "18",
 	height: "18",
 	viewBox: "0 0 24 24",
@@ -10677,19 +10242,19 @@ var CloseIcon$2 = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 	strokeWidth: "2",
 	strokeLinecap: "round",
 	"aria-hidden": "true",
-	children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+	children: [/* @__PURE__ */ jsx("line", {
 		x1: "6",
 		y1: "6",
 		x2: "18",
 		y2: "18"
-	}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+	}), /* @__PURE__ */ jsx("line", {
 		x1: "18",
 		y1: "6",
 		x2: "6",
 		y2: "18"
 	})]
 });
-var PlaybackIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var PlaybackIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "16",
 	height: "16",
 	viewBox: "0 0 24 24",
@@ -10699,17 +10264,17 @@ var PlaybackIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 	strokeLinecap: "round",
 	strokeLinejoin: "round",
 	"aria-hidden": "true",
-	children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+	children: [/* @__PURE__ */ jsx("circle", {
 		cx: "12",
 		cy: "12",
 		r: "9"
-	}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", {
+	}), /* @__PURE__ */ jsx("path", {
 		d: "M10 9l5 3-5 3z",
 		fill: "currentColor",
 		stroke: "none"
 	})]
 });
-var VisualIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var VisualIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "16",
 	height: "16",
 	viewBox: "0 0 24 24",
@@ -10719,13 +10284,13 @@ var VisualIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 	strokeLinecap: "round",
 	strokeLinejoin: "round",
 	"aria-hidden": "true",
-	children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+	children: [/* @__PURE__ */ jsx("circle", {
 		cx: "12",
 		cy: "12",
 		r: "3"
-	}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" })]
+	}), /* @__PURE__ */ jsx("path", { d: "M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" })]
 });
-var AnalyticsIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var AnalyticsIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "16",
 	height: "16",
 	viewBox: "0 0 24 24",
@@ -10736,19 +10301,19 @@ var AnalyticsIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 	strokeLinejoin: "round",
 	"aria-hidden": "true",
 	children: [
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+		/* @__PURE__ */ jsx("line", {
 			x1: "6",
 			y1: "20",
 			x2: "6",
 			y2: "12"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+		/* @__PURE__ */ jsx("line", {
 			x1: "12",
 			y1: "20",
 			x2: "12",
 			y2: "4"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+		/* @__PURE__ */ jsx("line", {
 			x1: "18",
 			y1: "20",
 			x2: "18",
@@ -10756,7 +10321,7 @@ var AnalyticsIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 		})
 	]
 });
-var AgentIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var AgentIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "16",
 	height: "16",
 	viewBox: "0 0 24 24",
@@ -10767,29 +10332,29 @@ var AgentIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 	strokeLinejoin: "round",
 	"aria-hidden": "true",
 	children: [
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", {
+		/* @__PURE__ */ jsx("rect", {
 			x: "5",
 			y: "8",
 			width: "14",
 			height: "11",
 			rx: "2.5"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M12 4v4" }),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("path", { d: "M12 4v4" }),
+		/* @__PURE__ */ jsx("circle", {
 			cx: "12",
 			cy: "3",
 			r: "1.4",
 			fill: "currentColor",
 			stroke: "none"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("circle", {
 			cx: "9.5",
 			cy: "13",
 			r: "1.2",
 			fill: "currentColor",
 			stroke: "none"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("circle", {
 			cx: "14.5",
 			cy: "13",
 			r: "1.2",
@@ -10798,7 +10363,7 @@ var AgentIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 		})
 	]
 });
-var CommentsIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", {
+var CommentsIcon = () => /* @__PURE__ */ jsx("svg", {
 	width: "16",
 	height: "16",
 	viewBox: "0 0 24 24",
@@ -10808,9 +10373,9 @@ var CommentsIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", {
 	strokeLinecap: "round",
 	strokeLinejoin: "round",
 	"aria-hidden": "true",
-	children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M21 11.5a8.38 8.38 0 0 1-8.5 8.5 9 9 0 0 1-3.8-.8L3 21l1.3-4a8.5 8.5 0 0 1-1-4A8.38 8.38 0 0 1 11.5 4 8.38 8.38 0 0 1 21 11.5z" })
+	children: /* @__PURE__ */ jsx("path", { d: "M21 11.5a8.38 8.38 0 0 1-8.5 8.5 9 9 0 0 1-3.8-.8L3 21l1.3-4a8.5 8.5 0 0 1-1-4A8.38 8.38 0 0 1 11.5 4 8.38 8.38 0 0 1 21 11.5z" })
 });
-var LockIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var LockIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "16",
 	height: "16",
 	viewBox: "0 0 24 24",
@@ -10820,13 +10385,13 @@ var LockIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 	strokeLinecap: "round",
 	strokeLinejoin: "round",
 	"aria-hidden": "true",
-	children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", {
+	children: [/* @__PURE__ */ jsx("rect", {
 		x: "5",
 		y: "11",
 		width: "14",
 		height: "9",
 		rx: "2"
-	}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M8 11V8a4 4 0 0 1 8 0v3" })]
+	}), /* @__PURE__ */ jsx("path", { d: "M8 11V8a4 4 0 0 1 8 0v3" })]
 });
 //#endregion
 //#region src/audio-player/surfaces/SurfaceButton.tsx
@@ -10837,7 +10402,7 @@ var LockIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 * by construction. Active state is exposed via `aria-pressed` + a modifier class.
 */
 function SurfaceButton({ active, children, onClick, label, disabled = false, className }) {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+	return /* @__PURE__ */ jsx("button", {
 		type: "button",
 		className: `ap-surface-btn ap-tap${active ? " ap-surface-btn--active" : ""}${className ? ` ${className}` : ""}`,
 		onClick,
@@ -11016,7 +10581,7 @@ function resolveLevel(items, path) {
 	};
 }
 /** Default trigger glyph — a small command-wheel mark. */
-var TriggerIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var TriggerIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "16",
 	height: "16",
 	viewBox: "0 0 24 24",
@@ -11027,27 +10592,27 @@ var TriggerIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 	strokeLinejoin: "round",
 	"aria-hidden": "true",
 	children: [
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("circle", {
 			cx: "12",
 			cy: "12",
 			r: "2.2"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("circle", {
 			cx: "12",
 			cy: "4.5",
 			r: "1.8"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("circle", {
 			cx: "18.5",
 			cy: "15.5",
 			r: "1.8"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("circle", {
 			cx: "5.5",
 			cy: "15.5",
 			r: "1.8"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M12 6.7v3M13.8 13.1l2.8 1.6M10.2 13.1l-2.8 1.6" })
+		/* @__PURE__ */ jsx("path", { d: "M12 6.7v3M13.8 13.1l2.8 1.6M10.2 13.1l-2.8 1.6" })
 	]
 });
 /**
@@ -11154,7 +10719,7 @@ function SEICanvasActionMenu({ items, onOpenQueue, onActivateCanvas, onSelect, o
 		else close();
 	}, [close, path.length]);
 	const inSubmenu = path.length > 0;
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+	return /* @__PURE__ */ jsxs(Fragment, { children: [/* @__PURE__ */ jsx("button", {
 		ref: triggerRef,
 		type: "button",
 		className: `ap-surface-btn ap-tap${open ? " ap-surface-btn--active" : ""}${className ? ` ${className}` : ""}`,
@@ -11162,27 +10727,27 @@ function SEICanvasActionMenu({ items, onOpenQueue, onActivateCanvas, onSelect, o
 		"aria-haspopup": "menu",
 		"aria-expanded": open,
 		"aria-label": ariaLabel,
-		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TriggerIcon, {})
-	}), open && typeof document !== "undefined" && createPortal(/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		children: /* @__PURE__ */ jsx(TriggerIcon, {})
+	}), open && typeof document !== "undefined" && createPortal(/* @__PURE__ */ jsxs("div", {
 		className: "sac",
 		style: themeStyle,
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		children: [/* @__PURE__ */ jsx("div", {
 			className: "sac__backdrop",
 			onPointerDown: (e) => {
 				if (e.button === 0) close();
 			},
 			"aria-hidden": "true",
 			"data-entered": entered
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		}), /* @__PURE__ */ jsx("div", {
 			className: "sac__stage",
 			role: "menu",
 			"aria-label": ariaLabel,
-			children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			children: /* @__PURE__ */ jsxs("div", {
 				className: "sac__arc",
 				"data-open": entered,
 				style: { "--arc-radius": `${arcRadius}px` },
 				children: [
-					inSubmenu && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					inSubmenu && /* @__PURE__ */ jsx("div", {
 						className: "sac__crumb",
 						"aria-hidden": "true",
 						children: trail.join(" › ")
@@ -11192,7 +10757,7 @@ function SEICanvasActionMenu({ items, onOpenQueue, onActivateCanvas, onSelect, o
 						const interactive = isNodeInteractive(node);
 						const offset = offsets[i];
 						const Icon = node.icon;
-						return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+						return /* @__PURE__ */ jsxs("button", {
 							type: "button",
 							role: "menuitem",
 							className: `sac__node sac__node--${state}`,
@@ -11206,28 +10771,28 @@ function SEICanvasActionMenu({ items, onOpenQueue, onActivateCanvas, onSelect, o
 							"aria-haspopup": node.children ? "menu" : void 0,
 							tabIndex: interactive ? 0 : -1,
 							children: [
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								/* @__PURE__ */ jsx("span", {
 									className: "sac__node-icon",
-									children: state === "locked" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LockIcon, {}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Icon, {})
+									children: state === "locked" ? /* @__PURE__ */ jsx(LockIcon, {}) : /* @__PURE__ */ jsx(Icon, {})
 								}),
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								/* @__PURE__ */ jsx("span", {
 									className: "sac__node-label",
 									children: node.label
 								}),
-								state === "coming-soon" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								state === "coming-soon" && /* @__PURE__ */ jsx("span", {
 									className: "sac__badge",
 									children: "soon"
 								})
 							]
 						}, node.id);
 					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					/* @__PURE__ */ jsx("button", {
 						ref: centerRef,
 						type: "button",
 						className: "sac__center ap-tap",
 						onClick: handleCenter,
 						"aria-label": inSubmenu ? "Back" : "Close menu",
-						children: inSubmenu ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChevronLeftIcon, {}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CloseIcon$2, {})
+						children: inSubmenu ? /* @__PURE__ */ jsx(ChevronLeftIcon, {}) : /* @__PURE__ */ jsx(CloseIcon$2, {})
 					})
 				]
 			})
@@ -11265,16 +10830,16 @@ function PlayerSurfaceButtons({ surface, showCanvasButton = surface.canvasSuppor
 		onOpenFocusedController?.(route);
 	}, [onOpenFocusedController]);
 	if (!showCanvasButton && !showQueueButton) return null;
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsxs("div", {
 		className: `ap-surface-actions${className ? ` ${className}` : ""}`,
 		role: "group",
 		"aria-label": "Player surfaces",
-		children: [showCanvasButton && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SurfaceButton, {
+		children: [showCanvasButton && /* @__PURE__ */ jsx(SurfaceButton, {
 			active: surface.isCanvasOpen,
 			onClick: surface.toggleCanvas,
 			label: "SEI Canvas",
-			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CanvasIcon, {})
-		}), showQueueButton && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SEICanvasActionMenu, {
+			children: /* @__PURE__ */ jsx(CanvasIcon, {})
+		}), showQueueButton && /* @__PURE__ */ jsx(SEICanvasActionMenu, {
 			items: menuItems,
 			onActivateCanvas: surface.toggleCanvas,
 			onOpenQueue: onOpenQueue ?? surface.toggleQueue,
@@ -11297,14 +10862,14 @@ function PlayerSurfaceButtons({ surface, showCanvasButton = surface.canvasSuppor
 */
 function SEICanvasHost({ open, face, supported, activeSurfaceId, children }) {
 	if (!supported) return null;
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+	return /* @__PURE__ */ jsx("div", {
 		className: "ap-sei-canvas-host",
 		"data-sei-canvas-host": "",
 		"data-open": open ? "true" : "false",
 		"data-face": face,
 		"data-surface-id": activeSurfaceId,
 		"aria-hidden": open ? void 0 : true,
-		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		children: /* @__PURE__ */ jsx("div", {
 			className: "ap-sei-canvas-host__inner",
 			children
 		})
@@ -11326,30 +10891,30 @@ function QueueSurface({ maxItems, className }) {
 		index
 	})).filter(({ index }) => index >= currentIndex);
 	const items = typeof maxItems === "number" ? upcoming.slice(0, maxItems) : upcoming;
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsxs("div", {
 		className: `ap-queue-surface${className ? ` ${className}` : ""}`,
 		role: "group",
 		"aria-label": "Up next",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		children: [/* @__PURE__ */ jsx("div", {
 			className: "ap-queue-surface__head",
 			children: "Up next"
-		}), items.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		}), items.length === 0 ? /* @__PURE__ */ jsx("div", {
 			className: "ap-queue-surface__empty",
 			children: "Queue is empty"
-		}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+		}) : /* @__PURE__ */ jsx("ul", {
 			className: "ap-queue-surface__list",
 			children: items.map(({ track, index }) => {
 				const isCurrent = index === currentIndex;
-				return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+				return /* @__PURE__ */ jsx("li", { children: /* @__PURE__ */ jsxs("button", {
 					type: "button",
 					className: `ap-queue-surface__row ap-tap${isCurrent ? " ap-queue-surface__row--current" : ""}`,
 					onClick: () => s.playTrack(index),
 					"aria-current": isCurrent ? "true" : void 0,
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					children: [/* @__PURE__ */ jsx("span", {
 						className: "ap-queue-surface__title",
 						title: track.title,
 						children: track.title
-					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					}), /* @__PURE__ */ jsx("span", {
 						className: "ap-queue-surface__artist",
 						title: track.artist,
 						children: track.artist
@@ -11429,17 +10994,17 @@ function LyricDisplay({ settings, playback }) {
 			inline: "nearest"
 		});
 	}, [activeIndex, settings.animationMode]);
-	if (lines.length === 0) return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	if (lines.length === 0) return /* @__PURE__ */ jsxs("div", {
 		className: "sap-visual-lyric sap-visual-lyric--empty",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+		children: [/* @__PURE__ */ jsx("p", {
 			className: "sap-visual-lyric__empty-title",
 			children: "No lyrics"
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+		}), /* @__PURE__ */ jsx("p", {
 			className: "sap-visual-lyric__empty-hint",
 			children: "This track has no lyrics to display."
 		})]
 	});
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+	return /* @__PURE__ */ jsx("div", {
 		className: "sap-visual-lyric",
 		ref: containerRef,
 		"data-animation": settings.animationMode,
@@ -11451,7 +11016,7 @@ function LyricDisplay({ settings, playback }) {
 		},
 		children: lines.map((line, i) => {
 			const isActive = i === activeIndex;
-			return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+			return /* @__PURE__ */ jsx("p", {
 				className: "sap-visual-lyric__line",
 				"data-active": isActive ? "true" : "false",
 				style: isActive ? { color: settings.highlightColor } : void 0,
@@ -11462,9 +11027,9 @@ function LyricDisplay({ settings, playback }) {
 }
 /** A labeled field row used by the settings panel. */
 function Field({ label, children }) {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+	return /* @__PURE__ */ jsxs("label", {
 		className: "sap-visual-field",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+		children: [/* @__PURE__ */ jsx("span", {
 			className: "sap-visual-field__label",
 			children: label
 		}), children]
@@ -11476,24 +11041,24 @@ function Field({ label, children }) {
 * `onChange` and update the live SEI Canvas visual.
 */
 function LyricSettingsPanel({ settings, onChange }) {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsxs("div", {
 		className: "sap-visual-settings",
 		children: [
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, {
+			/* @__PURE__ */ jsx(Field, {
 				label: "Font family",
-				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("select", {
+				children: /* @__PURE__ */ jsx("select", {
 					className: "sap-visual-input",
 					value: settings.fontFamily,
 					onChange: (e) => onChange({ fontFamily: e.target.value }),
-					children: FONT_FAMILY_OPTIONS.map((opt) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+					children: FONT_FAMILY_OPTIONS.map((opt) => /* @__PURE__ */ jsx("option", {
 						value: opt.value,
 						children: opt.label
 					}, opt.label))
 				})
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, {
+			/* @__PURE__ */ jsx(Field, {
 				label: `Font weight (${settings.fontWeight})`,
-				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+				children: /* @__PURE__ */ jsx("input", {
 					className: "sap-visual-input",
 					type: "range",
 					min: 100,
@@ -11503,9 +11068,9 @@ function LyricSettingsPanel({ settings, onChange }) {
 					onChange: (e) => onChange({ fontWeight: Number(e.target.value) })
 				})
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, {
+			/* @__PURE__ */ jsx(Field, {
 				label: `Font size (${settings.fontSize}px)`,
-				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+				children: /* @__PURE__ */ jsx("input", {
 					className: "sap-visual-input",
 					type: "range",
 					min: 12,
@@ -11515,9 +11080,9 @@ function LyricSettingsPanel({ settings, onChange }) {
 					onChange: (e) => onChange({ fontSize: Number(e.target.value) })
 				})
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, {
+			/* @__PURE__ */ jsx(Field, {
 				label: `Line height (${settings.lineHeight.toFixed(1)})`,
-				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+				children: /* @__PURE__ */ jsx("input", {
 					className: "sap-visual-input",
 					type: "range",
 					min: 1,
@@ -11527,22 +11092,22 @@ function LyricSettingsPanel({ settings, onChange }) {
 					onChange: (e) => onChange({ lineHeight: Number(e.target.value) })
 				})
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, {
+			/* @__PURE__ */ jsx(Field, {
 				label: "Highlight color",
-				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+				children: /* @__PURE__ */ jsx("input", {
 					className: "sap-visual-input sap-visual-input--color",
 					type: "color",
 					value: settings.highlightColor,
 					onChange: (e) => onChange({ highlightColor: e.target.value })
 				})
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, {
+			/* @__PURE__ */ jsx(Field, {
 				label: "Animation mode",
-				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("select", {
+				children: /* @__PURE__ */ jsx("select", {
 					className: "sap-visual-input",
 					value: settings.animationMode,
 					onChange: (e) => onChange({ animationMode: e.target.value }),
-					children: ANIMATION_OPTIONS.map((opt) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+					children: ANIMATION_OPTIONS.map((opt) => /* @__PURE__ */ jsx("option", {
 						value: opt.value,
 						children: opt.label
 					}, opt.value))
@@ -11567,13 +11132,13 @@ var lyricDisplayDefinition = {
 * This is a minimal Sea-Workshop-Light format #2 (structured React) export.
 */
 function SampleVisual({ primaryColor = "#7cc4ff", label = "Hello Skin" }) {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsxs("div", {
 		className: "container",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+		children: [/* @__PURE__ */ jsx("h2", {
 			className: "title",
 			style: { color: primaryColor },
 			children: label
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ring" })]
+		}), /* @__PURE__ */ jsx("div", { className: "ring" })]
 	});
 }
 //#endregion
@@ -11581,15 +11146,15 @@ function SampleVisual({ primaryColor = "#7cc4ff", label = "Hello Skin" }) {
 /** Default settings for this skin. Edit to match your component's API. */
 var sampleSkinDefaultSettings = {};
 function SampleSkin({ settings, playback }) {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+	return /* @__PURE__ */ jsx("div", {
 		className: "sap-visual-sample-skin",
-		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SampleVisual, {})
+		children: /* @__PURE__ */ jsx(SampleVisual, {})
 	});
 }
 function SampleSkinSettingsPanel({ settings, onChange }) {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+	return /* @__PURE__ */ jsx("div", {
 		className: "sap-visual-settings",
-		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+		children: /* @__PURE__ */ jsxs("p", {
 			style: {
 				opacity: .6,
 				fontSize: 12
@@ -11726,7 +11291,7 @@ function VisualSlotsProvider({ children }) {
 		getSettings,
 		updateSettings
 	]);
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(VisualSlotsContext.Provider, {
+	return /* @__PURE__ */ jsx(VisualSlotsContext.Provider, {
 		value,
 		children
 	});
@@ -11771,18 +11336,18 @@ function useVisualSlots() {
 function SEICanvasRenderer({ currentTime = 0, duration = 0, lyrics } = {}) {
 	const slots = useVisualSlots();
 	const def = getVisualComponent(slots.getActive("seiCanvas"));
-	if (!def) return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	if (!def) return /* @__PURE__ */ jsxs("div", {
 		className: "sap-visual-empty",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+		children: [/* @__PURE__ */ jsx("span", {
 			className: "sap-visual-empty__title",
 			children: "SEI Canvas"
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+		}), /* @__PURE__ */ jsx("span", {
 			className: "sap-visual-empty__hint",
 			children: "No visual selected."
 		})]
 	});
 	const { Component } = def;
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Component, {
+	return /* @__PURE__ */ jsx(Component, {
 		settings: slots.getSettings(def.id),
 		playback: {
 			currentTime,
@@ -11802,9 +11367,9 @@ function SEICanvasRenderer({ currentTime = 0, duration = 0, lyrics } = {}) {
 function ScrubberCanvasRenderer({ currentTime, duration, onSeek, children }) {
 	const slots = useVisualSlots();
 	const def = getVisualComponent(slots.getActive("scrubberCanvas"));
-	if (!def) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children });
+	if (!def) return /* @__PURE__ */ jsx(Fragment, { children });
 	const { Component } = def;
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Component, { settings: {
+	return /* @__PURE__ */ jsx(Component, { settings: {
 		...slots.getSettings(def.id),
 		currentTime,
 		duration,
@@ -11909,33 +11474,33 @@ function VolumeControl({ volume, isMuted, disabled, volumeUnsupported = false, o
 	const effective = isMuted ? 0 : volume;
 	const rawPct = effective * 100;
 	const pct = Number.isFinite(rawPct) ? Math.max(0, Math.min(100, rawPct)) : 0;
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsxs("div", {
 		className: "ap-volume",
 		children: [
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+			/* @__PURE__ */ jsx("button", {
 				type: "button",
 				className: "ap-icon-btn ap-volume__mute",
 				onClick: onToggleMute,
 				disabled,
 				"aria-label": isMuted ? "Unmute" : "Mute",
 				"aria-pressed": isMuted,
-				children: isMuted || effective === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", {
+				children: isMuted || effective === 0 ? /* @__PURE__ */ jsx("svg", {
 					width: "18",
 					height: "18",
 					viewBox: "0 0 24 24",
 					fill: "currentColor",
 					"aria-hidden": "true",
-					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.8 8.8 0 0 0 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06a8.99 8.99 0 0 0 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4 9.91 6.09 12 8.18V4z" })
-				}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", {
+					children: /* @__PURE__ */ jsx("path", { d: "M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.8 8.8 0 0 0 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06a8.99 8.99 0 0 0 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4 9.91 6.09 12 8.18V4z" })
+				}) : /* @__PURE__ */ jsx("svg", {
 					width: "18",
 					height: "18",
 					viewBox: "0 0 24 24",
 					fill: "currentColor",
 					"aria-hidden": "true",
-					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" })
+					children: /* @__PURE__ */ jsx("path", { d: "M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" })
 				})
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			/* @__PURE__ */ jsxs("div", {
 				ref: trackRef,
 				className: "ap-volume__slider",
 				role: "slider",
@@ -11952,18 +11517,18 @@ function VolumeControl({ volume, isMuted, disabled, volumeUnsupported = false, o
 				onPointerCancel: handlePointerUp,
 				onKeyDown: handleKeyDown,
 				children: [
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ap-volume__track" }),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					/* @__PURE__ */ jsx("div", { className: "ap-volume__track" }),
+					/* @__PURE__ */ jsx("div", {
 						className: "ap-volume__fill",
 						style: { width: `${pct}%` }
 					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					/* @__PURE__ */ jsx("div", {
 						className: "ap-volume__thumb",
 						style: { left: `${pct}%` }
 					})
 				]
 			}),
-			volumeUnsupported && !disabled && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+			volumeUnsupported && !disabled && /* @__PURE__ */ jsx("span", {
 				className: "ap-volume__hint",
 				role: "note",
 				"aria-label": "Use the mute button to silence audio; this browser does not support volume control",
@@ -12637,7 +12202,7 @@ var QueueRowWrapper = ({ index, style, data }) => {
 	if (!track) return null;
 	const isActive = actualIndex === currentIndex;
 	const isDragging = drag.drag !== null && drag.drag.index === actualIndex;
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(QueueRow, {
+	return /* @__PURE__ */ jsx(QueueRow, {
 		style,
 		track,
 		index: actualIndex,
@@ -12720,46 +12285,46 @@ function useQueueDrag(itemCount, onReorder, rowHeight = 56, startIndexOffset = 0
 		})
 	};
 }
-var DragHandleIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var DragHandleIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "16",
 	height: "16",
 	viewBox: "0 0 16 16",
 	fill: "currentColor",
 	"aria-hidden": "true",
 	children: [
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("circle", {
 			cx: "5",
 			cy: "4",
 			r: "1.3"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("circle", {
 			cx: "11",
 			cy: "4",
 			r: "1.3"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("circle", {
 			cx: "5",
 			cy: "8",
 			r: "1.3"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("circle", {
 			cx: "11",
 			cy: "8",
 			r: "1.3"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("circle", {
 			cx: "5",
 			cy: "12",
 			r: "1.3"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("circle", {
 			cx: "11",
 			cy: "12",
 			r: "1.3"
 		})
 	]
 });
-var CloseIcon$1 = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var CloseIcon$1 = () => /* @__PURE__ */ jsxs("svg", {
 	width: "18",
 	height: "18",
 	viewBox: "0 0 24 24",
@@ -12769,19 +12334,19 @@ var CloseIcon$1 = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 	strokeLinecap: "round",
 	strokeLinejoin: "round",
 	"aria-hidden": "true",
-	children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+	children: [/* @__PURE__ */ jsx("line", {
 		x1: "18",
 		y1: "6",
 		x2: "6",
 		y2: "18"
-	}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+	}), /* @__PURE__ */ jsx("line", {
 		x1: "6",
 		y1: "6",
 		x2: "18",
 		y2: "18"
 	})]
 });
-var RemoveIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var RemoveIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "14",
 	height: "14",
 	viewBox: "0 0 24 24",
@@ -12791,12 +12356,12 @@ var RemoveIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 	strokeLinecap: "round",
 	strokeLinejoin: "round",
 	"aria-hidden": "true",
-	children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+	children: [/* @__PURE__ */ jsx("line", {
 		x1: "18",
 		y1: "6",
 		x2: "6",
 		y2: "18"
-	}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+	}), /* @__PURE__ */ jsx("line", {
 		x1: "6",
 		y1: "6",
 		x2: "18",
@@ -12808,7 +12373,7 @@ function QueueRow({ track, index, isActive, isDragging, dragOffset, dragHandlers
 	useEffect(() => {
 		if (isActive && rowRef.current) rowRef.current.focus();
 	}, [isActive]);
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsxs("div", {
 		ref: rowRef,
 		className: `ap-q-row${isActive ? " ap-q-row--active" : ""}${isDragging ? " ap-q-row--dragging" : ""}`,
 		role: "listitem",
@@ -12819,61 +12384,61 @@ function QueueRow({ track, index, isActive, isDragging, dragOffset, dragHandlers
 			...isDragging && dragOffset !== 0 ? { transform: `translateY(${dragOffset}px)` } : {}
 		},
 		children: [
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+			/* @__PURE__ */ jsx("span", {
 				className: "ap-q-row__drag",
 				"aria-hidden": "true",
 				style: { touchAction: "none" },
 				onPointerDown: dragHandlers.onPointerDown,
 				onPointerMove: dragHandlers.onPointerMove,
 				onPointerUp: dragHandlers.onPointerUp,
-				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DragHandleIcon, {})
+				children: /* @__PURE__ */ jsx(DragHandleIcon, {})
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+			/* @__PURE__ */ jsx("span", {
 				className: "ap-q-row__num",
-				children: isActive && isPlaying ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+				children: isActive && isPlaying ? /* @__PURE__ */ jsxs("span", {
 					className: "ap-eq",
 					"aria-hidden": "true",
 					children: [
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {})
+						/* @__PURE__ */ jsx("i", {}),
+						/* @__PURE__ */ jsx("i", {}),
+						/* @__PURE__ */ jsx("i", {})
 					]
 				}) : index + 1
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			/* @__PURE__ */ jsxs("div", {
 				className: "ap-q-row__meta",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				children: [/* @__PURE__ */ jsx("span", {
 					className: "ap-q-row__title",
 					children: track.title
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				}), /* @__PURE__ */ jsx("span", {
 					className: "ap-q-row__artist",
 					children: track.artist
 				})]
 			}),
-			isActive && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+			isActive && /* @__PURE__ */ jsx("span", {
 				className: "ap-q-row__badge",
 				children: "Now Playing"
 			}),
-			!isActive && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+			!isActive && /* @__PURE__ */ jsx("button", {
 				type: "button",
 				className: "ap-q-row__play-btn ap-tap",
 				onClick: onPlay,
 				"aria-label": `Play ${track.title}`,
-				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", {
+				children: /* @__PURE__ */ jsx("svg", {
 					width: "14",
 					height: "14",
 					viewBox: "0 0 24 24",
 					fill: "currentColor",
 					"aria-hidden": "true",
-					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M8 5v14l12-7z" })
+					children: /* @__PURE__ */ jsx("path", { d: "M8 5v14l12-7z" })
 				})
 			}),
-			!isActive && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+			!isActive && /* @__PURE__ */ jsx("button", {
 				type: "button",
 				className: "ap-q-row__remove ap-tap",
 				onClick: onRemove,
 				"aria-label": `Remove ${track.title} from queue`,
-				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RemoveIcon, {})
+				children: /* @__PURE__ */ jsx(RemoveIcon, {})
 			})
 		]
 	});
@@ -12920,26 +12485,26 @@ function QueueDrawer({ queue, currentIndex, isPlaying = false, open, onClose, on
 		return () => document.removeEventListener("keydown", handleKey);
 	}, [open, onClose]);
 	if (!open) return null;
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsxs("div", {
 		className: "ap-q-overlay",
 		role: "dialog",
 		"aria-modal": "true",
 		"aria-label": "Up next queue",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		children: [/* @__PURE__ */ jsx("div", {
 			className: "ap-q-backdrop",
 			onClick: onClose,
 			"aria-hidden": "true"
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		}), /* @__PURE__ */ jsxs("div", {
 			className: "ap-q-drawer ap-anim-in",
 			children: [
-				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				/* @__PURE__ */ jsxs("div", {
 					className: "ap-q-header",
 					children: [
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+						/* @__PURE__ */ jsx("h2", {
 							className: "ap-q-header__title",
 							children: "Up Next"
 						}),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+						/* @__PURE__ */ jsxs("span", {
 							className: "ap-q-header__count",
 							children: [
 								queue.length,
@@ -12947,28 +12512,28 @@ function QueueDrawer({ queue, currentIndex, isPlaying = false, open, onClose, on
 								queue.length !== 1 ? "s" : ""
 							]
 						}),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						/* @__PURE__ */ jsx("button", {
 							type: "button",
 							className: "ap-q-header__close ap-tap",
 							onClick: onClose,
 							"aria-label": "Close queue drawer",
-							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CloseIcon$1, {})
+							children: /* @__PURE__ */ jsx(CloseIcon$1, {})
 						})
 					]
 				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				/* @__PURE__ */ jsx("div", {
 					className: "ap-sr-only",
 					role: "status",
 					"aria-live": "polite",
 					"aria-atomic": "true",
 					children: announcement
 				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				/* @__PURE__ */ jsx("div", {
 					className: "ap-q-list",
 					role: "list",
 					"aria-label": "Queue tracks",
 					style: { touchAction: "pan-y" },
-					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AutoSizer, { children: ({ height, width }) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FixedSizeList, {
+					children: /* @__PURE__ */ jsx(AutoSizer, { children: ({ height, width }) => /* @__PURE__ */ jsx(FixedSizeList, {
 						outerRef: drag.setContainerRef,
 						height,
 						width,
@@ -12991,13 +12556,13 @@ function QueueDrawer({ queue, currentIndex, isPlaying = false, open, onClose, on
 						children: QueueRowWrapper
 					}) })
 				}),
-				queue.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				queue.length === 0 && /* @__PURE__ */ jsx("div", {
 					className: "ap-q-empty",
-					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: "Queue is empty" })
+					children: /* @__PURE__ */ jsx("p", { children: "Queue is empty" })
 				}),
-				queue.length > 0 && upcomingStart >= queue.length && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				queue.length > 0 && upcomingStart >= queue.length && /* @__PURE__ */ jsx("div", {
 					className: "ap-q-empty",
-					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: "No more tracks — the queue ends after this one." })
+					children: /* @__PURE__ */ jsx("p", { children: "No more tracks — the queue ends after this one." })
 				})
 			]
 		})]
@@ -13082,12 +12647,12 @@ function parseWorkspaceRoute(value) {
 //#endregion
 //#region src/audio-player/components/workspace/LibraryPlaylistsWorkspace.tsx
 function LibraryPlaylistsWorkspace() {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsxs("div", {
 		className: "sap-ctl__workspace-empty",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+		children: [/* @__PURE__ */ jsx("p", {
 			className: "sap-ctl__workspace-lead",
 			children: "Playlists coming soon"
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+		}), /* @__PURE__ */ jsx("p", {
 			className: "sap-ctl__workspace-sub",
 			children: "Browse, build and reorder playlists from here."
 		})]
@@ -13096,12 +12661,12 @@ function LibraryPlaylistsWorkspace() {
 //#endregion
 //#region src/audio-player/components/workspace/LibraryQueueWorkspace.tsx
 function LibraryQueueWorkspace() {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsxs("div", {
 		className: "sap-ctl__workspace-empty",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+		children: [/* @__PURE__ */ jsx("p", {
 			className: "sap-ctl__workspace-lead",
 			children: "Up Next"
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+		}), /* @__PURE__ */ jsx("p", {
 			className: "sap-ctl__workspace-sub",
 			children: "An in-workspace view of the play queue is on the way. Use the queue drawer for now."
 		})]
@@ -13111,12 +12676,12 @@ function LibraryQueueWorkspace() {
 //#region src/audio-player/components/workspace/PluginSettingsWorkspace.tsx
 function PluginSettingsWorkspace({ pluginId }) {
 	const label = pluginId ? pluginId.charAt(0).toUpperCase() + pluginId.slice(1) : "Plugin";
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsxs("div", {
 		className: "sap-ctl__workspace-empty",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+		children: [/* @__PURE__ */ jsxs("p", {
 			className: "sap-ctl__workspace-lead",
 			children: [label, " settings"]
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+		}), /* @__PURE__ */ jsxs("p", {
 			className: "sap-ctl__workspace-sub",
 			children: [
 				"Configuration for the ",
@@ -13129,12 +12694,12 @@ function PluginSettingsWorkspace({ pluginId }) {
 //#endregion
 //#region src/audio-player/components/workspace/PlaybackAutomixWorkspace.tsx
 function PlaybackAutomixWorkspace() {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsxs("div", {
 		className: "sap-ctl__workspace-empty",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+		children: [/* @__PURE__ */ jsx("p", {
 			className: "sap-ctl__workspace-lead",
 			children: "Automix settings coming soon"
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+		}), /* @__PURE__ */ jsx("p", {
 			className: "sap-ctl__workspace-sub",
 			children: "Crossfade length, beat snapping and transition tuning will live here."
 		})]
@@ -13143,12 +12708,12 @@ function PlaybackAutomixWorkspace() {
 //#endregion
 //#region src/audio-player/components/workspace/AgentQueueDirectorWorkspace.tsx
 function AgentQueueDirectorWorkspace() {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsxs("div", {
 		className: "sap-ctl__workspace-empty",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+		children: [/* @__PURE__ */ jsx("p", {
 			className: "sap-ctl__workspace-lead",
 			children: "AI queue director coming soon"
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+		}), /* @__PURE__ */ jsx("p", {
 			className: "sap-ctl__workspace-sub",
 			children: "Let an agent curate and reorder what plays next."
 		})]
@@ -13374,56 +12939,56 @@ function ActivityLogPanel() {
 	const handleExportText = useCallback(() => {
 		downloadLog(log.exportText(), `activity-log-${Date.now()}.txt`, "text/plain");
 	}, [log]);
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsxs("div", {
 		className: "al",
 		children: [
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			/* @__PURE__ */ jsxs("div", {
 				className: "al__toolbar",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				children: [/* @__PURE__ */ jsxs("div", {
 					className: "al__filters",
 					children: [
-						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", {
+						/* @__PURE__ */ jsxs("select", {
 							className: "al__select",
 							value: filters.status,
 							onChange: handleStatusChange,
 							"aria-label": "Filter by status",
 							children: [
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+								/* @__PURE__ */ jsx("option", {
 									value: "all",
 									children: "All status"
 								}),
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+								/* @__PURE__ */ jsx("option", {
 									value: "info",
 									children: "Info"
 								}),
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+								/* @__PURE__ */ jsx("option", {
 									value: "warn",
 									children: "Warn"
 								}),
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+								/* @__PURE__ */ jsx("option", {
 									value: "error",
 									children: "Error"
 								}),
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+								/* @__PURE__ */ jsx("option", {
 									value: "success",
 									children: "Success"
 								})
 							]
 						}),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", {
+						/* @__PURE__ */ jsxs("select", {
 							className: "al__select",
 							value: filters.area,
 							onChange: handleAreaChange,
 							"aria-label": "Filter by area",
-							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+							children: [/* @__PURE__ */ jsx("option", {
 								value: "all",
 								children: "All areas"
-							}), Object.keys(AREA_LABELS).map((area) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+							}), Object.keys(AREA_LABELS).map((area) => /* @__PURE__ */ jsx("option", {
 								value: area,
 								children: AREA_LABELS[area]
 							}, area))]
 						}),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+						/* @__PURE__ */ jsx("input", {
 							className: "al__search",
 							type: "search",
 							placeholder: "Search messages…",
@@ -13432,18 +12997,18 @@ function ActivityLogPanel() {
 							"aria-label": "Search activity log"
 						})
 					]
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				}), /* @__PURE__ */ jsxs("div", {
 					className: "al__actions",
 					children: [
-						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+						/* @__PURE__ */ jsxs("button", {
 							type: "button",
 							className: "al__btn al__btn--copy",
 							onClick: handleCopy,
 							"aria-label": copied ? "Copied" : "Copy log",
 							title: copied ? "Copied!" : "Copy to clipboard",
-							children: [copied ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CheckIcon, {}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "al__icon-copy" }), copied ? "Copied" : "Copy"]
+							children: [copied ? /* @__PURE__ */ jsx(CheckIcon, {}) : /* @__PURE__ */ jsx("span", { className: "al__icon-copy" }), copied ? "Copied" : "Copy"]
 						}),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						/* @__PURE__ */ jsx("button", {
 							type: "button",
 							className: "al__btn al__btn--export",
 							onClick: handleExportText,
@@ -13451,7 +13016,7 @@ function ActivityLogPanel() {
 							title: "Export as .txt",
 							children: "TXT"
 						}),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						/* @__PURE__ */ jsx("button", {
 							type: "button",
 							className: "al__btn al__btn--export",
 							onClick: handleExportJson,
@@ -13459,7 +13024,7 @@ function ActivityLogPanel() {
 							title: "Export as .json",
 							children: "JSON"
 						}),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						/* @__PURE__ */ jsx("button", {
 							type: "button",
 							className: "al__btn al__btn--clear",
 							onClick: handleClear,
@@ -13470,7 +13035,7 @@ function ActivityLogPanel() {
 					]
 				})]
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			/* @__PURE__ */ jsxs("div", {
 				className: "al__badge",
 				children: [
 					filtered.length,
@@ -13481,13 +13046,13 @@ function ActivityLogPanel() {
 					filters.status !== "all" || filters.area !== "all" || filters.search.trim() ? " (filtered)" : ""
 				]
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			/* @__PURE__ */ jsx("div", {
 				className: "al__list",
 				ref: listRef,
-				children: filtered.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				children: filtered.length === 0 ? /* @__PURE__ */ jsx("div", {
 					className: "al__empty",
 					children: log.count === 0 ? "No events recorded yet." : "No events match the current filters."
-				}) : filtered.map((event) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ActivityEventRow, { event }, event.id))
+				}) : filtered.map((event) => /* @__PURE__ */ jsx(ActivityEventRow, { event }, event.id))
 			})
 		]
 	});
@@ -13497,76 +13062,76 @@ function ActivityEventRow({ event }) {
 	const time = formatEventTime(event.timestamp);
 	const statusClass = STATUS_CLASS[event.status];
 	const hasDetails = event.details != null || event.error != null || event.message.length > 120;
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsxs("div", {
 		className: `al-event ${statusClass}${expanded ? " al-event--expanded" : ""}`,
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+		children: [/* @__PURE__ */ jsxs("button", {
 			type: "button",
 			className: "al-event__summary",
 			onClick: () => setExpanded((v) => !v),
 			"aria-expanded": expanded,
 			"aria-label": expanded ? "Collapse event details" : "Expand event details",
 			children: [
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				/* @__PURE__ */ jsx("span", {
 					className: "al-event__time",
 					children: time
 				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				/* @__PURE__ */ jsx("span", {
 					className: `al-event__status al-event__status--${event.status}`,
 					children: event.status
 				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				/* @__PURE__ */ jsx("span", {
 					className: "al-event__area",
 					children: AREA_LABELS[event.area]
 				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				/* @__PURE__ */ jsx("span", {
 					className: "al-event__msg",
 					children: event.message
 				}),
-				hasDetails && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				hasDetails && /* @__PURE__ */ jsx("span", {
 					className: "al-event__chevron",
 					"aria-hidden": "true",
 					children: expanded ? "▾" : "▸"
 				})
 			]
-		}), expanded && hasDetails && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		}), expanded && hasDetails && /* @__PURE__ */ jsxs("div", {
 			className: "al-event__details",
 			children: [
-				event.error && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				event.error && /* @__PURE__ */ jsxs("div", {
 					className: "al-event__detail-row",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					children: [/* @__PURE__ */ jsx("span", {
 						className: "al-event__detail-label",
 						children: "Error"
-					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("code", {
+					}), /* @__PURE__ */ jsx("code", {
 						className: "al-event__detail-val al-event__detail-val--error",
 						children: event.error
 					})]
 				}),
-				event.details && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				event.details && /* @__PURE__ */ jsxs("div", {
 					className: "al-event__detail-row",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					children: [/* @__PURE__ */ jsx("span", {
 						className: "al-event__detail-label",
 						children: "Details"
-					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("code", {
+					}), /* @__PURE__ */ jsx("code", {
 						className: "al-event__detail-val",
 						children: formatDetails(event.details)
 					})]
 				}),
-				event.message.length > 120 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				event.message.length > 120 && /* @__PURE__ */ jsxs("div", {
 					className: "al-event__detail-row",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					children: [/* @__PURE__ */ jsx("span", {
 						className: "al-event__detail-label",
 						children: "Message"
-					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("code", {
+					}), /* @__PURE__ */ jsx("code", {
 						className: "al-event__detail-val",
 						children: event.message
 					})]
 				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				/* @__PURE__ */ jsxs("div", {
 					className: "al-event__detail-row",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					children: [/* @__PURE__ */ jsx("span", {
 						className: "al-event__detail-label",
 						children: "ID"
-					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("code", {
+					}), /* @__PURE__ */ jsxs("code", {
 						className: "al-event__detail-val",
 						children: ["#", event.id]
 					})]
@@ -13635,7 +13200,7 @@ function downloadLog(content, filename, mime) {
 * a scroll-ready container and the panel itself.
 */
 function ActivityLogWorkspace() {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ActivityLogPanel, {});
+	return /* @__PURE__ */ jsx(ActivityLogPanel, {});
 }
 //#endregion
 //#region src/audio-player/visual-slots/ControllerPanelRenderer.tsx
@@ -13648,18 +13213,18 @@ function ActivityLogWorkspace() {
 function ControllerPanelRenderer({ componentId, lyrics }) {
 	const slots = useVisualSlots();
 	const def = getVisualComponent(componentId);
-	if (!def || !def.SettingsPanel) return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	if (!def || !def.SettingsPanel) return /* @__PURE__ */ jsxs("div", {
 		className: "sap-ctl__workspace-empty",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+		children: [/* @__PURE__ */ jsx("p", {
 			className: "sap-ctl__workspace-lead",
 			children: def?.name ?? "Settings"
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+		}), /* @__PURE__ */ jsx("p", {
 			className: "sap-ctl__workspace-sub",
 			children: "This visual has no configurable settings."
 		})]
 	});
 	const { SettingsPanel } = def;
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SettingsPanel, {
+	return /* @__PURE__ */ jsx(SettingsPanel, {
 		settings: slots.getSettings(def.id),
 		onChange: (partial) => slots.updateSettings(def.id, partial),
 		lyrics
@@ -13680,20 +13245,20 @@ function VisualSlotPicker({ slot = "seiCanvas" }) {
 	const { getActive, setActive } = useVisualSlots();
 	const components = getVisualComponentsForSlot(slot);
 	const activeId = getActive(slot);
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsxs("div", {
 		className: "sap-visual-switcher",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+		children: [/* @__PURE__ */ jsx("span", {
 			className: "sap-visual-switcher__label",
 			children: "Choose Visual"
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		}), /* @__PURE__ */ jsxs("div", {
 			className: "sap-visual-switcher__list",
-			children: [components.map((def) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+			children: [components.map((def) => /* @__PURE__ */ jsx("button", {
 				type: "button",
 				className: `sap-visual-switcher__btn${activeId === def.id ? " sap-visual-switcher__btn--active" : ""}`,
 				onClick: () => setActive(slot, def.id),
 				"aria-pressed": activeId === def.id,
 				children: def.name
-			}, def.id)), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+			}, def.id)), /* @__PURE__ */ jsx("button", {
 				type: "button",
 				className: `sap-visual-switcher__btn${activeId === null ? " sap-visual-switcher__btn--active" : ""}`,
 				onClick: () => setActive(slot, null),
@@ -13728,15 +13293,15 @@ function titleForRoute(route) {
 function VisualCanvasWorkspace({ lyrics }) {
 	const { getActive } = useVisualSlots();
 	const activeId = getActive("seiCanvas");
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(VisualSlotPicker, { slot: "seiCanvas" }), activeId ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ControllerPanelRenderer, {
+	return /* @__PURE__ */ jsxs(Fragment, { children: [/* @__PURE__ */ jsx(VisualSlotPicker, { slot: "seiCanvas" }), activeId ? /* @__PURE__ */ jsx(ControllerPanelRenderer, {
 		componentId: activeId,
 		lyrics
-	}) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	}) : /* @__PURE__ */ jsxs("div", {
 		className: "sap-ctl__workspace-empty",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+		children: [/* @__PURE__ */ jsx("p", {
 			className: "sap-ctl__workspace-lead",
 			children: "No Visual"
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+		}), /* @__PURE__ */ jsx("p", {
 			className: "sap-ctl__workspace-sub",
 			children: "Select a visual above to configure it."
 		})]
@@ -13750,38 +13315,38 @@ function VisualCanvasWorkspace({ lyrics }) {
 */
 function contentForRoute(route, lyrics) {
 	switch (route) {
-		case "library:playlists": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LibraryPlaylistsWorkspace, {});
-		case "library:queue": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LibraryQueueWorkspace, {});
+		case "library:playlists": return /* @__PURE__ */ jsx(LibraryPlaylistsWorkspace, {});
+		case "library:queue": return /* @__PURE__ */ jsx(LibraryQueueWorkspace, {});
 		case "plugin-settings:lyrics":
-		case "visual:lyrics": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ControllerPanelRenderer, {
+		case "visual:lyrics": return /* @__PURE__ */ jsx(ControllerPanelRenderer, {
 			componentId: LYRIC_DISPLAY_ID,
 			lyrics
 		});
-		case "playback:automix": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlaybackAutomixWorkspace, {});
-		case "agent:queue-director": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AgentQueueDirectorWorkspace, {});
-		case "diagnostics:activity-log": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ActivityLogWorkspace, {});
-		case "visual:canvas": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(VisualCanvasWorkspace, { lyrics });
+		case "playback:automix": return /* @__PURE__ */ jsx(PlaybackAutomixWorkspace, {});
+		case "agent:queue-director": return /* @__PURE__ */ jsx(AgentQueueDirectorWorkspace, {});
+		case "diagnostics:activity-log": return /* @__PURE__ */ jsx(ActivityLogWorkspace, {});
+		case "visual:canvas": return /* @__PURE__ */ jsx(VisualCanvasWorkspace, { lyrics });
 		default: {
 			const parsed = parseWorkspaceRoute(route);
-			if (parsed?.category === "plugin-settings" && parsed.target) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PluginSettingsWorkspace, { pluginId: parsed.target });
+			if (parsed?.category === "plugin-settings" && parsed.target) return /* @__PURE__ */ jsx(PluginSettingsWorkspace, { pluginId: parsed.target });
 			return null;
 		}
 	}
 }
 function WorkspaceShell({ route, onClose, lyrics }) {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", {
+	return /* @__PURE__ */ jsxs(Fragment, { children: [/* @__PURE__ */ jsxs("header", {
 		className: "sap-ctl__header",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+		children: [/* @__PURE__ */ jsx("h2", {
 			className: "sap-ctl__title",
 			children: titleForRoute(route)
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+		}), /* @__PURE__ */ jsx("button", {
 			type: "button",
 			className: "sap-ctl__close ap-tap",
 			onClick: onClose,
 			"aria-label": "Close workspace",
-			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CloseIcon$2, {})
+			children: /* @__PURE__ */ jsx(CloseIcon$2, {})
 		})]
-	}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+	}), /* @__PURE__ */ jsx("div", {
 		className: "sap-ctl__workspace",
 		"data-route": route,
 		children: contentForRoute(route, lyrics)
@@ -13790,33 +13355,33 @@ function WorkspaceShell({ route, onClose, lyrics }) {
 //#endregion
 //#region src/audio-player/components/SAPController.tsx
 function Section({ title, children }) {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+	return /* @__PURE__ */ jsxs("section", {
 		className: "sap-ctl__section",
 		"aria-label": title,
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", {
+		children: [/* @__PURE__ */ jsx("h3", {
 			className: "sap-ctl__heading",
 			children: title
 		}), children]
 	});
 }
 function SwitchRow({ icon, label, on, onToggle }) {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+	return /* @__PURE__ */ jsxs("button", {
 		type: "button",
 		className: "sap-ctl__row ap-tap",
 		role: "switch",
 		"aria-checked": on,
 		onClick: onToggle,
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+		children: [/* @__PURE__ */ jsxs("span", {
 			className: "sap-ctl__label",
 			children: [icon, label]
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+		}), /* @__PURE__ */ jsx("span", {
 			className: `sap-ctl__switch${on ? " sap-ctl__switch--on" : ""}`,
 			"aria-hidden": "true",
-			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "sap-ctl__knob" })
+			children: /* @__PURE__ */ jsx("span", { className: "sap-ctl__knob" })
 		})]
 	});
 }
-var CloseIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var CloseIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "18",
 	height: "18",
 	viewBox: "0 0 24 24",
@@ -13825,12 +13390,12 @@ var CloseIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 	strokeWidth: "2",
 	strokeLinecap: "round",
 	"aria-hidden": "true",
-	children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+	children: [/* @__PURE__ */ jsx("line", {
 		x1: "6",
 		y1: "6",
 		x2: "18",
 		y2: "18"
-	}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+	}), /* @__PURE__ */ jsx("line", {
 		x1: "18",
 		y1: "6",
 		x2: "6",
@@ -13859,7 +13424,7 @@ function KaraokeLyrics({ lyrics }) {
 		return result;
 	}, [lyrics]);
 	const containerRef = useRef(null);
-	if (!parsed.some((l) => l.time >= 0)) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+	if (!parsed.some((l) => l.time >= 0)) return /* @__PURE__ */ jsx("div", {
 		className: "sap-ctl__lyrics",
 		children: lyrics
 	});
@@ -13880,10 +13445,10 @@ function KaraokeLyrics({ lyrics }) {
 			}
 		}
 	}, [activeIndex]);
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+	return /* @__PURE__ */ jsx("div", {
 		className: "sap-ctl__lyrics sap-ctl__lyrics--karaoke",
 		ref: containerRef,
-		children: parsed.map((line, idx) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		children: parsed.map((line, idx) => /* @__PURE__ */ jsx("div", {
 			className: `sap-ctl__lyric-line ${idx === activeIndex ? "sap-ctl__lyric-line--active" : ""}`,
 			children: line.text || "\xA0"
 		}, idx))
@@ -13951,14 +13516,14 @@ function SAPController({ open, onClose, route = "options", playback, queue, info
 		backgroundColor
 	});
 	const isOptions = route === "options";
-	return createPortal(/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return createPortal(/* @__PURE__ */ jsxs("div", {
 		className: "sap-ctl",
 		style: themeVars,
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		children: [/* @__PURE__ */ jsx("div", {
 			className: "sap-ctl__backdrop",
 			onClick: onClose,
 			"aria-hidden": "true"
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		}), /* @__PURE__ */ jsxs("div", {
 			ref: sheetRef,
 			className: "sap-ctl__sheet",
 			role: "dialog",
@@ -13966,82 +13531,82 @@ function SAPController({ open, onClose, route = "options", playback, queue, info
 			"aria-label": isOptions ? "Player options" : "Player workspace",
 			onKeyDown: handleTrapKeyDown,
 			children: [
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				/* @__PURE__ */ jsx("div", {
 					className: "sap-ctl__grab",
 					"aria-hidden": "true"
 				}),
-				!isOptions && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(WorkspaceShell, {
+				!isOptions && /* @__PURE__ */ jsxs(Fragment, { children: [/* @__PURE__ */ jsx(WorkspaceShell, {
 					route,
 					onClose,
 					lyrics: info?.lyrics
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				}), /* @__PURE__ */ jsx("div", {
 					className: "sap-ctl__divider",
 					role: "separator",
 					"aria-hidden": "true"
 				})] }),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", {
+				/* @__PURE__ */ jsxs("header", {
 					className: "sap-ctl__header",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+					children: [/* @__PURE__ */ jsx("h2", {
 						className: "sap-ctl__title",
 						children: isOptions ? "Options" : "Options"
-					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					}), /* @__PURE__ */ jsx("button", {
 						ref: closeRef,
 						type: "button",
 						className: "sap-ctl__close ap-tap",
 						onClick: onClose,
 						"aria-label": isOptions ? "Close player options" : "Close workspace",
-						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CloseIcon, {})
+						children: /* @__PURE__ */ jsx(CloseIcon, {})
 					})]
 				}),
-				playback && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Section, {
+				playback && /* @__PURE__ */ jsxs(Section, {
 					title: "Playback",
 					children: [
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SwitchRow, {
-							icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ShuffleIcon, {}),
+						/* @__PURE__ */ jsx(SwitchRow, {
+							icon: /* @__PURE__ */ jsx(ShuffleIcon, {}),
 							label: "Shuffle",
 							on: playback.shuffle,
 							onToggle: playback.onToggleShuffle
 						}),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+						/* @__PURE__ */ jsxs("button", {
 							type: "button",
 							className: "sap-ctl__row ap-tap",
 							onClick: playback.onCycleRepeat,
 							"aria-label": `Repeat: ${playback.repeatMode}. Activate to change.`,
-							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+							children: [/* @__PURE__ */ jsxs("span", {
 								className: "sap-ctl__label",
-								children: [playback.repeatMode === "one" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RepeatOneIcon, {}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RepeatIcon, {}), "Repeat"]
-							}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								children: [playback.repeatMode === "one" ? /* @__PURE__ */ jsx(RepeatOneIcon, {}) : /* @__PURE__ */ jsx(RepeatIcon, {}), "Repeat"]
+							}), /* @__PURE__ */ jsx("span", {
 								className: "sap-ctl__value",
 								children: playback.repeatMode
 							})]
 						}),
-						playback.onToggleAutomix && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SwitchRow, {
-							icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AutomixIcon, {}),
+						playback.onToggleAutomix && /* @__PURE__ */ jsx(SwitchRow, {
+							icon: /* @__PURE__ */ jsx(AutomixIcon, {}),
 							label: "Automix",
 							on: playback.automix ?? false,
 							onToggle: playback.onToggleAutomix
 						}),
-						playback.onToggleAutoPlay && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SwitchRow, {
-							icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AutoPlayIcon, {}),
+						playback.onToggleAutoPlay && /* @__PURE__ */ jsx(SwitchRow, {
+							icon: /* @__PURE__ */ jsx(AutoPlayIcon, {}),
 							label: "Auto Play",
 							on: playback.autoPlay ?? false,
 							onToggle: playback.onToggleAutoPlay
 						})
 					]
 				}),
-				queue && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Section, {
+				queue && /* @__PURE__ */ jsx(Section, {
 					title: "Queue",
-					children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+					children: /* @__PURE__ */ jsxs("button", {
 						type: "button",
 						className: "sap-ctl__row ap-tap",
 						onClick: () => {
 							onClose();
 							queue.onOpenQueue();
 						},
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+						children: [/* @__PURE__ */ jsxs("span", {
 							className: "sap-ctl__label",
-							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(QueueIcon, {}), "Up Next"]
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+							children: [/* @__PURE__ */ jsx(QueueIcon, {}), "Up Next"]
+						}), /* @__PURE__ */ jsxs("span", {
 							className: "sap-ctl__value",
 							children: [
 								queue.count,
@@ -14051,90 +13616,90 @@ function SAPController({ open, onClose, route = "options", playback, queue, info
 						})]
 					})
 				}),
-				info && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Section, {
+				info && /* @__PURE__ */ jsxs(Section, {
 					title: "Info",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					children: [/* @__PURE__ */ jsxs("div", {
 						className: "sap-ctl__meta",
 						children: [
-							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							/* @__PURE__ */ jsxs("div", {
 								className: "sap-ctl__meta-row",
-								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								children: [/* @__PURE__ */ jsx("span", {
 									className: "sap-ctl__meta-key",
 									children: "Track"
-								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								}), /* @__PURE__ */ jsx("span", {
 									className: "sap-ctl__meta-val",
 									children: info.title
 								})]
 							}),
-							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							/* @__PURE__ */ jsxs("div", {
 								className: "sap-ctl__meta-row",
-								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								children: [/* @__PURE__ */ jsx("span", {
 									className: "sap-ctl__meta-key",
 									children: "Artist"
-								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								}), /* @__PURE__ */ jsx("span", {
 									className: "sap-ctl__meta-val",
 									children: info.artist
 								})]
 							}),
-							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							/* @__PURE__ */ jsxs("div", {
 								className: "sap-ctl__meta-row",
-								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								children: [/* @__PURE__ */ jsx("span", {
 									className: "sap-ctl__meta-key",
 									children: "Length"
-								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								}), /* @__PURE__ */ jsx("span", {
 									className: "sap-ctl__meta-val",
 									children: Number.isFinite(info.duration) && info.duration > 0 ? formatTime(info.duration) : "–:––"
 								})]
 							})
 						]
-					}), info.lyrics && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+					}), info.lyrics && /* @__PURE__ */ jsxs(Fragment, { children: [/* @__PURE__ */ jsxs("button", {
 						type: "button",
 						className: "sap-ctl__row ap-tap",
 						onClick: () => setLyricsOpen((v) => !v),
 						"aria-expanded": lyricsOpen,
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+						children: [/* @__PURE__ */ jsxs("span", {
 							className: "sap-ctl__label",
-							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(LyricsIcon, {}), "Lyrics"]
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							children: [/* @__PURE__ */ jsx(LyricsIcon, {}), "Lyrics"]
+						}), /* @__PURE__ */ jsx("span", {
 							className: "sap-ctl__value",
 							children: lyricsOpen ? "hide" : "show"
 						})]
-					}), lyricsOpen && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(KaraokeLyrics, { lyrics: info.lyrics })] })]
+					}), lyricsOpen && /* @__PURE__ */ jsx(KaraokeLyrics, { lyrics: info.lyrics })] })]
 				}),
-				share && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Section, {
+				share && /* @__PURE__ */ jsx(Section, {
 					title: "Share",
-					children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+					children: /* @__PURE__ */ jsxs("button", {
 						type: "button",
 						className: "sap-ctl__row ap-tap",
 						onClick: share.onShare,
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+						children: [/* @__PURE__ */ jsxs("span", {
 							className: "sap-ctl__label",
-							children: [share.copied ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CheckIcon, {}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ShareIcon, {}), "Share"]
-						}), share.copied && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							children: [share.copied ? /* @__PURE__ */ jsx(CheckIcon, {}) : /* @__PURE__ */ jsx(ShareIcon, {}), "Share"]
+						}), share.copied && /* @__PURE__ */ jsx("span", {
 							className: "sap-ctl__value",
 							children: "copied"
 						})]
 					})
 				}),
-				waveform && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Section, {
+				waveform && /* @__PURE__ */ jsx(Section, {
 					title: "Visual",
-					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SwitchRow, {
-						icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(WaveIcon, {}),
+					children: /* @__PURE__ */ jsx(SwitchRow, {
+						icon: /* @__PURE__ */ jsx(WaveIcon, {}),
 						label: "Show Waveform",
 						on: waveform.enabled,
 						onToggle: waveform.onToggle
 					})
 				}),
-				pluginNames && pluginNames.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Section, {
+				pluginNames && pluginNames.length > 0 && /* @__PURE__ */ jsx(Section, {
 					title: "Plugins",
-					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+					children: /* @__PURE__ */ jsx("ul", {
 						className: "sap-ctl__plugins",
-						children: pluginNames.map((name) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
+						children: pluginNames.map((name) => /* @__PURE__ */ jsxs("li", {
 							className: "sap-ctl__plugin",
-							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+							children: [/* @__PURE__ */ jsxs("span", {
 								className: "sap-ctl__label",
-								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(PluginIcon, {}), name]
-							}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								children: [/* @__PURE__ */ jsx(PluginIcon, {}), name]
+							}), /* @__PURE__ */ jsx("span", {
 								className: "sap-ctl__value",
 								children: "active"
 							})]
@@ -14231,7 +13796,7 @@ function HoldSkipButton({ direction, disabled = false, skipDisabled = false, see
 		finishPress();
 	};
 	const label = `${seekLabel}; hold for ${skipLabel.toLowerCase()}`;
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+	return /* @__PURE__ */ jsxs("button", {
 		type: "button",
 		className: `${className} ap-hold-skip ap-hold-skip--${direction}${isHolding ? " ap-hold-skip--holding" : ""}`.trim(),
 		style: { "--ap-hold-ms": `${holdMs}ms` },
@@ -14246,16 +13811,16 @@ function HoldSkipButton({ direction, disabled = false, skipDisabled = false, see
 		onKeyDown: handleKeyDown,
 		onKeyUp: handleKeyUp,
 		children: [
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+			/* @__PURE__ */ jsx("span", {
 				className: "ap-hold-skip__icon",
 				"aria-hidden": "true",
 				children
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+			/* @__PURE__ */ jsx("span", {
 				className: "ap-hold-skip__progress",
 				"aria-hidden": "true"
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+			/* @__PURE__ */ jsxs("span", {
 				id: hintId,
 				className: "ap-sr-only",
 				children: [
@@ -14426,13 +13991,13 @@ function TextMarquee({ children, className, title, disabled = false, minWidth = 
 		"--ap-marquee-distance": `${travel}px`,
 		"--ap-marquee-duration": `${Math.max(6, travel / 100 * secondsPer100px)}s`
 	} : void 0;
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+	return /* @__PURE__ */ jsx("div", {
 		ref: containerRef,
 		className: `ap-marquee${className ? ` ${className}` : ""}`,
 		"data-scroll": scrolling ? "true" : "false",
 		title,
 		style,
-		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+		children: /* @__PURE__ */ jsx("span", {
 			ref: innerRef,
 			className: "ap-marquee__inner",
 			children
@@ -14443,7 +14008,7 @@ function TextMarquee({ children, className, title, disabled = false, minWidth = 
 //#region src/audio-player/components/TrackMetadata.tsx
 /** Small "E" badge marking explicit content. Decorative glyph, real label. */
 function ExplicitBadge({ className }) {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+	return /* @__PURE__ */ jsx("span", {
 		className: `ap-explicit-badge${className ? ` ${className}` : ""}`,
 		"aria-label": "Explicit content",
 		title: "Explicit content",
@@ -14470,41 +14035,41 @@ function TrackMetadata({ track, variant = "compact", enableMarquee = false, show
 		featured,
 		trailing
 	].filter(Boolean).join(" ");
-	const primary = /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [title, track?.explicit && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ExplicitBadge, {})] });
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	const primary = /* @__PURE__ */ jsxs(Fragment, { children: [title, track?.explicit && /* @__PURE__ */ jsx(ExplicitBadge, {})] });
+	return /* @__PURE__ */ jsxs("div", {
 		className: `ap-meta ap-meta--${variant}${className ? ` ${className}` : ""}`,
 		"data-variant": variant,
 		children: [
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			/* @__PURE__ */ jsx("div", {
 				className: "ap-meta__primary",
 				dir: "auto",
-				children: enableMarquee ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextMarquee, {
+				children: enableMarquee ? /* @__PURE__ */ jsx(TextMarquee, {
 					className: "ap-meta__title",
 					title,
 					children: primary
-				}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				}) : /* @__PURE__ */ jsx("span", {
 					className: "ap-meta__title",
 					title,
 					children: primary
 				})
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			/* @__PURE__ */ jsxs("div", {
 				className: "ap-meta__secondary",
 				title: secondaryText,
 				dir: "auto",
 				children: [
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					/* @__PURE__ */ jsx("span", {
 						className: "ap-meta__artist",
 						children: artist
 					}),
-					featured && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+					featured && /* @__PURE__ */ jsxs("span", {
 						className: "ap-meta__featured",
 						"aria-label": `featuring ${track?.featuredArtists?.join(", ") ?? ""}`,
 						children: [" ", featured]
 					}),
-					trailing && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+					trailing && /* @__PURE__ */ jsxs("span", {
 						className: "ap-meta__album",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						children: [/* @__PURE__ */ jsx("span", {
 							className: "ap-meta__sep",
 							"aria-hidden": "true",
 							children: " · "
@@ -14512,7 +14077,7 @@ function TrackMetadata({ track, variant = "compact", enableMarquee = false, show
 					})
 				]
 			}),
-			showTertiary && release && release !== album && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			showTertiary && release && release !== album && /* @__PURE__ */ jsx("div", {
 				className: "ap-meta__tertiary",
 				title: release,
 				children: release
@@ -14635,10 +14200,10 @@ var TrackRow = memo(({ index, style, data }) => {
 	const track = queue[index];
 	if (!track) return null;
 	const active = index === currentIndex;
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+	return /* @__PURE__ */ jsx("div", {
 		style,
 		role: "listitem",
-		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+		children: /* @__PURE__ */ jsxs("button", {
 			type: "button",
 			className: "ap-tracklist__item" + (active ? " ap-tracklist__item--active" : ""),
 			onClick: () => onPlay(index),
@@ -14649,27 +14214,27 @@ var TrackRow = memo(({ index, style, data }) => {
 				boxSizing: "border-box"
 			},
 			children: [
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				/* @__PURE__ */ jsx("span", {
 					className: "ap-tracklist__num",
 					children: index + 1
 				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+				/* @__PURE__ */ jsxs("span", {
 					className: "ap-tracklist__meta",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					children: [/* @__PURE__ */ jsx("span", {
 						className: "ap-tracklist__title",
 						children: track.title
-					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					}), /* @__PURE__ */ jsx("span", {
 						className: "ap-tracklist__artist",
 						children: track.artist
 					})]
 				}),
-				active && isPlaying && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+				active && isPlaying && /* @__PURE__ */ jsxs("span", {
 					className: "ap-eq",
 					"aria-hidden": "true",
 					children: [
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {})
+						/* @__PURE__ */ jsx("i", {}),
+						/* @__PURE__ */ jsx("i", {}),
+						/* @__PURE__ */ jsx("i", {})
 					]
 				})
 			]
@@ -14716,19 +14281,19 @@ var AudioPlayerErrorBoundary = class extends Component {
 		this.setState({ error: null });
 	};
 	render() {
-		if (this.state.error) return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		if (this.state.error) return /* @__PURE__ */ jsxs("div", {
 			className: "ap-error-boundary",
 			role: "alert",
 			children: [
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				/* @__PURE__ */ jsx("p", {
 					className: "ap-error-boundary__title",
 					children: this.props.fallbackTitle
 				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				/* @__PURE__ */ jsx("p", {
 					className: "ap-error-boundary__message",
 					children: this.state.error.message
 				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+				/* @__PURE__ */ jsx("button", {
 					type: "button",
 					className: "ap-retry-btn",
 					onClick: this.handleReset,
@@ -14772,9 +14337,9 @@ var AudioPlayerErrorBoundary = class extends Component {
 * hidden on touch).
 */
 function AudioPlayer(props) {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AudioPlayerErrorBoundary, {
+	return /* @__PURE__ */ jsx(AudioPlayerErrorBoundary, {
 		fallbackTitle: "Audio player failed to render",
-		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AudioPlayerInner, { ...props })
+		children: /* @__PURE__ */ jsx(AudioPlayerInner, { ...props })
 	});
 }
 /**
@@ -14808,7 +14373,7 @@ function AudioPlayerInner(props) {
 		lyrics
 	]);
 	const queueSignature = useMemo(() => trackListSignature(initialQueue), [initialQueue]);
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AudioSessionProvider, {
+	return /* @__PURE__ */ jsx(AudioSessionProvider, {
 		initialQueue,
 		autoPlay,
 		shuffle,
@@ -14817,7 +14382,7 @@ function AudioPlayerInner(props) {
 		plugins: externalPlugins,
 		audioBackend,
 		onFallbackSource,
-		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AudioPlayerBody, {
+		children: /* @__PURE__ */ jsx(AudioPlayerBody, {
 			...props,
 			isPlaylistMode,
 			resolvedQueue: initialQueue,
@@ -15007,7 +14572,7 @@ function AudioPlayerBody(props) {
 		s.playTrack,
 		isPlaying
 	]);
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(VisualSlotsProvider, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsx(VisualSlotsProvider, { children: /* @__PURE__ */ jsxs("div", {
 		ref: rootRef,
 		className: `ap-root${className ? ` ${className}` : ""}${pageVisible ? "" : " ap-root--hidden"}`,
 		style: {
@@ -15018,7 +14583,7 @@ function AudioPlayerBody(props) {
 		"aria-label": "Audio player",
 		onKeyDown: handleRootKeyDown,
 		children: [
-			isPlaylistMode && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(QueueDrawer, {
+			isPlaylistMode && /* @__PURE__ */ jsx(QueueDrawer, {
 				queue,
 				currentIndex,
 				isPlaying,
@@ -15028,7 +14593,7 @@ function AudioPlayerBody(props) {
 				onReorder: s.moveQueueItem,
 				onRemove: s.removeFromQueue
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SAPController, {
+			/* @__PURE__ */ jsx(SAPController, {
 				open: controllerOpen,
 				onClose: handleCloseController,
 				route: controllerRoute,
@@ -15070,34 +14635,34 @@ function AudioPlayerBody(props) {
 				trackColor,
 				backgroundColor
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			/* @__PURE__ */ jsx("div", {
 				className: "ap-sr-only",
 				role: "status",
 				"aria-live": "polite",
 				"aria-atomic": "true",
 				children: announcement
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(BackgroundMedia, {
+			/* @__PURE__ */ jsx(BackgroundMedia, {
 				...resolveMedia({
 					media: backgroundMedia,
 					legacyImage: backgroundImage
 				}),
 				darkenAmount
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			/* @__PURE__ */ jsxs("div", {
 				className: "ap-content",
 				children: [
-					!hasAudio && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					!hasAudio && /* @__PURE__ */ jsxs("div", {
 						className: "ap-banner ap-banner--error ap-anim-in",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ErrorIcon, {}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Audio file missing" })]
+						children: [/* @__PURE__ */ jsx(ErrorIcon, {}), /* @__PURE__ */ jsx("span", { children: "Audio file missing" })]
 					}),
-					autoplayBlocked && hasAudio && !hasError && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					autoplayBlocked && hasAudio && !hasError && /* @__PURE__ */ jsxs("div", {
 						className: "ap-banner ap-banner--info ap-banner--col ap-anim-in",
 						role: "status",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						children: [/* @__PURE__ */ jsxs("div", {
 							className: "ap-banner__row",
-							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(InfoIcon, {}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Autoplay blocked. Tap play to start audio." })]
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							children: [/* @__PURE__ */ jsx(InfoIcon, {}), /* @__PURE__ */ jsx("span", { children: "Autoplay blocked. Tap play to start audio." })]
+						}), /* @__PURE__ */ jsx("button", {
 							type: "button",
 							className: "ap-retry-btn",
 							onClick: () => {
@@ -15107,34 +14672,34 @@ function AudioPlayerBody(props) {
 							children: "Play"
 						})]
 					}),
-					hasError && hasAudio && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					hasError && hasAudio && /* @__PURE__ */ jsxs("div", {
 						className: "ap-banner ap-banner--error ap-banner--col ap-anim-in",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						children: [/* @__PURE__ */ jsxs("div", {
 							className: "ap-banner__row",
-							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ErrorIcon, {}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: errorMessage })]
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							children: [/* @__PURE__ */ jsx(ErrorIcon, {}), /* @__PURE__ */ jsx("span", { children: errorMessage })]
+						}), /* @__PURE__ */ jsx("button", {
 							type: "button",
 							className: "ap-retry-btn",
 							onClick: s.retry,
 							children: "Retry"
 						})]
 					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					/* @__PURE__ */ jsx("div", {
 						className: "ap-top-actions",
-						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						children: /* @__PURE__ */ jsx("div", {
 							className: "ap-menu",
-							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							children: /* @__PURE__ */ jsx("button", {
 								type: "button",
 								className: "ap-icon-btn ap-tap ap-menu__btn",
 								onClick: handleOpenOptions,
 								"aria-label": "Player options",
 								"aria-haspopup": "dialog",
 								"aria-expanded": controllerOpen,
-								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DotsIcon, {})
+								children: /* @__PURE__ */ jsx(DotsIcon, {})
 							})
 						})
 					}),
-					isPlaylistMode && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					isPlaylistMode && /* @__PURE__ */ jsxs("div", {
 						className: "ap-track-counter",
 						children: [
 							"Track ",
@@ -15146,38 +14711,38 @@ function AudioPlayerBody(props) {
 							automix ? " · Automix" : ""
 						]
 					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					/* @__PURE__ */ jsxs("div", {
 						className: "ap-track-info",
 						role: "group",
 						"aria-label": "Track information",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						children: [/* @__PURE__ */ jsxs("div", {
 							className: "ap-track-info__title",
 							style: titleFont,
 							title: formatVersionedTitle(currentTrack.title, currentTrack.versionLabel),
-							children: [formatVersionedTitle(currentTrack.title, currentTrack.versionLabel), currentTrack.explicit && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ExplicitBadge, {})]
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							children: [formatVersionedTitle(currentTrack.title, currentTrack.versionLabel), currentTrack.explicit && /* @__PURE__ */ jsx(ExplicitBadge, {})]
+						}), /* @__PURE__ */ jsx("div", {
 							className: "ap-track-info__artist",
 							style: artistFont,
 							title: formatSecondaryLine(currentTrack),
 							children: formatSecondaryLine(currentTrack)
 						})]
 					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					/* @__PURE__ */ jsxs("div", {
 						className: "ap-progress-group",
 						role: "group",
 						"aria-label": "Playback progress",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ScrubberCanvasHost, {
+						children: [/* @__PURE__ */ jsx(ScrubberCanvasHost, {
 							face: "portable",
 							density: getScrubberDensity("portable"),
 							currentTime,
 							duration,
 							progress: duration > 0 ? currentTime / duration : 0,
 							onSeek: s.seek,
-							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ScrubberCanvasRenderer, {
+							children: /* @__PURE__ */ jsx(ScrubberCanvasRenderer, {
 								currentTime,
 								duration,
 								onSeek: s.seek,
-								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(WaveformAdapter, {
+								children: /* @__PURE__ */ jsx(WaveformAdapter, {
 									face: "portable",
 									density: getScrubberDensity("portable"),
 									waveform: effectiveWaveform,
@@ -15200,18 +14765,18 @@ function AudioPlayerBody(props) {
 									cursorColor: accentColor
 								})
 							})
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						}), /* @__PURE__ */ jsxs("div", {
 							className: "ap-times",
 							"aria-hidden": "true",
-							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: formatTime(currentTime) }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: formatTime(duration) })]
+							children: [/* @__PURE__ */ jsx("span", { children: formatTime(currentTime) }), /* @__PURE__ */ jsx("span", { children: formatTime(duration) })]
 						})]
 					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					/* @__PURE__ */ jsxs("div", {
 						className: "ap-transport",
 						role: "group",
 						"aria-label": "Playback controls",
 						children: [
-							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(HoldSkipButton, {
+							/* @__PURE__ */ jsx(HoldSkipButton, {
 								direction: "previous",
 								className: "ap-btn ap-btn--ghost ap-tap",
 								disabled: !hasAudio,
@@ -15220,17 +14785,17 @@ function AudioPlayerBody(props) {
 								skipLabel: "Previous track",
 								onSeek: () => s.seekBy(-10),
 								onSkip: s.previous,
-								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PrevIcon, {})
+								children: /* @__PURE__ */ jsx(PrevIcon, {})
 							}),
-							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							/* @__PURE__ */ jsx("button", {
 								type: "button",
 								className: `ap-btn ap-btn--play ap-tap${isPlaying ? " ap-btn--play-active" : ""}`,
 								onClick: s.toggle,
 								disabled: !hasAudio,
 								"aria-label": !hasAudio ? "Audio file missing" : showPlaySpinner ? "Buffering audio" : isPlaying ? "Pause" : "Play",
-								children: showPlaySpinner ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SpinnerIcon, {}) : isPlaying ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PauseIcon, {}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlayIcon, {})
+								children: showPlaySpinner ? /* @__PURE__ */ jsx(SpinnerIcon, {}) : isPlaying ? /* @__PURE__ */ jsx(PauseIcon, {}) : /* @__PURE__ */ jsx(PlayIcon, {})
 							}),
-							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(HoldSkipButton, {
+							/* @__PURE__ */ jsx(HoldSkipButton, {
 								direction: "next",
 								className: "ap-btn ap-btn--ghost ap-tap",
 								disabled: !hasAudio,
@@ -15239,11 +14804,11 @@ function AudioPlayerBody(props) {
 								skipLabel: "Next track",
 								onSeek: () => s.seekBy(10),
 								onSkip: s.next,
-								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(NextIcon, {})
+								children: /* @__PURE__ */ jsx(NextIcon, {})
 							})
 						]
 					}),
-					showVolume && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(VolumeControl, {
+					showVolume && /* @__PURE__ */ jsx(VolumeControl, {
 						volume,
 						isMuted,
 						disabled: !hasAudio,
@@ -15251,35 +14816,35 @@ function AudioPlayerBody(props) {
 						onVolumeChange: s.setVolume,
 						onToggleMute: s.toggleMute
 					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SEICanvasHost, {
+					/* @__PURE__ */ jsx(SEICanvasHost, {
 						open: surface.isCanvasOpen || surface.isQueueOpen,
 						face: "portable",
 						supported: surface.canvasSupported,
 						activeSurfaceId: surface.mode === "default" ? void 0 : surface.mode,
-						children: surface.isQueueOpen ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(QueueSurface, {}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SEICanvasRenderer, {
+						children: surface.isQueueOpen ? /* @__PURE__ */ jsx(QueueSurface, {}) : /* @__PURE__ */ jsx(SEICanvasRenderer, {
 							currentTime,
 							duration,
 							lyrics: currentTrack?.lyrics
 						})
 					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlayerSurfaceButtons, {
+					/* @__PURE__ */ jsx(PlayerSurfaceButtons, {
 						surface,
 						onOpenQueue: () => setQueueOpen(true),
 						onOpenFocusedController: handleOpenFocusedController
 					}),
-					currentTrack.purchaseUrl && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("a", {
+					currentTrack.purchaseUrl && /* @__PURE__ */ jsxs("a", {
 						className: "ap-wide-btn ap-wide-btn--solid ap-tap",
 						href: currentTrack.purchaseUrl,
 						target: "_blank",
 						rel: "noopener noreferrer",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(HeartIcon, {}), "Support Artist"]
+						children: [/* @__PURE__ */ jsx(HeartIcon, {}), "Support Artist"]
 					}),
-					isPlaylistMode && showTracklist && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					isPlaylistMode && showTracklist && /* @__PURE__ */ jsx("div", {
 						className: "ap-tracklist ap-anim-in",
 						role: "list",
 						"aria-label": "Playlist tracks",
 						style: { overflowY: "hidden" },
-						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FixedSizeList, {
+						children: /* @__PURE__ */ jsx(FixedSizeList, {
 							height: Math.min(276, queue.length * 52),
 							itemCount: queue.length,
 							itemSize: 52,
@@ -15293,7 +14858,7 @@ function AudioPlayerBody(props) {
 		]
 	}) });
 }
-var ErrorIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var ErrorIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "20",
 	height: "20",
 	viewBox: "0 0 24 24",
@@ -15302,18 +14867,18 @@ var ErrorIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 	strokeWidth: "2",
 	"aria-hidden": "true",
 	children: [
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("circle", {
 			cx: "12",
 			cy: "12",
 			r: "10"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+		/* @__PURE__ */ jsx("line", {
 			x1: "12",
 			y1: "8",
 			x2: "12",
 			y2: "12"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+		/* @__PURE__ */ jsx("line", {
 			x1: "12",
 			y1: "16",
 			x2: "12.01",
@@ -15321,7 +14886,7 @@ var ErrorIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 		})
 	]
 });
-var InfoIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var InfoIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "20",
 	height: "20",
 	viewBox: "0 0 24 24",
@@ -15330,18 +14895,18 @@ var InfoIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 	strokeWidth: "2",
 	"aria-hidden": "true",
 	children: [
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("circle", {
 			cx: "12",
 			cy: "12",
 			r: "10"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+		/* @__PURE__ */ jsx("line", {
 			x1: "12",
 			y1: "16",
 			x2: "12",
 			y2: "12"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+		/* @__PURE__ */ jsx("line", {
 			x1: "12",
 			y1: "8",
 			x2: "12.01",
@@ -15349,33 +14914,33 @@ var InfoIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 		})
 	]
 });
-var PlayIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", {
+var PlayIcon = () => /* @__PURE__ */ jsx("svg", {
 	width: "24",
 	height: "24",
 	viewBox: "0 0 24 24",
 	fill: "currentColor",
 	"aria-hidden": "true",
-	children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M8 5v14l12-7z" })
+	children: /* @__PURE__ */ jsx("path", { d: "M8 5v14l12-7z" })
 });
-var PauseIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var PauseIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "24",
 	height: "24",
 	viewBox: "0 0 24 24",
 	fill: "currentColor",
 	"aria-hidden": "true",
-	children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", {
+	children: [/* @__PURE__ */ jsx("rect", {
 		x: "6",
 		y: "4",
 		width: "4",
 		height: "16"
-	}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", {
+	}), /* @__PURE__ */ jsx("rect", {
 		x: "14",
 		y: "4",
 		width: "4",
 		height: "16"
 	})]
 });
-var SpinnerIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var SpinnerIcon = () => /* @__PURE__ */ jsxs("svg", {
 	className: "ap-spin",
 	width: "24",
 	height: "24",
@@ -15384,37 +14949,37 @@ var SpinnerIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 	stroke: "currentColor",
 	strokeWidth: "2",
 	"aria-hidden": "true",
-	children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+	children: [/* @__PURE__ */ jsx("circle", {
 		cx: "12",
 		cy: "12",
 		r: "10",
 		opacity: "0.25"
-	}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", {
+	}), /* @__PURE__ */ jsx("path", {
 		d: "M12 2a10 10 0 0 1 10 10",
 		strokeLinecap: "round"
 	})]
 });
-var PrevIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var PrevIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "14",
 	height: "14",
 	viewBox: "0 0 24 24",
 	fill: "currentColor",
 	"aria-hidden": "true",
-	children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", {
+	children: [/* @__PURE__ */ jsx("rect", {
 		x: "5",
 		y: "4",
 		width: "2.5",
 		height: "16",
 		rx: "0.5"
-	}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M20 5v14L9 12z" })]
+	}), /* @__PURE__ */ jsx("path", { d: "M20 5v14L9 12z" })]
 });
-var NextIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var NextIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "14",
 	height: "14",
 	viewBox: "0 0 24 24",
 	fill: "currentColor",
 	"aria-hidden": "true",
-	children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M4 5v14l11-7z" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", {
+	children: [/* @__PURE__ */ jsx("path", { d: "M4 5v14l11-7z" }), /* @__PURE__ */ jsx("rect", {
 		x: "16.5",
 		y: "4",
 		width: "2.5",
@@ -15422,7 +14987,7 @@ var NextIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
 		rx: "0.5"
 	})]
 });
-var HeartIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", {
+var HeartIcon = () => /* @__PURE__ */ jsx("svg", {
 	width: "16",
 	height: "16",
 	viewBox: "0 0 24 24",
@@ -15432,26 +14997,26 @@ var HeartIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", {
 	strokeLinecap: "round",
 	strokeLinejoin: "round",
 	"aria-hidden": "true",
-	children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" })
+	children: /* @__PURE__ */ jsx("path", { d: "M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" })
 });
-var DotsIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+var DotsIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "18",
 	height: "18",
 	viewBox: "0 0 24 24",
 	fill: "currentColor",
 	"aria-hidden": "true",
 	children: [
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("circle", {
 			cx: "5",
 			cy: "12",
 			r: "1.8"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("circle", {
 			cx: "12",
 			cy: "12",
 			r: "1.8"
 		}),
-		/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+		/* @__PURE__ */ jsx("circle", {
 			cx: "19",
 			cy: "12",
 			r: "1.8"
@@ -16498,6 +16063,412 @@ function createWaveformPlugin(config = {}) {
 	return new WaveformPlugin(config);
 }
 //#endregion
+//#region src/audio-player/cues/cueRuntime.ts
+var CueRuntime = class {
+	context;
+	firedCueIds = /* @__PURE__ */ new Set();
+	timeCues;
+	cueMap = /* @__PURE__ */ new Map();
+	triggerMap = /* @__PURE__ */ new Map();
+	lastTime = 0;
+	activeSprites = /* @__PURE__ */ new Map();
+	constructor(context, manifest) {
+		this.context = context;
+		this.timeCues = manifest.cues.filter((c) => c.trigger.kind === "time").sort((a, b) => {
+			return (a.trigger.kind === "time" ? a.trigger.at : 0) - (b.trigger.kind === "time" ? b.trigger.at : 0);
+		});
+		for (const cue of manifest.cues) {
+			if (cue.id) this.cueMap.set(cue.id, cue);
+			if (cue.trigger.kind !== "time") {
+				const triggerKey = `${cue.trigger.kind}:${cue.trigger.value}`;
+				if (!this.triggerMap.has(triggerKey)) this.triggerMap.set(triggerKey, []);
+				this.triggerMap.get(triggerKey).push(cue);
+			}
+		}
+		if (manifest.assets?.spritePacks && this.context.sounds) {
+			const packToLoad = manifest.assets.spritePacks["default"] || Object.values(manifest.assets.spritePacks)[0];
+			if (packToLoad) this.context.sounds.loadSpritePack(packToLoad).catch((e) => {
+				console.warn("SAP Cues: Failed to load sprite pack", e);
+			});
+		}
+	}
+	reset() {
+		this.firedCueIds.clear();
+		this.lastTime = 0;
+		if (this.context.sounds) for (const ids of this.activeSprites.values()) for (const id of ids) this.context.sounds.stopSprite(id);
+		this.activeSprites.clear();
+	}
+	handleTimeUpdate(currentTime, isSeeking = false) {
+		for (const cue of this.timeCues) {
+			if (cue.trigger.kind !== "time") continue;
+			const hasFired = this.firedCueIds.has(cue.id);
+			const triggerTime = cue.trigger.at;
+			if (isSeeking && currentTime < triggerTime) {
+				if (cue.replayable) this.firedCueIds.delete(cue.id);
+				continue;
+			}
+			if (!hasFired && currentTime >= triggerTime) {
+				if (isSeeking && !cue.fireOnSeek) {
+					this.firedCueIds.add(cue.id);
+					continue;
+				}
+				if (isSeeking || this.lastTime <= triggerTime && currentTime >= triggerTime) {
+					this.firedCueIds.add(cue.id);
+					this.executeActions(cue.actions);
+				}
+			}
+		}
+		this.lastTime = currentTime;
+	}
+	/** Manually execute a cue by its ID, ignoring time checks. */
+	executeCueById(id) {
+		const cue = this.cueMap.get(id);
+		if (cue) this.executeActions(cue.actions);
+	}
+	/** Execute any cues matching the given trigger kind and value. */
+	executeCueByTrigger(kind, value) {
+		const triggerKey = `${kind}:${value}`;
+		const cues = this.triggerMap.get(triggerKey);
+		if (cues) for (const cue of cues) this.executeActions(cue.actions);
+	}
+	executeActions(actions) {
+		for (const action of actions) try {
+			switch (action.command) {
+				case "sprite.play":
+					if (this.context.sounds) {
+						const id = this.context.sounds.playSprite(action.clip, {
+							loop: action.loop,
+							volume: action.volume
+						});
+						if (id) {
+							const key = `${action.pack || "default"}:${action.clip}`;
+							if (!this.activeSprites.has(key)) this.activeSprites.set(key, []);
+							this.activeSprites.get(key).push(id);
+						}
+					}
+					break;
+				case "sprite.stop":
+					if (this.context.sounds) if (action.clip) {
+						const key = `${action.pack || "default"}:${action.clip}`;
+						const ids = this.activeSprites.get(key);
+						if (ids) {
+							for (const id of ids) this.context.sounds.stopSprite(id);
+							this.activeSprites.delete(key);
+						}
+					} else {
+						for (const ids of this.activeSprites.values()) for (const id of ids) this.context.sounds.stopSprite(id);
+						this.activeSprites.clear();
+					}
+					break;
+				case "sprite.fade":
+					if (this.context.sounds) {
+						const key = `${action.pack || "default"}:${action.clip}`;
+						const ids = this.activeSprites.get(key);
+						if (ids) for (const id of ids) this.context.sounds.fadeSprite(id, action.volume, action.durationMs);
+					}
+					break;
+				case "player.seek":
+					this.context.getEngine().seek(action.time);
+					break;
+				case "player.pause":
+					this.context.getEngine().pause();
+					break;
+				case "event.emit":
+					(this.context.getRootElement() || window).dispatchEvent(new CustomEvent(action.eventName, {
+						detail: action.detail,
+						bubbles: true
+					}));
+					break;
+				case "ambience.crossfade":
+				case "duck.set":
+				case "volume.fadeNarration":
+				case "layer.set":
+				case "spatial.pan":
+					(this.context.getRootElement() || window).dispatchEvent(new CustomEvent("sap-narrative-cue", {
+						detail: action,
+						bubbles: true
+					}));
+					break;
+			}
+		} catch (e) {
+			console.error("SAP Cues: Failed to execute cue action", action, e);
+		}
+	}
+};
+var cueTriggerSchema = union([object({
+	kind: literal("time"),
+	at: number()
+}), object({
+	kind: _enum([
+		"scene",
+		"paragraph",
+		"chapter",
+		"metadata",
+		"tension",
+		"powerShift",
+		"emotion",
+		"relationshipShift",
+		"danger",
+		"element",
+		"signature",
+		"intensity"
+	]),
+	value: union([string(), number()])
+})]);
+var cueActionSchema = discriminatedUnion("command", [
+	object({
+		command: literal("sprite.play"),
+		pack: string(),
+		clip: string(),
+		loop: boolean().optional(),
+		fadeInMs: number().optional(),
+		volume: number().optional()
+	}),
+	object({
+		command: literal("sprite.stop"),
+		pack: string().optional(),
+		clip: string().optional(),
+		fadeOutMs: number().optional()
+	}),
+	object({
+		command: literal("sprite.fade"),
+		pack: string(),
+		clip: string(),
+		volume: number(),
+		durationMs: number()
+	}),
+	object({
+		command: literal("ambience.crossfade"),
+		profile: string(),
+		durationMs: number().optional()
+	}),
+	object({
+		command: literal("duck.set"),
+		amount: number()
+	}),
+	object({
+		command: literal("volume.fadeNarration"),
+		volume: number(),
+		durationMs: number()
+	}),
+	object({
+		command: literal("player.seek"),
+		time: number()
+	}),
+	object({ command: literal("player.pause") }),
+	object({
+		command: literal("event.emit"),
+		eventName: string(),
+		detail: unknown().optional()
+	}),
+	object({
+		command: literal("layer.set"),
+		layer: string(),
+		state: union([string(), number()])
+	}),
+	object({
+		command: literal("spatial.pan"),
+		pack: string().optional(),
+		clip: string().optional(),
+		x: number(),
+		y: number(),
+		z: number(),
+		durationMs: number().optional()
+	})
+]);
+var cueEventSchema = object({
+	id: string().optional().transform((val) => val || `cue-${Math.random().toString(36).slice(2, 9)}`),
+	trigger: cueTriggerSchema,
+	actions: array(any().transform((val) => {
+		const parsed = cueActionSchema.safeParse(val);
+		if (!parsed.success) {
+			console.warn("SAP Cues: Ignoring invalid action:", parsed.error);
+			return null;
+		}
+		return parsed.data;
+	})).transform((actions) => actions.filter((a) => a !== null)),
+	replayable: boolean().optional(),
+	fireOnSeek: boolean().optional()
+});
+var audioSpriteClipSchema = object({
+	offset: number(),
+	duration: number(),
+	volume: number().optional(),
+	loop: boolean().optional()
+});
+var audioSpriteManifestSchema = object({
+	src: string(),
+	clips: record(string(), audioSpriteClipSchema)
+});
+var cueManifestSchema = object({
+	version: literal("sap-cues/1"),
+	id: string().optional(),
+	metadata: record(string(), unknown()).optional(),
+	assets: object({ spritePacks: record(string(), audioSpriteManifestSchema).optional() }).optional(),
+	cues: array(any().transform((val, _ctx) => {
+		const parsed = cueEventSchema.safeParse(val);
+		if (!parsed.success) {
+			console.warn("SAP Cues: Ignoring invalid cue:", parsed.error);
+			return null;
+		}
+		return parsed.data;
+	})).transform((cues) => cues.filter((c) => c !== null))
+});
+function validateCueManifest(json) {
+	try {
+		const parsed = cueManifestSchema.safeParse(json);
+		if (parsed.success) return parsed.data;
+		console.warn("SAP Cues: Manifest validation failed entirely.", parsed.error);
+		return null;
+	} catch (e) {
+		console.error("SAP Cues: Validation threw an exception", e);
+		return null;
+	}
+}
+//#endregion
+//#region src/audio-player/cues/CueManifestPlugin.ts
+var CueManifestPlugin = class {
+	name = "cueManifest";
+	context = null;
+	runtime = null;
+	abortController = null;
+	init(context) {
+		this.context = context;
+		this.handleDispatchCue = this.handleDispatchCue.bind(this);
+		(this.context.getRootElement() || window).addEventListener("sap-dispatch-cue", this.handleDispatchCue);
+	}
+	destroy() {
+		if (this.context) (this.context.getRootElement() || window).removeEventListener("sap-dispatch-cue", this.handleDispatchCue);
+		this.cleanup();
+		this.context = null;
+	}
+	handleDispatchCue(e) {
+		if (!this.runtime) return;
+		const detail = e.detail;
+		if (!detail) return;
+		if (detail.id) this.runtime.executeCueById(detail.id);
+		else if (detail.kind && detail.value !== void 0) this.runtime.executeCueByTrigger(detail.kind, detail.value);
+	}
+	cleanup() {
+		if (this.abortController) {
+			this.abortController.abort();
+			this.abortController = null;
+		}
+		if (this.runtime) {
+			this.runtime.reset();
+			this.runtime = null;
+		}
+	}
+	onTrackLoad(track) {
+		this.cleanup();
+		if (!track || !this.context) return;
+		if (track.cueManifest) {
+			const manifest = validateCueManifest(track.cueManifest);
+			if (manifest) this.runtime = new CueRuntime(this.context, manifest);
+		} else if (track.cueManifestUrl) {
+			this.abortController = new AbortController();
+			fetch(track.cueManifestUrl, { signal: this.abortController.signal }).then((res) => {
+				if (!res.ok) throw new Error(`Failed to fetch cue manifest: ${res.status} ${res.statusText}`);
+				return res.json();
+			}).then((data) => {
+				const manifest = validateCueManifest(data);
+				if (manifest && this.context) this.runtime = new CueRuntime(this.context, manifest);
+			}).catch((e) => {
+				if (e.name !== "AbortError") console.warn("Failed to fetch cue manifest from URL:", e);
+			});
+		}
+	}
+	onTimeUpdate(position) {
+		if (this.runtime && this.context) this.runtime.handleTimeUpdate(position, false);
+	}
+	onSeek(position) {
+		if (this.runtime) this.runtime.handleTimeUpdate(position, true);
+	}
+	onStop() {
+		this.cleanup();
+	}
+};
+function createCueManifestPlugin() {
+	return new CueManifestPlugin();
+}
+//#endregion
+//#region src/audio-player/cues/useNarrativeCueController.ts
+/**
+* A host-facing React hook that acts as the bridge between generic Cue Manifest
+* events and the SAP narrative audio engine.
+*/
+function useNarrativeCueController(options = {}) {
+	const { eventTarget } = options;
+	const [state, setState] = useState({
+		sceneMood: void 0,
+		ambientProfile: void 0,
+		fxClip: void 0,
+		fxLoop: false,
+		duckAmount: .6,
+		intensity: 1,
+		chapterId: void 0
+	});
+	useEffect(() => {
+		const target = eventTarget || (typeof window !== "undefined" ? window : null);
+		if (!target) return;
+		const handler = (e) => {
+			const action = e.detail;
+			if (!action || !action.command) return;
+			setState((s) => {
+				const next = { ...s };
+				switch (action.command) {
+					case "ambience.crossfade":
+						next.ambientProfile = action.profile;
+						break;
+					case "duck.set":
+						next.duckAmount = action.amount;
+						break;
+				}
+				return next;
+			});
+		};
+		target.addEventListener("sap-narrative-cue", handler);
+		return () => target.removeEventListener("sap-narrative-cue", handler);
+	}, [eventTarget]);
+	const dispatchCueEvent = useCallback((trigger) => {
+		const target = eventTarget || (typeof window !== "undefined" ? window : null);
+		if (!target) return;
+		target.dispatchEvent(new CustomEvent("sap-dispatch-cue", {
+			detail: trigger,
+			bubbles: true
+		}));
+	}, [eventTarget]);
+	return {
+		/** Options to spread into `useNarrativeAudio`. */
+		narrativeOptions: state,
+		dispatchCueEvent,
+		enterScene: useCallback((sceneId) => {
+			dispatchCueEvent({
+				kind: "scene",
+				value: sceneId
+			});
+		}, [dispatchCueEvent]),
+		enterParagraph: useCallback((paragraphId) => {
+			dispatchCueEvent({
+				kind: "paragraph",
+				value: paragraphId
+			});
+		}, [dispatchCueEvent]),
+		enterChapter: useCallback((chapterId) => {
+			dispatchCueEvent({
+				kind: "chapter",
+				value: chapterId
+			});
+		}, [dispatchCueEvent]),
+		applyMetadataSignature: useCallback((signature) => {
+			dispatchCueEvent({
+				kind: "signature",
+				value: signature
+			});
+		}, [dispatchCueEvent])
+	};
+}
+//#endregion
 //#region src/audio-player/utils/checkCodecSupport.ts
 /**
 * Check if the browser supports a given audio MIME type.
@@ -16580,15 +16551,15 @@ async function validateTrackSource(url, options = {}) {
 //#endregion
 //#region src/audio-player/components/workspace/VisualLyricsWorkspace.tsx
 function VisualLyricsWorkspace({ lyrics }) {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsxs("div", {
 		className: "sap-ctl__workspace-empty",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+		children: [/* @__PURE__ */ jsx("p", {
 			className: "sap-ctl__workspace-lead",
 			children: "Lyrics"
-		}), lyrics ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		}), lyrics ? /* @__PURE__ */ jsx("div", {
 			className: "sap-ctl__lyrics",
 			children: lyrics
-		}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+		}) : /* @__PURE__ */ jsx("p", {
 			className: "sap-ctl__workspace-sub",
 			children: "Lyrics display and sync settings will appear here."
 		})]
@@ -16868,37 +16839,37 @@ function PlayerHero({ face, collapsed, title, artist, art, className, album, fea
 	});
 	const release = releaseTitle?.trim();
 	const useMarquee = marquee && !collapsed;
-	const titleContent = /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [fullTitle, explicit && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ExplicitBadge, {})] });
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	const titleContent = /* @__PURE__ */ jsxs(Fragment, { children: [fullTitle, explicit && /* @__PURE__ */ jsx(ExplicitBadge, {})] });
+	return /* @__PURE__ */ jsxs("div", {
 		className: `ap-hero${className ? ` ${className}` : ""}`,
 		"data-collapsed": collapsed ? "true" : "false",
 		"data-face": face,
 		role: "group",
 		"aria-label": "Track information",
-		children: [art && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		children: [art && /* @__PURE__ */ jsx("div", {
 			className: "ap-hero__art",
 			children: art
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		}), /* @__PURE__ */ jsxs("div", {
 			className: "ap-hero__text",
 			children: [
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				/* @__PURE__ */ jsx("div", {
 					className: "ap-hero__title",
 					title: fullTitle,
 					dir: "auto",
 					style: titleFont,
-					children: useMarquee ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextMarquee, {
+					children: useMarquee ? /* @__PURE__ */ jsx(TextMarquee, {
 						className: "ap-hero__marquee",
 						children: titleContent
 					}) : titleContent
 				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				/* @__PURE__ */ jsx("div", {
 					className: "ap-hero__artist",
 					title: secondary,
 					dir: "auto",
 					style: artistFont,
 					children: secondary
 				}),
-				!collapsed && release && release !== album?.trim() && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				!collapsed && release && release !== album?.trim() && /* @__PURE__ */ jsx("div", {
 					className: "ap-hero__release",
 					title: release,
 					dir: "auto",
@@ -16941,7 +16912,7 @@ function FullCardPlayer({ showVolume = defaultShowVolume(), backgroundMedia, bac
 		media: artMedia,
 		legacyCss: art
 	});
-	const heroArtNode = heroArt.media?.kind === "video" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("video", {
+	const heroArtNode = heroArt.media?.kind === "video" ? /* @__PURE__ */ jsx("video", {
 		className: "ap-fc__hero-art",
 		src: heroArt.media.src,
 		poster: heroArt.media.poster,
@@ -16951,7 +16922,7 @@ function FullCardPlayer({ showVolume = defaultShowVolume(), backgroundMedia, bac
 		loop: true,
 		playsInline: true,
 		"aria-hidden": "true"
-	}) : heroArt.cssBackground ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+	}) : heroArt.cssBackground ? /* @__PURE__ */ jsx("div", {
 		className: "ap-fc__hero-art",
 		style: { backgroundImage: heroArt.cssBackground },
 		"aria-hidden": "true"
@@ -16988,7 +16959,7 @@ function FullCardPlayer({ showVolume = defaultShowVolume(), backgroundMedia, bac
 		setControllerRoute("options");
 		setControllerOpen(true);
 	}, []);
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(VisualSlotsProvider, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsx(VisualSlotsProvider, { children: /* @__PURE__ */ jsxs("div", {
 		className: `ap-fc ap-glass-surface${className ? ` ${className}` : ""}`,
 		style: {
 			...themeVars,
@@ -16998,13 +16969,13 @@ function FullCardPlayer({ showVolume = defaultShowVolume(), backgroundMedia, bac
 		role: "region",
 		"aria-label": "Now playing",
 		children: [
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(BackgroundMedia, {
+			/* @__PURE__ */ jsx(BackgroundMedia, {
 				media: backdrop.media,
 				cssBackground: backdrop.cssBackground,
 				darkenAmount,
 				className: "ap-fc__bg"
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(QueueDrawer, {
+			/* @__PURE__ */ jsx(QueueDrawer, {
 				queue,
 				currentIndex,
 				isPlaying,
@@ -17014,7 +16985,7 @@ function FullCardPlayer({ showVolume = defaultShowVolume(), backgroundMedia, bac
 				onReorder: s.moveQueueItem,
 				onRemove: s.removeFromQueue
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SAPController, {
+			/* @__PURE__ */ jsx(SAPController, {
 				open: controllerOpen,
 				onClose: handleCloseController,
 				route: controllerRoute,
@@ -17042,30 +17013,30 @@ function FullCardPlayer({ showVolume = defaultShowVolume(), backgroundMedia, bac
 				} : void 0,
 				...theme
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			/* @__PURE__ */ jsx("div", {
 				className: "ap-fc__menu",
-				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+				children: /* @__PURE__ */ jsx("button", {
 					type: "button",
 					className: "ap-icon-btn ap-tap ap-menu__btn",
 					onClick: handleOpenOptions,
 					"aria-label": "Player options",
 					"aria-haspopup": "dialog",
 					"aria-expanded": controllerOpen,
-					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DotsIcon$1, {})
+					children: /* @__PURE__ */ jsx(DotsIcon$1, {})
 				})
 			}),
-			isEmpty && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			isEmpty && /* @__PURE__ */ jsxs("div", {
 				className: "ap-banner ap-banner--info ap-anim-in",
 				role: "status",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ErrorIcon$1, {}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Queue is empty" })]
+				children: [/* @__PURE__ */ jsx(ErrorIcon$1, {}), /* @__PURE__ */ jsx("span", { children: "Queue is empty" })]
 			}),
-			autoplayBlocked && hasAudio && !hasError && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			autoplayBlocked && hasAudio && !hasError && /* @__PURE__ */ jsxs("div", {
 				className: "ap-banner ap-banner--info ap-banner--col ap-anim-in",
 				role: "status",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				children: [/* @__PURE__ */ jsxs("div", {
 					className: "ap-banner__row",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ErrorIcon$1, {}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Autoplay blocked. Tap play to start audio." })]
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					children: [/* @__PURE__ */ jsx(ErrorIcon$1, {}), /* @__PURE__ */ jsx("span", { children: "Autoplay blocked. Tap play to start audio." })]
+				}), /* @__PURE__ */ jsx("button", {
 					type: "button",
 					className: "ap-retry-btn",
 					onClick: () => {
@@ -17075,19 +17046,19 @@ function FullCardPlayer({ showVolume = defaultShowVolume(), backgroundMedia, bac
 					children: "Play"
 				})]
 			}),
-			hasError && hasAudio && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			hasError && hasAudio && /* @__PURE__ */ jsxs("div", {
 				className: "ap-banner ap-banner--error ap-banner--col ap-anim-in",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				children: [/* @__PURE__ */ jsxs("div", {
 					className: "ap-banner__row",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ErrorIcon$1, {}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: errorMessage })]
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					children: [/* @__PURE__ */ jsx(ErrorIcon$1, {}), /* @__PURE__ */ jsx("span", { children: errorMessage })]
+				}), /* @__PURE__ */ jsx("button", {
 					type: "button",
 					className: "ap-retry-btn",
 					onClick: s.retry,
 					children: "Retry"
 				})]
 			}),
-			!isEmpty && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			!isEmpty && /* @__PURE__ */ jsxs("div", {
 				className: "ap-fc__counter",
 				children: [
 					"Track ",
@@ -17099,10 +17070,10 @@ function FullCardPlayer({ showVolume = defaultShowVolume(), backgroundMedia, bac
 					automix ? " · Automix" : ""
 				]
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			/* @__PURE__ */ jsxs("div", {
 				className: "ap-fc__stage",
 				"data-surface-open": surface.mode !== "default",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlayerHero, {
+				children: [/* @__PURE__ */ jsx(PlayerHero, {
 					face: "fullCard",
 					collapsed: surface.isHeroCollapsed,
 					title: currentTrack?.title ?? "Nothing playing",
@@ -17117,37 +17088,37 @@ function FullCardPlayer({ showVolume = defaultShowVolume(), backgroundMedia, bac
 					marquee: true,
 					titleFont,
 					artistFont
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SEICanvasHost, {
+				}), /* @__PURE__ */ jsx(SEICanvasHost, {
 					open: surface.isCanvasOpen || surface.isQueueOpen,
 					face: "fullCard",
 					supported: surface.canvasSupported,
 					activeSurfaceId: surface.mode === "default" ? void 0 : surface.mode,
-					children: surface.isQueueOpen ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(QueueSurface, {}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SEICanvasRenderer, {
+					children: surface.isQueueOpen ? /* @__PURE__ */ jsx(QueueSurface, {}) : /* @__PURE__ */ jsx(SEICanvasRenderer, {
 						currentTime,
 						duration,
 						lyrics: currentTrack?.lyrics
 					})
 				})]
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			/* @__PURE__ */ jsxs("div", {
 				className: "ap-fc__control-dock",
 				children: [
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ScrubberCanvasHost, {
+					/* @__PURE__ */ jsx(ScrubberCanvasHost, {
 						face: "fullCard",
 						density: getScrubberDensity("fullCard"),
 						currentTime,
 						duration,
 						progress: duration > 0 ? currentTime / duration : 0,
 						onSeek: s.seek,
-						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ScrubberCanvasRenderer, {
+						children: /* @__PURE__ */ jsx(ScrubberCanvasRenderer, {
 							currentTime,
 							duration,
 							onSeek: s.seek,
-							children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							children: /* @__PURE__ */ jsxs("div", {
 								className: "ap-progress-group",
 								role: "group",
 								"aria-label": "Playback progress",
-								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(WaveformAdapter, {
+								children: [/* @__PURE__ */ jsx(WaveformAdapter, {
 									face: "fullCard",
 									density: getScrubberDensity("fullCard"),
 									currentTime,
@@ -17163,20 +17134,20 @@ function FullCardPlayer({ showVolume = defaultShowVolume(), backgroundMedia, bac
 									getDecodedData: s.getDecodedData,
 									url: s.getBackendInfo().active === "html5" ? s.currentSrc : void 0,
 									sourceKey: currentTrack ? trackKey(currentTrack) : void 0
-								}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								}), /* @__PURE__ */ jsxs("div", {
 									className: "ap-times",
 									"aria-hidden": "true",
-									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: formatTime(currentTime) }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: formatTime(duration) })]
+									children: [/* @__PURE__ */ jsx("span", { children: formatTime(currentTime) }), /* @__PURE__ */ jsx("span", { children: formatTime(duration) })]
 								})]
 							})
 						})
 					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					/* @__PURE__ */ jsxs("div", {
 						className: "ap-transport",
 						role: "group",
 						"aria-label": "Playback controls",
 						children: [
-							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(HoldSkipButton, {
+							/* @__PURE__ */ jsx(HoldSkipButton, {
 								direction: "previous",
 								className: "ap-btn ap-btn--ghost ap-tap",
 								disabled: !hasAudio,
@@ -17185,17 +17156,17 @@ function FullCardPlayer({ showVolume = defaultShowVolume(), backgroundMedia, bac
 								skipLabel: "Previous track",
 								onSeek: () => s.seekBy(-10),
 								onSkip: s.previous,
-								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PrevIcon$1, {})
+								children: /* @__PURE__ */ jsx(PrevIcon$1, {})
 							}),
-							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							/* @__PURE__ */ jsx("button", {
 								type: "button",
 								className: `ap-btn ap-btn--play ap-tap${isPlaying ? " ap-btn--play-active" : ""}`,
 								onClick: s.toggle,
 								disabled: !hasAudio,
 								"aria-label": showPlaySpinner ? "Buffering audio" : isPlaying ? "Pause" : "Play",
-								children: showPlaySpinner ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SpinnerIcon$1, {}) : isPlaying ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PauseIcon$1, {}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlayIcon$1, {})
+								children: showPlaySpinner ? /* @__PURE__ */ jsx(SpinnerIcon$1, {}) : isPlaying ? /* @__PURE__ */ jsx(PauseIcon$1, {}) : /* @__PURE__ */ jsx(PlayIcon$1, {})
 							}),
-							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(HoldSkipButton, {
+							/* @__PURE__ */ jsx(HoldSkipButton, {
 								direction: "next",
 								className: "ap-btn ap-btn--ghost ap-tap",
 								disabled: !hasAudio,
@@ -17204,11 +17175,11 @@ function FullCardPlayer({ showVolume = defaultShowVolume(), backgroundMedia, bac
 								skipLabel: "Next track",
 								onSeek: () => s.seekBy(10),
 								onSkip: s.next,
-								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(NextIcon$1, {})
+								children: /* @__PURE__ */ jsx(NextIcon$1, {})
 							})
 						]
 					}),
-					showVolume && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(VolumeControl, {
+					showVolume && /* @__PURE__ */ jsx(VolumeControl, {
 						volume,
 						isMuted,
 						disabled: !hasAudio,
@@ -17216,7 +17187,7 @@ function FullCardPlayer({ showVolume = defaultShowVolume(), backgroundMedia, bac
 						onVolumeChange: s.setVolume,
 						onToggleMute: s.toggleMute
 					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlayerSurfaceButtons, {
+					/* @__PURE__ */ jsx(PlayerSurfaceButtons, {
 						surface,
 						onOpenQueue: handleOpenQueue,
 						onOpenFocusedController: handleOpenFocusedController
@@ -17258,7 +17229,7 @@ function ArcActionButton({ actions, ariaLabel = "Actions", className }) {
 		indexLeaves(actions, map);
 		return map;
 	}, [actions]);
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SEICanvasActionMenu, {
+	return /* @__PURE__ */ jsx(SEICanvasActionMenu, {
 		items,
 		onSelect: (node) => leaves.get(node.id)?.onSelect?.(node.id),
 		ariaLabel,
@@ -17396,7 +17367,7 @@ function VaultRowPlayer({ track, number, actions, onAction, className, style, ..
 		if (isActive) s.toggle();
 		else s.playNow(track);
 	};
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsxs("div", {
 		className: `ap-vr${isActive ? " ap-vr--active" : ""}${className ? ` ${className}` : ""}`,
 		style: {
 			...buildThemeVars(theme),
@@ -17406,55 +17377,55 @@ function VaultRowPlayer({ track, number, actions, onAction, className, style, ..
 		"data-vault-category": track.vaultCategory,
 		"aria-current": isActive ? "true" : void 0,
 		children: [
-			category && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+			category && /* @__PURE__ */ jsx("span", {
 				className: "ap-vr__chip ap-vr__chip--lead",
 				title: category.label,
 				children: category.label
 			}),
-			number !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+			number !== void 0 && /* @__PURE__ */ jsx("span", {
 				className: "ap-vr__num",
 				children: number
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+			/* @__PURE__ */ jsx("button", {
 				type: "button",
 				className: "ap-btn ap-btn--play ap-vr__play ap-tap",
 				onClick: handleToggle,
 				"aria-label": isBufferingThis ? "Buffering audio" : isPlayingThis ? `Pause ${track.title}` : `Play ${track.title}`,
-				children: isBufferingThis ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SpinnerIcon$1, {}) : isPlayingThis ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PauseIcon$1, {}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlayIcon$1, {})
+				children: isBufferingThis ? /* @__PURE__ */ jsx(SpinnerIcon$1, {}) : isPlayingThis ? /* @__PURE__ */ jsx(PauseIcon$1, {}) : /* @__PURE__ */ jsx(PlayIcon$1, {})
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			/* @__PURE__ */ jsxs("div", {
 				className: "ap-vr__meta",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+				children: [/* @__PURE__ */ jsxs("span", {
 					className: "ap-vr__title",
 					title: formatVersionedTitle(track.title, track.versionLabel),
-					children: [formatVersionedTitle(track.title, track.versionLabel), track.explicit && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ExplicitBadge, {})]
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+					children: [formatVersionedTitle(track.title, track.versionLabel), track.explicit && /* @__PURE__ */ jsx(ExplicitBadge, {})]
+				}), /* @__PURE__ */ jsxs("span", {
 					className: "ap-vr__artist",
 					title: formatSecondaryLine(track),
-					children: [category && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					children: [category && /* @__PURE__ */ jsx("span", {
 						className: "ap-vr__chip ap-vr__chip--inline",
 						children: category.label
-					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					}), /* @__PURE__ */ jsx("span", {
 						className: "ap-vr__artist-text",
 						children: formatSecondaryLine(track)
 					})]
 				})]
 			}),
-			isActive && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+			isActive && /* @__PURE__ */ jsx("span", {
 				className: "ap-vr__time",
 				"aria-hidden": "true",
 				children: formatTime(s.currentTime)
 			}),
-			isPlayingThis && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+			isPlayingThis && /* @__PURE__ */ jsxs("span", {
 				className: "ap-eq",
 				"aria-hidden": "true",
 				children: [
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {})
+					/* @__PURE__ */ jsx("i", {}),
+					/* @__PURE__ */ jsx("i", {}),
+					/* @__PURE__ */ jsx("i", {})
 				]
 			}),
-			showAction && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArcActionButton, {
+			showAction && /* @__PURE__ */ jsx(ArcActionButton, {
 				actions: resolvedActions,
 				ariaLabel: `Actions for ${track.title}`,
 				className: "ap-vr__action"
@@ -17491,7 +17462,7 @@ function StickyBottomPlayer({ fixed = true, showVolume = defaultShowVolume(), cl
 	if (s.queue.length === 0 || !s.currentTrack) return null;
 	const { currentTrack, isPlaying, isBuffering, shuffle, repeatMode, automix } = s;
 	const showPlaySpinner = isBuffering;
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsxs("div", {
 		className: `ap-sb${fixed ? " ap-sb--fixed" : ""}${className ? ` ${className}` : ""}`,
 		style: {
 			...buildThemeVars(theme),
@@ -17500,7 +17471,7 @@ function StickyBottomPlayer({ fixed = true, showVolume = defaultShowVolume(), cl
 		role: "region",
 		"aria-label": "Playback bar",
 		children: [
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(QueueDrawer, {
+			/* @__PURE__ */ jsx(QueueDrawer, {
 				queue: s.queue,
 				currentIndex: s.currentIndex,
 				isPlaying: s.isPlaying,
@@ -17510,7 +17481,7 @@ function StickyBottomPlayer({ fixed = true, showVolume = defaultShowVolume(), cl
 				onReorder: s.moveQueueItem,
 				onRemove: s.removeFromQueue
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SAPController, {
+			/* @__PURE__ */ jsx(SAPController, {
 				open: controllerOpen,
 				onClose: () => setControllerOpen(false),
 				route: "options",
@@ -17538,27 +17509,27 @@ function StickyBottomPlayer({ fixed = true, showVolume = defaultShowVolume(), cl
 				},
 				...theme
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			/* @__PURE__ */ jsxs("div", {
 				className: "ap-sb__inner",
 				children: [
-					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					/* @__PURE__ */ jsxs("div", {
 						className: "ap-sb__meta",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+						children: [/* @__PURE__ */ jsxs("span", {
 							className: "ap-sb__title",
 							title: formatVersionedTitle(currentTrack.title, currentTrack.versionLabel),
-							children: [formatVersionedTitle(currentTrack.title, currentTrack.versionLabel), currentTrack.explicit && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ExplicitBadge, {})]
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							children: [formatVersionedTitle(currentTrack.title, currentTrack.versionLabel), currentTrack.explicit && /* @__PURE__ */ jsx(ExplicitBadge, {})]
+						}), /* @__PURE__ */ jsx("span", {
 							className: "ap-sb__artist",
 							title: formatSecondaryLine(currentTrack),
 							children: formatSecondaryLine(currentTrack)
 						})]
 					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					/* @__PURE__ */ jsxs("div", {
 						className: "ap-sb__center",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						children: [/* @__PURE__ */ jsxs("div", {
 							className: "ap-sb__controls",
 							children: [
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(HoldSkipButton, {
+								/* @__PURE__ */ jsx(HoldSkipButton, {
 									direction: "previous",
 									className: "ap-btn ap-btn--ghost ap-btn--sm ap-tap",
 									disabled: !s.hasAudio,
@@ -17567,17 +17538,17 @@ function StickyBottomPlayer({ fixed = true, showVolume = defaultShowVolume(), cl
 									skipLabel: "Previous track",
 									onSeek: () => s.seekBy(-10),
 									onSkip: s.previous,
-									children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PrevIcon$1, {})
+									children: /* @__PURE__ */ jsx(PrevIcon$1, {})
 								}),
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+								/* @__PURE__ */ jsx("button", {
 									type: "button",
 									className: `ap-btn ap-btn--play ap-sb__play ap-tap${isPlaying ? " ap-btn--play-active" : ""}`,
 									onClick: s.toggle,
 									disabled: !s.hasAudio,
 									"aria-label": showPlaySpinner ? "Buffering audio" : isPlaying ? "Pause" : "Play",
-									children: showPlaySpinner ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SpinnerIcon$1, {}) : isPlaying ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PauseIcon$1, {}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlayIcon$1, {})
+									children: showPlaySpinner ? /* @__PURE__ */ jsx(SpinnerIcon$1, {}) : isPlaying ? /* @__PURE__ */ jsx(PauseIcon$1, {}) : /* @__PURE__ */ jsx(PlayIcon$1, {})
 								}),
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(HoldSkipButton, {
+								/* @__PURE__ */ jsx(HoldSkipButton, {
 									direction: "next",
 									className: "ap-btn ap-btn--ghost ap-btn--sm ap-tap",
 									disabled: !s.hasAudio,
@@ -17586,34 +17557,34 @@ function StickyBottomPlayer({ fixed = true, showVolume = defaultShowVolume(), cl
 									skipLabel: "Next track",
 									onSeek: () => s.seekBy(10),
 									onSkip: s.next,
-									children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(NextIcon$1, {})
+									children: /* @__PURE__ */ jsx(NextIcon$1, {})
 								}),
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+								/* @__PURE__ */ jsx("button", {
 									type: "button",
 									className: "ap-icon-btn ap-tap",
 									onClick: () => setControllerOpen(true),
 									"aria-label": "Player options",
 									"aria-haspopup": "dialog",
 									"aria-expanded": controllerOpen,
-									children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DotsIcon$1, {})
+									children: /* @__PURE__ */ jsx(DotsIcon$1, {})
 								})
 							]
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						}), /* @__PURE__ */ jsxs("div", {
 							className: "ap-sb__scrub",
 							children: [
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								/* @__PURE__ */ jsx("span", {
 									className: "ap-sb__t",
 									"aria-hidden": "true",
 									children: formatTime(s.currentTime)
 								}),
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ScrubberCanvasHost, {
+								/* @__PURE__ */ jsx(ScrubberCanvasHost, {
 									face: "stickyBottom",
 									density: getScrubberDensity("stickyBottom"),
 									currentTime: s.currentTime,
 									duration: s.duration,
 									progress: s.duration > 0 ? s.currentTime / s.duration : 0,
 									onSeek: s.seek,
-									children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(WaveformAdapter, {
+									children: /* @__PURE__ */ jsx(WaveformAdapter, {
 										face: "stickyBottom",
 										density: getScrubberDensity("stickyBottom"),
 										currentTime: s.currentTime,
@@ -17626,7 +17597,7 @@ function StickyBottomPlayer({ fixed = true, showVolume = defaultShowVolume(), cl
 										onSeekEnd: () => s.setSeeking(false)
 									})
 								}),
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								/* @__PURE__ */ jsx("span", {
 									className: "ap-sb__t",
 									"aria-hidden": "true",
 									children: formatTime(s.duration)
@@ -17634,9 +17605,9 @@ function StickyBottomPlayer({ fixed = true, showVolume = defaultShowVolume(), cl
 							]
 						})]
 					}),
-					showVolume && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					showVolume && /* @__PURE__ */ jsx("div", {
 						className: "ap-sb__volume",
-						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(VolumeControl, {
+						children: /* @__PURE__ */ jsx(VolumeControl, {
 							volume: s.volume,
 							isMuted: s.isMuted,
 							disabled: !s.hasAudio,
@@ -17677,47 +17648,47 @@ function MiniSidebarPlayer({ art = "linear-gradient(135deg,#7C5CFF,#22D3A6)", ar
 	const { currentTrack, isPlaying, isBuffering, hasAudio } = s;
 	const msTitle = currentTrack ? formatVersionedTitle(currentTrack.title, currentTrack.versionLabel) : "Nothing playing";
 	const msSecondary = currentTrack ? formatSecondaryLine(currentTrack) : "—";
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsxs("div", {
 		className: `ap-ms-shell${className ? ` ${className}` : ""}`,
 		style: {
 			...buildThemeVars(theme),
 			...style
 		},
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		children: [/* @__PURE__ */ jsxs("div", {
 			className: "ap-ms ap-glass-surface ap-glass-surface--compact",
 			role: "region",
 			"aria-label": "Mini player",
 			children: [
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				/* @__PURE__ */ jsx("div", {
 					className: `ap-ms__art${isPlaying ? " ap-ms__art--playing" : ""}`,
 					style: blockArt.cssBackground ? { backgroundImage: blockArt.cssBackground } : void 0,
 					"aria-hidden": "true",
-					children: blockArt.media && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BackgroundMedia, {
+					children: blockArt.media && /* @__PURE__ */ jsx(BackgroundMedia, {
 						media: blockArt.media,
 						className: "ap-ms__bg"
 					})
 				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				/* @__PURE__ */ jsxs("div", {
 					className: "ap-ms__meta",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+					children: [/* @__PURE__ */ jsxs("span", {
 						className: "ap-ms__title",
 						title: msTitle,
-						children: [msTitle, currentTrack?.explicit && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ExplicitBadge, {})]
-					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						children: [msTitle, currentTrack?.explicit && /* @__PURE__ */ jsx(ExplicitBadge, {})]
+					}), /* @__PURE__ */ jsx("span", {
 						className: "ap-ms__artist",
 						title: msSecondary,
 						children: msSecondary
 					})]
 				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+				/* @__PURE__ */ jsx("button", {
 					type: "button",
 					className: "ap-btn ap-btn--play ap-ms__play ap-tap",
 					onClick: s.toggle,
 					disabled: !hasAudio,
 					"aria-label": isBuffering ? "Buffering audio" : isPlaying ? "Pause" : "Play",
-					children: isBuffering ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SpinnerIcon$1, {}) : isPlaying ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PauseIcon$1, {}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlayIcon$1, {})
+					children: isBuffering ? /* @__PURE__ */ jsx(SpinnerIcon$1, {}) : isPlaying ? /* @__PURE__ */ jsx(PauseIcon$1, {}) : /* @__PURE__ */ jsx(PlayIcon$1, {})
 				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlayerSurfaceButtons, {
+				/* @__PURE__ */ jsx(PlayerSurfaceButtons, {
 					surface,
 					showTransport: true,
 					canPrevious: s.canPrevious,
@@ -17726,10 +17697,10 @@ function MiniSidebarPlayer({ art = "linear-gradient(135deg,#7C5CFF,#22D3A6)", ar
 					onNext: s.next
 				})
 			]
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		}), /* @__PURE__ */ jsx("div", {
 			className: "ap-ms__surface",
 			"data-open": surface.isQueueOpen ? "true" : "false",
-			children: surface.isQueueOpen && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(QueueSurface, { maxItems: 6 })
+			children: surface.isQueueOpen && /* @__PURE__ */ jsx(QueueSurface, { maxItems: 6 })
 		})]
 	});
 }
@@ -17769,74 +17740,74 @@ function SeaCardPlayer({ track, art = "linear-gradient(135deg,#FF7AC6,#7C5CFF)",
 		media: artMedia,
 		legacyCss: art
 	});
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", {
+	return /* @__PURE__ */ jsxs("article", {
 		className: `ap-sea${isActive ? " ap-sea--active" : ""}${className ? ` ${className}` : ""}`,
 		style: {
 			...buildThemeVars(theme),
 			...style
 		},
 		children: [
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			/* @__PURE__ */ jsxs("div", {
 				className: "ap-sea__art",
 				style: cardArt.cssBackground ? { backgroundImage: cardArt.cssBackground } : void 0,
 				children: [
-					cardArt.media && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BackgroundMedia, {
+					cardArt.media && /* @__PURE__ */ jsx(BackgroundMedia, {
 						media: cardArt.media,
 						className: "ap-sea__bg"
 					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					/* @__PURE__ */ jsx("button", {
 						type: "button",
 						className: "ap-btn ap-btn--play ap-sea__play ap-tap",
 						onClick: handleToggle,
 						"aria-label": isBufferingThis ? "Buffering audio" : isPlayingThis ? `Pause ${track.title}` : `Play ${track.title}`,
-						children: isBufferingThis ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SpinnerIcon$1, {}) : isPlayingThis ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PauseIcon$1, {}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlayIcon$1, {})
+						children: isBufferingThis ? /* @__PURE__ */ jsx(SpinnerIcon$1, {}) : isPlayingThis ? /* @__PURE__ */ jsx(PauseIcon$1, {}) : /* @__PURE__ */ jsx(PlayIcon$1, {})
 					}),
-					tag && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					tag && /* @__PURE__ */ jsx("span", {
 						className: "ap-sea__tag",
 						children: tag
 					}),
-					isActive && hasPeaks && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					isActive && hasPeaks && /* @__PURE__ */ jsx("button", {
 						type: "button",
 						className: "ap-icon-btn ap-tap ap-sea__wave-btn",
 						onClick: surface.toggleCanvas,
 						"aria-label": surface.isCanvasOpen ? "Hide waveform" : "Show waveform",
 						"aria-expanded": surface.isCanvasOpen,
-						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(WaveIcon, {})
+						children: /* @__PURE__ */ jsx(WaveIcon, {})
 					})
 				]
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			/* @__PURE__ */ jsxs("div", {
 				className: "ap-sea__body",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				children: [/* @__PURE__ */ jsxs("div", {
 					className: "ap-sea__head",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					children: [/* @__PURE__ */ jsxs("div", {
 						className: "ap-sea__meta",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						children: [/* @__PURE__ */ jsxs("div", {
 							className: "ap-sea__title",
 							title: formatVersionedTitle(track.title, track.versionLabel),
 							style: titleFont,
-							children: [formatVersionedTitle(track.title, track.versionLabel), track.explicit && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ExplicitBadge, {})]
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							children: [formatVersionedTitle(track.title, track.versionLabel), track.explicit && /* @__PURE__ */ jsx(ExplicitBadge, {})]
+						}), /* @__PURE__ */ jsx("div", {
 							className: "ap-sea__artist",
 							title: formatSecondaryLine(track),
 							style: artistFont,
 							children: formatSecondaryLine(track)
 						})]
-					}), showAction && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArcActionButton, {
+					}), showAction && /* @__PURE__ */ jsx(ArcActionButton, {
 						actions,
 						ariaLabel: `Actions for ${track.title}`,
 						className: "ap-sea__action"
 					})]
-				}), isActive && !surface.isCanvasOpen && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				}), isActive && !surface.isCanvasOpen && /* @__PURE__ */ jsx("div", {
 					className: "ap-sea__progress",
-					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ScrubberCanvasHost, {
+					children: /* @__PURE__ */ jsx(ScrubberCanvasHost, {
 						face: "seaCard",
 						density: getScrubberDensity("seaCard"),
 						currentTime: s.currentTime,
 						duration: s.duration,
 						progress: s.duration > 0 ? s.currentTime / s.duration : 0,
 						onSeek: s.seek,
-						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ProgressBar, {
+						children: /* @__PURE__ */ jsx(ProgressBar, {
 							currentTime: s.currentTime,
 							duration: s.duration,
 							buffered: s.buffered,
@@ -17849,14 +17820,14 @@ function SeaCardPlayer({ track, art = "linear-gradient(135deg,#FF7AC6,#7C5CFF)",
 					})
 				})]
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SEICanvasHost, {
+			/* @__PURE__ */ jsx(SEICanvasHost, {
 				open: surface.isCanvasOpen,
 				face: "seaCard",
 				supported: isActive && surface.canvasSupported,
 				activeSurfaceId: surface.mode === "default" ? void 0 : surface.mode,
-				children: surface.isCanvasOpen && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				children: surface.isCanvasOpen && /* @__PURE__ */ jsxs("div", {
 					className: "ap-sea__overlay",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlayerHero, {
+					children: [/* @__PURE__ */ jsx(PlayerHero, {
 						face: "seaCard",
 						collapsed: false,
 						title: track.title ?? "",
@@ -17868,7 +17839,7 @@ function SeaCardPlayer({ track, art = "linear-gradient(135deg,#FF7AC6,#7C5CFF)",
 						releaseTitle: track.releaseTitle,
 						subtitle: track.subtitle,
 						marquee: true
-					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(WaveformAdapter, {
+					}), /* @__PURE__ */ jsx(WaveformAdapter, {
 						face: "seaCard",
 						density: getScrubberDensity("seaCard"),
 						currentTime: s.currentTime,
@@ -17892,7 +17863,7 @@ function SeaCardPlayer({ track, art = "linear-gradient(135deg,#FF7AC6,#7C5CFF)",
 }
 //#endregion
 //#region src/audio-player/narrative/useNarrativeAudio.ts
-function clamp01(value) {
+function clamp01$1(value) {
 	if (!Number.isFinite(value)) return 0;
 	return Math.max(0, Math.min(1, value));
 }
@@ -17925,17 +17896,17 @@ function useNarrativeAudio(options = {}) {
 	const ambienceIdRef = useRef(null);
 	const fxIdRef = useRef(null);
 	const loadedSrcRef = useRef(null);
-	const [ambienceVolume, setAmbienceVolumeState] = useState(clamp01(ambienceVolumeProp));
+	const [ambienceVolume, setAmbienceVolumeState] = useState(clamp01$1(ambienceVolumeProp));
 	useEffect(() => {
-		setAmbienceVolumeState(clamp01(ambienceVolumeProp));
+		setAmbienceVolumeState(clamp01$1(ambienceVolumeProp));
 	}, [ambienceVolumeProp]);
 	const getEngine = useCallback(() => {
 		if (!engineRef.current) engineRef.current = createAudioSpriteEngine();
 		return engineRef.current;
 	}, []);
-	const targetAmbience = clamp01(ambienceVolume * clamp01(intensity));
+	const targetAmbience = clamp01$1(ambienceVolume * clamp01$1(intensity));
 	const isNarrating = narrationState === "playing" || narrationState === void 0 && session.isPlaying;
-	const duckedAmbience = clamp01(targetAmbience * (1 - clamp01(duckAmount) * clamp01(intensity)));
+	const duckedAmbience = clamp01$1(targetAmbience * (1 - clamp01$1(duckAmount) * clamp01$1(intensity)));
 	const liveAmbienceTarget = isNarrating ? duckedAmbience : targetAmbience;
 	useEffect(() => {
 		const src = ambienceManifest?.src?.trim();
@@ -18007,7 +17978,7 @@ function useNarrativeAudio(options = {}) {
 	}, [liveAmbienceTarget]);
 	useEffect(() => {
 		if (narrationVolumeProp === void 0) return;
-		session.setVolume(clamp01(narrationVolumeProp));
+		session.setVolume(clamp01$1(narrationVolumeProp));
 	}, [narrationVolumeProp, session]);
 	useEffect(() => {
 		return () => {
@@ -18018,9 +17989,9 @@ function useNarrativeAudio(options = {}) {
 		};
 	}, []);
 	const setAmbienceVolume = useCallback((value) => {
-		setAmbienceVolumeState(clamp01(value));
+		setAmbienceVolumeState(clamp01$1(value));
 	}, []);
-	const setNarrationVolume = useCallback((value) => session.setVolume(clamp01(value)), [session]);
+	const setNarrationVolume = useCallback((value) => session.setVolume(clamp01$1(value)), [session]);
 	const hasAmbience = Boolean(ambienceManifest?.src?.trim()) && Boolean(ambientProfile);
 	const indicatorState = isNarrating ? "narrating" : hasAmbience ? "ambient" : "silent";
 	return {
@@ -18075,7 +18046,7 @@ function NarrativeFace({ chapterId, sceneMood, ambientProfile, fxClip, fxLoop, a
 	}, [narrative]);
 	const showSpinner = session.isBuffering;
 	const moodLabel = narrative.mood ?? "Ambience";
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsxs("div", {
 		className: `ap-nf${embedded ? " ap-nf--embedded" : ""} ap-nf--${narrative.indicatorState}${className ? ` ${className}` : ""}`,
 		style: {
 			...buildThemeVars(theme),
@@ -18085,32 +18056,32 @@ function NarrativeFace({ chapterId, sceneMood, ambientProfile, fxClip, fxLoop, a
 		"aria-label": "Narration audio",
 		"data-chapter-id": chapterId,
 		children: [
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			/* @__PURE__ */ jsxs("div", {
 				className: "ap-nf__scape",
 				title: `Soundscape: ${moodLabel}`,
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				children: [/* @__PURE__ */ jsx("span", {
 					className: "ap-nf__dot",
 					"aria-hidden": "true"
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				}), /* @__PURE__ */ jsx("span", {
 					className: "ap-nf__mood",
 					children: moodLabel
 				})]
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+			/* @__PURE__ */ jsx("button", {
 				type: "button",
 				className: `ap-btn ap-btn--play ap-nf__play ap-tap${narrative.isPlaying ? " ap-btn--play-active" : ""}`,
 				onClick: narrative.togglePlay,
 				disabled: !narrative.hasNarration,
 				"aria-label": showSpinner ? "Buffering narration" : narrative.isPlaying ? "Pause narration" : "Play narration",
-				children: showSpinner ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SpinnerIcon$1, {}) : narrative.isPlaying ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PauseIcon$1, {}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlayIcon$1, {})
+				children: showSpinner ? /* @__PURE__ */ jsx(SpinnerIcon$1, {}) : narrative.isPlaying ? /* @__PURE__ */ jsx(PauseIcon$1, {}) : /* @__PURE__ */ jsx(PlayIcon$1, {})
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			/* @__PURE__ */ jsxs("div", {
 				className: "ap-nf__vol ap-nf__vol--narration",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				children: [/* @__PURE__ */ jsx("span", {
 					className: "ap-nf__vol-label",
 					"aria-hidden": "true",
 					children: "Voice"
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(VolumeControl, {
+				}), /* @__PURE__ */ jsx(VolumeControl, {
 					volume: narrative.narrationVolume,
 					isMuted: narrative.isMuted,
 					disabled: !narrative.hasNarration,
@@ -18119,12 +18090,12 @@ function NarrativeFace({ chapterId, sceneMood, ambientProfile, fxClip, fxLoop, a
 					onToggleMute: narrative.toggleMute
 				})]
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+			/* @__PURE__ */ jsxs("label", {
 				className: "ap-nf__vol ap-nf__vol--ambience",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				children: [/* @__PURE__ */ jsx("span", {
 					className: "ap-nf__vol-label",
 					children: "Ambience"
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+				}), /* @__PURE__ */ jsx("input", {
 					className: "ap-nf__range",
 					type: "range",
 					min: 0,
@@ -18135,15 +18106,262 @@ function NarrativeFace({ chapterId, sceneMood, ambientProfile, fxClip, fxLoop, a
 					"aria-label": "Ambience volume"
 				})]
 			}),
-			showExpand && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+			showExpand && /* @__PURE__ */ jsx("button", {
 				type: "button",
 				className: "ap-icon-btn ap-nf__expand ap-tap",
 				onClick: onExpand,
 				"aria-label": "Soundscape settings",
-				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DotsIcon$1, {})
+				children: /* @__PURE__ */ jsx(DotsIcon$1, {})
 			})
 		]
 	});
+}
+//#endregion
+//#region src/audio-player/narrative/SceneMixEngine.ts
+/**
+* Default crossfade length for scene switches. Shorter than the music-player
+* `AUTOMIX_FADE_MS`: a narrative cue ("the boss appears") wants the score to
+* turn over in a couple of seconds, not a DJ-length blend.
+*/
+var SCENE_FADE_MS = 2e3;
+/** Ramp tick interval — wall-clock so throttled background tabs keep fading. */
+var TICK_MS = 33;
+function clamp01(value) {
+	if (!Number.isFinite(value)) return 0;
+	return Math.max(0, Math.min(1, value));
+}
+/**
+* A latched "this browser ignores programmatic volume" flag (iOS Safari).
+* Once detected, crossfades degrade to hard swaps instead of silently doing
+* nothing — the scene still changes, it just cuts.
+*/
+var volumeWritesUnsupported = false;
+/**
+* Cue-driven two-deck crossfader for scene scores (reader BGM, ambient beds).
+*
+* `AutomixPlugin` blends playlist tracks at their natural *end*; a narrative
+* host instead needs "switch to this track *now*" mid-track, whenever the
+* story's mood changes. This engine reuses the same building blocks — an
+* equal-power cos/sin ramp on a wall-clock interval, deck parking at the
+* silence-trim start via the shared Automix Lite analysis, autoplay-rejection
+* and volume-locked-browser fallbacks — behind one imperative call:
+*
+* ```ts
+* const mix = createSceneMixEngine()
+* mix.setLevel(0.4)
+* mix.crossfadeTo({ id: "BOSS_1", title: "Boss 1", audioFile: url })
+* ```
+*
+* Headless by design: it renders nothing and owns detached `Audio` elements,
+* so a host can keep its existing UI untouched. Level/mute changes re-target
+* live (including mid-fade), matching how the Automix ramp re-reads the user
+* volume every tick.
+*/
+var SceneMixEngine = class {
+	decks = [];
+	active = null;
+	level = 1;
+	muted = false;
+	loop;
+	defaultFadeMs;
+	tickTimer = null;
+	disposed = false;
+	constructor(options = {}) {
+		this.loop = options.loop ?? true;
+		this.defaultFadeMs = Math.max(0, options.fadeMs ?? 2e3);
+	}
+	/** Key of the track currently owning the mix (fading in or steady). */
+	getCurrentTrackKey() {
+		return this.active?.key ?? null;
+	}
+	/**
+	* Set the effective output level (0..1) for the whole scene layer. The
+	* host owns any composition (user volume × intensity × layer share) and
+	* hands the result here; mid-fade changes re-target on the next tick.
+	*/
+	setLevel(value) {
+		this.level = clamp01(value);
+		this.applyGains();
+	}
+	getLevel() {
+		return this.level;
+	}
+	/** Mute/unmute without losing playback position or fade state. */
+	setMuted(muted) {
+		this.muted = muted;
+		for (const deck of this.decks) deck.el.muted = muted;
+		this.applyGains();
+	}
+	getMuted() {
+		return this.muted;
+	}
+	/**
+	* Crossfade the scene score to `track`. The incoming deck parks at the
+	* track's silence-trim start (when analysis is available) so the fade
+	* never runs through dead air. Calling again mid-fade retires every
+	* audible deck toward silence and hands the mix to the newest track; a
+	* repeat call for the already-active track is a no-op.
+	*/
+	crossfadeTo(track, options = {}) {
+		if (this.disposed || typeof Audio === "undefined") return;
+		const src = getPrimaryTrackSource(track);
+		if (!src) return;
+		const key = trackKey(track);
+		if (this.active && this.active.key === key && !this.active.retiring) return;
+		const fadeMs = Math.max(0, options.fadeMs ?? this.defaultFadeMs);
+		const el = new Audio();
+		el.loop = this.loop;
+		el.preload = "auto";
+		el.crossOrigin = "anonymous";
+		el.muted = this.muted;
+		try {
+			el.volume = 0;
+		} catch {
+			volumeWritesUnsupported = true;
+		}
+		const abort = new AbortController();
+		const deck = {
+			el,
+			key,
+			curveGain: 0,
+			rampT0: performance.now(),
+			rampFromGain: 0,
+			rampToGain: 1,
+			rampMs: volumeWritesUnsupported ? 0 : fadeMs,
+			retiring: false,
+			abort
+		};
+		const applyTrimStart = () => {
+			const startMs = getTrackTrims(track)?.trimStartMs ?? 0;
+			if (startMs <= 0) return;
+			if (el.paused && el.readyState >= 1) try {
+				el.currentTime = startMs / 1e3;
+			} catch {}
+		};
+		el.addEventListener("loadedmetadata", applyTrimStart, { signal: abort.signal });
+		el.addEventListener("error", () => {
+			this.releaseDeck(deck);
+		}, { signal: abort.signal });
+		ensureTrackAnalysis(track).then(() => {
+			if (!abort.signal.aborted && !deck.retiring) applyTrimStart();
+		});
+		el.src = src;
+		for (const other of this.decks) this.retire(other, fadeMs);
+		this.decks.push(deck);
+		this.active = deck;
+		let playPromise;
+		try {
+			el.load();
+			playPromise = el.play();
+		} catch {
+			this.releaseDeck(deck);
+			return;
+		}
+		playPromise?.catch(() => {
+			if (!this.decks.includes(deck)) return;
+			const wasNewest = this.decks[this.decks.length - 1] === deck;
+			this.releaseDeck(deck);
+			if (!wasNewest) return;
+			const survivor = this.decks[this.decks.length - 1];
+			if (survivor) {
+				this.unretire(survivor, fadeMs);
+				this.active = survivor;
+			}
+		});
+		this.applyGains();
+		this.startTicking();
+	}
+	/** Fade the whole scene layer to silence and release every deck. */
+	stop(fadeMs = this.defaultFadeMs) {
+		for (const deck of this.decks) this.retire(deck, fadeMs);
+		this.active = null;
+		this.startTicking();
+	}
+	dispose() {
+		this.disposed = true;
+		this.stopTicking();
+		for (const deck of [...this.decks]) this.releaseDeck(deck);
+		this.active = null;
+	}
+	retire(deck, fadeMs) {
+		if (deck.retiring) return;
+		deck.retiring = true;
+		deck.rampT0 = performance.now();
+		deck.rampFromGain = deck.curveGain;
+		deck.rampToGain = 0;
+		deck.rampMs = volumeWritesUnsupported ? 0 : fadeMs;
+		if (this.active === deck) this.active = null;
+	}
+	/** Bring a retiring deck back (the switch that displaced it fell through). */
+	unretire(deck, fadeMs) {
+		deck.retiring = false;
+		deck.rampT0 = performance.now();
+		deck.rampFromGain = deck.curveGain;
+		deck.rampToGain = 1;
+		deck.rampMs = volumeWritesUnsupported ? 0 : fadeMs;
+		this.startTicking();
+	}
+	/**
+	* Advance every in-flight ramp along the equal-power curve and write the
+	* composed gain to each element. Mirrors `AutomixPlugin.runRamp`: fade-in
+	* follows sin(t·π/2), fade-out follows g₀·cos(t·π/2), and the write is
+	* verified so volume-locked browsers latch the hard-swap fallback instead
+	* of fading silently into nothing.
+	*/
+	tick = () => {
+		const now = performance.now();
+		let anyRamping = false;
+		for (const deck of [...this.decks]) {
+			const t = deck.rampMs <= 0 ? 1 : Math.min(1, (now - deck.rampT0) / deck.rampMs);
+			if (deck.rampToGain > deck.rampFromGain) {
+				const span = deck.rampToGain - deck.rampFromGain;
+				deck.curveGain = deck.rampFromGain + span * Math.sin(t * Math.PI / 2);
+			} else deck.curveGain = deck.rampFromGain * Math.cos(t * Math.PI / 2);
+			if (t < 1) anyRamping = true;
+			else if (deck.retiring) {
+				this.releaseDeck(deck);
+				continue;
+			}
+			this.applyDeckGain(deck);
+		}
+		if (!anyRamping) this.stopTicking();
+	};
+	applyGains() {
+		for (const deck of this.decks) this.applyDeckGain(deck);
+	}
+	applyDeckGain(deck) {
+		if (volumeWritesUnsupported) return;
+		const target = clamp01(deck.curveGain * this.level);
+		try {
+			deck.el.volume = target;
+			if (this.level > .1 && Math.abs(deck.el.volume - target) > .05) volumeWritesUnsupported = true;
+		} catch {
+			volumeWritesUnsupported = true;
+		}
+	}
+	startTicking() {
+		if (this.tickTimer !== null || this.disposed) return;
+		this.tickTimer = setInterval(this.tick, TICK_MS);
+	}
+	stopTicking() {
+		if (this.tickTimer !== null) {
+			clearInterval(this.tickTimer);
+			this.tickTimer = null;
+		}
+	}
+	releaseDeck(deck) {
+		deck.abort.abort();
+		this.decks = this.decks.filter((d) => d !== deck);
+		if (this.active === deck) this.active = null;
+		try {
+			deck.el.pause();
+			deck.el.removeAttribute("src");
+			deck.el.load();
+		} catch {}
+	}
+};
+function createSceneMixEngine(options = {}) {
+	return new SceneMixEngine(options);
 }
 //#endregion
 //#region src/audio-player/plugins/registry/usePluginRegistry.tsx
@@ -18313,7 +18531,7 @@ function PluginRegistryProvider({ children }) {
 		toggleActive,
 		activeInstances
 	]);
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PluginRegistryContext.Provider, {
+	return /* @__PURE__ */ jsx(PluginRegistryContext.Provider, {
 		value: snapshot,
 		children
 	});
@@ -18358,14 +18576,14 @@ function PluginManagerPanel() {
 	const { available, installed, install, uninstall, toggleActive, activeInstances } = usePluginRegistry();
 	const installedIds = new Set(installed.map((r) => r.entry.id));
 	const availableButNotInstalled = available.filter((e) => !installedIds.has(e.id));
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsxs("div", {
 		className: "lab-plugin-manager",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		children: [/* @__PURE__ */ jsxs("div", {
 			className: "lab-plugin-manager__head",
-			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+			children: [/* @__PURE__ */ jsx("span", {
 				className: "lab-plugin-manager__title",
 				children: "Plugin Registry"
-			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+			}), /* @__PURE__ */ jsxs("span", {
 				className: "lab-plugin-manager__badge",
 				children: [
 					activeInstances.length,
@@ -18374,15 +18592,15 @@ function PluginManagerPanel() {
 					" active"
 				]
 			})]
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		}), /* @__PURE__ */ jsxs("div", {
 			className: "lab-plugin-manager__body",
-			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(PluginListSection, {
+			children: [/* @__PURE__ */ jsx(PluginListSection, {
 				title: "Available",
 				count: availableButNotInstalled.length,
 				emptyLabel: "All plugins are installed.",
-				children: availableButNotInstalled.map((entry) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PluginCard, {
+				children: availableButNotInstalled.map((entry) => /* @__PURE__ */ jsx(PluginCard, {
 					entry,
-					action: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					action: /* @__PURE__ */ jsx("button", {
 						type: "button",
 						className: "lab-plugin-card__btn lab-plugin-card__btn--install",
 						onClick: () => install(entry.id),
@@ -18390,22 +18608,22 @@ function PluginManagerPanel() {
 						children: "Install"
 					})
 				}, entry.id))
-			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PluginListSection, {
+			}), /* @__PURE__ */ jsx(PluginListSection, {
 				title: "Installed",
 				count: installed.length,
 				emptyLabel: "No plugins installed yet.",
 				children: installed.map((record) => {
 					const active = record.active;
-					return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PluginCard, {
+					return /* @__PURE__ */ jsx(PluginCard, {
 						entry: record.entry,
 						active,
-						action: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						action: /* @__PURE__ */ jsxs(Fragment, { children: [/* @__PURE__ */ jsx("button", {
 							type: "button",
 							className: `lab-plugin-card__btn${active ? " lab-plugin-card__btn--active" : " lab-plugin-card__btn--inactive"}`,
 							onClick: () => toggleActive(record.entry.id),
 							"aria-label": `${active ? "Deactivate" : "Activate"} ${record.entry.label}`,
 							children: active ? "Active" : "Inactive"
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						}), /* @__PURE__ */ jsx("button", {
 							type: "button",
 							className: "lab-plugin-card__btn lab-plugin-card__btn--uninstall",
 							onClick: () => uninstall(record.entry.id),
@@ -18419,45 +18637,45 @@ function PluginManagerPanel() {
 	});
 }
 function PluginListSection({ title, count, emptyLabel, children }) {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsxs("div", {
 		className: "lab-plugin-manager__section",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		children: [/* @__PURE__ */ jsxs("div", {
 			className: "lab-plugin-manager__section-head",
-			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+			children: [/* @__PURE__ */ jsx("span", {
 				className: "lab-plugin-manager__section-title",
 				children: title
-			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+			}), /* @__PURE__ */ jsx("span", {
 				className: "lab-plugin-manager__section-count",
 				children: count
 			})]
-		}), count === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+		}), count === 0 ? /* @__PURE__ */ jsx("p", {
 			className: "lab-plugin-manager__empty",
 			children: emptyLabel
-		}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		}) : /* @__PURE__ */ jsx("div", {
 			className: "lab-plugin-manager__list",
 			children
 		})]
 	});
 }
 function PluginCard({ entry, active, action }) {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+	return /* @__PURE__ */ jsxs("div", {
 		className: `lab-plugin-card${active ? " lab-plugin-card--active" : ""}`,
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		children: [/* @__PURE__ */ jsxs("div", {
 			className: "lab-plugin-card__body",
-			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			children: [/* @__PURE__ */ jsxs("div", {
 				className: "lab-plugin-card__head",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				children: [/* @__PURE__ */ jsx("span", {
 					className: "lab-plugin-card__label",
 					children: entry.label
-				}), entry.category && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				}), entry.category && /* @__PURE__ */ jsx("span", {
 					className: "lab-plugin-card__category",
 					children: entry.category
 				})]
-			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+			}), /* @__PURE__ */ jsx("p", {
 				className: "lab-plugin-card__desc",
 				children: entry.description
 			})]
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		}), /* @__PURE__ */ jsx("div", {
 			className: "lab-plugin-card__actions",
 			children: action
 		})]
@@ -18487,7 +18705,7 @@ function ActivityLogProvider({ children, config }) {
 	const storeRef = useRef(null);
 	if (storeRef.current === null) storeRef.current = createActivityLogStore(config);
 	const api = useMemo(() => storeRef.current, []);
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ActivityLogContext.Provider, {
+	return /* @__PURE__ */ jsx(ActivityLogContext.Provider, {
 		value: api,
 		children
 	});
@@ -19142,6 +19360,6 @@ function getPropertyDefaults() {
 	return acc;
 }
 //#endregion
-export { ARC_RADIUS, AUTOMIX_FADE_MS, ActivityLogContext, ActivityLogPanel, ActivityLogProvider, ActivityLogWorkspace, AgentQueueDirectorWorkspace, AnalyticsPlugin, ArcActionButton, AudioPlayer, AudioPlayer as default, AudioSessionProvider, AudioSpriteEngine, AutoThemePlugin, AutomixPlugin, BUILTIN_VISUAL_COMPONENTS, BackgroundMedia, ControllerPanelRenderer, DEFAULT_ACTIVITY_LOG_CONFIG, DEFAULT_PLUGIN_SURFACES, DefaultPluginErrorHandler, ExplicitBadge, FAMILY_DEFAULTS, FullCardPlayer, GracefulDegradation, HTML5AudioBackend, INITIAL_SURFACE_STATE, KeyboardShortcutPlugin, LYRIC_DISPLAY_ID, LibraryPlaylistsWorkspace, LibraryQueueWorkspace, LyricDisplay, LyricSettingsPanel, LyricsPlugin, MAJOR_FACES, MiniSidebarPlayer, NarrativeFace, PLAYER_FACE_CAPABILITIES, PROPERTY_GROUPS, PROPERTY_GROUP_LABELS, PROPERTY_REGISTRY, PRO_CONFIDENCE_MIN, PlaybackAutomixWorkspace, PlayerHero, PlayerSurfaceButtons, PluginError, PluginErrorBoundary, PluginErrorBoundaryFactory, PluginManager, PluginManagerPanel, PluginRegistryProvider, PluginSettingsWorkspace, ProgressBar, QueueDrawer, QueueSurface, SAPController, SEICanvasActionMenu, SEICanvasHost, SEICanvasRenderer, ScrubberCanvasHost, ScrubberCanvasRenderer, SeaCardPlayer, SleepTimerPlugin, StickyBottomPlayer, SurfaceButton, TextMarquee, TrackMetadata, VAULT_CATEGORY_META, VaultRowPlayer, VisualLyricsWorkspace, VisualSlotPicker, VisualSlotsProvider, VolumeControl, WORKSPACE_ROUTES, WaveformAdapter, WaveformPlugin, WaveformProgress, WebAudioBackend, WorkspaceShell, arcOffsets, bpmCompatibility, buildMenuTree, canEnterCanvas, checkCodecSupport, clearCustomCategories, composeEventHandlers, computePeaksFromUrl, computeTransitionPoints, contrastText, createActivityLogStore, createAnalyticsPlugin, createAudioBackend, createAudioSpriteEngine, createAutoThemePlugin, createAutomixPlugin, createKeyboardShortcutPlugin, createLyricsPlugin, createPluginErrorBoundary, createSleepTimerPlugin, createWaveformPlugin, defaultShowVolume, deriveHeroCollapsed, deserializeSession, ensureMuted, ensureProTrackAnalysis, ensureTrackAnalysis, extractPalette, extractPeaks, faceSupportsAction, faceSupportsContextualActions, faceSupportsHeroCollapse, faceSupportsSEICanvas, faceSupportsScrubberCanvas, faceSupportsWaveform, formatFeatured, formatSecondaryLine, formatTime, formatVersionedTitle, getAllVaultCategories, getAllVisualComponents, getByPropPath, getDefaultComponentForSlot, getDisplayArtist, getDisplayTitle, getFaceCapability, getFaceFamily, getGlobalErrorBoundaryFactory, getPluginCanvasSurfaceId, getPluginSettingsRoute, getPluginSurfaceDefinition, getPluginSurfaceDefinitionsByCategory, getPluginSurfaceDefinitionsForMenuBranch, getPreferredCanvasPlacement, getPrimaryTrackSource, getPropertiesForFace, getPropertiesForGroup, getPropertyDefaults, getScrubberDensity, getScrubberHeight, getTrackAnalysis, getTrackSources, getTrackTrims, getVaultCategoryMeta, getVisualComponent, getVisualComponentsForSlot, gradient, hasCanvasSurface, hasSettingsSurface, isHeadlessPlugin, isIOS, isMobileDevice, isNodeInteractive, isPluginError, isSAPDefaultPrevented, isSessionEngine, isWorkspaceRoute, lyricDefaultSettings, lyricDisplayDefinition, mergeRefs, normalizeRhythmConfidence, parseWorkspaceRoute, planTransition, quantizePixels, registerVaultCategory, registerVisualComponent, relativeLuminance, resolveMedia, rgbToCss, serializeSession, setByPropPath, setGlobalErrorHandler, shouldEnableMarquee, snapToBeat, sortPluginSurfaceDefinitions, surfaceReducer, trackKey, trackSourcesSignature, useActivePluginInstances, useActivityLog, useActivityLogRecording, useAudioPlayer, useAudioSession, useAutomix, useMediaSessionObserver, useNarrativeAudio, usePlayerSurface, usePluginManager, usePluginRegistry, useReducedMotion, useSAPPropGetters, useShareTrack, useVisualSlots, validateTrackSource, withErrorBoundary };
+export { ARC_RADIUS, AUTOMIX_FADE_MS, ActivityLogContext, ActivityLogPanel, ActivityLogProvider, ActivityLogWorkspace, AgentQueueDirectorWorkspace, AnalyticsPlugin, ArcActionButton, AudioPlayer, AudioPlayer as default, AudioSessionProvider, AudioSpriteEngine, AutoThemePlugin, AutomixPlugin, BUILTIN_VISUAL_COMPONENTS, BackgroundMedia, ControllerPanelRenderer, CueManifestPlugin, CueRuntime, DEFAULT_ACTIVITY_LOG_CONFIG, DEFAULT_PLUGIN_SURFACES, DefaultPluginErrorHandler, ExplicitBadge, FAMILY_DEFAULTS, FullCardPlayer, GracefulDegradation, HTML5AudioBackend, INITIAL_SURFACE_STATE, KeyboardShortcutPlugin, LYRIC_DISPLAY_ID, LibraryPlaylistsWorkspace, LibraryQueueWorkspace, LyricDisplay, LyricSettingsPanel, LyricsPlugin, MAJOR_FACES, MiniSidebarPlayer, NarrativeFace, PLAYER_FACE_CAPABILITIES, PROPERTY_GROUPS, PROPERTY_GROUP_LABELS, PROPERTY_REGISTRY, PRO_CONFIDENCE_MIN, PlaybackAutomixWorkspace, PlayerHero, PlayerSurfaceButtons, PluginError, PluginErrorBoundary, PluginErrorBoundaryFactory, PluginManager, PluginManagerPanel, PluginRegistryProvider, PluginSettingsWorkspace, ProgressBar, QueueDrawer, QueueSurface, SAPController, SCENE_FADE_MS, SEICanvasActionMenu, SEICanvasHost, SEICanvasRenderer, SceneMixEngine, ScrubberCanvasHost, ScrubberCanvasRenderer, SeaCardPlayer, SleepTimerPlugin, StickyBottomPlayer, SurfaceButton, TextMarquee, TrackMetadata, VAULT_CATEGORY_META, VaultRowPlayer, VisualLyricsWorkspace, VisualSlotPicker, VisualSlotsProvider, VolumeControl, WORKSPACE_ROUTES, WaveformAdapter, WaveformPlugin, WaveformProgress, WebAudioBackend, WorkspaceShell, arcOffsets, bpmCompatibility, buildMenuTree, canEnterCanvas, checkCodecSupport, clearCustomCategories, composeEventHandlers, computePeaksFromUrl, computeTransitionPoints, contrastText, createActivityLogStore, createAnalyticsPlugin, createAudioBackend, createAudioSpriteEngine, createAutoThemePlugin, createAutomixPlugin, createCueManifestPlugin, createKeyboardShortcutPlugin, createLyricsPlugin, createPluginErrorBoundary, createSceneMixEngine, createSleepTimerPlugin, createWaveformPlugin, defaultShowVolume, deriveHeroCollapsed, deserializeSession, ensureMuted, ensureProTrackAnalysis, ensureTrackAnalysis, extractPalette, extractPeaks, faceSupportsAction, faceSupportsContextualActions, faceSupportsHeroCollapse, faceSupportsSEICanvas, faceSupportsScrubberCanvas, faceSupportsWaveform, formatFeatured, formatSecondaryLine, formatTime, formatVersionedTitle, getAllVaultCategories, getAllVisualComponents, getByPropPath, getDefaultComponentForSlot, getDisplayArtist, getDisplayTitle, getFaceCapability, getFaceFamily, getGlobalErrorBoundaryFactory, getPluginCanvasSurfaceId, getPluginSettingsRoute, getPluginSurfaceDefinition, getPluginSurfaceDefinitionsByCategory, getPluginSurfaceDefinitionsForMenuBranch, getPreferredCanvasPlacement, getPrimaryTrackSource, getPropertiesForFace, getPropertiesForGroup, getPropertyDefaults, getScrubberDensity, getScrubberHeight, getTrackAnalysis, getTrackSources, getTrackTrims, getVaultCategoryMeta, getVisualComponent, getVisualComponentsForSlot, gradient, hasCanvasSurface, hasSettingsSurface, isHeadlessPlugin, isIOS, isMobileDevice, isNodeInteractive, isPluginError, isSAPDefaultPrevented, isSessionEngine, isWorkspaceRoute, lyricDefaultSettings, lyricDisplayDefinition, mergeRefs, normalizeRhythmConfidence, parseWorkspaceRoute, planTransition, quantizePixels, registerVaultCategory, registerVisualComponent, relativeLuminance, resolveMedia, rgbToCss, serializeSession, setByPropPath, setGlobalErrorHandler, shouldEnableMarquee, snapToBeat, sortPluginSurfaceDefinitions, surfaceReducer, trackKey, trackSourcesSignature, useActivePluginInstances, useActivityLog, useActivityLogRecording, useAudioPlayer, useAudioSession, useAutomix, useMediaSessionObserver, useNarrativeAudio, useNarrativeCueController, usePlayerSurface, usePluginManager, usePluginRegistry, useReducedMotion, useSAPPropGetters, useShareTrack, useVisualSlots, validateCueManifest, validateTrackSource, withErrorBoundary };
 
 //# sourceMappingURL=index.js.map

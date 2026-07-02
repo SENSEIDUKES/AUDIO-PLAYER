@@ -22,7 +22,15 @@ export default defineConfig({
         },
         outDir: "dist",
         rollupOptions: {
-            external: ["react", "react-dom", "essentia.js", "wavesurfer.js"],
+            // Regexes so subpath imports (react/jsx-runtime, react-dom/client)
+            // stay external too — bundling the CJS jsx-runtime leaves a bare
+            // `require("react")` in the ESM output, which breaks consumers.
+            external: [
+                /^react($|\/)/,
+                /^react-dom($|\/)/,
+                "essentia.js",
+                "wavesurfer.js",
+            ],
             output: {
                 globals: {
                     react: "React",

@@ -257,6 +257,17 @@ export type {
     NarrationState,
     SoundscapeIndicatorState,
 } from "./narrative/useNarrativeAudio"
+// Cue-driven scene-score crossfader (reader BGM): the Automix building blocks
+// (equal-power ramp, silence-trim parking) behind an imperative crossfadeTo().
+export {
+    SceneMixEngine,
+    createSceneMixEngine,
+    SCENE_FADE_MS,
+} from "./narrative/SceneMixEngine"
+export type {
+    SceneMixEngineOptions,
+    SceneCrossfadeOptions,
+} from "./narrative/SceneMixEngine"
 export {
     VAULT_CATEGORY_META,
     getVaultCategoryMeta,
