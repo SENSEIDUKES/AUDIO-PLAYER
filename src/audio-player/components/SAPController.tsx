@@ -151,10 +151,6 @@ function KaraokeLyrics({ lyrics }: { lyrics: string }) {
     const containerRef = useRef<HTMLDivElement>(null)
     const isKaraoke = parsed.some((l) => l.time >= 0)
 
-    if (!isKaraoke) {
-        return <div className="sap-ctl__lyrics">{lyrics}</div>
-    }
-
     let activeIndex = -1
     for (let i = 0; i < parsed.length; i++) {
         if (parsed[i].time >= 0 && currentTime >= parsed[i].time) {
@@ -177,6 +173,10 @@ function KaraokeLyrics({ lyrics }: { lyrics: string }) {
             }
         }
     }, [activeIndex])
+
+    if (!isKaraoke) {
+        return <div className="sap-ctl__lyrics">{lyrics}</div>
+    }
 
     return (
         <div className="sap-ctl__lyrics sap-ctl__lyrics--karaoke" ref={containerRef}>

@@ -62,6 +62,10 @@ export class CueRuntime {
     }
 
     handleTimeUpdate(currentTime: number, isSeeking = false) {
+        // A backward jump in playback position is a rewind even when no explicit
+        // seek event fired — e.g. automatic looping or a custom player rewind.
+        // Detecting it here lets replayable cues reset in those cases too.
+        const isRewind = isSeeking || currentTime < this.lastTime
 
         for (const cue of this.timeCues) {
             if (cue.trigger.kind !== "time") continue
@@ -69,8 +73,8 @@ export class CueRuntime {
             const hasFired = this.firedCueIds.has(cue.id)
             const triggerTime = cue.trigger.at
 
-            // If seeking backward, allow replayable cues to fire again in the future
-            if (isSeeking && currentTime < triggerTime) {
+            // If rewinding past a cue, allow replayable cues to fire again later.
+            if (isRewind && currentTime < triggerTime) {
                 if (cue.replayable) {
                     this.firedCueIds.delete(cue.id)
                 }
