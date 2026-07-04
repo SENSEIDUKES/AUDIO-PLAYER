@@ -33,11 +33,37 @@ interface Message {
     content: string
 }
 
+const safeSessionStorage = {
+    getItem(key: string): string | null {
+        try {
+            return sessionStorage.getItem(key)
+        } catch {
+            return null
+        }
+    },
+    setItem(key: string, value: string): void {
+        try {
+            sessionStorage.setItem(key, value)
+        } catch (err) {
+            console.warn("sessionStorage setItem failed:", err)
+        }
+    },
+    removeItem(key: string): void {
+        try {
+            sessionStorage.removeItem(key)
+        } catch {}
+    }
+}
+
 const KEY_NAME = "VITE_OPENROUTER_API_KEY";
-const API_KEY =
-    (typeof window !== "undefined" && (window as any)[KEY_NAME]) ||
-    (typeof globalThis !== "undefined" && (globalThis as any).process?.env?.[KEY_NAME]) ||
-    "";
+
+const getApiKey = (): string => {
+    return (
+        (typeof window !== "undefined" && (window as any)[KEY_NAME]) ||
+        (typeof process !== "undefined" && (process as any).env?.[KEY_NAME]) ||
+        ""
+    );
+};
 
 const PRESET_KEYS = {
     "demo-scout": "VITE_PRESET_DEMO_SCOUT",
@@ -45,19 +71,19 @@ const PRESET_KEYS = {
     "memoir": "VITE_PRESET_MEMOIR",
 };
 
-const getPresetValue = (v: AgentScoutVariant, fallback: string): string => {
+const getPresetValue = (v: AgentScoutVariant): string => {
     const key = PRESET_KEYS[v];
+    const fallback =
+        v === "demo-scout"
+            ? "@preset/sea-demo-scout-dev"
+            : v === "studio-scout"
+            ? "@preset/sea-studio-scout-dev"
+            : "@preset/sea-demo-memoir-dev";
     return (
         (typeof window !== "undefined" && (window as any)[key]) ||
-        (typeof globalThis !== "undefined" && (globalThis as any).process?.env?.[key]) ||
+        (typeof process !== "undefined" && (process as any).env?.[key]) ||
         fallback
     );
-};
-
-const PRESETS: Record<AgentScoutVariant, string> = {
-    "demo-scout": getPresetValue("demo-scout", "@preset/sea-demo-scout-dev"),
-    "studio-scout": getPresetValue("studio-scout", "@preset/sea-studio-scout-dev"),
-    "memoir": getPresetValue("memoir", "@preset/sea-demo-memoir-dev"),
 };
 
 const getSystemPrompt = (variant: AgentScoutVariant, track: Track | null, queue: Track[]) => {
@@ -169,12 +195,13 @@ export function AgentScoutWorkspace({ variant }: { variant: AgentScoutVariant })
     const storageKey = `sap-agent-chat:${variant}:${trackId}`
 
     const [messages, setMessages] = useState<Message[]>(() => {
-        try {
-            const saved = sessionStorage.getItem(storageKey)
-            return saved ? JSON.parse(saved) : []
-        } catch {
-            return []
+        const saved = safeSessionStorage.getItem(storageKey)
+        if (saved) {
+            try {
+                return JSON.parse(saved)
+            } catch {}
         }
+        return []
     })
 
     const [input, setInput] = useState("")
@@ -182,15 +209,24 @@ export function AgentScoutWorkspace({ variant }: { variant: AgentScoutVariant })
     const [error, setError] = useState<string | null>(null)
 
     const chatEndRef = useRef<HTMLDivElement>(null)
+    const abortControllerRef = useRef<AbortController | null>(null)
 
     useEffect(() => {
-        try {
-            const saved = sessionStorage.getItem(storageKey)
-            setMessages(saved ? JSON.parse(saved) : [])
-            setError(null)
-        } catch {
-            setMessages([])
+        return () => {
+            abortControllerRef.current?.abort()
         }
+    }, [])
+
+    useEffect(() => {
+        const saved = safeSessionStorage.getItem(storageKey)
+        if (saved) {
+            try {
+                setMessages(JSON.parse(saved))
+                setError(null)
+                return
+            } catch {}
+        }
+        setMessages([])
     }, [storageKey])
 
     useEffect(() => {
@@ -202,26 +238,32 @@ export function AgentScoutWorkspace({ variant }: { variant: AgentScoutVariant })
     const handleSendMessage = async (textToSend: string) => {
         if (!textToSend.trim() || loading) return
 
-        if (!API_KEY) {
+        const apiKey = getApiKey()
+        if (!apiKey) {
             setError("OpenRouter API key is missing. Please configure VITE_OPENROUTER_API_KEY in your .env.local file.")
             return
         }
 
         const newMessages = [...messages, { role: "user" as const, content: textToSend }]
         setMessages(newMessages)
-        sessionStorage.setItem(storageKey, JSON.stringify(newMessages))
+        safeSessionStorage.setItem(storageKey, JSON.stringify(newMessages))
         setInput("")
         setLoading(true)
         setError(null)
 
+        abortControllerRef.current?.abort()
+        const abortController = new AbortController()
+        abortControllerRef.current = abortController
+
         try {
-            const presetModel = PRESETS[variant]
+            const presetModel = getPresetValue(variant)
             const systemPrompt = getSystemPrompt(variant, currentTrack, queue)
 
             const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                 method: "POST",
+                signal: abortController.signal,
                 headers: {
-                    "Authorization": `Bearer ${API_KEY}`,
+                    "Authorization": `Bearer ${apiKey}`,
                     "Content-Type": "application/json",
                     "HTTP-Referer": "https://sap.seaportal.world",
                     "X-Title": "SEIHouse Audio Player",
@@ -249,8 +291,9 @@ export function AgentScoutWorkspace({ variant }: { variant: AgentScoutVariant })
 
             const updatedMessages = [...newMessages, { role: "assistant" as const, content: assistantContent }]
             setMessages(updatedMessages)
-            sessionStorage.setItem(storageKey, JSON.stringify(updatedMessages))
+            safeSessionStorage.setItem(storageKey, JSON.stringify(updatedMessages))
         } catch (err: any) {
+            if (err.name === "AbortError") return
             console.error("Agent Connection Error:", err)
             setError(err?.message || "Failed to communicate with OpenRouter. Please try again.")
         } finally {
@@ -270,7 +313,7 @@ export function AgentScoutWorkspace({ variant }: { variant: AgentScoutVariant })
 
     const clearChat = () => {
         setMessages([])
-        sessionStorage.removeItem(storageKey)
+        safeSessionStorage.removeItem(storageKey)
         setError(null)
     }
 
@@ -313,12 +356,12 @@ export function AgentScoutWorkspace({ variant }: { variant: AgentScoutVariant })
                     <button
                         type="button"
                         onClick={startInitialAnalysis}
-                        disabled={!currentTrack || loading || !API_KEY}
+                        disabled={!currentTrack || loading || !getApiKey()}
                         className="sap-ctl__agent-btn-primary ap-tap"
                     >
                         {loading ? "Initializing..." : copy.actionLabel}
                     </button>
-                    {!API_KEY && (
+                    {!getApiKey() && (
                         <p style={{ color: "#ef4444", fontSize: "12px", marginTop: "12px", opacity: 0.8 }}>
                             API Key missing. Please set VITE_OPENROUTER_API_KEY in your .env.local file.
                         </p>
@@ -374,7 +417,7 @@ export function AgentScoutWorkspace({ variant }: { variant: AgentScoutVariant })
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={(e) => {
-                                if (e.key === "Enter" && !e.shiftKey) {
+                                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                                     e.preventDefault()
                                     void handleSendMessage(input)
                                 }
