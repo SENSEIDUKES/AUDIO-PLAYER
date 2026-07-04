@@ -1,6 +1,5 @@
 import { CSSProperties } from 'react';
 import { AudioPlayerTheme, MediaSource, Track } from '../types';
-import { ArcAction, ArcCommandHost } from '../surfaces/ArcActionButton';
 import { WorkspaceRoute } from '../components/workspace/workspaceRoutes';
 export interface SeaCardPlayerProps extends AudioPlayerTheme {
     /** The track this card represents and plays into the shared session. */
@@ -15,19 +14,6 @@ export interface SeaCardPlayerProps extends AudioPlayerTheme {
     artMedia?: MediaSource | null;
     /** Optional price / tag chip. */
     tag?: string;
-    /**
-     * Card actions surfaced through the Arc Action Button (the card's action
-     * surface). A plain, extensible list — append actions or nest `children`
-     * without touching the card. Mirrors the Vault row's `actions` API so Arc
-     * behavior stays consistent across faces.
-     */
-    actions?: ArcAction[];
-    /**
-     * Immediate command implementations for this card's arc (e.g.
-     * `"share.url"` / `"track.favorite"`). Leaves whose command isn't wired
-     * are pruned, never rendered dead. Mirrors the Vault row's `commands` API.
-     */
-    commands?: ArcCommandHost["commands"];
     /**
      * Opens a focused workspace in the SAP Controller shell — the destination
      * of the arc's `"sap-controller"` leaves (the standardized Plugins,
@@ -56,6 +42,6 @@ export interface SeaCardPlayerProps extends AudioPlayerTheme {
  * the interactive `WaveformAdapter` (`supportsWaveform: true`). No radial menu is
  * added — the card stays clean and tap-to-play.
  */
-export declare function SeaCardPlayer({ track, art, artMedia, tag, actions, commands, onOpenWorkspace, titleFont, artistFont, className, style, ...theme }: SeaCardPlayerProps): import("react").JSX.Element;
+export declare function SeaCardPlayer({ track, art, artMedia, tag, onOpenWorkspace, titleFont, artistFont, className, style, ...theme }: SeaCardPlayerProps): import("react").JSX.Element;
 export default SeaCardPlayer;
 //# sourceMappingURL=SeaCardPlayer.d.ts.map

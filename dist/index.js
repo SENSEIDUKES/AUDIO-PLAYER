@@ -9533,7 +9533,7 @@ var PLAYER_FACE_CAPABILITIES = Object.fromEntries(Object.entries({
 	},
 	seaCard: {
 		family: "primary",
-		supportsContextualActions: false,
+		supportsContextualActions: true,
 		preferredCanvasPlacement: "overlay"
 	},
 	miniSidebar: {
@@ -18821,14 +18821,13 @@ function sameTrack(a, b) {
 * the interactive `WaveformAdapter` (`supportsWaveform: true`). No radial menu is
 * added — the card stays clean and tap-to-play.
 */
-function SeaCardPlayer({ track, art = "linear-gradient(135deg,#FF7AC6,#7C5CFF)", artMedia, tag, actions, commands, onOpenWorkspace, titleFont, artistFont, className, style, ...theme }) {
+function SeaCardPlayer({ track, art = "linear-gradient(135deg,#FF7AC6,#7C5CFF)", artMedia, tag, onOpenWorkspace, titleFont, artistFont, className, style, ...theme }) {
 	const s = useAudioSession();
 	const surface = usePlayerSurface("seaCard");
 	const isActive = s.currentTrack ? sameTrack(s.currentTrack, track) : false;
 	const hasPeaks = (track.peaks?.length ?? 0) > 0 && (track.peaks?.[0]?.length ?? 0) > 0;
 	const isPlayingThis = isActive && s.isPlaying;
 	const isBufferingThis = isActive && s.isBuffering;
-	const showAction = faceSupportsAction("seaCard") && (actions?.length ?? 0) > 0;
 	const handleToggle = () => {
 		if (isActive) s.toggle();
 		else s.playNow(track);
@@ -18890,12 +18889,10 @@ function SeaCardPlayer({ track, art = "linear-gradient(135deg,#FF7AC6,#7C5CFF)",
 							style: artistFont,
 							children: formatSecondaryLine(track)
 						})]
-					}), showAction && /* @__PURE__ */ jsx(ArcActionButton, {
-						actions,
-						commands,
-						onOpenWorkspace,
-						ariaLabel: `Actions for ${track.title}`,
-						className: "ap-sea__action"
+					}), /* @__PURE__ */ jsx(PlayerSurfaceButtons, {
+						surface,
+						onOpenFocusedController: onOpenWorkspace,
+						activePluginIds: s.pluginNames
 					})]
 				}), isActive && !surface.isCanvasOpen && /* @__PURE__ */ jsx("div", {
 					className: "ap-sea__progress",
