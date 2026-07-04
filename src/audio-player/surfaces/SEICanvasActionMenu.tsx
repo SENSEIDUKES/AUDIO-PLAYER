@@ -341,7 +341,7 @@ export function SEICanvasActionMenu({
                                 <button
                                     ref={centerRef}
                                     type="button"
-                                    className="sac__center ap-tap"
+                                    className="sac__center"
                                     onClick={handleCenter}
                                     aria-label={inSubmenu ? "Back" : "Close menu"}
                                 >
