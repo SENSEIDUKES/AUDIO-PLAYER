@@ -39,14 +39,28 @@ describe("VaultRowPlayer — Arc actions", () => {
         expect(html).not.toContain("ap-surface-btn")
     })
 
-    it("renders the command wheel when queue leaves are live via the row's built-in commands", () => {
-        // No onOpenWorkspace/share wiring: the Vault/Agent/Share branches prune,
-        // but the queue branch stays live off the row's session commands, so
-        // the trigger still renders.
+    it("renders the standardized command wheel when the host routes workspaces", () => {
+        // The standardized wheel's arms (Vault, Playback, Agents and Share ›
+        // Add to) are all SAP Controller destinations, so wiring
+        // onOpenWorkspace keeps the trigger live.
+        const html = render(
+            <VaultRowPlayer
+                track={TRACK}
+                actions={buildVaultTrackArcActions()}
+                onOpenWorkspace={() => {}}
+            />
+        )
+        expect(html).toContain("ap-vr__action")
+    })
+
+    it("prunes the whole wheel on a host with no workspace routing and no share commands", () => {
+        // Without onOpenWorkspace every sap-controller leaf dies, and the two
+        // immediate Share leaves (Link, Favorite) have no wired commands — the
+        // arc renders no dead buttons, so the trigger disappears entirely.
         const html = render(
             <VaultRowPlayer track={TRACK} actions={buildVaultTrackArcActions()} />
         )
-        expect(html).toContain("ap-vr__action")
+        expect(html).not.toContain("ap-vr__action")
     })
 
     it("renders no trigger at all when every leaf is dead on this host", () => {

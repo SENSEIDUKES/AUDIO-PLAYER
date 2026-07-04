@@ -47,6 +47,21 @@ describe("buildMenuTree", () => {
         return undefined
     }
 
+    it("builds the standardized arms — Plugins | Playback | Share | Agents — on a fully wired host", () => {
+        const tree = buildMenuTree({
+            canvasSupported: true,
+            isCanvasActive: false,
+            canRouteWorkspaces: true,
+            canShareLink: true,
+        })
+        expect(tree.map((n) => n.label)).toEqual([
+            "Plugins",
+            "Playback",
+            "Share",
+            "Agents",
+        ])
+    })
+
     it("exposes Up Next and Canvas as leaf actions in the expected places", () => {
         const tree = buildMenuTree({ canvasSupported: true, isCanvasActive: false })
         expect(findNode(tree, "up-next")?.actionId).toBe("open-queue")
@@ -56,8 +71,8 @@ describe("buildMenuTree", () => {
     it("omits the Canvas node entirely on faces without canvas support (no dead buttons)", () => {
         const tree = buildMenuTree({ canvasSupported: false, isCanvasActive: false })
         expect(findNode(tree, "canvas")).toBeUndefined()
-        // With no visual leaves left, the whole Plugin branch disappears too.
-        expect(findNode(tree, "plugin")).toBeUndefined()
+        // With no plugin leaves left either, the whole Plugins branch disappears.
+        expect(findNode(tree, "plugins")).toBeUndefined()
     })
 
     it("marks the Canvas node active when the canvas surface is open", () => {
@@ -77,29 +92,103 @@ describe("buildMenuTree", () => {
             canvasSupported: true,
             isCanvasActive: false,
             canRouteWorkspaces: true,
+            activePluginIds: ["lyrics", "automix", "analytics"],
+            canShareLink: true,
+            canFavorite: true,
         })
         for (const node of collect(tree)) {
             expect(node.state).not.toBe("coming-soon")
         }
     })
 
+    it("shows only currently active plugins, bucketed under Audio / Visual / Analytics", () => {
+        const tree = buildMenuTree({
+            canvasSupported: true,
+            isCanvasActive: false,
+            canRouteWorkspaces: true,
+            activePluginIds: ["registry-lyrics", "registry-automix", "analytics"],
+        })
+        const plugins = findNode(tree, "plugins")!
+        const byLabel = Object.fromEntries(
+            plugins.children!.map((b) => [b.label, b.children!.map((c) => c.label)])
+        )
+        expect(byLabel["Audio"]).toEqual(["Automix"])
+        expect(byLabel["Visual"]).toEqual(["Lyrics", "Canvas"])
+        expect(byLabel["Analytics"]).toEqual(["Analytics"])
+        expect(findNode(tree, "plugin-lyrics")?.workspaceRoute).toBe(
+            "plugin-settings:lyrics"
+        )
+        expect(findNode(tree, "plugin-automix")?.workspaceRoute).toBe(
+            "playback:automix"
+        )
+        // An inactive plugin never surfaces.
+        expect(findNode(tree, "plugin-waveform")).toBeUndefined()
+    })
+
     it("includes workspace-only nodes only when the host routes workspaces", () => {
-        const unrouted = buildMenuTree({ canvasSupported: true, isCanvasActive: false })
-        for (const id of ["lyrics", "automix", "agent", "activity-log"]) {
+        const unrouted = buildMenuTree({
+            canvasSupported: true,
+            isCanvasActive: false,
+            activePluginIds: ["lyrics"],
+        })
+        for (const id of [
+            "plugin-lyrics",
+            "controls",
+            "debug",
+            "share-add-to",
+            "agents",
+        ]) {
             expect(findNode(unrouted, id)).toBeUndefined()
         }
         const routed = buildMenuTree({
             canvasSupported: true,
             isCanvasActive: false,
             canRouteWorkspaces: true,
+            activePluginIds: ["lyrics"],
         })
-        expect(findNode(routed, "lyrics")?.workspaceRoute).toBe("plugin-settings:lyrics")
-        expect(findNode(routed, "automix")?.workspaceRoute).toBe("playback:automix")
-        expect(findNode(routed, "agent")?.workspaceRoute).toBe("agent:queue-director")
-        expect(findNode(routed, "activity-log")?.workspaceRoute).toBe(
+        expect(findNode(routed, "plugin-lyrics")?.workspaceRoute).toBe(
+            "plugin-settings:lyrics"
+        )
+        expect(findNode(routed, "controls")?.workspaceRoute).toBe(
+            "playback:controls"
+        )
+        expect(findNode(routed, "debug")?.workspaceRoute).toBe(
             "diagnostics:activity-log"
         )
-        expect(isNodeInteractive(findNode(routed, "agent")!)).toBe(true)
+        expect(findNode(routed, "share-add-to")?.workspaceRoute).toBe(
+            "library:vault"
+        )
+        expect(isNodeInteractive(findNode(routed, "agents")!)).toBe(true)
+    })
+
+    it("points Agents › Scout at the Demo tier by default and the Studio tier when entitled", () => {
+        const base = { canvasSupported: true, isCanvasActive: false, canRouteWorkspaces: true }
+        const demo = buildMenuTree(base)
+        expect(findNode(demo, "agent-scout")?.workspaceRoute).toBe("agent:demo-scout")
+        expect(findNode(demo, "agent-memoir")?.workspaceRoute).toBe("agent:memoir")
+        const studio = buildMenuTree({
+            ...base,
+            entitlements: { studioScout: true },
+        })
+        expect(findNode(studio, "agent-scout")?.workspaceRoute).toBe(
+            "agent:studio-scout"
+        )
+    })
+
+    it("adds Share leaves only when the host wires them (Link / Favorite)", () => {
+        const none = buildMenuTree({ canvasSupported: true, isCanvasActive: false })
+        expect(findNode(none, "share")).toBeUndefined()
+        const wired = buildMenuTree({
+            canvasSupported: true,
+            isCanvasActive: false,
+            canShareLink: true,
+            canFavorite: true,
+            isFavorite: true,
+        })
+        const share = findNode(wired, "share")!
+        expect(share.children!.map((c) => c.label)).toEqual(["Link", "Favorite"])
+        expect(findNode(wired, "share-link")?.actionId).toBe("share-link")
+        expect(findNode(wired, "share-favorite")?.state).toBe("active")
     })
 
     it("treats available and inactive nodes as interactive", () => {
@@ -107,9 +196,10 @@ describe("buildMenuTree", () => {
             canvasSupported: true,
             isCanvasActive: false,
             canRouteWorkspaces: true,
+            activePluginIds: ["lyrics"],
         })
         expect(isNodeInteractive(findNode(tree, "up-next")!)).toBe(true)
-        expect(isNodeInteractive(findNode(tree, "lyrics")!)).toBe(true)
+        expect(isNodeInteractive(findNode(tree, "plugin-lyrics")!)).toBe(true)
     })
 
     it("attaches the focused workspace route to Up Next", () => {

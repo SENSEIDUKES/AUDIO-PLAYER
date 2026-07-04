@@ -320,6 +320,7 @@ export function SAPController({
                             route={route}
                             onClose={onClose}
                             lyrics={info?.lyrics}
+                            playback={playback}
                         />
                         <div className="sap-ctl__divider" role="separator" aria-hidden="true" />
                     </>

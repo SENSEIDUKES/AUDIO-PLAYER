@@ -22,13 +22,20 @@ export const WORKSPACE_ROUTES = [
     "library:vault",
     "plugin-settings:lyrics",
     "plugin-settings:waveform",
+    "plugin-settings:analytics",
+    "plugin-settings:sleep-timer",
+    "plugin-settings:auto-theme",
     "playback:automix",
+    "playback:controls",
     "agent:queue-director",
     "agent:demo-scout",
     "agent:studio-scout",
     "agent:memoir",
     "visual:canvas",
     "visual:lyrics",
+    "vault:tag",
+    "vault:rename",
+    "vault:radio",
     "diagnostics:activity-log",
 ] as const
 
@@ -43,6 +50,7 @@ export type WorkspaceRouteCategory =
     | "playback"
     | "agent"
     | "visual"
+    | "vault"
     | "diagnostics"
 
 /** A route broken into its category + target for the shell to dispatch on. */

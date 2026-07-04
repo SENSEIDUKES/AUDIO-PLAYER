@@ -150,9 +150,9 @@ function workshopShareCommands(track: Track): ArcCommandHost["commands"] {
     }
 }
 
-/* The workshop's Vault preview: rows carry the selected-track command wheel
-   (Add to Queue / Share / Vault / Agent) and route Vault/Agent leaves into one
-   shared SAP Controller instance owned here. */
+/* The workshop's Vault preview: rows carry the standardized command wheel with
+   the Vault face's dedicated Vault arm (Vault / Playback / Share / Agents) and
+   route workspace leaves into one shared SAP Controller instance owned here. */
 function WorkshopVaultRows({
     tracks,
     theme,
@@ -161,7 +161,8 @@ function WorkshopVaultRows({
     theme: AudioPlayerTheme
 }) {
     const [route, setRoute] = useState<WorkspaceRoute | null>(null)
-    // No Studio Scout entitlement in the workshop — the leaf renders locked.
+    // No Studio Scout entitlement in the workshop — Agents › Scout routes to
+    // its free Demo tier.
     const arcActions = useMemo(
         () => buildVaultTrackArcActions({ entitlements: { studioScout: false } }),
         []
