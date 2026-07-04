@@ -8,6 +8,11 @@ export default defineConfig({
         react(),
         dts({
             include: ["src/audio-player"],
+            exclude: [
+                "src/audio-player/**/__tests__/**",
+                "src/audio-player/**/*.test.ts",
+                "src/audio-player/**/*.test.tsx",
+            ],
             outDir: "dist",
             strictOutput: true,
             rollupTypes: true,

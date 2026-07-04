@@ -46,10 +46,6 @@ export default tseslint.config(
         },
         rules: {
             "no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
-            "@typescript-eslint/no-unused-vars": [
-                "warn",
-                { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
-            ],
         },
     },
     // Disable rules that conflict with Prettier's formatting.
