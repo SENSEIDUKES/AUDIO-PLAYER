@@ -13614,10 +13614,7 @@ function KaraokeLyrics({ lyrics }) {
 		return result;
 	}, [lyrics]);
 	const containerRef = useRef(null);
-	if (!parsed.some((l) => l.time >= 0)) return /* @__PURE__ */ jsx("div", {
-		className: "sap-ctl__lyrics",
-		children: lyrics
-	});
+	const isKaraoke = parsed.some((l) => l.time >= 0);
 	let activeIndex = -1;
 	for (let i = 0; i < parsed.length; i++) if (parsed[i].time >= 0 && currentTime >= parsed[i].time) activeIndex = i;
 	useEffect(() => {
@@ -13635,6 +13632,10 @@ function KaraokeLyrics({ lyrics }) {
 			}
 		}
 	}, [activeIndex]);
+	if (!isKaraoke) return /* @__PURE__ */ jsx("div", {
+		className: "sap-ctl__lyrics",
+		children: lyrics
+	});
 	return /* @__PURE__ */ jsx("div", {
 		className: "sap-ctl__lyrics sap-ctl__lyrics--karaoke",
 		ref: containerRef,
@@ -16289,11 +16290,12 @@ var CueRuntime = class {
 		this.activeSprites.clear();
 	}
 	handleTimeUpdate(currentTime, isSeeking = false) {
+		const isRewind = isSeeking || currentTime < this.lastTime;
 		for (const cue of this.timeCues) {
 			if (cue.trigger.kind !== "time") continue;
 			const hasFired = this.firedCueIds.has(cue.id);
 			const triggerTime = cue.trigger.at;
-			if (isSeeking && currentTime < triggerTime) {
+			if (isRewind && currentTime < triggerTime) {
 				if (cue.replayable) this.firedCueIds.delete(cue.id);
 				continue;
 			}
