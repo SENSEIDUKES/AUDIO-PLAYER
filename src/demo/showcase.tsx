@@ -21,7 +21,7 @@ import type {
     VaultCategory,
     WorkspaceRoute,
 } from "../audio-player"
-import { NextIcon, QueueIcon } from "../audio-player/skins/icons"
+
 import { noLuckTracks, NO_LUCK_COVER, NO_LUCK_ART, SEA_THEME } from "./data"
 
 /* Demonstrate a host-registered CUSTOM classification (beyond the built-ins) —
@@ -112,7 +112,7 @@ function ShowcaseVaultRows() {
 function ShowcaseSeaCards() {
     const s = useAudioSession()
     const [route, setRoute] = useState<WorkspaceRoute | null>(null)
-    const cardActions = (track: Track): ArcAction[] => [
+    const cardActions = (): ArcAction[] => [
         ...buildStandardTrackArcActions({ activePluginIds: s.pluginNames }),
     ]
     return (
@@ -123,7 +123,7 @@ function ShowcaseSeaCards() {
                     track={t}
                     art={NO_LUCK_ART}
                     tag="SEA"
-                    actions={cardActions(t)}
+                    actions={cardActions()}
                     commands={trackCommands(t)}
                     onOpenWorkspace={setRoute}
                     {...SEA_THEME}

@@ -4,7 +4,6 @@ import {
 } from "../plugins/surfaces/defaultPluginSurfaces"
 import { getPluginSettingsRoute } from "../plugins/surfaces/pluginSurfaceHelpers"
 import { isWorkspaceRoute } from "../components/workspace/workspaceRoutes"
-import type { WorkspaceRoute } from "../components/workspace/workspaceRoutes"
 import {
     AgentIcon,
     AnalyticsIcon,

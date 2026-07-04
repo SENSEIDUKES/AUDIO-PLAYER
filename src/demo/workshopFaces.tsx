@@ -10,9 +10,11 @@ import {
     NarrativeFace,
     SAPController,
     buildVaultTrackArcActions,
+    buildStandardTrackArcActions,
     useAudioSession,
 } from "../audio-player"
 import type {
+    ArcAction,
     ArcCommandHost,
     AudioPlayerPlugin,
     AudioPlayerTheme,
