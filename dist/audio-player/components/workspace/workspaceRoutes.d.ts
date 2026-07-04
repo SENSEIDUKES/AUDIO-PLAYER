@@ -14,7 +14,7 @@
  * data model.
  */
 /** Every workspace route the shell knows how to render. */
-export declare const WORKSPACE_ROUTES: readonly ["options", "library:playlists", "library:queue", "plugin-settings:lyrics", "plugin-settings:waveform", "playback:automix", "agent:queue-director", "visual:canvas", "visual:lyrics", "diagnostics:activity-log"];
+export declare const WORKSPACE_ROUTES: readonly ["options", "library:playlists", "library:queue", "library:vault", "plugin-settings:lyrics", "plugin-settings:waveform", "playback:automix", "agent:queue-director", "agent:demo-scout", "agent:studio-scout", "agent:memoir", "visual:canvas", "visual:lyrics", "diagnostics:activity-log"];
 /** A validated workspace destination. `"options"` is the legacy default. */
 export type WorkspaceRoute = (typeof WORKSPACE_ROUTES)[number];
 /** The top-level grouping of a route, taken from the part before the `:`. */

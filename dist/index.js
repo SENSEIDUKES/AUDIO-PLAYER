@@ -8671,6 +8671,14 @@ function AudioSessionProvider({ children, initialQueue = [], initialIndex = 0, a
 	const enqueue = useCallback((track) => {
 		setQueueState((q) => [...q, track]);
 	}, []);
+	const playNext = useCallback((track) => {
+		setQueueState((q) => {
+			if (currentIndex < 0 || currentIndex >= q.length) return [...q, track];
+			const next = [...q];
+			next.splice(currentIndex + 1, 0, track);
+			return next;
+		});
+	}, [currentIndex]);
 	const playNow = useCallback((track) => {
 		const key = trackKey(track);
 		const existing = queue.findIndex((t) => trackKey(t) === key);
@@ -8803,6 +8811,7 @@ function AudioSessionProvider({ children, initialQueue = [], initialIndex = 0, a
 		setQueue,
 		playTrack,
 		enqueue,
+		playNext,
 		playNow,
 		next,
 		previous,
@@ -8829,6 +8838,7 @@ function AudioSessionProvider({ children, initialQueue = [], initialIndex = 0, a
 		setQueue,
 		playTrack,
 		enqueue,
+		playNext,
 		playNow,
 		next,
 		previous,
@@ -10363,7 +10373,7 @@ var AgentIcon = () => /* @__PURE__ */ jsxs("svg", {
 		})
 	]
 });
-var CommentsIcon = () => /* @__PURE__ */ jsx("svg", {
+var MailIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "16",
 	height: "16",
 	viewBox: "0 0 24 24",
@@ -10373,7 +10383,51 @@ var CommentsIcon = () => /* @__PURE__ */ jsx("svg", {
 	strokeLinecap: "round",
 	strokeLinejoin: "round",
 	"aria-hidden": "true",
-	children: /* @__PURE__ */ jsx("path", { d: "M21 11.5a8.38 8.38 0 0 1-8.5 8.5 9 9 0 0 1-3.8-.8L3 21l1.3-4a8.5 8.5 0 0 1-1-4A8.38 8.38 0 0 1 11.5 4 8.38 8.38 0 0 1 21 11.5z" })
+	children: [/* @__PURE__ */ jsx("rect", {
+		x: "3",
+		y: "5",
+		width: "18",
+		height: "14",
+		rx: "2"
+	}), /* @__PURE__ */ jsx("path", { d: "M3 7l9 6 9-6" })]
+});
+var LinkIcon = () => /* @__PURE__ */ jsxs("svg", {
+	width: "16",
+	height: "16",
+	viewBox: "0 0 24 24",
+	fill: "none",
+	stroke: "currentColor",
+	strokeWidth: "2",
+	strokeLinecap: "round",
+	strokeLinejoin: "round",
+	"aria-hidden": "true",
+	children: [/* @__PURE__ */ jsx("path", { d: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" }), /* @__PURE__ */ jsx("path", { d: "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" })]
+});
+var VaultIcon = () => /* @__PURE__ */ jsxs("svg", {
+	width: "16",
+	height: "16",
+	viewBox: "0 0 24 24",
+	fill: "none",
+	stroke: "currentColor",
+	strokeWidth: "2",
+	strokeLinecap: "round",
+	strokeLinejoin: "round",
+	"aria-hidden": "true",
+	children: [
+		/* @__PURE__ */ jsx("rect", {
+			x: "3",
+			y: "4",
+			width: "18",
+			height: "16",
+			rx: "2"
+		}),
+		/* @__PURE__ */ jsx("circle", {
+			cx: "12",
+			cy: "12",
+			r: "4"
+		}),
+		/* @__PURE__ */ jsx("path", { d: "M12 8.5V12l2.2 1.6" })
+	]
 });
 var LockIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "16",
@@ -10418,111 +10472,86 @@ function SurfaceButton({ active, children, onClick, label, disabled = false, cla
 * The V1 hardcoded menu tree. A builder (not a constant) so per-face capability
 * and live surface state can adjust node states without the arc knowing about
 * the player. Replaceable later by a plugin-registry-driven tree of the same shape.
+*
+* Command-router rules: every node this returns does a real action. Nodes whose
+* only destination is a focused SAP Controller workspace appear only when the
+* host routes workspaces; the Canvas leaf appears only on faces that can host
+* the SEICanvas. There are no "coming soon" placeholders — a capability that
+* doesn't exist yet simply isn't in the tree.
 */
-function buildMenuTree({ canvasSupported, isCanvasActive, includeTransport = false, canPrevious = false, canNext = false }) {
-	return [
-		{
-			id: "plugin",
-			label: "Plugin",
-			icon: PluginIcon,
-			children: [
-				{
-					id: "visual",
-					label: "Visual",
-					icon: VisualIcon,
-					children: [
-						{
-							id: "lyrics",
-							label: "Lyrics",
-							icon: LyricsIcon,
-							state: "inactive",
-							actionId: "select-lyrics",
-							workspaceRoute: "plugin-settings:lyrics"
-						},
-						{
-							id: "canvas",
-							label: "Canvas",
-							icon: CanvasIcon,
-							state: !canvasSupported ? "disabled" : isCanvasActive ? "active" : "available",
-							actionId: "activate-canvas"
-						},
-						{
-							id: "comments",
-							label: "Comments",
-							icon: CommentsIcon,
-							state: "coming-soon"
-						}
-					]
-				},
-				{
-					id: "plugin-playback",
-					label: "Playback",
-					icon: PlaybackIcon,
-					state: "coming-soon"
-				},
-				{
-					id: "analytics",
-					label: "Analytics",
-					icon: AnalyticsIcon,
-					state: "coming-soon"
-				}
-			]
-		},
-		{
-			id: "playback",
-			label: "Playback",
-			icon: PlaybackIcon,
-			children: [
-				...includeTransport ? [{
-					id: "previous-track",
-					label: "Previous",
-					icon: PrevIcon$1,
-					state: canPrevious ? "available" : "disabled",
-					actionId: "previous-track"
-				}, {
-					id: "next-track",
-					label: "Next",
-					icon: NextIcon$1,
-					state: canNext ? "available" : "disabled",
-					actionId: "next-track"
-				}] : [],
-				{
-					id: "up-next",
-					label: "Up Next",
-					icon: QueueIcon,
-					actionId: "open-queue",
-					workspaceRoute: "library:queue"
-				},
-				{
-					id: "automix",
-					label: "Automix",
-					icon: AutomixIcon,
-					state: "coming-soon",
-					workspaceRoute: "playback:automix"
-				},
-				{
-					id: "repeat",
-					label: "Repeat",
-					icon: RepeatIcon,
-					state: "coming-soon"
-				}
-			]
-		},
-		{
-			id: "agent",
-			label: "Agent",
-			icon: AgentIcon,
-			state: "coming-soon",
-			workspaceRoute: "agent:queue-director"
-		},
-		{
-			id: "activity-log",
-			label: "Activity Log",
-			icon: AnalyticsIcon,
-			state: "available",
-			workspaceRoute: "diagnostics:activity-log"
-		}
-	];
+function buildMenuTree({ canvasSupported, isCanvasActive, includeTransport = false, canPrevious = false, canNext = false, canRouteWorkspaces = false }) {
+	const transportNodes = includeTransport ? [{
+		id: "previous-track",
+		label: "Previous",
+		icon: PrevIcon$1,
+		state: canPrevious ? "available" : "disabled",
+		actionId: "previous-track"
+	}, {
+		id: "next-track",
+		label: "Next",
+		icon: NextIcon$1,
+		state: canNext ? "available" : "disabled",
+		actionId: "next-track"
+	}] : [];
+	const visualNodes = [];
+	if (canRouteWorkspaces) visualNodes.push({
+		id: "lyrics",
+		label: "Lyrics",
+		icon: LyricsIcon,
+		state: "inactive",
+		actionId: "select-lyrics",
+		workspaceRoute: "plugin-settings:lyrics"
+	});
+	if (canvasSupported) visualNodes.push({
+		id: "canvas",
+		label: "Canvas",
+		icon: CanvasIcon,
+		state: isCanvasActive ? "active" : "available",
+		actionId: "activate-canvas"
+	});
+	const playbackChildren = [...transportNodes, {
+		id: "up-next",
+		label: "Up Next",
+		icon: QueueIcon,
+		actionId: "open-queue",
+		workspaceRoute: "library:queue"
+	}];
+	if (canRouteWorkspaces) playbackChildren.push({
+		id: "automix",
+		label: "Automix",
+		icon: AutomixIcon,
+		workspaceRoute: "playback:automix"
+	});
+	const tree = [];
+	if (visualNodes.length > 0) tree.push({
+		id: "plugin",
+		label: "Plugin",
+		icon: PluginIcon,
+		children: [{
+			id: "visual",
+			label: "Visual",
+			icon: VisualIcon,
+			children: visualNodes
+		}]
+	});
+	tree.push({
+		id: "playback",
+		label: "Playback",
+		icon: PlaybackIcon,
+		children: playbackChildren
+	});
+	if (canRouteWorkspaces) tree.push({
+		id: "agent",
+		label: "Agent",
+		icon: AgentIcon,
+		workspaceRoute: "agent:queue-director"
+	}, {
+		id: "activity-log",
+		label: "Activity Log",
+		icon: AnalyticsIcon,
+		workspaceRoute: "diagnostics:activity-log"
+	});
+	return tree;
 }
 /** Whether a node can be interacted with (entered or actioned). */
 function isNodeInteractive(node) {
@@ -10813,14 +10842,16 @@ function PlayerSurfaceButtons({ surface, showCanvasButton = surface.canvasSuppor
 		isCanvasActive: surface.isCanvasOpen,
 		includeTransport: showTransport,
 		canPrevious,
-		canNext
+		canNext,
+		canRouteWorkspaces: Boolean(onOpenFocusedController)
 	}) : [], [
 		showQueueButton,
 		surface.canvasSupported,
 		surface.isCanvasOpen,
 		showTransport,
 		canPrevious,
-		canNext
+		canNext,
+		onOpenFocusedController
 	]);
 	const handleSelect = useCallback((node) => {
 		if (node.actionId === "previous-track") onPrevious?.();
@@ -12612,10 +12643,14 @@ var WORKSPACE_ROUTES = [
 	"options",
 	"library:playlists",
 	"library:queue",
+	"library:vault",
 	"plugin-settings:lyrics",
 	"plugin-settings:waveform",
 	"playback:automix",
 	"agent:queue-director",
+	"agent:demo-scout",
+	"agent:studio-scout",
+	"agent:memoir",
 	"visual:canvas",
 	"visual:lyrics",
 	"diagnostics:activity-log"
@@ -12717,6 +12752,153 @@ function AgentQueueDirectorWorkspace() {
 			className: "sap-ctl__workspace-sub",
 			children: "Let an agent curate and reorder what plays next."
 		})]
+	});
+}
+//#endregion
+//#region src/audio-player/components/workspace/AgentScoutWorkspace.tsx
+var AGENT_COPY = {
+	"demo-scout": {
+		lead: "Demo Scout",
+		sub: "Scans your demos and surfaces the ones worth finishing next."
+	},
+	"studio-scout": {
+		lead: "Studio Scout",
+		sub: "Pro session analysis for studio-ready tracks. Requires the Studio entitlement."
+	},
+	memoir: {
+		lead: "Memoir",
+		sub: "Builds a narrated history of a track from its vault versions."
+	}
+};
+function AgentScoutWorkspace({ variant }) {
+	const copy = AGENT_COPY[variant];
+	if (!copy) return null;
+	return /* @__PURE__ */ jsxs("div", {
+		className: "sap-ctl__workspace-empty",
+		"data-agent": variant,
+		children: [/* @__PURE__ */ jsx("p", {
+			className: "sap-ctl__workspace-lead",
+			children: copy.lead
+		}), /* @__PURE__ */ jsx("p", {
+			className: "sap-ctl__workspace-sub",
+			children: copy.sub
+		})]
+	});
+}
+//#endregion
+//#region src/audio-player/skins/vaultCategories.ts
+/**
+* Vault category → visual identity. Rows derive their color/status from this map
+* (driven by `Track.vaultCategory`) instead of depending on per-row artwork, so
+* a long list stays fast, clean, and scannable.
+*
+* Colors are plain CSS values so the host can keep using its own theme tokens
+* elsewhere; override per row via the existing `AudioPlayerTheme` props when a
+* different palette is needed.
+*/
+var VAULT_CATEGORY_META = {
+	demo: {
+		label: "Demo",
+		color: "#7C5CFF"
+	},
+	beat: {
+		label: "Beat",
+		color: "#22D3A6"
+	},
+	mix: {
+		label: "Mix",
+		color: "#38BDF8"
+	},
+	master: {
+		label: "Master",
+		color: "#F5C451"
+	},
+	memo: {
+		label: "Memo",
+		color: "#A1A1AA"
+	},
+	arcNote: {
+		label: "Arc Note",
+		color: "#FB7185"
+	},
+	toFinish: {
+		label: "To Finish",
+		color: "#FB923C"
+	},
+	archived: {
+		label: "Archived",
+		color: "#6B7280"
+	}
+};
+/**
+* Host-registered custom categories. Kept in a Map (mirroring the visual-slots
+* registry) so apps can add their own classifications — or recolor a built-in —
+* without editing the library. Checked before the built-ins so a registration
+* can override a built-in id.
+*/
+var CUSTOM_CATEGORIES = /* @__PURE__ */ new Map();
+/**
+* Register (or replace) a custom Vault category's visual identity. Call once at
+* startup; rows reading `track.vaultCategory === id` then pick up the label +
+* accent color automatically. Registering under a built-in id overrides it.
+*/
+function registerVaultCategory(id, meta) {
+	CUSTOM_CATEGORIES.set(id, meta);
+}
+/** Remove all custom registrations, restoring the built-in defaults. Mainly
+*  useful for test isolation, or to reset host-defined categories. */
+function clearCustomCategories() {
+	CUSTOM_CATEGORIES.clear();
+}
+/**
+* Every known category as `[id, meta]` pairs — built-ins first, then custom
+* registrations (custom entries that reuse a built-in id appear once, overridden).
+* Useful for building a category picker.
+*/
+function getAllVaultCategories() {
+	const merged = new Map(Object.entries(VAULT_CATEGORY_META));
+	for (const [id, meta] of CUSTOM_CATEGORIES) merged.set(id, meta);
+	return Array.from(merged.entries());
+}
+/**
+* Look up a category's visual identity, or `null` when none is set. Accepts any
+* string so custom (host-registered) categories resolve alongside the built-ins;
+* custom registrations win. Unknown values return `null`, keeping the contract
+* honest against unexpected external data.
+*/
+function getVaultCategoryMeta(category) {
+	if (!category) return null;
+	if (CUSTOM_CATEGORIES.has(category)) return CUSTOM_CATEGORIES.get(category);
+	return Object.prototype.hasOwnProperty.call(VAULT_CATEGORY_META, category) ? VAULT_CATEGORY_META[category] : null;
+}
+//#endregion
+//#region src/audio-player/components/workspace/LibraryVaultWorkspace.tsx
+function LibraryVaultWorkspace() {
+	const categories = getAllVaultCategories();
+	return /* @__PURE__ */ jsxs("div", {
+		className: "sap-ctl__workspace-empty",
+		children: [
+			/* @__PURE__ */ jsx("p", {
+				className: "sap-ctl__workspace-lead",
+				children: "Add to Vault"
+			}),
+			/* @__PURE__ */ jsx("p", {
+				className: "sap-ctl__workspace-sub",
+				children: "File this track under a vault classification."
+			}),
+			categories.length > 0 && /* @__PURE__ */ jsx("ul", {
+				className: "sap-ctl__workspace-list",
+				"aria-label": "Vault classifications",
+				children: categories.map(([id, meta]) => /* @__PURE__ */ jsxs("li", {
+					className: "sap-ctl__workspace-item",
+					children: [/* @__PURE__ */ jsx("span", {
+						className: "sap-ctl__workspace-swatch",
+						style: { background: meta.color },
+						"aria-hidden": "true"
+					}), meta.label]
+				}, id))
+			})
+		]
 	});
 }
 //#endregion
@@ -13275,11 +13457,15 @@ function titleForRoute(route) {
 	switch (route) {
 		case "library:playlists": return "Playlists";
 		case "library:queue": return "Up Next";
+		case "library:vault": return "Add to Vault";
 		case "plugin-settings:lyrics":
 		case "visual:lyrics": return "Lyrics";
 		case "plugin-settings:waveform": return "Waveform";
 		case "playback:automix": return "Automix";
 		case "agent:queue-director": return "Queue Director";
+		case "agent:demo-scout": return "Demo Scout";
+		case "agent:studio-scout": return "Studio Scout";
+		case "agent:memoir": return "Memoir";
 		case "diagnostics:activity-log": return "Activity Log";
 		case "visual:canvas": return "Canvas";
 		default: return "Workspace";
@@ -13317,6 +13503,7 @@ function contentForRoute(route, lyrics) {
 	switch (route) {
 		case "library:playlists": return /* @__PURE__ */ jsx(LibraryPlaylistsWorkspace, {});
 		case "library:queue": return /* @__PURE__ */ jsx(LibraryQueueWorkspace, {});
+		case "library:vault": return /* @__PURE__ */ jsx(LibraryVaultWorkspace, {});
 		case "plugin-settings:lyrics":
 		case "visual:lyrics": return /* @__PURE__ */ jsx(ControllerPanelRenderer, {
 			componentId: LYRIC_DISPLAY_ID,
@@ -13324,6 +13511,9 @@ function contentForRoute(route, lyrics) {
 		});
 		case "playback:automix": return /* @__PURE__ */ jsx(PlaybackAutomixWorkspace, {});
 		case "agent:queue-director": return /* @__PURE__ */ jsx(AgentQueueDirectorWorkspace, {});
+		case "agent:demo-scout": return /* @__PURE__ */ jsx(AgentScoutWorkspace, { variant: "demo-scout" });
+		case "agent:studio-scout": return /* @__PURE__ */ jsx(AgentScoutWorkspace, { variant: "studio-scout" });
+		case "agent:memoir": return /* @__PURE__ */ jsx(AgentScoutWorkspace, { variant: "memoir" });
 		case "diagnostics:activity-log": return /* @__PURE__ */ jsx(ActivityLogWorkspace, {});
 		case "visual:canvas": return /* @__PURE__ */ jsx(VisualCanvasWorkspace, { lyrics });
 		default: {
@@ -17198,6 +17388,85 @@ function FullCardPlayer({ showVolume = defaultShowVolume(), backgroundMedia, bac
 	}) });
 }
 //#endregion
+//#region src/audio-player/menu/arcRouting.ts
+/**
+* The effective visual/behavioral state of an action: an explicit `state`
+* wins; otherwise a `locked-entitlement` target renders locked and everything
+* else is available.
+*/
+function resolveArcActionState(action) {
+	if (action.state) return action.state;
+	return action.target === "locked-entitlement" ? "locked" : "available";
+}
+/** Resolve the immediate handler for a leaf, if any. Explicit `action`
+*  commands win over the legacy `onSelect`. */
+function immediateHandler(action, host) {
+	if (action.action) {
+		const command = host.commands?.[action.action];
+		if (command) return command;
+	}
+	if (action.onSelect) return () => action.onSelect(action.id);
+}
+/**
+* Whether a leaf resolves to a real destination on this host. Locked leaves
+* count as live — showing the lock honestly *is* their behavior. Branches are
+* live when any descendant leaf is.
+*/
+function isArcActionLive(action, host) {
+	if (action.children && action.children.length > 0) return action.children.some((child) => isArcActionLive(child, host));
+	switch (action.target) {
+		case "locked-entitlement": return true;
+		case "sei-canvas": return Boolean(host.openCanvas);
+		case "sap-controller": return Boolean(host.openWorkspace && action.workspaceRoute);
+		default: return Boolean(immediateHandler(action, host));
+	}
+}
+/**
+* Drop every leaf that cannot do a real action on this host, and every branch
+* left empty by that. What survives is exactly the set of buttons that work —
+* the arc never renders a "coming soon" or mystery no-op node.
+*/
+function pruneDeadArcActions(actions, host) {
+	const pruned = [];
+	if (!actions) return pruned;
+	for (const action of actions) {
+		if (action.children && action.children.length > 0) {
+			const children = pruneDeadArcActions(action.children, host);
+			if (children.length > 0) pruned.push({
+				...action,
+				children
+			});
+			continue;
+		}
+		if (isArcActionLive(action, host)) pruned.push(action);
+	}
+	return pruned;
+}
+/**
+* Dispatch a selected leaf to its destination. Returns `true` when the leaf
+* routed somewhere real, `false` for locked leaves and unresolvable targets
+* (which pruning should have removed before they were ever tappable).
+*/
+function routeArcAction(action, host) {
+	switch (action.target) {
+		case "locked-entitlement": return false;
+		case "sei-canvas":
+			if (!host.openCanvas) return false;
+			host.openCanvas();
+			return true;
+		case "sap-controller":
+			if (!host.openWorkspace || !action.workspaceRoute) return false;
+			host.openWorkspace(action.workspaceRoute);
+			return true;
+		default: {
+			const run = immediateHandler(action, host);
+			if (!run) return false;
+			run();
+			return true;
+		}
+	}
+}
+//#endregion
 //#region src/audio-player/surfaces/ArcActionButton.tsx
 /** Map the declarative action tree onto the arc menu's `MenuNode` tree. */
 function toMenuNodes(actions) {
@@ -17205,7 +17474,7 @@ function toMenuNodes(actions) {
 		id: a.id,
 		label: a.label,
 		icon: a.icon ?? DotsIcon$1,
-		state: a.state,
+		state: resolveArcActionState(a),
 		children: a.children && a.children.length > 0 ? toMenuNodes(a.children) : void 0
 	}));
 }
@@ -17215,112 +17484,44 @@ function indexLeaves(actions, map) {
 	else map.set(a.id, a);
 }
 /**
-* A generic Arc Action Button: the SEIHouse command-wheel affordance backed by a
-* plain `ArcAction[]` model. It is a thin, engine-agnostic adapter over
-* `SEICanvasActionMenu` — the trigger is a single button when closed (cheap to
-* mount in long lists), and the arc overlay only renders on tap. Any face can
-* reuse it as its primary action surface; Vault rows use it in place of the old
-* three-dot menu.
+* The Arc Action Button: the SEIHouse command-wheel affordance backed by a
+* plain `ArcAction[]` model, upgraded from a pretty radial UI into a command
+* router. Every leaf declares its `target`, and the button routes it into one
+* of exactly two real surfaces — the SEI Canvas (`onOpenCanvas`) or the SAP
+* Controller (`onOpenWorkspace`) — or runs an immediate command from
+* `commands`. Leaves the host hasn't wired are pruned before render, so every
+* visible node does a real action; entitlement-locked leaves stay visible but
+* render locked. The trigger is a single button when closed (cheap to mount in
+* long lists) and the arc overlay only renders on tap.
 */
-function ArcActionButton({ actions, ariaLabel = "Actions", className }) {
-	const items = useMemo(() => toMenuNodes(actions), [actions]);
+function ArcActionButton({ actions, commands, onOpenCanvas, onOpenWorkspace, ariaLabel = "Actions", className }) {
+	const host = useMemo(() => ({
+		commands,
+		openCanvas: onOpenCanvas,
+		openWorkspace: onOpenWorkspace
+	}), [
+		commands,
+		onOpenCanvas,
+		onOpenWorkspace
+	]);
+	const liveActions = useMemo(() => pruneDeadArcActions(actions, host), [actions, host]);
+	const items = useMemo(() => toMenuNodes(liveActions), [liveActions]);
 	const leaves = useMemo(() => {
 		const map = /* @__PURE__ */ new Map();
-		indexLeaves(actions, map);
+		indexLeaves(liveActions, map);
 		return map;
-	}, [actions]);
+	}, [liveActions]);
+	const handleSelect = useCallback((node) => {
+		const action = leaves.get(node.id);
+		if (action) routeArcAction(action, host);
+	}, [leaves, host]);
+	if (liveActions.length === 0) return null;
 	return /* @__PURE__ */ jsx(SEICanvasActionMenu, {
 		items,
-		onSelect: (node) => leaves.get(node.id)?.onSelect?.(node.id),
+		onSelect: handleSelect,
 		ariaLabel,
 		className
 	});
-}
-//#endregion
-//#region src/audio-player/skins/vaultCategories.ts
-/**
-* Vault category → visual identity. Rows derive their color/status from this map
-* (driven by `Track.vaultCategory`) instead of depending on per-row artwork, so
-* a long list stays fast, clean, and scannable.
-*
-* Colors are plain CSS values so the host can keep using its own theme tokens
-* elsewhere; override per row via the existing `AudioPlayerTheme` props when a
-* different palette is needed.
-*/
-var VAULT_CATEGORY_META = {
-	demo: {
-		label: "Demo",
-		color: "#7C5CFF"
-	},
-	beat: {
-		label: "Beat",
-		color: "#22D3A6"
-	},
-	mix: {
-		label: "Mix",
-		color: "#38BDF8"
-	},
-	master: {
-		label: "Master",
-		color: "#F5C451"
-	},
-	memo: {
-		label: "Memo",
-		color: "#A1A1AA"
-	},
-	arcNote: {
-		label: "Arc Note",
-		color: "#FB7185"
-	},
-	toFinish: {
-		label: "To Finish",
-		color: "#FB923C"
-	},
-	archived: {
-		label: "Archived",
-		color: "#6B7280"
-	}
-};
-/**
-* Host-registered custom categories. Kept in a Map (mirroring the visual-slots
-* registry) so apps can add their own classifications — or recolor a built-in —
-* without editing the library. Checked before the built-ins so a registration
-* can override a built-in id.
-*/
-var CUSTOM_CATEGORIES = /* @__PURE__ */ new Map();
-/**
-* Register (or replace) a custom Vault category's visual identity. Call once at
-* startup; rows reading `track.vaultCategory === id` then pick up the label +
-* accent color automatically. Registering under a built-in id overrides it.
-*/
-function registerVaultCategory(id, meta) {
-	CUSTOM_CATEGORIES.set(id, meta);
-}
-/** Remove all custom registrations, restoring the built-in defaults. Mainly
-*  useful for test isolation, or to reset host-defined categories. */
-function clearCustomCategories() {
-	CUSTOM_CATEGORIES.clear();
-}
-/**
-* Every known category as `[id, meta]` pairs — built-ins first, then custom
-* registrations (custom entries that reuse a built-in id appear once, overridden).
-* Useful for building a category picker.
-*/
-function getAllVaultCategories() {
-	const merged = new Map(Object.entries(VAULT_CATEGORY_META));
-	for (const [id, meta] of CUSTOM_CATEGORIES) merged.set(id, meta);
-	return Array.from(merged.entries());
-}
-/**
-* Look up a category's visual identity, or `null` when none is set. Accepts any
-* string so custom (host-registered) categories resolve alongside the built-ins;
-* custom registrations win. Unknown values return `null`, keeping the contract
-* honest against unexpected external data.
-*/
-function getVaultCategoryMeta(category) {
-	if (!category) return null;
-	if (CUSTOM_CATEGORIES.has(category)) return CUSTOM_CATEGORIES.get(category);
-	return Object.prototype.hasOwnProperty.call(VAULT_CATEGORY_META, category) ? VAULT_CATEGORY_META[category] : null;
 }
 //#endregion
 //#region src/audio-player/skins/VaultRowPlayer.tsx
@@ -17342,26 +17543,24 @@ function sameTrack$1(a, b) {
 * action button. Visual identity comes from the track's `vaultCategory` (accent
 * color + status label), not per-row artwork, keeping long lists fast to render.
 */
-function VaultRowPlayer({ track, number, actions, onAction, className, style, ...theme }) {
+function VaultRowPlayer({ track, number, actions, commands, onOpenWorkspace, className, style, ...theme }) {
 	const s = useAudioSession();
 	const isActive = s.currentTrack ? sameTrack$1(s.currentTrack, track) : false;
 	const isPlayingThis = isActive && s.isPlaying;
 	const isBufferingThis = isActive && s.isBuffering;
 	const category = getVaultCategoryMeta(track.vaultCategory);
-	const resolvedActions = useMemo(() => {
-		if (actions && actions.length > 0) return actions;
-		if (onAction) return [{
-			id: "more",
-			label: "More",
-			icon: DotsIcon$1,
-			onSelect: () => onAction(track)
-		}];
-		return [];
-	}, [
-		actions,
-		onAction,
-		track
+	const { playNext, enqueue } = s;
+	const rowCommands = useMemo(() => ({
+		"queue.insertAfterCurrent": () => playNext(track),
+		"queue.append": () => enqueue(track),
+		...commands
+	}), [
+		playNext,
+		enqueue,
+		track,
+		commands
 	]);
+	const resolvedActions = useMemo(() => actions ?? [], [actions]);
 	const showAction = faceSupportsAction("vaultRow") && resolvedActions.length > 0;
 	const handleToggle = () => {
 		if (isActive) s.toggle();
@@ -17427,6 +17626,8 @@ function VaultRowPlayer({ track, number, actions, onAction, className, style, ..
 			}),
 			showAction && /* @__PURE__ */ jsx(ArcActionButton, {
 				actions: resolvedActions,
+				commands: rowCommands,
+				onOpenWorkspace,
 				ariaLabel: `Actions for ${track.title}`,
 				className: "ap-vr__action"
 			})
@@ -18362,6 +18563,109 @@ var SceneMixEngine = class {
 };
 function createSceneMixEngine(options = {}) {
 	return new SceneMixEngine(options);
+}
+//#endregion
+//#region src/audio-player/menu/vaultTrackMenu.ts
+/**
+* The Vault face's selected-track command wheel:
+*
+*     Add to Queue › Play Next / Play Later     (immediate queue commands)
+*     Share        › Email / URL                (immediate share commands)
+*     Vault        › Add To / Playlist          (SAP Controller workspaces)
+*     Agent        › Demo Scout / Studio Scout / Memoir (SAP Controller workspaces)
+*
+* Every leaf carries an explicit `target`, so the arc renders it only when the
+* host actually wires that destination — there are no dead buttons, and the
+* only surfaces reachable from here are immediate commands, the SEI Canvas,
+* and the SAP Controller. A builder (not a constant) so entitlement state can
+* flip Studio Scout between routed and locked per render.
+*/
+function buildVaultTrackArcActions({ entitlements } = {}) {
+	const hasStudioScout = entitlements?.studioScout === true;
+	return [
+		{
+			id: "add-to-queue",
+			label: "Add to Queue",
+			icon: QueueIcon,
+			children: [{
+				id: "play-next",
+				label: "Play Next",
+				icon: NextIcon$1,
+				target: "immediate-action",
+				action: "queue.insertAfterCurrent"
+			}, {
+				id: "play-later",
+				label: "Play Later",
+				icon: QueueIcon,
+				target: "immediate-action",
+				action: "queue.append"
+			}]
+		},
+		{
+			id: "share",
+			label: "Share",
+			icon: ShareIcon,
+			children: [{
+				id: "share-email",
+				label: "Email",
+				icon: MailIcon,
+				target: "immediate-action",
+				action: "share.email"
+			}, {
+				id: "share-url",
+				label: "URL",
+				icon: LinkIcon,
+				target: "immediate-action",
+				action: "share.url"
+			}]
+		},
+		{
+			id: "vault",
+			label: "Vault",
+			icon: VaultIcon,
+			children: [{
+				id: "vault-add-to",
+				label: "Add To",
+				icon: VaultIcon,
+				target: "sap-controller",
+				workspaceRoute: "library:vault"
+			}, {
+				id: "vault-playlist",
+				label: "Playlist",
+				icon: QueueIcon,
+				target: "sap-controller",
+				workspaceRoute: "library:playlists"
+			}]
+		},
+		{
+			id: "agent",
+			label: "Agent",
+			icon: AgentIcon,
+			children: [
+				{
+					id: "agent-demo-scout",
+					label: "Demo Scout",
+					icon: AgentIcon,
+					target: "sap-controller",
+					workspaceRoute: "agent:demo-scout"
+				},
+				{
+					id: "agent-studio-scout",
+					label: "Studio Scout",
+					icon: AgentIcon,
+					target: hasStudioScout ? "sap-controller" : "locked-entitlement",
+					workspaceRoute: "agent:studio-scout"
+				},
+				{
+					id: "agent-memoir",
+					label: "Memoir",
+					icon: LyricsIcon,
+					target: "sap-controller",
+					workspaceRoute: "agent:memoir"
+				}
+			]
+		}
+	];
 }
 //#endregion
 //#region src/audio-player/plugins/registry/usePluginRegistry.tsx
@@ -19360,6 +19664,6 @@ function getPropertyDefaults() {
 	return acc;
 }
 //#endregion
-export { ARC_RADIUS, AUTOMIX_FADE_MS, ActivityLogContext, ActivityLogPanel, ActivityLogProvider, ActivityLogWorkspace, AgentQueueDirectorWorkspace, AnalyticsPlugin, ArcActionButton, AudioPlayer, AudioPlayer as default, AudioSessionProvider, AudioSpriteEngine, AutoThemePlugin, AutomixPlugin, BUILTIN_VISUAL_COMPONENTS, BackgroundMedia, ControllerPanelRenderer, CueManifestPlugin, CueRuntime, DEFAULT_ACTIVITY_LOG_CONFIG, DEFAULT_PLUGIN_SURFACES, DefaultPluginErrorHandler, ExplicitBadge, FAMILY_DEFAULTS, FullCardPlayer, GracefulDegradation, HTML5AudioBackend, INITIAL_SURFACE_STATE, KeyboardShortcutPlugin, LYRIC_DISPLAY_ID, LibraryPlaylistsWorkspace, LibraryQueueWorkspace, LyricDisplay, LyricSettingsPanel, LyricsPlugin, MAJOR_FACES, MiniSidebarPlayer, NarrativeFace, PLAYER_FACE_CAPABILITIES, PROPERTY_GROUPS, PROPERTY_GROUP_LABELS, PROPERTY_REGISTRY, PRO_CONFIDENCE_MIN, PlaybackAutomixWorkspace, PlayerHero, PlayerSurfaceButtons, PluginError, PluginErrorBoundary, PluginErrorBoundaryFactory, PluginManager, PluginManagerPanel, PluginRegistryProvider, PluginSettingsWorkspace, ProgressBar, QueueDrawer, QueueSurface, SAPController, SCENE_FADE_MS, SEICanvasActionMenu, SEICanvasHost, SEICanvasRenderer, SceneMixEngine, ScrubberCanvasHost, ScrubberCanvasRenderer, SeaCardPlayer, SleepTimerPlugin, StickyBottomPlayer, SurfaceButton, TextMarquee, TrackMetadata, VAULT_CATEGORY_META, VaultRowPlayer, VisualLyricsWorkspace, VisualSlotPicker, VisualSlotsProvider, VolumeControl, WORKSPACE_ROUTES, WaveformAdapter, WaveformPlugin, WaveformProgress, WebAudioBackend, WorkspaceShell, arcOffsets, bpmCompatibility, buildMenuTree, canEnterCanvas, checkCodecSupport, clearCustomCategories, composeEventHandlers, computePeaksFromUrl, computeTransitionPoints, contrastText, createActivityLogStore, createAnalyticsPlugin, createAudioBackend, createAudioSpriteEngine, createAutoThemePlugin, createAutomixPlugin, createCueManifestPlugin, createKeyboardShortcutPlugin, createLyricsPlugin, createPluginErrorBoundary, createSceneMixEngine, createSleepTimerPlugin, createWaveformPlugin, defaultShowVolume, deriveHeroCollapsed, deserializeSession, ensureMuted, ensureProTrackAnalysis, ensureTrackAnalysis, extractPalette, extractPeaks, faceSupportsAction, faceSupportsContextualActions, faceSupportsHeroCollapse, faceSupportsSEICanvas, faceSupportsScrubberCanvas, faceSupportsWaveform, formatFeatured, formatSecondaryLine, formatTime, formatVersionedTitle, getAllVaultCategories, getAllVisualComponents, getByPropPath, getDefaultComponentForSlot, getDisplayArtist, getDisplayTitle, getFaceCapability, getFaceFamily, getGlobalErrorBoundaryFactory, getPluginCanvasSurfaceId, getPluginSettingsRoute, getPluginSurfaceDefinition, getPluginSurfaceDefinitionsByCategory, getPluginSurfaceDefinitionsForMenuBranch, getPreferredCanvasPlacement, getPrimaryTrackSource, getPropertiesForFace, getPropertiesForGroup, getPropertyDefaults, getScrubberDensity, getScrubberHeight, getTrackAnalysis, getTrackSources, getTrackTrims, getVaultCategoryMeta, getVisualComponent, getVisualComponentsForSlot, gradient, hasCanvasSurface, hasSettingsSurface, isHeadlessPlugin, isIOS, isMobileDevice, isNodeInteractive, isPluginError, isSAPDefaultPrevented, isSessionEngine, isWorkspaceRoute, lyricDefaultSettings, lyricDisplayDefinition, mergeRefs, normalizeRhythmConfidence, parseWorkspaceRoute, planTransition, quantizePixels, registerVaultCategory, registerVisualComponent, relativeLuminance, resolveMedia, rgbToCss, serializeSession, setByPropPath, setGlobalErrorHandler, shouldEnableMarquee, snapToBeat, sortPluginSurfaceDefinitions, surfaceReducer, trackKey, trackSourcesSignature, useActivePluginInstances, useActivityLog, useActivityLogRecording, useAudioPlayer, useAudioSession, useAutomix, useMediaSessionObserver, useNarrativeAudio, useNarrativeCueController, usePlayerSurface, usePluginManager, usePluginRegistry, useReducedMotion, useSAPPropGetters, useShareTrack, useVisualSlots, validateCueManifest, validateTrackSource, withErrorBoundary };
+export { ARC_RADIUS, AUTOMIX_FADE_MS, ActivityLogContext, ActivityLogPanel, ActivityLogProvider, ActivityLogWorkspace, AgentQueueDirectorWorkspace, AnalyticsPlugin, ArcActionButton, AudioPlayer, AudioPlayer as default, AudioSessionProvider, AudioSpriteEngine, AutoThemePlugin, AutomixPlugin, BUILTIN_VISUAL_COMPONENTS, BackgroundMedia, ControllerPanelRenderer, CueManifestPlugin, CueRuntime, DEFAULT_ACTIVITY_LOG_CONFIG, DEFAULT_PLUGIN_SURFACES, DefaultPluginErrorHandler, ExplicitBadge, FAMILY_DEFAULTS, FullCardPlayer, GracefulDegradation, HTML5AudioBackend, INITIAL_SURFACE_STATE, KeyboardShortcutPlugin, LYRIC_DISPLAY_ID, LibraryPlaylistsWorkspace, LibraryQueueWorkspace, LyricDisplay, LyricSettingsPanel, LyricsPlugin, MAJOR_FACES, MiniSidebarPlayer, NarrativeFace, PLAYER_FACE_CAPABILITIES, PROPERTY_GROUPS, PROPERTY_GROUP_LABELS, PROPERTY_REGISTRY, PRO_CONFIDENCE_MIN, PlaybackAutomixWorkspace, PlayerHero, PlayerSurfaceButtons, PluginError, PluginErrorBoundary, PluginErrorBoundaryFactory, PluginManager, PluginManagerPanel, PluginRegistryProvider, PluginSettingsWorkspace, ProgressBar, QueueDrawer, QueueSurface, SAPController, SCENE_FADE_MS, SEICanvasActionMenu, SEICanvasHost, SEICanvasRenderer, SceneMixEngine, ScrubberCanvasHost, ScrubberCanvasRenderer, SeaCardPlayer, SleepTimerPlugin, StickyBottomPlayer, SurfaceButton, TextMarquee, TrackMetadata, VAULT_CATEGORY_META, VaultRowPlayer, VisualLyricsWorkspace, VisualSlotPicker, VisualSlotsProvider, VolumeControl, WORKSPACE_ROUTES, WaveformAdapter, WaveformPlugin, WaveformProgress, WebAudioBackend, WorkspaceShell, arcOffsets, bpmCompatibility, buildMenuTree, buildVaultTrackArcActions, canEnterCanvas, checkCodecSupport, clearCustomCategories, composeEventHandlers, computePeaksFromUrl, computeTransitionPoints, contrastText, createActivityLogStore, createAnalyticsPlugin, createAudioBackend, createAudioSpriteEngine, createAutoThemePlugin, createAutomixPlugin, createCueManifestPlugin, createKeyboardShortcutPlugin, createLyricsPlugin, createPluginErrorBoundary, createSceneMixEngine, createSleepTimerPlugin, createWaveformPlugin, defaultShowVolume, deriveHeroCollapsed, deserializeSession, ensureMuted, ensureProTrackAnalysis, ensureTrackAnalysis, extractPalette, extractPeaks, faceSupportsAction, faceSupportsContextualActions, faceSupportsHeroCollapse, faceSupportsSEICanvas, faceSupportsScrubberCanvas, faceSupportsWaveform, formatFeatured, formatSecondaryLine, formatTime, formatVersionedTitle, getAllVaultCategories, getAllVisualComponents, getByPropPath, getDefaultComponentForSlot, getDisplayArtist, getDisplayTitle, getFaceCapability, getFaceFamily, getGlobalErrorBoundaryFactory, getPluginCanvasSurfaceId, getPluginSettingsRoute, getPluginSurfaceDefinition, getPluginSurfaceDefinitionsByCategory, getPluginSurfaceDefinitionsForMenuBranch, getPreferredCanvasPlacement, getPrimaryTrackSource, getPropertiesForFace, getPropertiesForGroup, getPropertyDefaults, getScrubberDensity, getScrubberHeight, getTrackAnalysis, getTrackSources, getTrackTrims, getVaultCategoryMeta, getVisualComponent, getVisualComponentsForSlot, gradient, hasCanvasSurface, hasSettingsSurface, isArcActionLive, isHeadlessPlugin, isIOS, isMobileDevice, isNodeInteractive, isPluginError, isSAPDefaultPrevented, isSessionEngine, isWorkspaceRoute, lyricDefaultSettings, lyricDisplayDefinition, mergeRefs, normalizeRhythmConfidence, parseWorkspaceRoute, planTransition, pruneDeadArcActions, quantizePixels, registerVaultCategory, registerVisualComponent, relativeLuminance, resolveArcActionState, resolveMedia, rgbToCss, routeArcAction, serializeSession, setByPropPath, setGlobalErrorHandler, shouldEnableMarquee, snapToBeat, sortPluginSurfaceDefinitions, surfaceReducer, trackKey, trackSourcesSignature, useActivePluginInstances, useActivityLog, useActivityLogRecording, useAudioPlayer, useAudioSession, useAutomix, useMediaSessionObserver, useNarrativeAudio, useNarrativeCueController, usePlayerSurface, usePluginManager, usePluginRegistry, useReducedMotion, useSAPPropGetters, useShareTrack, useVisualSlots, validateCueManifest, validateTrackSource, withErrorBoundary };
 
 //# sourceMappingURL=index.js.map

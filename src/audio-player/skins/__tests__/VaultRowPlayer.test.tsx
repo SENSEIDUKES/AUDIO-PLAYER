@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import { AudioSessionProvider } from "../../session/AudioSessionContext"
+import { buildVaultTrackArcActions } from "../../menu/vaultTrackMenu"
 import type { ArcAction } from "../../surfaces/ArcActionButton"
 import type { Track } from "../../types"
 import { VaultRowPlayer } from "../VaultRowPlayer"
@@ -32,16 +33,40 @@ describe("VaultRowPlayer — Arc actions", () => {
         expect(html).not.toContain("ap-icon-btn ap-vr__action")
     })
 
-    it("synthesizes an Arc action from the legacy onAction prop (back-compat)", () => {
-        const html = render(<VaultRowPlayer track={TRACK} onAction={() => {}} />)
-        expect(html).toContain("ap-surface-btn")
-        expect(html).toContain("ap-vr__action")
-    })
-
-    it("renders no action surface when neither actions nor onAction are given", () => {
+    it("renders no action surface when no actions are given", () => {
         const html = render(<VaultRowPlayer track={TRACK} />)
         expect(html).not.toContain("ap-vr__action")
         expect(html).not.toContain("ap-surface-btn")
+    })
+
+    it("renders the command wheel when queue leaves are live via the row's built-in commands", () => {
+        // No onOpenWorkspace/share wiring: the Vault/Agent/Share branches prune,
+        // but the queue branch stays live off the row's session commands, so
+        // the trigger still renders.
+        const html = render(
+            <VaultRowPlayer track={TRACK} actions={buildVaultTrackArcActions()} />
+        )
+        expect(html).toContain("ap-vr__action")
+    })
+
+    it("renders no trigger at all when every leaf is dead on this host", () => {
+        const deadOnly: ArcAction[] = [
+            {
+                id: "vault",
+                label: "Vault",
+                children: [
+                    {
+                        id: "vault-playlist",
+                        label: "Playlist",
+                        target: "sap-controller",
+                        workspaceRoute: "library:playlists",
+                    },
+                ],
+            },
+        ]
+        // No onOpenWorkspace → the only branch prunes away entirely.
+        const html = render(<VaultRowPlayer track={TRACK} actions={deadOnly} />)
+        expect(html).not.toContain("ap-vr__action")
     })
 })
 

@@ -283,6 +283,31 @@
     line-height: 1.5;
     opacity: 0.6;
 }
+/* Simple classification list inside a workspace (e.g. the Vault "Add To" surface). */
+.sap-ctl__workspace-list {
+    list-style: none;
+    margin: 12px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    text-align: left;
+}
+.sap-ctl__workspace-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    font-size: 13.5px;
+}
+.sap-ctl__workspace-swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex: none;
+}
 
 @keyframes sap-sheet-in {
     from {

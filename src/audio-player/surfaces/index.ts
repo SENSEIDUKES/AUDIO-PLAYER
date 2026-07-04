@@ -47,6 +47,24 @@ export type { SEICanvasActionMenuProps, ArcOffset } from "./SEICanvasActionMenu"
 export { ArcActionButton } from "./ArcActionButton"
 export type { ArcAction, ArcActionButtonProps } from "./ArcActionButton"
 
+export {
+    resolveArcActionState,
+    isArcActionLive,
+    pruneDeadArcActions,
+    routeArcAction,
+} from "../menu/arcRouting"
+export type {
+    ArcActionTarget,
+    ArcCommandId,
+    ArcCommandHost,
+} from "../menu/arcRouting"
+
+export { buildVaultTrackArcActions } from "../menu/vaultTrackMenu"
+export type {
+    VaultTrackEntitlements,
+    BuildVaultTrackArcActionsOptions,
+} from "../menu/vaultTrackMenu"
+
 export { buildMenuTree, isNodeInteractive } from "../menu/menuData"
 export type {
     MenuNode,

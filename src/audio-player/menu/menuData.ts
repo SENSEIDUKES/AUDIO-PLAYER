@@ -5,14 +5,12 @@ import {
     AnalyticsIcon,
     AutomixIcon,
     CanvasIcon,
-    CommentsIcon,
     LyricsIcon,
     NextIcon,
     PlaybackIcon,
     PluginIcon,
     PrevIcon,
     QueueIcon,
-    RepeatIcon,
     VisualIcon,
 } from "../skins/icons"
 
@@ -87,12 +85,25 @@ export interface BuildMenuTreeOptions {
     /** Whether previous/next are currently available (gates the transport leaves). */
     canPrevious?: boolean
     canNext?: boolean
+    /**
+     * Whether the host wires `onOpenWorkspace` (SAP Controller routing). Nodes
+     * whose only real destination is a focused workspace (Lyrics, Automix,
+     * Agent, Activity Log) are omitted entirely when the host can't route
+     * there — the arc renders no dead buttons. Defaults to off.
+     */
+    canRouteWorkspaces?: boolean
 }
 
 /**
  * The V1 hardcoded menu tree. A builder (not a constant) so per-face capability
  * and live surface state can adjust node states without the arc knowing about
  * the player. Replaceable later by a plugin-registry-driven tree of the same shape.
+ *
+ * Command-router rules: every node this returns does a real action. Nodes whose
+ * only destination is a focused SAP Controller workspace appear only when the
+ * host routes workspaces; the Canvas leaf appears only on faces that can host
+ * the SEICanvas. There are no "coming soon" placeholders — a capability that
+ * doesn't exist yet simply isn't in the tree.
  */
 export function buildMenuTree({
     canvasSupported,
@@ -100,13 +111,8 @@ export function buildMenuTree({
     includeTransport = false,
     canPrevious = false,
     canNext = false,
+    canRouteWorkspaces = false,
 }: BuildMenuTreeOptions): MenuNode[] {
-    const canvasState: MenuItemState = !canvasSupported
-        ? "disabled"
-        : isCanvasActive
-          ? "active"
-          : "available"
-
     const transportNodes: MenuNode[] = includeTransport
         ? [
               {
@@ -126,8 +132,52 @@ export function buildMenuTree({
           ]
         : []
 
-    return [
+    // Plugin › Visual leaves. Lyrics is a workspace destination; Canvas is the
+    // SEI Canvas toggle and exists only where the face can actually host it —
+    // a face without canvas support gets no Canvas node at all.
+    const visualNodes: MenuNode[] = []
+    if (canRouteWorkspaces) {
+        visualNodes.push({
+            id: "lyrics",
+            label: "Lyrics",
+            icon: LyricsIcon,
+            state: "inactive",
+            actionId: "select-lyrics",
+            workspaceRoute: "plugin-settings:lyrics",
+        })
+    }
+    if (canvasSupported) {
+        visualNodes.push({
+            id: "canvas",
+            label: "Canvas",
+            icon: CanvasIcon,
+            state: isCanvasActive ? "active" : "available",
+            actionId: "activate-canvas",
+        })
+    }
+
+    const playbackChildren: MenuNode[] = [
+        ...transportNodes,
         {
+            id: "up-next",
+            label: "Up Next",
+            icon: QueueIcon,
+            actionId: "open-queue",
+            workspaceRoute: "library:queue",
+        },
+    ]
+    if (canRouteWorkspaces) {
+        playbackChildren.push({
+            id: "automix",
+            label: "Automix",
+            icon: AutomixIcon,
+            workspaceRoute: "playback:automix",
+        })
+    }
+
+    const tree: MenuNode[] = []
+    if (visualNodes.length > 0) {
+        tree.push({
             id: "plugin",
             label: "Plugin",
             icon: PluginIcon,
@@ -136,87 +186,34 @@ export function buildMenuTree({
                     id: "visual",
                     label: "Visual",
                     icon: VisualIcon,
-                    children: [
-                        {
-                            id: "lyrics",
-                            label: "Lyrics",
-                            icon: LyricsIcon,
-                            state: "inactive",
-                            actionId: "select-lyrics",
-                            workspaceRoute: "plugin-settings:lyrics",
-                        },
-                        {
-                            id: "canvas",
-                            label: "Canvas",
-                            icon: CanvasIcon,
-                            state: canvasState,
-                            actionId: "activate-canvas",
-                        },
-                        {
-                            id: "comments",
-                            label: "Comments",
-                            icon: CommentsIcon,
-                            state: "coming-soon",
-                        },
-                    ],
-                },
-                {
-                    id: "plugin-playback",
-                    label: "Playback",
-                    icon: PlaybackIcon,
-                    state: "coming-soon",
-                },
-                {
-                    id: "analytics",
-                    label: "Analytics",
-                    icon: AnalyticsIcon,
-                    state: "coming-soon",
+                    children: visualNodes,
                 },
             ],
-        },
-        {
-            id: "playback",
-            label: "Playback",
-            icon: PlaybackIcon,
-            children: [
-                ...transportNodes,
-                {
-                    id: "up-next",
-                    label: "Up Next",
-                    icon: QueueIcon,
-                    actionId: "open-queue",
-                    workspaceRoute: "library:queue",
-                },
-                {
-                    id: "automix",
-                    label: "Automix",
-                    icon: AutomixIcon,
-                    state: "coming-soon",
-                    workspaceRoute: "playback:automix",
-                },
-                {
-                    id: "repeat",
-                    label: "Repeat",
-                    icon: RepeatIcon,
-                    state: "coming-soon",
-                },
-            ],
-        },
-        {
-            id: "agent",
-            label: "Agent",
-            icon: AgentIcon,
-            state: "coming-soon",
-            workspaceRoute: "agent:queue-director",
-        },
-        {
-            id: "activity-log",
-            label: "Activity Log",
-            icon: AnalyticsIcon as ComponentType,
-            state: "available",
-            workspaceRoute: "diagnostics:activity-log",
-        },
-    ]
+        })
+    }
+    tree.push({
+        id: "playback",
+        label: "Playback",
+        icon: PlaybackIcon,
+        children: playbackChildren,
+    })
+    if (canRouteWorkspaces) {
+        tree.push(
+            {
+                id: "agent",
+                label: "Agent",
+                icon: AgentIcon,
+                workspaceRoute: "agent:queue-director",
+            },
+            {
+                id: "activity-log",
+                label: "Activity Log",
+                icon: AnalyticsIcon as ComponentType,
+                workspaceRoute: "diagnostics:activity-log",
+            }
+        )
+    }
+    return tree
 }
 
 /** Whether a node can be interacted with (entered or actioned). */

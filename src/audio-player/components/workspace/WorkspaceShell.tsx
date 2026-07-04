@@ -7,6 +7,8 @@ import { LibraryQueueWorkspace } from "./LibraryQueueWorkspace"
 import { PluginSettingsWorkspace } from "./PluginSettingsWorkspace"
 import { PlaybackAutomixWorkspace } from "./PlaybackAutomixWorkspace"
 import { AgentQueueDirectorWorkspace } from "./AgentQueueDirectorWorkspace"
+import { AgentScoutWorkspace } from "./AgentScoutWorkspace"
+import { LibraryVaultWorkspace } from "./LibraryVaultWorkspace"
 import { ActivityLogWorkspace } from "../../diagnostics/ActivityLogWorkspace"
 import { ControllerPanelRenderer } from "../../visual-slots/ControllerPanelRenderer"
 import { LYRIC_DISPLAY_ID } from "../../visual-slots/components/LyricDisplay"
@@ -36,6 +38,8 @@ function titleForRoute(route: WorkspaceRoute): string {
             return "Playlists"
         case "library:queue":
             return "Up Next"
+        case "library:vault":
+            return "Add to Vault"
         case "plugin-settings:lyrics":
         case "visual:lyrics":
             return "Lyrics"
@@ -45,6 +49,12 @@ function titleForRoute(route: WorkspaceRoute): string {
             return "Automix"
         case "agent:queue-director":
             return "Queue Director"
+        case "agent:demo-scout":
+            return "Demo Scout"
+        case "agent:studio-scout":
+            return "Studio Scout"
+        case "agent:memoir":
+            return "Memoir"
         case "diagnostics:activity-log":
             return "Activity Log"
         case "visual:canvas":
@@ -95,6 +105,8 @@ function contentForRoute(route: WorkspaceRoute, lyrics?: string): ReactNode {
             return <LibraryPlaylistsWorkspace />
         case "library:queue":
             return <LibraryQueueWorkspace />
+        case "library:vault":
+            return <LibraryVaultWorkspace />
         case "plugin-settings:lyrics":
         case "visual:lyrics":
             // The lyric display is a seiCanvas visual that declares a settings
@@ -110,6 +122,12 @@ function contentForRoute(route: WorkspaceRoute, lyrics?: string): ReactNode {
             return <PlaybackAutomixWorkspace />
         case "agent:queue-director":
             return <AgentQueueDirectorWorkspace />
+        case "agent:demo-scout":
+            return <AgentScoutWorkspace variant="demo-scout" />
+        case "agent:studio-scout":
+            return <AgentScoutWorkspace variant="studio-scout" />
+        case "agent:memoir":
+            return <AgentScoutWorkspace variant="memoir" />
         case "diagnostics:activity-log":
             return <ActivityLogWorkspace />
         case "visual:canvas":

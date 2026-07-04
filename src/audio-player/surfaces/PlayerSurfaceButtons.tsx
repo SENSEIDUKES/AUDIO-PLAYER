@@ -75,6 +75,10 @@ export function PlayerSurfaceButtons({
                       includeTransport: showTransport,
                       canPrevious,
                       canNext,
+                      // Workspace-only nodes (Lyrics, Automix, Agent, Activity
+                      // Log) exist only when the host actually routes into the
+                      // SAP Controller shell — otherwise they'd be dead buttons.
+                      canRouteWorkspaces: Boolean(onOpenFocusedController),
                   })
                 : [],
         [
@@ -84,6 +88,7 @@ export function PlayerSurfaceButtons({
             showTransport,
             canPrevious,
             canNext,
+            onOpenFocusedController,
         ]
     )
 

@@ -55,13 +55,26 @@ export interface BuildMenuTreeOptions {
     /** Whether previous/next are currently available (gates the transport leaves). */
     canPrevious?: boolean;
     canNext?: boolean;
+    /**
+     * Whether the host wires `onOpenWorkspace` (SAP Controller routing). Nodes
+     * whose only real destination is a focused workspace (Lyrics, Automix,
+     * Agent, Activity Log) are omitted entirely when the host can't route
+     * there — the arc renders no dead buttons. Defaults to off.
+     */
+    canRouteWorkspaces?: boolean;
 }
 /**
  * The V1 hardcoded menu tree. A builder (not a constant) so per-face capability
  * and live surface state can adjust node states without the arc knowing about
  * the player. Replaceable later by a plugin-registry-driven tree of the same shape.
+ *
+ * Command-router rules: every node this returns does a real action. Nodes whose
+ * only destination is a focused SAP Controller workspace appear only when the
+ * host routes workspaces; the Canvas leaf appears only on faces that can host
+ * the SEICanvas. There are no "coming soon" placeholders — a capability that
+ * doesn't exist yet simply isn't in the tree.
  */
-export declare function buildMenuTree({ canvasSupported, isCanvasActive, includeTransport, canPrevious, canNext, }: BuildMenuTreeOptions): MenuNode[];
+export declare function buildMenuTree({ canvasSupported, isCanvasActive, includeTransport, canPrevious, canNext, canRouteWorkspaces, }: BuildMenuTreeOptions): MenuNode[];
 /** Whether a node can be interacted with (entered or actioned). */
 export declare function isNodeInteractive(node: MenuNode): boolean;
 //# sourceMappingURL=menuData.d.ts.map
