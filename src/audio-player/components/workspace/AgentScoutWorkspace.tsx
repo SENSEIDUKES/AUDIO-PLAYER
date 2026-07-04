@@ -60,7 +60,7 @@ const KEY_NAME = "VITE_OPENROUTER_API_KEY";
 const getApiKey = (): string => {
     return (
         (typeof window !== "undefined" && (window as any)[KEY_NAME]) ||
-        (typeof process !== "undefined" && (process as any).env?.[KEY_NAME]) ||
+        (typeof globalThis !== "undefined" && (globalThis as any).process?.env?.[KEY_NAME]) ||
         ""
     );
 };
@@ -81,7 +81,7 @@ const getPresetValue = (v: AgentScoutVariant): string => {
             : "@preset/sea-demo-memoir-dev";
     return (
         (typeof window !== "undefined" && (window as any)[key]) ||
-        (typeof process !== "undefined" && (process as any).env?.[key]) ||
+        (typeof globalThis !== "undefined" && (globalThis as any).process?.env?.[key]) ||
         fallback
     );
 };

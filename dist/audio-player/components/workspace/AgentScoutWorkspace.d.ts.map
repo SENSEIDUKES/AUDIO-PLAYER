@@ -1,1 +1,0 @@
-{"version":3,"file":"AgentScoutWorkspace.d.ts","sourceRoot":"","sources":["../../../../src/audio-player/components/workspace/AgentScoutWorkspace.tsx"],"names":[],"mappings":"AAUA,MAAM,MAAM,iBAAiB,GAAG,YAAY,GAAG,cAAc,GAAG,QAAQ,CAAA;AAwJxE,wBAAgB,mBAAmB,CAAC,EAAE,OAAO,EAAE,EAAE;IAAE,OAAO,EAAE,iBAAiB,CAAA;CAAE,sCA4O9E;AAED,eAAe,mBAAmB,CAAA"}
