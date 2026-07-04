@@ -465,13 +465,6 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
         [s]
     )
 
-    // Active plugin instance names for the arc menu's Plugins branch — stable
-    // unless the plugin set itself changes.
-    const activePluginNames = useMemo(
-        () => externalPlugins.map((plugin) => plugin.name),
-        [externalPlugins]
-    )
-
     const { share, copied: shareCopied, nativeShare } = useShareTrack(
         currentTrack.title ?? "",
         currentTrack.artist ?? ""
@@ -975,7 +968,7 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
                 <PlayerSurfaceButtons
                     surface={surface}
                     onOpenQueue={() => setQueueOpen(true)}
-                    activePluginIds={activePluginNames}
+                    activePluginIds={s.pluginNames}
                     onShareLink={handleShareClick}
                     onOpenFocusedController={handleOpenFocusedController}
                 />

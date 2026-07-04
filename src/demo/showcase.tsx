@@ -65,6 +65,7 @@ function trackCommands(track: Track): ArcCommandHost["commands"] {
    Radio). Share leaves use the commands above; every workspace leaf routes
    into the one SAP Controller instance owned here. */
 function ShowcaseVaultRows() {
+    const s = useAudioSession()
     const [route, setRoute] = useState<WorkspaceRoute | null>(null)
     // Studio Scout entitlement is deliberately absent here, so Agents › Scout
     // routes to its free Demo tier.
@@ -89,6 +90,16 @@ function ShowcaseVaultRows() {
                 open={route !== null}
                 route={route ?? "options"}
                 onClose={() => setRoute(null)}
+                // Live session playback state so the arc's Playback › Controls
+                // section shows real switches, not the empty placeholder.
+                playback={{
+                    shuffle: s.shuffle,
+                    onToggleShuffle: s.toggleShuffle,
+                    repeatMode: s.repeatMode,
+                    onCycleRepeat: s.cycleRepeat,
+                    automix: s.automix,
+                    onToggleAutomix: s.toggleAutomix,
+                }}
                 {...SEA_THEME}
             />
         </div>
@@ -136,6 +147,16 @@ function ShowcaseSeaCards() {
                 open={route !== null}
                 route={route ?? "options"}
                 onClose={() => setRoute(null)}
+                // Live session playback state so the arc's Playback › Controls
+                // section shows real switches, not the empty placeholder.
+                playback={{
+                    shuffle: s.shuffle,
+                    onToggleShuffle: s.toggleShuffle,
+                    repeatMode: s.repeatMode,
+                    onCycleRepeat: s.cycleRepeat,
+                    automix: s.automix,
+                    onToggleAutomix: s.toggleAutomix,
+                }}
                 {...SEA_THEME}
             />
         </div>

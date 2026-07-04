@@ -10,6 +10,7 @@ import {
     NarrativeFace,
     SAPController,
     buildVaultTrackArcActions,
+    useAudioSession,
 } from "../audio-player"
 import type {
     ArcCommandHost,
@@ -160,6 +161,7 @@ function WorkshopVaultRows({
     tracks: Track[]
     theme: AudioPlayerTheme
 }) {
+    const s = useAudioSession()
     const [route, setRoute] = useState<WorkspaceRoute | null>(null)
     // No Studio Scout entitlement in the workshop — Agents › Scout routes to
     // its free Demo tier.
@@ -193,6 +195,16 @@ function WorkshopVaultRows({
                 open={route !== null}
                 route={route ?? "options"}
                 onClose={() => setRoute(null)}
+                // Live session playback state so the arc's Playback › Controls
+                // section shows real switches, not the empty placeholder.
+                playback={{
+                    shuffle: s.shuffle,
+                    onToggleShuffle: s.toggleShuffle,
+                    repeatMode: s.repeatMode,
+                    onCycleRepeat: s.cycleRepeat,
+                    automix: s.automix,
+                    onToggleAutomix: s.toggleAutomix,
+                }}
                 {...theme}
             />
         </div>
