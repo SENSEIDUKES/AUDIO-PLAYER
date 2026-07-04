@@ -455,6 +455,23 @@ export function AudioSessionProvider({
         setQueueState((q) => [...q, track])
     }, [])
 
+    // "Play Next": insert immediately after the active track, so it is what the
+    // session advances into. With no active track this degenerates to an append
+    // (the queue is empty or nothing is current, so "after current" is the end).
+    const playNext = useCallback(
+        (track: Track) => {
+            setQueueState((q) => {
+                if (currentIndex < 0 || currentIndex >= q.length) {
+                    return [...q, track]
+                }
+                const next = [...q]
+                next.splice(currentIndex + 1, 0, track)
+                return next
+            })
+        },
+        [currentIndex]
+    )
+
     const playNow = useCallback(
         (track: Track) => {
             const key = trackKey(track)
@@ -645,6 +662,7 @@ export function AudioSessionProvider({
             setQueue,
             playTrack,
             enqueue,
+            playNext,
             playNow,
             next,
             previous,
@@ -672,6 +690,7 @@ export function AudioSessionProvider({
             setQueue,
             playTrack,
             enqueue,
+            playNext,
             playNow,
             next,
             previous,

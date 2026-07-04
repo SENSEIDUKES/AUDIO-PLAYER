@@ -53,9 +53,11 @@ describe("buildMenuTree", () => {
         expect(findNode(tree, "canvas")?.actionId).toBe("activate-canvas")
     })
 
-    it("disables the Canvas node on faces without canvas support", () => {
+    it("omits the Canvas node entirely on faces without canvas support (no dead buttons)", () => {
         const tree = buildMenuTree({ canvasSupported: false, isCanvasActive: false })
-        expect(findNode(tree, "canvas")?.state).toBe("disabled")
+        expect(findNode(tree, "canvas")).toBeUndefined()
+        // With no visual leaves left, the whole Plugin branch disappears too.
+        expect(findNode(tree, "plugin")).toBeUndefined()
     })
 
     it("marks the Canvas node active when the canvas surface is open", () => {
@@ -63,26 +65,56 @@ describe("buildMenuTree", () => {
         expect(findNode(tree, "canvas")?.state).toBe("active")
     })
 
-    it("keeps coming-soon placeholders non-interactive", () => {
-        const tree = buildMenuTree({ canvasSupported: true, isCanvasActive: false })
-        const agent = findNode(tree, "agent")!
-        expect(agent.state).toBe("coming-soon")
-        expect(isNodeInteractive(agent)).toBe(false)
+    it("ships no coming-soon placeholders anywhere in the tree", () => {
+        const collect = (nodes: MenuNode[], out: MenuNode[] = []): MenuNode[] => {
+            for (const n of nodes) {
+                out.push(n)
+                if (n.children) collect(n.children, out)
+            }
+            return out
+        }
+        const tree = buildMenuTree({
+            canvasSupported: true,
+            isCanvasActive: false,
+            canRouteWorkspaces: true,
+        })
+        for (const node of collect(tree)) {
+            expect(node.state).not.toBe("coming-soon")
+        }
+    })
+
+    it("includes workspace-only nodes only when the host routes workspaces", () => {
+        const unrouted = buildMenuTree({ canvasSupported: true, isCanvasActive: false })
+        for (const id of ["lyrics", "automix", "agent", "activity-log"]) {
+            expect(findNode(unrouted, id)).toBeUndefined()
+        }
+        const routed = buildMenuTree({
+            canvasSupported: true,
+            isCanvasActive: false,
+            canRouteWorkspaces: true,
+        })
+        expect(findNode(routed, "lyrics")?.workspaceRoute).toBe("plugin-settings:lyrics")
+        expect(findNode(routed, "automix")?.workspaceRoute).toBe("playback:automix")
+        expect(findNode(routed, "agent")?.workspaceRoute).toBe("agent:queue-director")
+        expect(findNode(routed, "activity-log")?.workspaceRoute).toBe(
+            "diagnostics:activity-log"
+        )
+        expect(isNodeInteractive(findNode(routed, "agent")!)).toBe(true)
     })
 
     it("treats available and inactive nodes as interactive", () => {
-        const tree = buildMenuTree({ canvasSupported: true, isCanvasActive: false })
+        const tree = buildMenuTree({
+            canvasSupported: true,
+            isCanvasActive: false,
+            canRouteWorkspaces: true,
+        })
         expect(isNodeInteractive(findNode(tree, "up-next")!)).toBe(true)
         expect(isNodeInteractive(findNode(tree, "lyrics")!)).toBe(true)
     })
 
-    it("attaches the focused workspace route to the leaf nodes", () => {
+    it("attaches the focused workspace route to Up Next", () => {
         const tree = buildMenuTree({ canvasSupported: true, isCanvasActive: false })
-        // These drive SEICanvasActionMenu's onOpenWorkspace dispatch.
-        expect(findNode(tree, "lyrics")?.workspaceRoute).toBe("plugin-settings:lyrics")
         expect(findNode(tree, "up-next")?.workspaceRoute).toBe("library:queue")
-        expect(findNode(tree, "automix")?.workspaceRoute).toBe("playback:automix")
-        expect(findNode(tree, "agent")?.workspaceRoute).toBe("agent:queue-director")
     })
 
     it("keeps Up Next's legacy open-queue action as a backward-compat fallback", () => {

@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react"
 import type { ReactNode } from "react"
 import {
     AudioPlayer,
@@ -7,10 +8,19 @@ import {
     StickyBottomPlayer,
     MiniSidebarPlayer,
     SeaCardPlayer,
+    SAPController,
+    buildVaultTrackArcActions,
     registerVaultCategory,
+    useAudioSession,
 } from "../audio-player"
-import type { ArcAction, Track, VaultCategory } from "../audio-player"
-import { QueueIcon, ShareIcon } from "../audio-player/skins/icons"
+import type {
+    ArcAction,
+    ArcCommandHost,
+    Track,
+    VaultCategory,
+    WorkspaceRoute,
+} from "../audio-player"
+import { NextIcon, QueueIcon } from "../audio-player/skins/icons"
 import { noLuckTracks, NO_LUCK_COVER, NO_LUCK_ART, SEA_THEME } from "./data"
 
 /* Demonstrate a host-registered CUSTOM classification (beyond the built-ins) —
@@ -34,20 +44,91 @@ const vaultShowcaseTracks: Track[] = noLuckTracks.map((track, i) => ({
     vaultCategory: VAULT_SHOWCASE_CATEGORIES[i % VAULT_SHOWCASE_CATEGORIES.length],
 }))
 
-/* Build the row's Arc actions. New actions are just appended here — the row
-   never changes. A nested "More" branch shows submenu support. */
-const vaultActions = (track: Track): ArcAction[] => [
-    { id: "queue", label: "Add to Queue", icon: QueueIcon, onSelect: () => console.log("queue", track.title) },
-    { id: "share", label: "Share", icon: ShareIcon, onSelect: () => console.log("share", track.title) },
-    {
-        id: "more",
-        label: "More",
-        children: [
-            { id: "edit", label: "Edit", onSelect: () => console.log("edit", track.title) },
-            { id: "archive", label: "Archive", onSelect: () => console.log("archive", track.title) },
-        ],
-    },
-]
+/* Real share commands for a track: Email opens a prefilled mail draft, URL
+   copies the track's link. These back the arc's Share › Email / URL leaves. */
+function shareCommands(track: Track): ArcCommandHost["commands"] {
+    const url = track.audioFile ?? ""
+    return {
+        "share.email": () => {
+            window.location.href = `mailto:?subject=${encodeURIComponent(
+                `${track.title} — ${track.artist ?? ""}`
+            )}&body=${encodeURIComponent(url)}`
+        },
+        "share.url": () => {
+            void navigator.clipboard?.writeText(url)
+        },
+    }
+}
+
+/* The Vault rows with the selected-track command wheel. Queue leaves run on the
+   shared session inside the row; share leaves use the commands above; Vault and
+   Agent leaves route into the one SAP Controller instance owned here. */
+function ShowcaseVaultRows() {
+    const [route, setRoute] = useState<WorkspaceRoute | null>(null)
+    // Studio Scout entitlement is deliberately absent here so the showcase
+    // demonstrates the locked (paid) state on the Agent branch.
+    const arcActions = useMemo(
+        () => buildVaultTrackArcActions({ entitlements: { studioScout: false } }),
+        []
+    )
+    return (
+        <div className="showcase-face__vault">
+            {vaultShowcaseTracks.map((t, i) => (
+                <VaultRowPlayer
+                    key={t.id ?? t.title}
+                    track={t}
+                    number={i + 1}
+                    actions={arcActions}
+                    commands={shareCommands(t)}
+                    onOpenWorkspace={setRoute}
+                    {...SEA_THEME}
+                />
+            ))}
+            <SAPController
+                open={route !== null}
+                route={route ?? "options"}
+                onClose={() => setRoute(null)}
+                {...SEA_THEME}
+            />
+        </div>
+    )
+}
+
+/* SEA cards keep a lean immediate-action list: queue commands wired straight to
+   the shared session (no dead demo buttons). */
+function ShowcaseSeaCards() {
+    const s = useAudioSession()
+    const cardActions = (track: Track): ArcAction[] => [
+        {
+            id: "play-next",
+            label: "Play Next",
+            icon: NextIcon,
+            target: "immediate-action",
+            onSelect: () => s.playNext(track),
+        },
+        {
+            id: "play-later",
+            label: "Play Later",
+            icon: QueueIcon,
+            target: "immediate-action",
+            onSelect: () => s.enqueue(track),
+        },
+    ]
+    return (
+        <div className="showcase-face__sea">
+            {noLuckTracks.slice(0, 4).map((t) => (
+                <SeaCardPlayer
+                    key={t.id ?? t.title}
+                    track={t}
+                    art={NO_LUCK_ART}
+                    tag="SEA"
+                    actions={cardActions(t)}
+                    {...SEA_THEME}
+                />
+            ))}
+        </div>
+    )
+}
 
 /* Captioned gallery card: every face example gets a name, a one-line
    description, and small capability tags so the family rules read at a glance. */
@@ -226,18 +307,7 @@ export function Showcase() {
                             surface="Marketplace / card variant — embeddable SEA drop cards built on the primary contract."
                             tags={["SEICanvas", "Waveform / ScrubberCanvas", "Action button"]}
                         >
-                            <div className="showcase-face__sea">
-                                {noLuckTracks.slice(0, 4).map((t) => (
-                                    <SeaCardPlayer
-                                        key={t.id ?? t.title}
-                                        track={t}
-                                        art={NO_LUCK_ART}
-                                        tag="SEA"
-                                        actions={vaultActions(t)}
-                                        {...SEA_THEME}
-                                    />
-                                ))}
-                            </div>
+                            <ShowcaseSeaCards />
                         </FaceCard>
                     </div>
                 </section>
@@ -277,17 +347,7 @@ export function Showcase() {
                             tags={["Classification color", "Arc actions", "No per-row scrubber"]}
                             wide
                         >
-                            <div className="showcase-face__vault">
-                                {vaultShowcaseTracks.map((t, i) => (
-                                    <VaultRowPlayer
-                                        key={t.id ?? t.title}
-                                        track={t}
-                                        number={i + 1}
-                                        actions={vaultActions(t)}
-                                        {...SEA_THEME}
-                                    />
-                                ))}
-                            </div>
+                            <ShowcaseVaultRows />
                         </FaceCard>
                     </div>
                 </section>

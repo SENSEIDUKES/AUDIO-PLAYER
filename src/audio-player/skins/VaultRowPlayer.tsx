@@ -11,10 +11,11 @@ import {
 import { trackKey } from "../utils/trackKey"
 import { faceSupportsAction } from "../surfaces/faceCapabilities"
 import { ArcActionButton } from "../surfaces/ArcActionButton"
-import type { ArcAction } from "../surfaces/ArcActionButton"
+import type { ArcAction, ArcCommandHost } from "../surfaces/ArcActionButton"
+import type { WorkspaceRoute } from "../components/workspace/workspaceRoutes"
 import { getVaultCategoryMeta } from "./vaultCategories"
 import { buildThemeVars } from "./themeVars"
-import { DotsIcon, PauseIcon, PlayIcon, SpinnerIcon } from "./icons"
+import { PauseIcon, PlayIcon, SpinnerIcon } from "./icons"
 import "./skins.css"
 
 export interface VaultRowPlayerProps extends AudioPlayerTheme {
@@ -25,15 +26,22 @@ export interface VaultRowPlayerProps extends AudioPlayerTheme {
     /**
      * Row actions surfaced through the Arc Action Button (the primary row action
      * surface). A plain, extensible list — append actions or nest `children`
-     * without touching the row. Supersedes `onAction`.
+     * without touching the row.
      */
     actions?: ArcAction[]
     /**
-     * @deprecated Legacy single action entry point. When `actions` is omitted,
-     * this is synthesized into a single "More" arc action so existing callers
-     * keep working. Prefer `actions`.
+     * Extra immediate command implementations for this row's arc (e.g.
+     * `"share.email"` / `"share.url"`). Merged over the row's built-in queue
+     * commands — `"queue.insertAfterCurrent"` (Play Next) and `"queue.append"`
+     * (Play Later) are wired to the shared session for this track by default.
      */
-    onAction?: (track: Track) => void
+    commands?: ArcCommandHost["commands"]
+    /**
+     * Opens a focused workspace in the SAP Controller shell — the destination
+     * of the arc's `"sap-controller"` leaves (Vault, Agent). Without it those
+     * leaves are pruned from the wheel rather than rendered dead.
+     */
+    onOpenWorkspace?: (route: WorkspaceRoute) => void
     className?: string
     style?: CSSProperties
 }
@@ -61,7 +69,8 @@ export function VaultRowPlayer({
     track,
     number,
     actions,
-    onAction,
+    commands,
+    onOpenWorkspace,
     className,
     style,
     ...theme
@@ -73,18 +82,19 @@ export function VaultRowPlayer({
     // row so only the active track's button can spin.
     const isBufferingThis = isActive && s.isBuffering
     const category = getVaultCategoryMeta(track.vaultCategory)
-    // Resolve the arc actions: prefer the explicit list; otherwise synthesize a
-    // single "More" action from the legacy `onAction` so existing callers keep a
-    // working action surface (now an arc instead of a three-dot menu).
-    const resolvedActions = useMemo<ArcAction[]>(() => {
-        if (actions && actions.length > 0) return actions
-        if (onAction) {
-            return [
-                { id: "more", label: "More", icon: DotsIcon, onSelect: () => onAction(track) },
-            ]
-        }
-        return []
-    }, [actions, onAction, track])
+    // The row's built-in immediate commands bind the arc's queue leaves to the
+    // shared session for *this* track: Play Next inserts right after the active
+    // track, Play Later appends. Host `commands` merge over them, so a host can
+    // add (or override) commands like share.email/share.url per row.
+    const rowCommands = useMemo<ArcCommandHost["commands"]>(
+        () => ({
+            "queue.insertAfterCurrent": () => s.playNext(track),
+            "queue.append": () => s.enqueue(track),
+            ...commands,
+        }),
+        [s, track, commands]
+    )
+    const resolvedActions = useMemo<ArcAction[]>(() => actions ?? [], [actions])
     // The capability allows the button, but only render it when there are actions
     // — otherwise it would be an interactive yet empty control.
     const showAction = faceSupportsAction("vaultRow") && resolvedActions.length > 0
@@ -162,6 +172,8 @@ export function VaultRowPlayer({
             {showAction && (
                 <ArcActionButton
                     actions={resolvedActions}
+                    commands={rowCommands}
+                    onOpenWorkspace={onOpenWorkspace}
                     ariaLabel={`Actions for ${track.title}`}
                     className="ap-vr__action"
                 />

@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react"
 import type { CSSProperties, ReactNode } from "react"
 import {
     AudioPlayer,
@@ -7,9 +8,11 @@ import {
     MiniSidebarPlayer,
     SeaCardPlayer,
     NarrativeFace,
+    SAPController,
+    buildVaultTrackArcActions,
 } from "../audio-player"
 import type {
-    ArcAction,
+    ArcCommandHost,
     AudioPlayerPlugin,
     AudioPlayerTheme,
     MediaSource,
@@ -17,9 +20,9 @@ import type {
     RepeatMode,
     Track,
     VaultCategory,
+    WorkspaceRoute,
 } from "../audio-player"
 import { getPropertyDefaults } from "../audio-player"
-import { QueueIcon, ShareIcon } from "../audio-player/skins/icons"
 import { NO_LUCK_COVER, NO_LUCK_ART } from "./data"
 
 export type WorkshopFaceId =
@@ -131,12 +134,69 @@ const WORKSHOP_VAULT_CATEGORIES: VaultCategory[] = [
     "arcNote",
 ]
 
-/* Default Arc actions for a Vault row in the workshop. Appending here is all it
-   takes to add a row action — the row never changes. */
-const vaultRowActions = (track: Track): ArcAction[] => [
-    { id: "queue", label: "Add to Queue", icon: QueueIcon, onSelect: () => console.log("queue", track.title) },
-    { id: "share", label: "Share", icon: ShareIcon, onSelect: () => console.log("share", track.title) },
-]
+/* Real share commands for a Vault row's arc: Email opens a prefilled mail
+   draft, URL copies the track link. */
+function workshopShareCommands(track: Track): ArcCommandHost["commands"] {
+    const url = track.audioFile ?? ""
+    return {
+        "share.email": () => {
+            window.location.href = `mailto:?subject=${encodeURIComponent(
+                `${track.title} — ${track.artist ?? ""}`
+            )}&body=${encodeURIComponent(url)}`
+        },
+        "share.url": () => {
+            void navigator.clipboard?.writeText(url)
+        },
+    }
+}
+
+/* The workshop's Vault preview: rows carry the selected-track command wheel
+   (Add to Queue / Share / Vault / Agent) and route Vault/Agent leaves into one
+   shared SAP Controller instance owned here. */
+function WorkshopVaultRows({
+    tracks,
+    theme,
+}: {
+    tracks: Track[]
+    theme: AudioPlayerTheme
+}) {
+    const [route, setRoute] = useState<WorkspaceRoute | null>(null)
+    // No Studio Scout entitlement in the workshop — the leaf renders locked.
+    const arcActions = useMemo(
+        () => buildVaultTrackArcActions({ entitlements: { studioScout: false } }),
+        []
+    )
+    return (
+        <div className="workshop__vault">
+            {tracks.map((t, i) => {
+                // Tag rows with rotating categories so the classification
+                // color system is visible in the workshop preview.
+                const tagged: Track = {
+                    ...t,
+                    vaultCategory:
+                        WORKSHOP_VAULT_CATEGORIES[i % WORKSHOP_VAULT_CATEGORIES.length],
+                }
+                return (
+                    <VaultRowPlayer
+                        key={tagged.id ?? tagged.title}
+                        track={tagged}
+                        number={i + 1}
+                        actions={arcActions}
+                        commands={workshopShareCommands(tagged)}
+                        onOpenWorkspace={setRoute}
+                        {...theme}
+                    />
+                )
+            })}
+            <SAPController
+                open={route !== null}
+                route={route ?? "options"}
+                onClose={() => setRoute(null)}
+                {...theme}
+            />
+        </div>
+    )
+}
 
 export const WORKSHOP_FACES: readonly WorkshopFaceDefinition[] = [
     {
@@ -228,35 +288,7 @@ export const WORKSHOP_FACES: readonly WorkshopFaceDefinition[] = [
         sessionBased: true,
         controls: ["theme"],
         render: ({ settings, tracks }) => (
-            <div className="workshop__vault">
-                {tracks.map((t, i) => {
-                    // Tag rows with rotating categories so the classification
-                    // color system is visible in the workshop preview.
-                    const tagged: Track = {
-                        ...t,
-                        vaultCategory: WORKSHOP_VAULT_CATEGORIES[i % WORKSHOP_VAULT_CATEGORIES.length],
-                    }
-                    // First row uses the legacy `onAction` to prove the arc still
-                    // renders via back-compat synthesis; the rest use `actions`.
-                    return i === 0 ? (
-                        <VaultRowPlayer
-                            key={tagged.id ?? tagged.title}
-                            track={tagged}
-                            number={i + 1}
-                            onAction={(track) => console.log("vault action", track.title)}
-                            {...settings.theme}
-                        />
-                    ) : (
-                        <VaultRowPlayer
-                            key={tagged.id ?? tagged.title}
-                            track={tagged}
-                            number={i + 1}
-                            actions={vaultRowActions(tagged)}
-                            {...settings.theme}
-                        />
-                    )
-                })}
-            </div>
+            <WorkshopVaultRows tracks={tracks} theme={settings.theme} />
         ),
     },
     {

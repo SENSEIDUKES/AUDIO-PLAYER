@@ -1,30 +1,34 @@
-import { useMemo } from "react"
-import type { ComponentType } from "react"
+import { useCallback, useMemo } from "react"
 import { DotsIcon } from "../skins/icons"
-import type { MenuItemState, MenuNode } from "../menu/menuData"
+import type { MenuNode } from "../menu/menuData"
+import {
+    pruneDeadArcActions,
+    resolveArcActionState,
+    routeArcAction,
+} from "../menu/arcRouting"
+import type { ArcAction, ArcCommandHost } from "../menu/arcRouting"
+import type { WorkspaceRoute } from "../components/workspace/workspaceRoutes"
 import { SEICanvasActionMenu } from "./SEICanvasActionMenu"
 
-/**
- * A declarative row/face action. `onSelect` fires for leaf actions; provide
- * `children` to nest a submenu instead (its `onSelect` is then ignored). New
- * actions are added by appending to the `actions` array — no row/menu rewrite.
- */
-export interface ArcAction {
-    id: string
-    label: string
-    /** Optional glyph; defaults to the three-dot mark. */
-    icon?: ComponentType
-    /** Reuses the arc menu's state union (available/disabled/locked/…). */
-    state?: MenuItemState
-    /** Leaf handler. Receives the action id; ignored when `children` is set. */
-    onSelect?: (id: string) => void
-    /** Nested actions — renders a submenu in the arc. */
-    children?: ArcAction[]
-}
+export type { ArcAction, ArcActionTarget, ArcCommandId, ArcCommandHost } from "../menu/arcRouting"
 
 export interface ArcActionButtonProps {
-    /** The actions to surface in the arc. */
+    /** The declarative action tree to surface in the arc. */
     actions: ArcAction[]
+    /**
+     * Immediate command implementations, keyed by command id (e.g.
+     * `"queue.insertAfterCurrent"`). Leaves with an `action` the host doesn't
+     * implement are pruned, never rendered dead.
+     */
+    commands?: ArcCommandHost["commands"]
+    /** Opens/toggles the SEI Canvas — the destination of `"sei-canvas"` leaves. */
+    onOpenCanvas?: () => void
+    /**
+     * Opens a focused workspace route in the SAP Controller shell — the
+     * destination of `"sap-controller"` leaves. Without it those leaves (and
+     * any branch left empty) are pruned.
+     */
+    onOpenWorkspace?: (route: WorkspaceRoute) => void
     ariaLabel?: string
     className?: string
 }
@@ -35,12 +39,13 @@ function toMenuNodes(actions: ArcAction[]): MenuNode[] {
         id: a.id,
         label: a.label,
         icon: a.icon ?? DotsIcon,
-        state: a.state,
-        // No `actionId`: leaf selections fall through to the menu's `onSelect`,
-        // which we dispatch by id — keeping this fully decoupled from the
-        // reserved queue/canvas actions. An empty `children` array stays
-        // `undefined` so the node renders as a leaf (matching `indexLeaves`),
-        // not a submenu that opens nothing.
+        // Locked-entitlement targets render locked without the caller having
+        // to set both fields; an explicit `state` still wins.
+        state: resolveArcActionState(a),
+        // No `actionId`/`workspaceRoute` on the nodes: all leaf dispatch goes
+        // through the single router below, keeping this decoupled from the
+        // menu's reserved queue/canvas actions. An empty `children` array stays
+        // `undefined` so the node renders as a leaf, not an empty submenu.
         children:
             a.children && a.children.length > 0
                 ? toMenuNodes(a.children)
@@ -57,29 +62,58 @@ function indexLeaves(actions: ArcAction[], map: Map<string, ArcAction>): void {
 }
 
 /**
- * A generic Arc Action Button: the SEIHouse command-wheel affordance backed by a
- * plain `ArcAction[]` model. It is a thin, engine-agnostic adapter over
- * `SEICanvasActionMenu` — the trigger is a single button when closed (cheap to
- * mount in long lists), and the arc overlay only renders on tap. Any face can
- * reuse it as its primary action surface; Vault rows use it in place of the old
- * three-dot menu.
+ * The Arc Action Button: the SEIHouse command-wheel affordance backed by a
+ * plain `ArcAction[]` model, upgraded from a pretty radial UI into a command
+ * router. Every leaf declares its `target`, and the button routes it into one
+ * of exactly two real surfaces — the SEI Canvas (`onOpenCanvas`) or the SAP
+ * Controller (`onOpenWorkspace`) — or runs an immediate command from
+ * `commands`. Leaves the host hasn't wired are pruned before render, so every
+ * visible node does a real action; entitlement-locked leaves stay visible but
+ * render locked. The trigger is a single button when closed (cheap to mount in
+ * long lists) and the arc overlay only renders on tap.
  */
 export function ArcActionButton({
     actions,
+    commands,
+    onOpenCanvas,
+    onOpenWorkspace,
     ariaLabel = "Actions",
     className,
 }: ArcActionButtonProps) {
-    const items = useMemo(() => toMenuNodes(actions), [actions])
+    const host = useMemo<ArcCommandHost>(
+        () => ({
+            commands,
+            openCanvas: onOpenCanvas,
+            openWorkspace: onOpenWorkspace,
+        }),
+        [commands, onOpenCanvas, onOpenWorkspace]
+    )
+    // No dead buttons: drop every leaf that can't reach a real destination on
+    // this host (and every branch that ends up empty), then render the rest.
+    const liveActions = useMemo(
+        () => pruneDeadArcActions(actions, host),
+        [actions, host]
+    )
+    const items = useMemo(() => toMenuNodes(liveActions), [liveActions])
     const leaves = useMemo(() => {
         const map = new Map<string, ArcAction>()
-        indexLeaves(actions, map)
+        indexLeaves(liveActions, map)
         return map
-    }, [actions])
+    }, [liveActions])
 
+    const handleSelect = useCallback(
+        (node: MenuNode) => {
+            const action = leaves.get(node.id)
+            if (action) routeArcAction(action, host)
+        },
+        [leaves, host]
+    )
+
+    if (liveActions.length === 0) return null
     return (
         <SEICanvasActionMenu
             items={items}
-            onSelect={(node) => leaves.get(node.id)?.onSelect?.(node.id)}
+            onSelect={handleSelect}
             ariaLabel={ariaLabel}
             className={className}
         />

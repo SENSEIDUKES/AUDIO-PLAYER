@@ -451,6 +451,9 @@ export interface SessionEngine extends AudioPlayerEngine {
     playTrack: (index: number) => void;
     /** Append a track to the end of the queue (no playback change). */
     enqueue: (track: Track) => void;
+    /** Insert a track immediately after the active track ("Play Next").
+     *  Falls back to an append when nothing is current. */
+    playNext: (track: Track) => void;
     /** Play a track immediately: jump to it if already queued, else append + play. */
     playNow: (track: Track) => void;
     /** Advance to the next track (honors shuffle / repeat). */
