@@ -136,6 +136,9 @@ export function pruneDeadArcActions(
     host: ArcCommandHost
 ): ArcAction[] {
     const pruned: ArcAction[] = []
+    // Public library entry point: a null/undefined tree from an untyped (plain
+    // JS) caller prunes to nothing instead of throwing.
+    if (!actions) return pruned
     for (const action of actions) {
         if (action.children && action.children.length > 0) {
             const children = pruneDeadArcActions(action.children, host)

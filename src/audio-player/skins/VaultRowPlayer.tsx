@@ -86,13 +86,17 @@ export function VaultRowPlayer({
     // shared session for *this* track: Play Next inserts right after the active
     // track, Play Later appends. Host `commands` merge over them, so a host can
     // add (or override) commands like share.email/share.url per row.
+    // Depend on the two stable callbacks, not the whole session object — the
+    // session value changes on every playback tick, which would re-memoize
+    // this map on each render across a long list of rows.
+    const { playNext, enqueue } = s
     const rowCommands = useMemo<ArcCommandHost["commands"]>(
         () => ({
-            "queue.insertAfterCurrent": () => s.playNext(track),
-            "queue.append": () => s.enqueue(track),
+            "queue.insertAfterCurrent": () => playNext(track),
+            "queue.append": () => enqueue(track),
             ...commands,
         }),
-        [s, track, commands]
+        [playNext, enqueue, track, commands]
     )
     const resolvedActions = useMemo<ArcAction[]>(() => actions ?? [], [actions])
     // The capability allows the button, but only render it when there are actions

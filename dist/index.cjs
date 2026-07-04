@@ -12784,6 +12784,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 	};
 	function AgentScoutWorkspace({ variant }) {
 		const copy = AGENT_COPY[variant];
+		if (!copy) return null;
 		return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 			className: "sap-ctl__workspace-empty",
 			"data-agent": variant,
@@ -17439,6 +17440,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 	*/
 	function pruneDeadArcActions(actions, host) {
 		const pruned = [];
+		if (!actions) return pruned;
 		for (const action of actions) {
 			if (action.children && action.children.length > 0) {
 				const children = pruneDeadArcActions(action.children, host);
@@ -17559,12 +17561,14 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 		const isPlayingThis = isActive && s.isPlaying;
 		const isBufferingThis = isActive && s.isBuffering;
 		const category = getVaultCategoryMeta(track.vaultCategory);
+		const { playNext, enqueue } = s;
 		const rowCommands = (0, react.useMemo)(() => ({
-			"queue.insertAfterCurrent": () => s.playNext(track),
-			"queue.append": () => s.enqueue(track),
+			"queue.insertAfterCurrent": () => playNext(track),
+			"queue.append": () => enqueue(track),
 			...commands
 		}), [
-			s,
+			playNext,
+			enqueue,
 			track,
 			commands
 		]);

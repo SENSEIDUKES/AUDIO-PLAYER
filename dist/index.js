@@ -12772,6 +12772,7 @@ var AGENT_COPY = {
 };
 function AgentScoutWorkspace({ variant }) {
 	const copy = AGENT_COPY[variant];
+	if (!copy) return null;
 	return /* @__PURE__ */ jsxs("div", {
 		className: "sap-ctl__workspace-empty",
 		"data-agent": variant,
@@ -17427,6 +17428,7 @@ function isArcActionLive(action, host) {
 */
 function pruneDeadArcActions(actions, host) {
 	const pruned = [];
+	if (!actions) return pruned;
 	for (const action of actions) {
 		if (action.children && action.children.length > 0) {
 			const children = pruneDeadArcActions(action.children, host);
@@ -17547,12 +17549,14 @@ function VaultRowPlayer({ track, number, actions, commands, onOpenWorkspace, cla
 	const isPlayingThis = isActive && s.isPlaying;
 	const isBufferingThis = isActive && s.isBuffering;
 	const category = getVaultCategoryMeta(track.vaultCategory);
+	const { playNext, enqueue } = s;
 	const rowCommands = useMemo(() => ({
-		"queue.insertAfterCurrent": () => s.playNext(track),
-		"queue.append": () => s.enqueue(track),
+		"queue.insertAfterCurrent": () => playNext(track),
+		"queue.append": () => enqueue(track),
 		...commands
 	}), [
-		s,
+		playNext,
+		enqueue,
 		track,
 		commands
 	]);

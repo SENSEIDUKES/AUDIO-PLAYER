@@ -21,6 +21,9 @@ const AGENT_COPY: Record<AgentScoutVariant, { lead: string; sub: string }> = {
 
 export function AgentScoutWorkspace({ variant }: { variant: AgentScoutVariant }) {
     const copy = AGENT_COPY[variant]
+    // Unknown variants can only arrive from untyped (plain JS) hosts; render
+    // nothing rather than crash the whole controller sheet.
+    if (!copy) return null
     return (
         <div className="sap-ctl__workspace-empty" data-agent={variant}>
             <p className="sap-ctl__workspace-lead">{copy.lead}</p>
