@@ -113,20 +113,6 @@ function ShowcaseSeaCards() {
     const s = useAudioSession()
     const [route, setRoute] = useState<WorkspaceRoute | null>(null)
     const cardActions = (track: Track): ArcAction[] => [
-        {
-            id: "play-next",
-            label: "Play Next",
-            icon: NextIcon,
-            target: "immediate-action",
-            onSelect: () => s.playNext(track),
-        },
-        {
-            id: "play-later",
-            label: "Play Later",
-            icon: QueueIcon,
-            target: "immediate-action",
-            onSelect: () => s.enqueue(track),
-        },
         ...buildStandardTrackArcActions({ activePluginIds: s.pluginNames }),
     ]
     return (
@@ -149,6 +135,35 @@ function ShowcaseSeaCards() {
                 onClose={() => setRoute(null)}
                 // Live session playback state so the arc's Playback › Controls
                 // section shows real switches, not the empty placeholder.
+                playback={{
+                    shuffle: s.shuffle,
+                    onToggleShuffle: s.toggleShuffle,
+                    repeatMode: s.repeatMode,
+                    onCycleRepeat: s.cycleRepeat,
+                    automix: s.automix,
+                    onToggleAutomix: s.toggleAutomix,
+                }}
+                {...SEA_THEME}
+            />
+        </div>
+    )
+}
+
+function ShowcaseMiniSidebar() {
+    const s = useAudioSession()
+    const [route, setRoute] = useState<WorkspaceRoute | null>(null)
+    return (
+        <div className="showcase-face__mini">
+            <MiniSidebarPlayer
+                art={NO_LUCK_ART}
+                onOpenWorkspace={setRoute}
+                activePluginIds={s.pluginNames}
+                {...SEA_THEME}
+            />
+            <SAPController
+                open={route !== null}
+                route={route ?? "options"}
+                onClose={() => setRoute(null)}
                 playback={{
                     shuffle: s.shuffle,
                     onToggleShuffle: s.toggleShuffle,
@@ -364,7 +379,7 @@ export function Showcase() {
                             surface="Minimal compact widget — no inline scrubber, no inline Next button (skip/next moved into the action menu)."
                             tags={["Action button", "No inline scrubber"]}
                         >
-                            <MiniSidebarPlayer art={NO_LUCK_ART} {...SEA_THEME} />
+                            <ShowcaseMiniSidebar />
                         </FaceCard>
                         <FaceCard
                             name="StickyBottomPlayer"

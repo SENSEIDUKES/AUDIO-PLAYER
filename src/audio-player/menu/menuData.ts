@@ -327,16 +327,20 @@ export function buildMenuTree({
                     id: "agent-scout",
                     label: "Scout",
                     icon: AgentIcon,
-                    workspaceRoute:
-                        entitlements?.studioScout === true
-                            ? "agent:studio-scout"
-                            : "agent:demo-scout",
+                    workspaceRoute: "agent:demo-scout",
                 },
                 {
                     id: "agent-memoir",
                     label: "Memoir",
                     icon: LyricsIcon,
                     workspaceRoute: "agent:memoir",
+                },
+                {
+                    id: "agent-studio-scout",
+                    label: "Studio Scout",
+                    icon: AgentIcon,
+                    workspaceRoute: "agent:studio-scout",
+                    state: entitlements?.studioScout ? "available" : "locked",
                 },
             ],
         })

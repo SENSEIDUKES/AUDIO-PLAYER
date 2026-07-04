@@ -12,6 +12,7 @@ import {
     formatSecondaryLine,
     formatVersionedTitle,
 } from "../utils/formatMetadata"
+import type { WorkspaceRoute } from "../components/workspace/workspaceRoutes"
 import "./skins.css"
 
 export interface MiniSidebarPlayerProps extends AudioPlayerTheme {
@@ -19,10 +20,18 @@ export interface MiniSidebarPlayerProps extends AudioPlayerTheme {
         Applied as background-image so the cover/center sizing rules hold. */
     art?: string
     /**
+    /**
      * Unified artwork media (image or video). Supersedes `art` when set; video
      * renders muted/looping in the small art block.
      */
     artMedia?: MediaSource | null
+    /**
+     * Opens a focused workspace in the SAP Controller shell. Required for the
+     * radial menu to render its full set of workspace-routed options.
+     */
+    onOpenWorkspace?: (route: WorkspaceRoute) => void
+    /** Active plugin ids to populate the Plugins branch. */
+    activePluginIds?: readonly string[]
     className?: string
     style?: CSSProperties
 }
@@ -45,6 +54,8 @@ export interface MiniSidebarPlayerProps extends AudioPlayerTheme {
 export function MiniSidebarPlayer({
     art = "linear-gradient(135deg,#7C5CFF,#22D3A6)",
     artMedia,
+    onOpenWorkspace,
+    activePluginIds,
     className,
     style,
     ...theme
@@ -110,6 +121,8 @@ export function MiniSidebarPlayer({
                     canNext={s.canNext}
                     onPrevious={s.previous}
                     onNext={s.next}
+                    onOpenFocusedController={onOpenWorkspace}
+                    activePluginIds={activePluginIds}
                 />
             </div>
 

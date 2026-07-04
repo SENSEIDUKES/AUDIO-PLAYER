@@ -211,6 +211,54 @@ function WorkshopVaultRows({
     )
 }
 
+function WorkshopSeaCards({
+    tracks,
+    theme,
+    settings,
+}: {
+    tracks: Track[]
+    theme: AudioPlayerTheme
+    settings: WorkshopSettings
+}) {
+    const s = useAudioSession()
+    const [route, setRoute] = useState<WorkspaceRoute | null>(null)
+    const cardActions = (): ArcAction[] => [
+        ...buildStandardTrackArcActions({ activePluginIds: s.pluginNames }),
+    ]
+    return (
+        <div className="workshop__sea">
+            {tracks.slice(0, 4).map((t) => (
+                <SeaCardPlayer
+                    key={t.id ?? t.title}
+                    track={t}
+                    art={settings.art}
+                    artMedia={settings.artMedia}
+                    tag="SEA"
+                    actions={cardActions()}
+                    onOpenWorkspace={setRoute}
+                    titleFont={settings.titleFont}
+                    artistFont={settings.artistFont}
+                    {...theme}
+                />
+            ))}
+            <SAPController
+                open={route !== null}
+                route={route ?? "options"}
+                onClose={() => setRoute(null)}
+                playback={{
+                    shuffle: s.shuffle,
+                    onToggleShuffle: s.toggleShuffle,
+                    repeatMode: s.repeatMode,
+                    onCycleRepeat: s.cycleRepeat,
+                    automix: s.automix,
+                    onToggleAutomix: s.toggleAutomix,
+                }}
+                {...theme}
+            />
+        </div>
+    )
+}
+
 export const WORKSHOP_FACES: readonly WorkshopFaceDefinition[] = [
     {
         id: "audio-player",
@@ -284,13 +332,35 @@ export const WORKSHOP_FACES: readonly WorkshopFaceDefinition[] = [
         playerFace: "miniSidebar",
         sessionBased: true,
         controls: ["theme", "art"],
-        render: ({ settings }) => (
-            <MiniSidebarPlayer
-                art={settings.art}
-                artMedia={settings.artMedia}
-                {...settings.theme}
-            />
-        ),
+        render: ({ settings }) => {
+            const s = useAudioSession();
+            const [route, setRoute] = useState<WorkspaceRoute | null>(null);
+            return (
+                <div className="workshop__mini">
+                    <MiniSidebarPlayer
+                        art={settings.art}
+                        artMedia={settings.artMedia}
+                        onOpenWorkspace={setRoute}
+                        activePluginIds={s.pluginNames}
+                        {...settings.theme}
+                    />
+                    <SAPController
+                        open={route !== null}
+                        route={route ?? "options"}
+                        onClose={() => setRoute(null)}
+                        playback={{
+                            shuffle: s.shuffle,
+                            onToggleShuffle: s.toggleShuffle,
+                            repeatMode: s.repeatMode,
+                            onCycleRepeat: s.cycleRepeat,
+                            automix: s.automix,
+                            onToggleAutomix: s.toggleAutomix,
+                        }}
+                        {...settings.theme}
+                    />
+                </div>
+            )
+        },
     },
     {
         id: "vault-row",
@@ -313,20 +383,7 @@ export const WORKSHOP_FACES: readonly WorkshopFaceDefinition[] = [
         sessionBased: true,
         controls: ["theme", "art"],
         render: ({ settings, tracks }) => (
-            <div className="workshop__sea">
-                {tracks.slice(0, 4).map((t) => (
-                    <SeaCardPlayer
-                        key={t.id ?? t.title}
-                        track={t}
-                        art={settings.art}
-                        artMedia={settings.artMedia}
-                        tag="SEA"
-                        titleFont={settings.titleFont}
-                        artistFont={settings.artistFont}
-                        {...settings.theme}
-                    />
-                ))}
-            </div>
+            <WorkshopSeaCards tracks={tracks} theme={settings.theme} settings={settings} />
         ),
     },
     {

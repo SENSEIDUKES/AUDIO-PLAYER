@@ -130,10 +130,6 @@ export function buildShareArcBranch(): ArcAction {
 export function buildAgentsArcBranch(
     entitlements?: ArcMenuEntitlements
 ): ArcAction {
-    const scoutRoute: WorkspaceRoute =
-        entitlements?.studioScout === true
-            ? "agent:studio-scout"
-            : "agent:demo-scout"
     return {
         id: "agents",
         label: "Agents",
@@ -144,7 +140,7 @@ export function buildAgentsArcBranch(
                 label: "Scout",
                 icon: AgentIcon,
                 target: "sap-controller",
-                workspaceRoute: scoutRoute,
+                workspaceRoute: "agent:demo-scout",
             },
             {
                 id: "agent-memoir",
@@ -152,6 +148,13 @@ export function buildAgentsArcBranch(
                 icon: LyricsIcon,
                 target: "sap-controller",
                 workspaceRoute: "agent:memoir",
+            },
+            {
+                id: "agent-studio-scout",
+                label: "Studio Scout",
+                icon: AgentIcon,
+                target: entitlements?.studioScout ? "sap-controller" : "locked-entitlement",
+                workspaceRoute: "agent:studio-scout",
             },
         ],
     }
