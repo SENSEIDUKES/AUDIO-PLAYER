@@ -21,8 +21,10 @@ import {
     PluginRegistryProvider,
     useActivePluginInstances,
     PluginManagerPanel,
+    SAPController,
 } from "../audio-player"
 import type { AudioBackendKind } from "../audio-player"
+import type { WorkspaceRoute } from "../audio-player/components/workspace/workspaceRoutes"
 import { SAMPLE, BROKEN, OG_BG, playlist, proPlaylist, stressPlaylist, SEA_THEME, SEA_ARTS } from "./data"
 
 /* ----------------------------- Reusable lab chrome ----------------------------- */
@@ -164,6 +166,68 @@ function HeadlessAdapterProbe() {
     )
 }
 
+function GlobalSessionInner() {
+    const s = useAudioSession()
+    const [route, setRoute] = useState<WorkspaceRoute | null>(null)
+
+    return (
+        <>
+            <div className="lab-session">
+                <div className="lab-session__main">
+                    <FullCardPlayer {...SEA_THEME} />
+                    <div className="lab-session__sea">
+                        {playlist.map((t, i) => (
+                            <SeaCardPlayer
+                                key={`${t.title}-${i}`}
+                                track={t}
+                                art={SEA_ARTS[i % SEA_ARTS.length]}
+                                tag={t.audioFile === BROKEN ? "broken" : "SEA"}
+                                onOpenWorkspace={setRoute}
+                                {...SEA_THEME}
+                            />
+                        ))}
+                    </div>
+                </div>
+                <aside className="lab-session__side">
+                    <h4 className="lab-app__sidebar-title">Now playing</h4>
+                    <MiniSidebarPlayer onOpenWorkspace={setRoute} {...SEA_THEME} />
+                    <h4 className="lab-app__sidebar-title">The Vault</h4>
+                    <div className="lab-session__vault">
+                        {playlist.map((t, i) => (
+                            <VaultRowPlayer
+                                key={`${t.title}-${i}`}
+                                track={t}
+                                number={i + 1}
+                                onOpenWorkspace={setRoute}
+                                {...SEA_THEME}
+                            />
+                        ))}
+                    </div>
+                </aside>
+            </div>
+            {/* fixed={false} so the bar previews inline instead of
+                covering the whole lab page. */}
+            <div className="lab-session__sticky">
+                <StickyBottomPlayer fixed={false} {...SEA_THEME} />
+            </div>
+            <HeadlessAdapterProbe />
+            <SAPController
+                open={route !== null}
+                route={route ?? "options"}
+                onClose={() => setRoute(null)}
+                playback={{
+                    shuffle: s.shuffle,
+                    onToggleShuffle: s.toggleShuffle,
+                    repeatMode: s.repeatMode,
+                    onCycleRepeat: s.cycleRepeat,
+                    automix: s.automix,
+                    onToggleAutomix: s.toggleAutomix,
+                }}
+            />
+        </>
+    )
+}
+
 /* Every skin below shares ONE AudioSessionProvider — and therefore one <audio>
    element and one queue. Pressing play / seeking / switching tracks in any skin
    updates all the others live. */
@@ -184,43 +248,7 @@ function GlobalSessionSection() {
             </p>
             <div className="lab-section__grid">
                 <AudioSessionProvider initialQueue={playlist}>
-                    <div className="lab-session">
-                        <div className="lab-session__main">
-                            <FullCardPlayer {...SEA_THEME} />
-                            <div className="lab-session__sea">
-                                {playlist.map((t, i) => (
-                                    <SeaCardPlayer
-                                        key={`${t.title}-${i}`}
-                                        track={t}
-                                        art={SEA_ARTS[i % SEA_ARTS.length]}
-                                        tag={t.audioFile === BROKEN ? "broken" : "SEA"}
-                                        {...SEA_THEME}
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                        <aside className="lab-session__side">
-                            <h4 className="lab-app__sidebar-title">Now playing</h4>
-                            <MiniSidebarPlayer {...SEA_THEME} />
-                            <h4 className="lab-app__sidebar-title">The Vault</h4>
-                            <div className="lab-session__vault">
-                                {playlist.map((t, i) => (
-                                    <VaultRowPlayer
-                                        key={`${t.title}-${i}`}
-                                        track={t}
-                                        number={i + 1}
-                                        {...SEA_THEME}
-                                    />
-                                ))}
-                            </div>
-                        </aside>
-                    </div>
-                    {/* fixed={false} so the bar previews inline instead of
-                        covering the whole lab page. */}
-                    <div className="lab-session__sticky">
-                        <StickyBottomPlayer fixed={false} {...SEA_THEME} />
-                    </div>
-                    <HeadlessAdapterProbe />
+                    <GlobalSessionInner />
                 </AudioSessionProvider>
             </div>
         </section>

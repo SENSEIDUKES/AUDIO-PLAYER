@@ -10,12 +10,10 @@ import {
     SeaCardPlayer,
     SAPController,
     buildVaultTrackArcActions,
-    buildStandardTrackArcActions,
     registerVaultCategory,
     useAudioSession,
 } from "../audio-player"
 import type {
-    ArcAction,
     ArcCommandHost,
     Track,
     VaultCategory,
@@ -112,9 +110,6 @@ function ShowcaseVaultRows() {
 function ShowcaseSeaCards() {
     const s = useAudioSession()
     const [route, setRoute] = useState<WorkspaceRoute | null>(null)
-    const cardActions = (): ArcAction[] => [
-        ...buildStandardTrackArcActions({ activePluginIds: s.pluginNames }),
-    ]
     return (
         <div className="showcase-face__sea">
             {noLuckTracks.slice(0, 4).map((t) => (
@@ -123,8 +118,6 @@ function ShowcaseSeaCards() {
                     track={t}
                     art={NO_LUCK_ART}
                     tag="SEA"
-                    actions={cardActions()}
-                    commands={trackCommands(t)}
                     onOpenWorkspace={setRoute}
                     {...SEA_THEME}
                 />

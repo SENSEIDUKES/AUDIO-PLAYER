@@ -14,9 +14,8 @@ import {
     formatSecondaryLine,
     formatVersionedTitle,
 } from "../utils/formatMetadata"
-import { getScrubberDensity, faceSupportsAction } from "../surfaces/faceCapabilities"
-import { ArcActionButton } from "../surfaces/ArcActionButton"
-import type { ArcAction, ArcCommandHost } from "../surfaces/ArcActionButton"
+import { getScrubberDensity } from "../surfaces/faceCapabilities"
+import { PlayerSurfaceButtons } from "../surfaces/PlayerSurfaceButtons"
 import type { WorkspaceRoute } from "../components/workspace/workspaceRoutes"
 import { buildThemeVars } from "./themeVars"
 import { PauseIcon, PlayIcon, SpinnerIcon, WaveIcon } from "./icons"
@@ -35,19 +34,6 @@ export interface SeaCardPlayerProps extends AudioPlayerTheme {
     artMedia?: MediaSource | null
     /** Optional price / tag chip. */
     tag?: string
-    /**
-     * Card actions surfaced through the Arc Action Button (the card's action
-     * surface). A plain, extensible list — append actions or nest `children`
-     * without touching the card. Mirrors the Vault row's `actions` API so Arc
-     * behavior stays consistent across faces.
-     */
-    actions?: ArcAction[]
-    /**
-     * Immediate command implementations for this card's arc (e.g.
-     * `"share.url"` / `"track.favorite"`). Leaves whose command isn't wired
-     * are pruned, never rendered dead. Mirrors the Vault row's `commands` API.
-     */
-    commands?: ArcCommandHost["commands"]
     /**
      * Opens a focused workspace in the SAP Controller shell — the destination
      * of the arc's `"sap-controller"` leaves (the standardized Plugins,
@@ -87,8 +73,6 @@ export function SeaCardPlayer({
     art = "linear-gradient(135deg,#FF7AC6,#7C5CFF)",
     artMedia,
     tag,
-    actions,
-    commands,
     onOpenWorkspace,
     titleFont,
     artistFont,
@@ -107,11 +91,6 @@ export function SeaCardPlayer({
     // Engine gates `isBuffering` to active/pending playback; scope it to this
     // card so only the active track's button can spin.
     const isBufferingThis = isActive && s.isBuffering
-    // The capability allows the action button, but only render it when there are
-    // actions — otherwise it would be an interactive yet empty control. Unlike
-    // the wave trigger this is not gated on `isActive`: card actions (add to
-    // queue, share, buy…) are meaningful on any card in a marketplace grid.
-    const showAction = faceSupportsAction("seaCard") && (actions?.length ?? 0) > 0
 
     const handleToggle = () => {
         if (isActive) s.toggle()
@@ -195,19 +174,13 @@ export function SeaCardPlayer({
                             {formatSecondaryLine(track)}
                         </div>
                     </div>
-                    {/* Arc Action Button: the card's action surface. Sits at the
-                        right of the title/artist row. The trigger is a single
-                        button when closed (cheap in a grid) and portals the arc
-                        overlay on tap. */}
-                    {showAction && (
-                        <ArcActionButton
-                            actions={actions!}
-                            commands={commands}
-                            onOpenWorkspace={onOpenWorkspace}
-                            ariaLabel={`Actions for ${track.title}`}
-                            className="ap-sea__action"
-                        />
-                    )}
+                    {/* PlayerSurfaceButtons: the card's action surface. Sits at the
+                        right of the title/artist row. */}
+                    <PlayerSurfaceButtons
+                        surface={surface}
+                        onOpenFocusedController={onOpenWorkspace}
+                        activePluginIds={s.pluginNames}
+                    />
                 </div>
                 {/* Hide the inline scrubber while the waveform overlay is open so
                     the card never shows two scrubbers at once. */}

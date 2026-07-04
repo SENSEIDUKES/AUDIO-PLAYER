@@ -172,7 +172,7 @@ const FACE_DEFINITIONS: Record<
         // its canvas lives in an overlay and it relies on tap-to-play, not the
         // radial menu.
         family: "primary",
-        supportsContextualActions: false,
+        supportsContextualActions: true,
         preferredCanvasPlacement: "overlay",
     },
     // ---- CompactPlayer family --------------------------------------------

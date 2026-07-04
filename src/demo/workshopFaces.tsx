@@ -10,11 +10,9 @@ import {
     NarrativeFace,
     SAPController,
     buildVaultTrackArcActions,
-    buildStandardTrackArcActions,
     useAudioSession,
 } from "../audio-player"
 import type {
-    ArcAction,
     ArcCommandHost,
     AudioPlayerPlugin,
     AudioPlayerTheme,
@@ -224,9 +222,6 @@ function WorkshopSeaCards({
 }) {
     const s = useAudioSession()
     const [route, setRoute] = useState<WorkspaceRoute | null>(null)
-    const cardActions = (): ArcAction[] => [
-        ...buildStandardTrackArcActions({ activePluginIds: s.pluginNames }),
-    ]
     return (
         <div className="workshop__sea">
             {tracks.slice(0, 4).map((t) => (
@@ -236,7 +231,6 @@ function WorkshopSeaCards({
                     art={settings.art}
                     artMedia={settings.artMedia}
                     tag="SEA"
-                    actions={cardActions()}
                     onOpenWorkspace={setRoute}
                     titleFont={settings.titleFont}
                     artistFont={settings.artistFont}
