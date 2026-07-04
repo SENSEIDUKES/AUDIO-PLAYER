@@ -1,0 +1,1 @@
+{"version":3,"file":"VaultActionWorkspace.d.ts","sourceRoot":"","sources":["../../../../src/audio-player/components/workspace/VaultActionWorkspace.tsx"],"names":[],"mappings":"AAMA,MAAM,MAAM,kBAAkB,GAAG,KAAK,GAAG,QAAQ,GAAG,OAAO,CAAA;AAkB3D,wBAAgB,oBAAoB,CAAC,EAAE,OAAO,EAAE,EAAE;IAAE,OAAO,EAAE,kBAAkB,CAAA;CAAE,sCAWhF;AAED,eAAe,oBAAoB,CAAA"}
