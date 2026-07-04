@@ -445,6 +445,12 @@ export interface SessionEngine extends AudioPlayerEngine {
     canNext: boolean;
     /** True when there is a track to go back to. */
     canPrevious: boolean;
+    /**
+     * Instance names of the plugins active on this session (e.g.
+     * "registry-lyrics"). Faces feed these to the arc menu so its Plugins
+     * branch lists only currently active plugins.
+     */
+    pluginNames: readonly string[];
     /** Replace the queue. Optionally start at `startIndex` and begin playing. */
     setQueue: (tracks: Track[], startIndex?: number, autoPlay?: boolean) => void;
     /** Jump to and play a queued track by index. */

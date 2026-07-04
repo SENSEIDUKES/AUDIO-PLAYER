@@ -16,8 +16,10 @@ export { resolveArcActionState, isArcActionLive, pruneDeadArcActions, routeArcAc
 export type { ArcActionTarget, ArcCommandId, ArcCommandHost, } from '../menu/arcRouting';
 export { buildVaultTrackArcActions } from '../menu/vaultTrackMenu';
 export type { VaultTrackEntitlements, BuildVaultTrackArcActionsOptions, } from '../menu/vaultTrackMenu';
+export { buildStandardTrackArcActions, buildPluginsArcBranch, buildPlaybackArcBranch, buildShareArcBranch, buildAgentsArcBranch, } from '../menu/standardArcActions';
+export type { BuildStandardArcActionsOptions } from '../menu/standardArcActions';
 export { buildMenuTree, isNodeInteractive } from '../menu/menuData';
-export type { MenuNode, MenuItemState, MenuActionId, BuildMenuTreeOptions, } from '../menu/menuData';
+export type { MenuNode, MenuItemState, MenuActionId, ArcMenuEntitlements, BuildMenuTreeOptions, } from '../menu/menuData';
 export { SEICanvasHost } from './SEICanvasHost';
 export type { SEICanvasHostProps } from './SEICanvasHost';
 export { ScrubberCanvasHost } from './ScrubberCanvasHost';

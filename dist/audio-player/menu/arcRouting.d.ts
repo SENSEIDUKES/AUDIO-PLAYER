@@ -16,7 +16,7 @@ export type ArcActionTarget = "immediate-action" | "sei-canvas" | "sap-controlle
  * Known immediate command ids the hosts resolve to real callbacks. Open string
  * union so faces can register custom commands without a type change.
  */
-export type ArcCommandId = "queue.insertAfterCurrent" | "queue.append" | "share.email" | "share.url" | (string & {});
+export type ArcCommandId = "queue.insertAfterCurrent" | "queue.append" | "share.email" | "share.url" | "track.favorite" | (string & {});
 /**
  * A declarative row/face action carried by the arc. Either a branch (has
  * `children`, opens a submenu) or a leaf. A leaf declares *where it routes*

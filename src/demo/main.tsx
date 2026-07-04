@@ -6,6 +6,13 @@ import { Workshop } from "./workshop"
 import { SurfacesDemo } from "./surfaces"
 import "./audio-player-lab.css"
 
+if (typeof window !== "undefined") {
+    (window as any).VITE_OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || "";
+    (window as any).VITE_PRESET_DEMO_SCOUT = import.meta.env.VITE_PRESET_DEMO_SCOUT || "";
+    (window as any).VITE_PRESET_STUDIO_SCOUT = import.meta.env.VITE_PRESET_STUDIO_SCOUT || "";
+    (window as any).VITE_PRESET_MEMOIR = import.meta.env.VITE_PRESET_MEMOIR || "";
+}
+
 /* SEIHouse Audio Player Lab — showcase, test, and customize player faces.
    - Showcase: clean working example of every player face.
    - Lab: QA, broken states, backends, plugins, stress tests.

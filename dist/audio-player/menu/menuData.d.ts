@@ -14,7 +14,7 @@ import { WorkspaceRoute } from '../components/workspace/workspaceRoutes';
 export type MenuItemState = "active" | "available" | "inactive" | "disabled" | "locked" | "coming-soon";
 /** Known leaf actions the host resolves to real callbacks. Open string union so
  *  the tree can carry future action ids without a type change. */
-export type MenuActionId = "open-queue" | "activate-canvas" | "select-lyrics" | "previous-track" | "next-track" | "open-activity-log" | (string & {});
+export type MenuActionId = "open-queue" | "activate-canvas" | "select-lyrics" | "previous-track" | "next-track" | "share-link" | "toggle-favorite" | "open-activity-log" | (string & {});
 /**
  * A node in the SEI Canvas Action Menu tree. Either a branch (has `children`,
  * pushes a submenu) or a leaf (has an `actionId`, resolves to a host callback).
@@ -40,6 +40,11 @@ export interface MenuNode {
      */
     workspaceRoute?: WorkspaceRoute;
 }
+/** Entitlements that gate parts of the standardized arc menu. */
+export interface ArcMenuEntitlements {
+    /** Studio Scout is the paid Scout tier; without it Scout routes to Demo Scout. */
+    studioScout?: boolean;
+}
 export interface BuildMenuTreeOptions {
     /** Whether the current face can host the SEICanvas. Disables the Canvas node. */
     canvasSupported: boolean;
@@ -57,24 +62,50 @@ export interface BuildMenuTreeOptions {
     canNext?: boolean;
     /**
      * Whether the host wires `onOpenWorkspace` (SAP Controller routing). Nodes
-     * whose only real destination is a focused workspace (Lyrics, Automix,
-     * Agent, Activity Log) are omitted entirely when the host can't route
-     * there — the arc renders no dead buttons. Defaults to off.
+     * whose only real destination is a focused workspace (the Plugins leaves,
+     * Controls, Debug, Share › Add to, the Agents branch) are omitted entirely
+     * when the host can't route there — the arc renders no dead buttons.
+     * Defaults to off.
      */
     canRouteWorkspaces?: boolean;
+    /**
+     * Ids of the plugins currently active on this player — catalog ids
+     * ("lyrics") or registry instance names ("registry-lyrics") both work.
+     * Drives the Plugins branch: only *currently active* plugins render, sorted
+     * into Audio / Visual / Analytics. Omitted or empty means no plugin leaves
+     * (Canvas can still keep the Visual branch alive on canvas-capable faces).
+     */
+    activePluginIds?: readonly string[];
+    /** Whether the host wires the Share › Link leaf (copy/share the track URL). */
+    canShareLink?: boolean;
+    /** Whether the host wires the Share › Favorite leaf. */
+    canFavorite?: boolean;
+    /** Marks the Favorite leaf active (the track is already a favorite). */
+    isFavorite?: boolean;
+    /** Entitlements gating the Agents branch (Scout tier). */
+    entitlements?: ArcMenuEntitlements;
 }
 /**
- * The V1 hardcoded menu tree. A builder (not a constant) so per-face capability
- * and live surface state can adjust node states without the arc knowing about
- * the player. Replaceable later by a plugin-registry-driven tree of the same shape.
+ * The standardized arc menu tree, shared by every face that hosts an arc menu:
  *
- * Command-router rules: every node this returns does a real action. Nodes whose
- * only destination is a focused SAP Controller workspace appear only when the
- * host routes workspaces; the Canvas leaf appears only on faces that can host
- * the SEICanvas. There are no "coming soon" placeholders — a capability that
- * doesn't exist yet simply isn't in the tree.
+ *     Plugins  › Audio / Visual / Analytics   (only currently active plugins)
+ *     Playback › Up Next / Controls / Debug
+ *     Share    › Link / Add to / Favorite
+ *     Agents   › Scout / Memoir
+ *
+ * A builder (not a constant) so per-face capability and live surface state can
+ * adjust node states without the arc knowing about the player.
+ *
+ * Command-router rules: every node this returns does a real action. Arc quick
+ * actions open a dedicated section in the "…" menu — leaves carry a
+ * `workspaceRoute` into the SAP Controller shell and appear only when the host
+ * routes workspaces; the Canvas leaf appears only on faces that can host the
+ * SEICanvas; Share › Link / Favorite appear only when the host wires their
+ * callbacks. Branches left empty by those rules are omitted. There are no
+ * "coming soon" placeholders — a capability that doesn't exist yet simply
+ * isn't in the tree.
  */
-export declare function buildMenuTree({ canvasSupported, isCanvasActive, includeTransport, canPrevious, canNext, canRouteWorkspaces, }: BuildMenuTreeOptions): MenuNode[];
+export declare function buildMenuTree({ canvasSupported, isCanvasActive, includeTransport, canPrevious, canNext, canRouteWorkspaces, activePluginIds, canShareLink, canFavorite, isFavorite, entitlements, }: BuildMenuTreeOptions): MenuNode[];
 /** Whether a node can be interacted with (entered or actioned). */
 export declare function isNodeInteractive(node: MenuNode): boolean;
 //# sourceMappingURL=menuData.d.ts.map

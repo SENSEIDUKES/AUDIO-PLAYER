@@ -8798,6 +8798,7 @@ function AudioSessionProvider({ children, initialQueue = [], initialIndex = 0, a
 	const setCacheLimit = useCallback((maxBuffers) => {
 		sharedAudioBufferCache.setMaxSize(maxBuffers);
 	}, []);
+	const pluginNames = useMemo(() => allPlugins.map((plugin) => plugin.name), [allPlugins]);
 	const value = useMemo(() => ({
 		...pluginAwareEngine,
 		queue,
@@ -8808,6 +8809,7 @@ function AudioSessionProvider({ children, initialQueue = [], initialIndex = 0, a
 		automix,
 		canNext,
 		canPrevious,
+		pluginNames,
 		setQueue,
 		playTrack,
 		enqueue,
@@ -8835,6 +8837,7 @@ function AudioSessionProvider({ children, initialQueue = [], initialIndex = 0, a
 		automix,
 		canNext,
 		canPrevious,
+		pluginNames,
 		setQueue,
 		playTrack,
 		enqueue,
@@ -10373,24 +10376,6 @@ var AgentIcon = () => /* @__PURE__ */ jsxs("svg", {
 		})
 	]
 });
-var MailIcon = () => /* @__PURE__ */ jsxs("svg", {
-	width: "16",
-	height: "16",
-	viewBox: "0 0 24 24",
-	fill: "none",
-	stroke: "currentColor",
-	strokeWidth: "2",
-	strokeLinecap: "round",
-	strokeLinejoin: "round",
-	"aria-hidden": "true",
-	children: [/* @__PURE__ */ jsx("rect", {
-		x: "3",
-		y: "5",
-		width: "18",
-		height: "14",
-		rx: "2"
-	}), /* @__PURE__ */ jsx("path", { d: "M3 7l9 6 9-6" })]
-});
 var LinkIcon = () => /* @__PURE__ */ jsxs("svg", {
 	width: "16",
 	height: "16",
@@ -10447,6 +10432,173 @@ var LockIcon = () => /* @__PURE__ */ jsxs("svg", {
 		rx: "2"
 	}), /* @__PURE__ */ jsx("path", { d: "M8 11V8a4 4 0 0 1 8 0v3" })]
 });
+var AudioIcon = () => /* @__PURE__ */ jsxs("svg", {
+	width: "16",
+	height: "16",
+	viewBox: "0 0 24 24",
+	fill: "none",
+	stroke: "currentColor",
+	strokeWidth: "2",
+	strokeLinecap: "round",
+	strokeLinejoin: "round",
+	"aria-hidden": "true",
+	children: [
+		/* @__PURE__ */ jsx("path", { d: "M11 5L6 9H3v6h3l5 4z" }),
+		/* @__PURE__ */ jsx("path", { d: "M15.5 8.5a5 5 0 0 1 0 7" }),
+		/* @__PURE__ */ jsx("path", { d: "M18.5 5.5a9 9 0 0 1 0 13" })
+	]
+});
+var ControlsIcon = () => /* @__PURE__ */ jsxs("svg", {
+	width: "16",
+	height: "16",
+	viewBox: "0 0 24 24",
+	fill: "none",
+	stroke: "currentColor",
+	strokeWidth: "2",
+	strokeLinecap: "round",
+	strokeLinejoin: "round",
+	"aria-hidden": "true",
+	children: [
+		/* @__PURE__ */ jsx("line", {
+			x1: "4",
+			y1: "21",
+			x2: "4",
+			y2: "14"
+		}),
+		/* @__PURE__ */ jsx("line", {
+			x1: "4",
+			y1: "10",
+			x2: "4",
+			y2: "3"
+		}),
+		/* @__PURE__ */ jsx("line", {
+			x1: "12",
+			y1: "21",
+			x2: "12",
+			y2: "12"
+		}),
+		/* @__PURE__ */ jsx("line", {
+			x1: "12",
+			y1: "8",
+			x2: "12",
+			y2: "3"
+		}),
+		/* @__PURE__ */ jsx("line", {
+			x1: "20",
+			y1: "21",
+			x2: "20",
+			y2: "16"
+		}),
+		/* @__PURE__ */ jsx("line", {
+			x1: "20",
+			y1: "12",
+			x2: "20",
+			y2: "3"
+		}),
+		/* @__PURE__ */ jsx("line", {
+			x1: "1",
+			y1: "14",
+			x2: "7",
+			y2: "14"
+		}),
+		/* @__PURE__ */ jsx("line", {
+			x1: "9",
+			y1: "8",
+			x2: "15",
+			y2: "8"
+		}),
+		/* @__PURE__ */ jsx("line", {
+			x1: "17",
+			y1: "16",
+			x2: "23",
+			y2: "16"
+		})
+	]
+});
+var DebugIcon = () => /* @__PURE__ */ jsxs("svg", {
+	width: "16",
+	height: "16",
+	viewBox: "0 0 24 24",
+	fill: "none",
+	stroke: "currentColor",
+	strokeWidth: "2",
+	strokeLinecap: "round",
+	strokeLinejoin: "round",
+	"aria-hidden": "true",
+	children: [
+		/* @__PURE__ */ jsx("rect", {
+			x: "8",
+			y: "7",
+			width: "8",
+			height: "11",
+			rx: "4"
+		}),
+		/* @__PURE__ */ jsx("path", { d: "M9.5 7a2.5 2.5 0 0 1 5 0" }),
+		/* @__PURE__ */ jsx("path", { d: "M8 11H4M8 15H4.5M16 11h4M16 15h3.5M10 4l-1-2M14 4l1-2" })
+	]
+});
+var HeartIcon$1 = () => /* @__PURE__ */ jsx("svg", {
+	width: "16",
+	height: "16",
+	viewBox: "0 0 24 24",
+	fill: "none",
+	stroke: "currentColor",
+	strokeWidth: "2",
+	strokeLinecap: "round",
+	strokeLinejoin: "round",
+	"aria-hidden": "true",
+	children: /* @__PURE__ */ jsx("path", { d: "M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" })
+});
+var TagIcon = () => /* @__PURE__ */ jsxs("svg", {
+	width: "16",
+	height: "16",
+	viewBox: "0 0 24 24",
+	fill: "none",
+	stroke: "currentColor",
+	strokeWidth: "2",
+	strokeLinecap: "round",
+	strokeLinejoin: "round",
+	"aria-hidden": "true",
+	children: [/* @__PURE__ */ jsx("path", { d: "M20.6 13.4L12 22 2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8z" }), /* @__PURE__ */ jsx("circle", {
+		cx: "7.5",
+		cy: "7.5",
+		r: "1.4",
+		fill: "currentColor",
+		stroke: "none"
+	})]
+});
+var RenameIcon = () => /* @__PURE__ */ jsx("svg", {
+	width: "16",
+	height: "16",
+	viewBox: "0 0 24 24",
+	fill: "none",
+	stroke: "currentColor",
+	strokeWidth: "2",
+	strokeLinecap: "round",
+	strokeLinejoin: "round",
+	"aria-hidden": "true",
+	children: /* @__PURE__ */ jsx("path", { d: "M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z" })
+});
+var RadioIcon = () => /* @__PURE__ */ jsxs("svg", {
+	width: "16",
+	height: "16",
+	viewBox: "0 0 24 24",
+	fill: "none",
+	stroke: "currentColor",
+	strokeWidth: "2",
+	strokeLinecap: "round",
+	strokeLinejoin: "round",
+	"aria-hidden": "true",
+	children: [
+		/* @__PURE__ */ jsx("circle", {
+			cx: "12",
+			cy: "12",
+			r: "2"
+		}),
+		/* @__PURE__ */ jsx("path", { d: "M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4" }),
+		/* @__PURE__ */ jsx("path", { d: "M4.9 19.1a10 10 0 0 1 0-14.2M19.1 4.9a10 10 0 0 1 0 14.2" })
+	]
+});
 //#endregion
 //#region src/audio-player/surfaces/SurfaceButton.tsx
 /**
@@ -10467,20 +10619,358 @@ function SurfaceButton({ active, children, onClick, label, disabled = false, cla
 	});
 }
 //#endregion
-//#region src/audio-player/menu/menuData.ts
+//#region src/audio-player/components/workspace/workspaceRoutes.ts
 /**
-* The V1 hardcoded menu tree. A builder (not a constant) so per-face capability
-* and live surface state can adjust node states without the arc knowing about
-* the player. Replaceable later by a plugin-registry-driven tree of the same shape.
+* Workspace routing model for the SAP Controller shell.
 *
-* Command-router rules: every node this returns does a real action. Nodes whose
-* only destination is a focused SAP Controller workspace appear only when the
-* host routes workspaces; the Canvas leaf appears only on faces that can host
-* the SEICanvas. There are no "coming soon" placeholders — a capability that
-* doesn't exist yet simply isn't in the tree.
+* The SAP Controller started life as a single "…" options sheet. It is now a
+* reusable workspace *shell*: the same portal, focus trap, escape handling and
+* body-scroll lock host either the legacy options surface (`"options"`) or a
+* focused configuration workspace selected from the radial action menu
+* (e.g. `"plugin-settings:lyrics"`).
+*
+* A route is a `category:target` string (the bare `"options"` route has no
+* target). Categories group routes by which workspace surface renders them.
+* Deliberately free of any engine/session/React imports so the routing model
+* can later be promoted into the seihouse-ui design system alongside the menu
+* data model.
 */
-function buildMenuTree({ canvasSupported, isCanvasActive, includeTransport = false, canPrevious = false, canNext = false, canRouteWorkspaces = false }) {
-	const transportNodes = includeTransport ? [{
+/** Every workspace route the shell knows how to render. */
+var WORKSPACE_ROUTES = [
+	"options",
+	"library:playlists",
+	"library:queue",
+	"library:vault",
+	"plugin-settings:lyrics",
+	"plugin-settings:waveform",
+	"plugin-settings:analytics",
+	"plugin-settings:sleep-timer",
+	"plugin-settings:auto-theme",
+	"playback:automix",
+	"playback:controls",
+	"agent:queue-director",
+	"agent:demo-scout",
+	"agent:studio-scout",
+	"agent:memoir",
+	"visual:canvas",
+	"visual:lyrics",
+	"vault:tag",
+	"vault:rename",
+	"vault:radio",
+	"diagnostics:activity-log"
+];
+var ROUTE_SET = new Set(WORKSPACE_ROUTES);
+/** Whether an arbitrary string is a known workspace route. */
+function isWorkspaceRoute(value) {
+	return ROUTE_SET.has(value);
+}
+/**
+* Validate and categorize a route string. Returns `null` for any value that is
+* not a known route, so callers can fall back to `"options"` (or ignore an
+* unrecognized node) rather than render an empty shell.
+*/
+function parseWorkspaceRoute(value) {
+	if (!value || !isWorkspaceRoute(value)) return null;
+	if (value === "options") return {
+		route: value,
+		category: "options",
+		target: null
+	};
+	const sep = value.indexOf(":");
+	return {
+		route: value,
+		category: value.slice(0, sep),
+		target: value.slice(sep + 1)
+	};
+}
+//#endregion
+//#region src/audio-player/plugins/surfaces/pluginSurfaceHelpers.ts
+/** True when the plugin exposes a (enabled) settings surface. */
+function hasSettingsSurface(definition) {
+	if (definition.kind !== "settings" && definition.kind !== "dual") return false;
+	return definition.settings?.enabled === true;
+}
+/** True when the plugin exposes a (enabled) SEI Canvas surface. */
+function hasCanvasSurface(definition) {
+	if (definition.kind !== "canvas" && definition.kind !== "dual") return false;
+	return definition.canvas?.enabled === true;
+}
+/** True when the plugin renders no UI at all. */
+function isHeadlessPlugin(definition) {
+	return definition.kind === "headless";
+}
+/** The declarative settings route, when the plugin has an enabled settings surface. */
+function getPluginSettingsRoute(definition) {
+	return hasSettingsSurface(definition) ? definition.settings?.route : void 0;
+}
+/** The SEI Canvas surface id, when the plugin has an enabled canvas surface. */
+function getPluginCanvasSurfaceId(definition) {
+	return hasCanvasSurface(definition) ? definition.canvas?.surfaceId : void 0;
+}
+/**
+* Return a new array sorted by menu order (ascending), tie-broken by pluginId.
+* Stable and non-mutating — the input array is left untouched.
+*/
+function sortPluginSurfaceDefinitions(definitions) {
+	return [...definitions].sort((a, b) => {
+		const orderA = a.menu?.order ?? Number.MAX_SAFE_INTEGER;
+		const orderB = b.menu?.order ?? Number.MAX_SAFE_INTEGER;
+		if (orderA !== orderB) return orderA - orderB;
+		return a.pluginId.localeCompare(b.pluginId);
+	});
+}
+//#endregion
+//#region src/audio-player/plugins/surfaces/defaultPluginSurfaces.ts
+var DEFAULT_PLUGIN_SURFACES = [
+	{
+		pluginId: "keyboard-shortcuts",
+		label: "Keyboard Shortcuts",
+		description: "Space / arrow / JKL transport controls.",
+		category: "utility",
+		kind: "headless"
+	},
+	{
+		pluginId: "analytics",
+		label: "Analytics",
+		description: "Playback event reporting.",
+		category: "analytics",
+		kind: "settings",
+		settings: {
+			enabled: true,
+			route: "plugin-settings:analytics",
+			label: "Analytics"
+		},
+		menu: {
+			branch: "plugin:analytics",
+			order: 40
+		}
+	},
+	{
+		pluginId: "lyrics",
+		label: "Lyrics",
+		description: "Synced lyrics — primary UI lives in SEI Canvas.",
+		category: "visual",
+		kind: "dual",
+		settings: {
+			enabled: true,
+			route: "plugin-settings:lyrics",
+			label: "Lyrics"
+		},
+		canvas: {
+			enabled: true,
+			surfaceId: "lyrics",
+			label: "Lyrics",
+			requiresActiveTrack: true,
+			preferredHeight: "standard"
+		},
+		menu: {
+			showInArc: true,
+			branch: "plugin:visual",
+			order: 10
+		}
+	},
+	{
+		pluginId: "sleep-timer",
+		label: "Sleep Timer",
+		description: "Auto-stop after a chosen duration.",
+		category: "utility",
+		kind: "settings",
+		settings: {
+			enabled: true,
+			route: "plugin-settings:sleep-timer",
+			label: "Sleep Timer"
+		},
+		menu: {
+			branch: "playback",
+			order: 30
+		}
+	},
+	{
+		pluginId: "automix",
+		label: "Automix",
+		description: "Beat-aware crossfades between tracks.",
+		category: "playback",
+		kind: "settings",
+		settings: {
+			enabled: true,
+			route: "playback:automix",
+			label: "Automix"
+		},
+		menu: {
+			branch: "playback",
+			order: 20
+		}
+	},
+	{
+		pluginId: "auto-theme",
+		label: "Auto Theme",
+		description: "Derives player colors from album art.",
+		category: "visual",
+		kind: "settings",
+		settings: {
+			enabled: true,
+			route: "plugin-settings:auto-theme",
+			label: "Auto Theme"
+		},
+		menu: {
+			branch: "plugin:visual",
+			order: 50
+		}
+	},
+	{
+		pluginId: "waveform",
+		label: "Waveform",
+		description: "Interactive waveform scrubber (no SEI Canvas surface yet).",
+		category: "visual",
+		kind: "settings",
+		settings: {
+			enabled: true,
+			route: "plugin-settings:waveform",
+			label: "Waveform"
+		},
+		menu: {
+			branch: "plugin:visual",
+			order: 60
+		}
+	}
+];
+/** Look up a single plugin's surface definition by its plugin id. */
+function getPluginSurfaceDefinition(pluginId) {
+	return DEFAULT_PLUGIN_SURFACES.find((def) => def.pluginId === pluginId);
+}
+/** All surface definitions in a given category, sorted by menu order. */
+function getPluginSurfaceDefinitionsByCategory(category) {
+	return sortPluginSurfaceDefinitions(DEFAULT_PLUGIN_SURFACES.filter((def) => def.category === category));
+}
+/** All surface definitions whose menu placement targets a given branch, sorted. */
+function getPluginSurfaceDefinitionsForMenuBranch(branch) {
+	return sortPluginSurfaceDefinitions(DEFAULT_PLUGIN_SURFACES.filter((def) => def.menu?.branch === branch));
+}
+/**
+* Map a plugin instance name back to its catalog plugin id. Registry-created
+* instances are named `"registry-<id>"` (see usePluginRegistry); bare ids pass
+* through unchanged, so hosts can supply either form.
+*/
+function normalizePluginId(nameOrId) {
+	return nameOrId.startsWith("registry-") ? nameOrId.slice(9) : nameOrId;
+}
+/**
+* Which Plugins sub-branch (Audio / Visual / Analytics) a plugin surfaces
+* under in the standardized arc menu. Playback- and utility-category plugins
+* are audio-affecting, so they fold into Audio. Agent-category plugins return
+* `null` — agents live under the arc's dedicated Agents branch, never Plugins.
+*/
+function getArcPluginBucket(definition) {
+	switch (definition.category) {
+		case "visual": return "visual";
+		case "analytics": return "analytics";
+		case "playback":
+		case "utility": return "audio";
+		default: return null;
+	}
+}
+/**
+* The surface definitions for the currently active plugins, sorted by menu
+* order. `activePluginIds` accepts catalog ids ("lyrics") or registry instance
+* names ("registry-lyrics"); unknown ids are ignored. This is what the arc
+* menu's Plugins branch renders — only plugins that are actually active, never
+* the full catalog.
+*/
+function getActivePluginSurfaceDefinitions(activePluginIds) {
+	const ids = new Set(activePluginIds.map(normalizePluginId));
+	return sortPluginSurfaceDefinitions(DEFAULT_PLUGIN_SURFACES.filter((def) => ids.has(def.pluginId)));
+}
+//#endregion
+//#region src/audio-player/menu/menuData.ts
+/** Icons for the Plugins › Audio/Visual/Analytics sub-branches. */
+var PLUGIN_BUCKET_META$1 = {
+	audio: {
+		id: "plugins-audio",
+		label: "Audio",
+		icon: AudioIcon
+	},
+	visual: {
+		id: "plugins-visual",
+		label: "Visual",
+		icon: VisualIcon
+	},
+	analytics: {
+		id: "plugins-analytics",
+		label: "Analytics",
+		icon: AnalyticsIcon
+	}
+};
+/** Per-plugin leaf icon: lyrics keeps its glyph; everything else gets the plug. */
+function pluginLeafIcon(pluginId) {
+	return pluginId === "lyrics" ? LyricsIcon : PluginIcon;
+}
+/**
+* The standardized arc menu tree, shared by every face that hosts an arc menu:
+*
+*     Plugins  › Audio / Visual / Analytics   (only currently active plugins)
+*     Playback › Up Next / Controls / Debug
+*     Share    › Link / Add to / Favorite
+*     Agents   › Scout / Memoir
+*
+* A builder (not a constant) so per-face capability and live surface state can
+* adjust node states without the arc knowing about the player.
+*
+* Command-router rules: every node this returns does a real action. Arc quick
+* actions open a dedicated section in the "…" menu — leaves carry a
+* `workspaceRoute` into the SAP Controller shell and appear only when the host
+* routes workspaces; the Canvas leaf appears only on faces that can host the
+* SEICanvas; Share › Link / Favorite appear only when the host wires their
+* callbacks. Branches left empty by those rules are omitted. There are no
+* "coming soon" placeholders — a capability that doesn't exist yet simply
+* isn't in the tree.
+*/
+function buildMenuTree({ canvasSupported, isCanvasActive, includeTransport = false, canPrevious = false, canNext = false, canRouteWorkspaces = false, activePluginIds = [], canShareLink = false, canFavorite = false, isFavorite = false, entitlements }) {
+	const tree = [];
+	const buckets = {
+		audio: [],
+		visual: [],
+		analytics: []
+	};
+	if (canRouteWorkspaces) for (const def of getActivePluginSurfaceDefinitions(activePluginIds)) {
+		const bucket = getArcPluginBucket(def);
+		const route = getPluginSettingsRoute(def);
+		if (!bucket || !route || !isWorkspaceRoute(route)) continue;
+		buckets[bucket].push({
+			id: `plugin-${def.pluginId}`,
+			label: def.label,
+			icon: pluginLeafIcon(def.pluginId),
+			workspaceRoute: route
+		});
+	}
+	if (canvasSupported) buckets.visual.push({
+		id: "canvas",
+		label: "Canvas",
+		icon: CanvasIcon,
+		state: isCanvasActive ? "active" : "available",
+		actionId: "activate-canvas"
+	});
+	const pluginChildren = [
+		"audio",
+		"visual",
+		"analytics"
+	].flatMap((bucket) => {
+		const children = buckets[bucket];
+		if (children.length === 0) return [];
+		const meta = PLUGIN_BUCKET_META$1[bucket];
+		return [{
+			id: meta.id,
+			label: meta.label,
+			icon: meta.icon,
+			children
+		}];
+	});
+	if (pluginChildren.length > 0) tree.push({
+		id: "plugins",
+		label: "Plugins",
+		icon: PluginIcon,
+		children: pluginChildren
+	});
+	const playbackChildren = includeTransport ? [{
 		id: "previous-track",
 		label: "Previous",
 		icon: PrevIcon$1,
@@ -10493,46 +10983,23 @@ function buildMenuTree({ canvasSupported, isCanvasActive, includeTransport = fal
 		state: canNext ? "available" : "disabled",
 		actionId: "next-track"
 	}] : [];
-	const visualNodes = [];
-	if (canRouteWorkspaces) visualNodes.push({
-		id: "lyrics",
-		label: "Lyrics",
-		icon: LyricsIcon,
-		state: "inactive",
-		actionId: "select-lyrics",
-		workspaceRoute: "plugin-settings:lyrics"
-	});
-	if (canvasSupported) visualNodes.push({
-		id: "canvas",
-		label: "Canvas",
-		icon: CanvasIcon,
-		state: isCanvasActive ? "active" : "available",
-		actionId: "activate-canvas"
-	});
-	const playbackChildren = [...transportNodes, {
+	playbackChildren.push({
 		id: "up-next",
 		label: "Up Next",
 		icon: QueueIcon,
 		actionId: "open-queue",
 		workspaceRoute: "library:queue"
-	}];
-	if (canRouteWorkspaces) playbackChildren.push({
-		id: "automix",
-		label: "Automix",
-		icon: AutomixIcon,
-		workspaceRoute: "playback:automix"
 	});
-	const tree = [];
-	if (visualNodes.length > 0) tree.push({
-		id: "plugin",
-		label: "Plugin",
-		icon: PluginIcon,
-		children: [{
-			id: "visual",
-			label: "Visual",
-			icon: VisualIcon,
-			children: visualNodes
-		}]
+	if (canRouteWorkspaces) playbackChildren.push({
+		id: "controls",
+		label: "Controls",
+		icon: ControlsIcon,
+		workspaceRoute: "playback:controls"
+	}, {
+		id: "debug",
+		label: "Debug",
+		icon: DebugIcon,
+		workspaceRoute: "diagnostics:activity-log"
 	});
 	tree.push({
 		id: "playback",
@@ -10540,16 +11007,47 @@ function buildMenuTree({ canvasSupported, isCanvasActive, includeTransport = fal
 		icon: PlaybackIcon,
 		children: playbackChildren
 	});
+	const shareChildren = [];
+	if (canShareLink) shareChildren.push({
+		id: "share-link",
+		label: "Link",
+		icon: LinkIcon,
+		actionId: "share-link"
+	});
+	if (canRouteWorkspaces) shareChildren.push({
+		id: "share-add-to",
+		label: "Add to",
+		icon: VaultIcon,
+		workspaceRoute: "library:vault"
+	});
+	if (canFavorite) shareChildren.push({
+		id: "share-favorite",
+		label: "Favorite",
+		icon: HeartIcon$1,
+		state: isFavorite ? "active" : "available",
+		actionId: "toggle-favorite"
+	});
+	if (shareChildren.length > 0) tree.push({
+		id: "share",
+		label: "Share",
+		icon: ShareIcon,
+		children: shareChildren
+	});
 	if (canRouteWorkspaces) tree.push({
-		id: "agent",
-		label: "Agent",
+		id: "agents",
+		label: "Agents",
 		icon: AgentIcon,
-		workspaceRoute: "agent:queue-director"
-	}, {
-		id: "activity-log",
-		label: "Activity Log",
-		icon: AnalyticsIcon,
-		workspaceRoute: "diagnostics:activity-log"
+		children: [{
+			id: "agent-scout",
+			label: "Scout",
+			icon: AgentIcon,
+			workspaceRoute: entitlements?.studioScout === true ? "agent:studio-scout" : "agent:demo-scout"
+		}, {
+			id: "agent-memoir",
+			label: "Memoir",
+			icon: LyricsIcon,
+			workspaceRoute: "agent:memoir"
+		}]
 	});
 	return tree;
 }
@@ -10818,7 +11316,7 @@ function SEICanvasActionMenu({ items, onOpenQueue, onActivateCanvas, onSelect, o
 					/* @__PURE__ */ jsx("button", {
 						ref: centerRef,
 						type: "button",
-						className: "sac__center ap-tap",
+						className: "sac__center",
 						onClick: handleCenter,
 						"aria-label": inSubmenu ? "Back" : "Close menu",
 						children: inSubmenu ? /* @__PURE__ */ jsx(ChevronLeftIcon, {}) : /* @__PURE__ */ jsx(CloseIcon$2, {})
@@ -10833,17 +11331,23 @@ function SEICanvasActionMenu({ items, onOpenQueue, onActivateCanvas, onSelect, o
 /**
 * The shared left/right surface controls. LEFT reveals the SEICanvas (only on
 * faces that support it). RIGHT is the SEI Canvas Action Menu — a bottom-arc
-* command wheel that replaces the old flat "Up Next" toggle. Queue lives inside
-* it under Playback › Up Next; the canvas under Plugin › Visual › Canvas.
+* command wheel carrying the standardized arc arms (Plugins | Playback | Share
+* | Agents). Queue lives inside it under Playback › Up Next; the canvas under
+* Plugins › Visual › Canvas.
 */
-function PlayerSurfaceButtons({ surface, showCanvasButton = surface.canvasSupported, showQueueButton = surface.contextualSupported, onOpenQueue, showTransport = false, canPrevious = false, canNext = false, onPrevious, onNext, onOpenFocusedController, className }) {
+function PlayerSurfaceButtons({ surface, showCanvasButton = surface.canvasSupported, showQueueButton = surface.contextualSupported, onOpenQueue, showTransport = false, canPrevious = false, canNext = false, onPrevious, onNext, activePluginIds, onShareLink, onToggleFavorite, isFavorite = false, entitlements, onOpenFocusedController, className }) {
 	const menuItems = useMemo(() => showQueueButton ? buildMenuTree({
 		canvasSupported: surface.canvasSupported,
 		isCanvasActive: surface.isCanvasOpen,
 		includeTransport: showTransport,
 		canPrevious,
 		canNext,
-		canRouteWorkspaces: Boolean(onOpenFocusedController)
+		canRouteWorkspaces: Boolean(onOpenFocusedController),
+		activePluginIds,
+		canShareLink: Boolean(onShareLink),
+		canFavorite: Boolean(onToggleFavorite),
+		isFavorite,
+		entitlements
 	}) : [], [
 		showQueueButton,
 		surface.canvasSupported,
@@ -10851,12 +11355,24 @@ function PlayerSurfaceButtons({ surface, showCanvasButton = surface.canvasSuppor
 		showTransport,
 		canPrevious,
 		canNext,
-		onOpenFocusedController
+		onOpenFocusedController,
+		activePluginIds,
+		onShareLink,
+		onToggleFavorite,
+		isFavorite,
+		entitlements
 	]);
 	const handleSelect = useCallback((node) => {
 		if (node.actionId === "previous-track") onPrevious?.();
 		else if (node.actionId === "next-track") onNext?.();
-	}, [onNext, onPrevious]);
+		else if (node.actionId === "share-link") onShareLink?.();
+		else if (node.actionId === "toggle-favorite") onToggleFavorite?.();
+	}, [
+		onNext,
+		onPrevious,
+		onShareLink,
+		onToggleFavorite
+	]);
 	const handleOpenWorkspace = useCallback((route) => {
 		onOpenFocusedController?.(route);
 	}, [onOpenFocusedController]);
@@ -12622,64 +13138,6 @@ function buildThemeVars(theme = {}) {
 	};
 }
 //#endregion
-//#region src/audio-player/components/workspace/workspaceRoutes.ts
-/**
-* Workspace routing model for the SAP Controller shell.
-*
-* The SAP Controller started life as a single "…" options sheet. It is now a
-* reusable workspace *shell*: the same portal, focus trap, escape handling and
-* body-scroll lock host either the legacy options surface (`"options"`) or a
-* focused configuration workspace selected from the radial action menu
-* (e.g. `"plugin-settings:lyrics"`).
-*
-* A route is a `category:target` string (the bare `"options"` route has no
-* target). Categories group routes by which workspace surface renders them.
-* Deliberately free of any engine/session/React imports so the routing model
-* can later be promoted into the seihouse-ui design system alongside the menu
-* data model.
-*/
-/** Every workspace route the shell knows how to render. */
-var WORKSPACE_ROUTES = [
-	"options",
-	"library:playlists",
-	"library:queue",
-	"library:vault",
-	"plugin-settings:lyrics",
-	"plugin-settings:waveform",
-	"playback:automix",
-	"agent:queue-director",
-	"agent:demo-scout",
-	"agent:studio-scout",
-	"agent:memoir",
-	"visual:canvas",
-	"visual:lyrics",
-	"diagnostics:activity-log"
-];
-var ROUTE_SET = new Set(WORKSPACE_ROUTES);
-/** Whether an arbitrary string is a known workspace route. */
-function isWorkspaceRoute(value) {
-	return ROUTE_SET.has(value);
-}
-/**
-* Validate and categorize a route string. Returns `null` for any value that is
-* not a known route, so callers can fall back to `"options"` (or ignore an
-* unrecognized node) rather than render an empty shell.
-*/
-function parseWorkspaceRoute(value) {
-	if (!value || !isWorkspaceRoute(value)) return null;
-	if (value === "options") return {
-		route: value,
-		category: "options",
-		target: null
-	};
-	const sep = value.indexOf(":");
-	return {
-		route: value,
-		category: value.slice(0, sep),
-		target: value.slice(sep + 1)
-	};
-}
-//#endregion
 //#region src/audio-player/components/workspace/LibraryPlaylistsWorkspace.tsx
 function LibraryPlaylistsWorkspace() {
 	return /* @__PURE__ */ jsxs("div", {
@@ -12741,6 +13199,74 @@ function PlaybackAutomixWorkspace() {
 	});
 }
 //#endregion
+//#region src/audio-player/components/workspace/PlaybackControlsWorkspace.tsx
+function SwitchRow$1({ icon, label, on, onToggle }) {
+	return /* @__PURE__ */ jsxs("button", {
+		type: "button",
+		className: "sap-ctl__row ap-tap",
+		role: "switch",
+		"aria-checked": on,
+		onClick: onToggle,
+		children: [/* @__PURE__ */ jsxs("span", {
+			className: "sap-ctl__label",
+			children: [icon, label]
+		}), /* @__PURE__ */ jsx("span", {
+			className: `sap-ctl__switch${on ? " sap-ctl__switch--on" : ""}`,
+			"aria-hidden": "true",
+			children: /* @__PURE__ */ jsx("span", { className: "sap-ctl__knob" })
+		})]
+	});
+}
+function PlaybackControlsWorkspace({ playback }) {
+	if (!playback) return /* @__PURE__ */ jsxs("div", {
+		className: "sap-ctl__workspace-empty",
+		children: [/* @__PURE__ */ jsx("p", {
+			className: "sap-ctl__workspace-lead",
+			children: "Controls"
+		}), /* @__PURE__ */ jsx("p", {
+			className: "sap-ctl__workspace-sub",
+			children: "Playback controls are not available on this player."
+		})]
+	});
+	return /* @__PURE__ */ jsxs("section", {
+		className: "sap-ctl__section",
+		"aria-label": "Playback controls",
+		children: [
+			/* @__PURE__ */ jsx(SwitchRow$1, {
+				icon: /* @__PURE__ */ jsx(ShuffleIcon, {}),
+				label: "Shuffle",
+				on: playback.shuffle,
+				onToggle: playback.onToggleShuffle
+			}),
+			/* @__PURE__ */ jsxs("button", {
+				type: "button",
+				className: "sap-ctl__row ap-tap",
+				onClick: playback.onCycleRepeat,
+				"aria-label": `Repeat: ${playback.repeatMode}. Activate to change.`,
+				children: [/* @__PURE__ */ jsxs("span", {
+					className: "sap-ctl__label",
+					children: [playback.repeatMode === "one" ? /* @__PURE__ */ jsx(RepeatOneIcon, {}) : /* @__PURE__ */ jsx(RepeatIcon, {}), "Repeat"]
+				}), /* @__PURE__ */ jsx("span", {
+					className: "sap-ctl__value",
+					children: playback.repeatMode
+				})]
+			}),
+			playback.onToggleAutomix && /* @__PURE__ */ jsx(SwitchRow$1, {
+				icon: /* @__PURE__ */ jsx(AutomixIcon, {}),
+				label: "Automix",
+				on: playback.automix ?? false,
+				onToggle: playback.onToggleAutomix
+			}),
+			playback.onToggleAutoPlay && /* @__PURE__ */ jsx(SwitchRow$1, {
+				icon: /* @__PURE__ */ jsx(AutoPlayIcon, {}),
+				label: "Auto Play",
+				on: playback.autoPlay ?? false,
+				onToggle: playback.onToggleAutoPlay
+			})
+		]
+	});
+}
+//#endregion
 //#region src/audio-player/components/workspace/AgentQueueDirectorWorkspace.tsx
 function AgentQueueDirectorWorkspace() {
 	return /* @__PURE__ */ jsxs("div", {
@@ -12759,29 +13285,308 @@ function AgentQueueDirectorWorkspace() {
 var AGENT_COPY = {
 	"demo-scout": {
 		lead: "Demo Scout",
-		sub: "Scans your demos and surfaces the ones worth finishing next."
+		sub: "Scans your demos and surfaces the ones worth finishing next.",
+		actionLabel: "Analyze Demo Track"
 	},
 	"studio-scout": {
 		lead: "Studio Scout",
-		sub: "Pro session analysis for studio-ready tracks. Requires the Studio entitlement."
+		sub: "Pro session analysis for studio-ready tracks. Requires the Studio entitlement.",
+		actionLabel: "Analyze Studio Session"
 	},
 	memoir: {
 		lead: "Memoir",
-		sub: "Builds a narrated history of a track from its vault versions."
+		sub: "Builds a narrated history of a track from its vault versions.",
+		actionLabel: "Generate Song Memoir"
 	}
 };
+var KEY_NAME = "VITE_OPENROUTER_API_KEY";
+var API_KEY = typeof window !== "undefined" && window[KEY_NAME] || typeof globalThis !== "undefined" && globalThis.process?.env?.[KEY_NAME] || "";
+var PRESET_KEYS = {
+	"demo-scout": "VITE_PRESET_DEMO_SCOUT",
+	"studio-scout": "VITE_PRESET_STUDIO_SCOUT",
+	"memoir": "VITE_PRESET_MEMOIR"
+};
+var getPresetValue = (v, fallback) => {
+	const key = PRESET_KEYS[v];
+	return typeof window !== "undefined" && window[key] || typeof globalThis !== "undefined" && globalThis.process?.env?.[key] || fallback;
+};
+var PRESETS = {
+	"demo-scout": getPresetValue("demo-scout", "@preset/sea-demo-scout-dev"),
+	"studio-scout": getPresetValue("studio-scout", "@preset/sea-studio-scout-dev"),
+	"memoir": getPresetValue("memoir", "@preset/sea-demo-memoir-dev")
+};
+var getSystemPrompt = (variant, track, queue) => {
+	const trackDetails = track ? `Title: ${track.title}
+Artist: ${track.artist}
+Album: ${track.albumTitle || "N/A"}
+Category/Status: ${track.vaultCategory || "N/A"}
+Lyrics: ${track.lyrics || "No lyrics available for this track."}` : "No active track selected.";
+	if (variant === "demo-scout") return `You are Demo Scout, the custom audio-analysis agent for SEIHouse. Your persona is a discerning, creative, and professional music producer and A&R scout. Your goal is to scan user's demo tracks and surface creative ideas, arrangement thoughts, and a recommendation on whether a demo is worth finishing.
+
+Current Track Context:
+${trackDetails}
+
+Guidelines:
+1. Be encouraging but honest and precise in your technical and creative feedback.
+2. Structure your response with clear sections:
+   - **Vibe & Concept Assessment**: Discuss the emotional core and potential of the demo.
+   - **Structure & Arrangement**: Highlight what works and what feels clunky.
+   - **Production Recommendations**: Offer 3 actionable changes (e.g., sound selection, transition fx, vocals).
+   - **Finishing Score**: Provide a completion score (1-10) and brief rationale on whether it's worth finishing next.
+Keep responses concise, premium, and focused on music production.`;
+	else if (variant === "studio-scout") return `You are Studio Scout, the professional mixing and mastering session agent for SEIHouse. Your persona is a senior mixing/mastering engineer with decades of studio experience. Your goal is to review studio-ready tracks and provide pro technical session advice.
+
+Current Track Context:
+${trackDetails}
+
+Guidelines:
+1. Provide highly technical and actionable mixing, arrangement, and mastering feedback.
+2. Structure your response with clear sections:
+   - **Technical Mix Assessment**: Frequency balance, dynamic range, and vocal/instrument leveling.
+   - **Transition & Impact Review**: Pacing, drops, automation, and spatial imaging.
+   - **Commercial/Streaming Readiness**: Loudness, stereo width, and overall sonic competitiveness.
+   - **Action Checklist**: A checklist of 3 immediate studio adjustments to perform.
+Keep responses technical, precise, and professional.`;
+	else return `You are Memoir, the archival/evolution agent for SEIHouse. Your goal is to build a narrated history of a track from its vault versions, synthesizing an engaging narrative about its creative journey.
+
+Current Track Context:
+${trackDetails}
+
+Other tracks in the Vault queue for context:
+${queue.map((t) => `- ${t.title} by ${t.artist}`).join("\n")}
+
+Guidelines:
+1. Write a beautiful, narrated story of the track's evolution. Treat it like a documentary or liner notes of a legendary release.
+2. Structure your response with clear sections:
+   - **The Origin / Spark**: Fictionalized or metadata-driven origin of the song's concept.
+   - **Evolutionary Arc**: How it progressed from draft to the active master/vault version.
+   - **Lyrical & Sonic Growth**: Interpretation of the song's message and how the audio supports it.
+   - **Archival Significance**: Where this track fits in the artist's legacy.
+Keep the style poetic, storytelling-focused, and highly artistic.`;
+};
+function parseInlineStyles(text) {
+	return text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+}
+function formatMessageContent(text) {
+	return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").split(/\n\n+/).map((block, i) => {
+		const trimmed = block.trim();
+		if (!trimmed) return null;
+		if (trimmed.startsWith("###")) return /* @__PURE__ */ jsx("h3", { children: trimmed.replace(/^###\s*/, "") }, i);
+		if (trimmed.startsWith("##")) return /* @__PURE__ */ jsx("h2", { children: trimmed.replace(/^##\s*/, "") }, i);
+		if (trimmed.startsWith("#")) return /* @__PURE__ */ jsx("h1", { children: trimmed.replace(/^#\s*/, "") }, i);
+		if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) return /* @__PURE__ */ jsx("ul", { children: trimmed.split(/\n[-*]\s+/).map((item, j) => /* @__PURE__ */ jsx("li", { dangerouslySetInnerHTML: { __html: parseInlineStyles(item.replace(/^[-*]\s+/, "")) } }, j)) }, i);
+		return /* @__PURE__ */ jsx("p", { dangerouslySetInnerHTML: { __html: parseInlineStyles(trimmed) } }, i);
+	});
+}
 function AgentScoutWorkspace({ variant }) {
 	const copy = AGENT_COPY[variant];
+	const { currentTrack, queue } = useAudioSession();
+	const storageKey = `sap-agent-chat:${variant}:${currentTrack?.id || currentTrack?.title || "none"}`;
+	const [messages, setMessages] = useState(() => {
+		try {
+			const saved = sessionStorage.getItem(storageKey);
+			return saved ? JSON.parse(saved) : [];
+		} catch {
+			return [];
+		}
+	});
+	const [input, setInput] = useState("");
+	const [loading, setLoading] = useState(false);
+	const [error, setError] = useState(null);
+	const chatEndRef = useRef(null);
+	useEffect(() => {
+		try {
+			const saved = sessionStorage.getItem(storageKey);
+			setMessages(saved ? JSON.parse(saved) : []);
+			setError(null);
+		} catch {
+			setMessages([]);
+		}
+	}, [storageKey]);
+	useEffect(() => {
+		chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+	}, [messages, loading]);
 	if (!copy) return null;
+	const handleSendMessage = async (textToSend) => {
+		if (!textToSend.trim() || loading) return;
+		if (!API_KEY) {
+			setError("OpenRouter API key is missing. Please configure VITE_OPENROUTER_API_KEY in your .env.local file.");
+			return;
+		}
+		const newMessages = [...messages, {
+			role: "user",
+			content: textToSend
+		}];
+		setMessages(newMessages);
+		sessionStorage.setItem(storageKey, JSON.stringify(newMessages));
+		setInput("");
+		setLoading(true);
+		setError(null);
+		try {
+			const presetModel = PRESETS[variant];
+			const systemPrompt = getSystemPrompt(variant, currentTrack, queue);
+			const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+				method: "POST",
+				headers: {
+					"Authorization": `Bearer ${API_KEY}`,
+					"Content-Type": "application/json",
+					"HTTP-Referer": "https://sap.seaportal.world",
+					"X-Title": "SEIHouse Audio Player"
+				},
+				body: JSON.stringify({
+					model: presetModel,
+					messages: [{
+						role: "system",
+						content: systemPrompt
+					}, ...newMessages]
+				})
+			});
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				throw new Error(errorData?.error?.message || `HTTP ${response.status} from OpenRouter`);
+			}
+			const assistantContent = (await response.json())?.choices?.[0]?.message?.content;
+			if (!assistantContent) throw new Error("No response content received from agent.");
+			const updatedMessages = [...newMessages, {
+				role: "assistant",
+				content: assistantContent
+			}];
+			setMessages(updatedMessages);
+			sessionStorage.setItem(storageKey, JSON.stringify(updatedMessages));
+		} catch (err) {
+			console.error("Agent Connection Error:", err);
+			setError(err?.message || "Failed to communicate with OpenRouter. Please try again.");
+		} finally {
+			setLoading(false);
+		}
+	};
+	const startInitialAnalysis = () => {
+		handleSendMessage(variant === "demo-scout" ? "Please scan this demo and tell me if it's worth finishing." : variant === "studio-scout" ? "Please perform a studio session mix analysis on this track." : "Please write the historical memoir of this track's evolution.");
+	};
+	const clearChat = () => {
+		setMessages([]);
+		sessionStorage.removeItem(storageKey);
+		setError(null);
+	};
 	return /* @__PURE__ */ jsxs("div", {
-		className: "sap-ctl__workspace-empty",
+		className: "sap-ctl__agent-workspace",
 		"data-agent": variant,
-		children: [/* @__PURE__ */ jsx("p", {
-			className: "sap-ctl__workspace-lead",
-			children: copy.lead
-		}), /* @__PURE__ */ jsx("p", {
-			className: "sap-ctl__workspace-sub",
-			children: copy.sub
+		children: [currentTrack && /* @__PURE__ */ jsxs("div", {
+			className: "sap-ctl__agent-track-badge",
+			children: [
+				/* @__PURE__ */ jsx("span", {
+					className: "sap-ctl__agent-track-title",
+					children: currentTrack.title
+				}),
+				/* @__PURE__ */ jsxs("span", {
+					className: "sap-ctl__agent-track-artist",
+					children: ["by ", currentTrack.artist]
+				}),
+				messages.length > 0 && /* @__PURE__ */ jsx("button", {
+					type: "button",
+					onClick: clearChat,
+					className: "sap-ctl__value ap-tap",
+					style: {
+						marginLeft: "auto",
+						background: "none",
+						border: "none",
+						color: "inherit",
+						cursor: "pointer",
+						opacity: .5,
+						fontSize: "11px"
+					},
+					children: "Reset Chat"
+				})
+			]
+		}), messages.length === 0 ? /* @__PURE__ */ jsxs("div", {
+			className: "sap-ctl__agent-intro",
+			children: [
+				/* @__PURE__ */ jsx("div", {
+					className: "sap-ctl__agent-intro-icon",
+					children: /* @__PURE__ */ jsx(AgentIcon, {})
+				}),
+				/* @__PURE__ */ jsxs("div", { children: [/* @__PURE__ */ jsx("p", {
+					className: "sap-ctl__workspace-lead",
+					children: copy.lead
+				}), /* @__PURE__ */ jsx("p", {
+					className: "sap-ctl__workspace-sub",
+					children: copy.sub
+				})] }),
+				/* @__PURE__ */ jsx("button", {
+					type: "button",
+					onClick: startInitialAnalysis,
+					disabled: !currentTrack || loading || !API_KEY,
+					className: "sap-ctl__agent-btn-primary ap-tap",
+					children: loading ? "Initializing..." : copy.actionLabel
+				}),
+				!API_KEY && /* @__PURE__ */ jsx("p", {
+					style: {
+						color: "#ef4444",
+						fontSize: "12px",
+						marginTop: "12px",
+						opacity: .8
+					},
+					children: "API Key missing. Please set VITE_OPENROUTER_API_KEY in your .env.local file."
+				})
+			]
+		}) : /* @__PURE__ */ jsxs("div", {
+			className: "sap-ctl__agent-chat",
+			children: [/* @__PURE__ */ jsxs("div", {
+				className: "sap-ctl__agent-history",
+				children: [
+					messages.map((msg, index) => /* @__PURE__ */ jsx("div", {
+						className: `sap-ctl__agent-msg sap-ctl__agent-msg--${msg.role}`,
+						children: /* @__PURE__ */ jsx("div", {
+							className: "sap-ctl__agent-msg-content",
+							children: formatMessageContent(msg.content)
+						})
+					}, index)),
+					loading && /* @__PURE__ */ jsxs("div", {
+						className: "sap-ctl__agent-loading-container",
+						children: [/* @__PURE__ */ jsxs("div", {
+							className: "sap-ctl__agent-loading-wave",
+							"aria-hidden": "true",
+							children: [
+								/* @__PURE__ */ jsx("span", { className: "sap-ctl__agent-loading-bar" }),
+								/* @__PURE__ */ jsx("span", { className: "sap-ctl__agent-loading-bar" }),
+								/* @__PURE__ */ jsx("span", { className: "sap-ctl__agent-loading-bar" }),
+								/* @__PURE__ */ jsx("span", { className: "sap-ctl__agent-loading-bar" })
+							]
+						}), /* @__PURE__ */ jsx("span", { children: "Agent thinking..." })]
+					}),
+					error && /* @__PURE__ */ jsxs("div", {
+						className: "sap-ctl__agent-loading-container",
+						style: { color: "#ef4444" },
+						children: [/* @__PURE__ */ jsx(ErrorIcon$1, {}), /* @__PURE__ */ jsx("span", { children: error })]
+					}),
+					/* @__PURE__ */ jsx("div", { ref: chatEndRef })
+				]
+			}), /* @__PURE__ */ jsxs("form", {
+				onSubmit: (e) => {
+					e.preventDefault();
+					handleSendMessage(input);
+				},
+				className: "sap-ctl__agent-input-form",
+				children: [/* @__PURE__ */ jsx("textarea", {
+					value: input,
+					onChange: (e) => setInput(e.target.value),
+					onKeyDown: (e) => {
+						if (e.key === "Enter" && !e.shiftKey) {
+							e.preventDefault();
+							handleSendMessage(input);
+						}
+					},
+					placeholder: "Ask follow-up questions...",
+					className: "sap-ctl__agent-input",
+					rows: 1,
+					disabled: loading
+				}), /* @__PURE__ */ jsx("button", {
+					type: "submit",
+					disabled: loading || !input.trim(),
+					className: "sap-ctl__agent-send-btn ap-tap",
+					children: loading ? /* @__PURE__ */ jsx(SpinnerIcon$1, {}) : "Send"
+				})]
+			})]
 		})]
 	});
 }
@@ -12899,6 +13704,37 @@ function LibraryVaultWorkspace() {
 				}, id))
 			})
 		]
+	});
+}
+//#endregion
+//#region src/audio-player/components/workspace/VaultActionWorkspace.tsx
+var VAULT_ACTION_COPY = {
+	tag: {
+		lead: "Tag",
+		sub: "File this track under a vault classification and add custom tags."
+	},
+	rename: {
+		lead: "Rename",
+		sub: "Rename this track and manage its version label."
+	},
+	radio: {
+		lead: "Radio",
+		sub: "Start a Vault Radio station seeded from this track."
+	}
+};
+function VaultActionWorkspace({ variant }) {
+	const copy = VAULT_ACTION_COPY[variant];
+	if (!copy) return null;
+	return /* @__PURE__ */ jsxs("div", {
+		className: "sap-ctl__workspace-empty",
+		"data-vault-action": variant,
+		children: [/* @__PURE__ */ jsx("p", {
+			className: "sap-ctl__workspace-lead",
+			children: copy.lead
+		}), /* @__PURE__ */ jsx("p", {
+			className: "sap-ctl__workspace-sub",
+			children: copy.sub
+		})]
 	});
 }
 //#endregion
@@ -13461,7 +14297,14 @@ function titleForRoute(route) {
 		case "plugin-settings:lyrics":
 		case "visual:lyrics": return "Lyrics";
 		case "plugin-settings:waveform": return "Waveform";
+		case "plugin-settings:analytics": return "Analytics";
+		case "plugin-settings:sleep-timer": return "Sleep Timer";
+		case "plugin-settings:auto-theme": return "Auto Theme";
 		case "playback:automix": return "Automix";
+		case "playback:controls": return "Controls";
+		case "vault:tag": return "Tag";
+		case "vault:rename": return "Rename";
+		case "vault:radio": return "Radio";
 		case "agent:queue-director": return "Queue Director";
 		case "agent:demo-scout": return "Demo Scout";
 		case "agent:studio-scout": return "Studio Scout";
@@ -13499,7 +14342,7 @@ function VisualCanvasWorkspace({ lyrics }) {
 * or `playback:*` route can't silently fall through to the wrong surface; the
 * `default` only parses for the genuinely dynamic `plugin-settings:<id>` case.
 */
-function contentForRoute(route, lyrics) {
+function contentForRoute(route, lyrics, playback) {
 	switch (route) {
 		case "library:playlists": return /* @__PURE__ */ jsx(LibraryPlaylistsWorkspace, {});
 		case "library:queue": return /* @__PURE__ */ jsx(LibraryQueueWorkspace, {});
@@ -13510,6 +14353,10 @@ function contentForRoute(route, lyrics) {
 			lyrics
 		});
 		case "playback:automix": return /* @__PURE__ */ jsx(PlaybackAutomixWorkspace, {});
+		case "playback:controls": return /* @__PURE__ */ jsx(PlaybackControlsWorkspace, { playback });
+		case "vault:tag": return /* @__PURE__ */ jsx(VaultActionWorkspace, { variant: "tag" });
+		case "vault:rename": return /* @__PURE__ */ jsx(VaultActionWorkspace, { variant: "rename" });
+		case "vault:radio": return /* @__PURE__ */ jsx(VaultActionWorkspace, { variant: "radio" });
 		case "agent:queue-director": return /* @__PURE__ */ jsx(AgentQueueDirectorWorkspace, {});
 		case "agent:demo-scout": return /* @__PURE__ */ jsx(AgentScoutWorkspace, { variant: "demo-scout" });
 		case "agent:studio-scout": return /* @__PURE__ */ jsx(AgentScoutWorkspace, { variant: "studio-scout" });
@@ -13523,7 +14370,7 @@ function contentForRoute(route, lyrics) {
 		}
 	}
 }
-function WorkspaceShell({ route, onClose, lyrics }) {
+function WorkspaceShell({ route, onClose, lyrics, playback }) {
 	return /* @__PURE__ */ jsxs(Fragment, { children: [/* @__PURE__ */ jsxs("header", {
 		className: "sap-ctl__header",
 		children: [/* @__PURE__ */ jsx("h2", {
@@ -13539,7 +14386,7 @@ function WorkspaceShell({ route, onClose, lyrics }) {
 	}), /* @__PURE__ */ jsx("div", {
 		className: "sap-ctl__workspace",
 		"data-route": route,
-		children: contentForRoute(route, lyrics)
+		children: contentForRoute(route, lyrics, playback)
 	})] });
 }
 //#endregion
@@ -13729,7 +14576,8 @@ function SAPController({ open, onClose, route = "options", playback, queue, info
 				!isOptions && /* @__PURE__ */ jsxs(Fragment, { children: [/* @__PURE__ */ jsx(WorkspaceShell, {
 					route,
 					onClose,
-					lyrics: info?.lyrics
+					lyrics: info?.lyrics,
+					playback
 				}), /* @__PURE__ */ jsx("div", {
 					className: "sap-ctl__divider",
 					role: "separator",
@@ -15021,6 +15869,8 @@ function AudioPlayerBody(props) {
 					/* @__PURE__ */ jsx(PlayerSurfaceButtons, {
 						surface,
 						onOpenQueue: () => setQueueOpen(true),
+						activePluginIds: s.pluginNames,
+						onShareLink: handleShareClick,
 						onOpenFocusedController: handleOpenFocusedController
 					}),
 					currentTrack.purchaseUrl && /* @__PURE__ */ jsxs("a", {
@@ -17382,6 +18232,8 @@ function FullCardPlayer({ showVolume = defaultShowVolume(), backgroundMedia, bac
 					/* @__PURE__ */ jsx(PlayerSurfaceButtons, {
 						surface,
 						onOpenQueue: handleOpenQueue,
+						activePluginIds: s.pluginNames,
+						onShareLink: currentTrack ? handleShareClick : void 0,
 						onOpenFocusedController: handleOpenFocusedController
 					})
 				]
@@ -17927,7 +18779,7 @@ function sameTrack(a, b) {
 * the interactive `WaveformAdapter` (`supportsWaveform: true`). No radial menu is
 * added — the card stays clean and tap-to-play.
 */
-function SeaCardPlayer({ track, art = "linear-gradient(135deg,#FF7AC6,#7C5CFF)", artMedia, tag, actions, titleFont, artistFont, className, style, ...theme }) {
+function SeaCardPlayer({ track, art = "linear-gradient(135deg,#FF7AC6,#7C5CFF)", artMedia, tag, actions, commands, onOpenWorkspace, titleFont, artistFont, className, style, ...theme }) {
 	const s = useAudioSession();
 	const surface = usePlayerSurface("seaCard");
 	const isActive = s.currentTrack ? sameTrack(s.currentTrack, track) : false;
@@ -17998,6 +18850,8 @@ function SeaCardPlayer({ track, art = "linear-gradient(135deg,#FF7AC6,#7C5CFF)",
 						})]
 					}), showAction && /* @__PURE__ */ jsx(ArcActionButton, {
 						actions,
+						commands,
+						onOpenWorkspace,
 						ariaLabel: `Actions for ${track.title}`,
 						className: "ap-sea__action"
 					})]
@@ -18567,106 +19421,241 @@ function createSceneMixEngine(options = {}) {
 	return new SceneMixEngine(options);
 }
 //#endregion
+//#region src/audio-player/menu/standardArcActions.ts
+/** Playback › Up Next / Controls / Debug — each a dedicated "…" menu section. */
+function buildPlaybackArcBranch() {
+	return {
+		id: "playback",
+		label: "Playback",
+		icon: PlaybackIcon,
+		children: [
+			{
+				id: "up-next",
+				label: "Up Next",
+				icon: QueueIcon,
+				target: "sap-controller",
+				workspaceRoute: "library:queue"
+			},
+			{
+				id: "controls",
+				label: "Controls",
+				icon: ControlsIcon,
+				target: "sap-controller",
+				workspaceRoute: "playback:controls"
+			},
+			{
+				id: "debug",
+				label: "Debug",
+				icon: DebugIcon,
+				target: "sap-controller",
+				workspaceRoute: "diagnostics:activity-log"
+			}
+		]
+	};
+}
+/**
+* Share › Link / Add to / Favorite. Link and Favorite are immediate host
+* commands (`"share.url"`, `"track.favorite"`) and prune away on hosts that
+* don't wire them; Add to opens the Add to Vault section in the "…" menu.
+*/
+function buildShareArcBranch() {
+	return {
+		id: "share",
+		label: "Share",
+		icon: ShareIcon,
+		children: [
+			{
+				id: "share-link",
+				label: "Link",
+				icon: LinkIcon,
+				target: "immediate-action",
+				action: "share.url"
+			},
+			{
+				id: "share-add-to",
+				label: "Add to",
+				icon: VaultIcon,
+				target: "sap-controller",
+				workspaceRoute: "library:vault"
+			},
+			{
+				id: "share-favorite",
+				label: "Favorite",
+				icon: HeartIcon$1,
+				target: "immediate-action",
+				action: "track.favorite"
+			}
+		]
+	};
+}
+/**
+* Agents › Scout / Memoir. Scout is the audio-analysis agent — it routes to
+* its paid Studio tier when entitled, else the free Demo tier. Memoir is
+* assistance and info (a narrated history of the track's vault versions).
+*/
+function buildAgentsArcBranch(entitlements) {
+	return {
+		id: "agents",
+		label: "Agents",
+		icon: AgentIcon,
+		children: [{
+			id: "agent-scout",
+			label: "Scout",
+			icon: AgentIcon,
+			target: "sap-controller",
+			workspaceRoute: entitlements?.studioScout === true ? "agent:studio-scout" : "agent:demo-scout"
+		}, {
+			id: "agent-memoir",
+			label: "Memoir",
+			icon: LyricsIcon,
+			target: "sap-controller",
+			workspaceRoute: "agent:memoir"
+		}]
+	};
+}
+var PLUGIN_BUCKET_META = {
+	audio: {
+		id: "plugins-audio",
+		label: "Audio",
+		icon: AudioIcon
+	},
+	visual: {
+		id: "plugins-visual",
+		label: "Visual",
+		icon: VisualIcon
+	},
+	analytics: {
+		id: "plugins-analytics",
+		label: "Analytics",
+		icon: AnalyticsIcon
+	}
+};
+/**
+* Plugins › Audio / Visual / Analytics, holding only the *currently active*
+* plugins (e.g. when Lyrics is active, tapping Visual reveals a Lyrics
+* button). Each plugin leaf opens that plugin's dedicated settings section in
+* the "…" menu. The Canvas toggle is the one built-in Visual leaf (target
+* `"sei-canvas"`); like everything else it prunes away on hosts that don't
+* wire the canvas. Returns `null` when no bucket has any live leaf.
+*/
+function buildPluginsArcBranch(activePluginIds = []) {
+	const buckets = {
+		audio: [],
+		visual: [],
+		analytics: []
+	};
+	for (const def of getActivePluginSurfaceDefinitions(activePluginIds)) {
+		const bucket = getArcPluginBucket(def);
+		const route = getPluginSettingsRoute(def);
+		if (!bucket || !route || !isWorkspaceRoute(route)) continue;
+		buckets[bucket].push({
+			id: `plugin-${def.pluginId}`,
+			label: def.label,
+			icon: def.pluginId === "lyrics" ? LyricsIcon : PluginIcon,
+			target: "sap-controller",
+			workspaceRoute: route
+		});
+	}
+	buckets.visual.push({
+		id: "canvas",
+		label: "Canvas",
+		icon: CanvasIcon,
+		target: "sei-canvas"
+	});
+	const children = [
+		"audio",
+		"visual",
+		"analytics"
+	].flatMap((bucket) => {
+		if (buckets[bucket].length === 0) return [];
+		const meta = PLUGIN_BUCKET_META[bucket];
+		return [{
+			id: meta.id,
+			label: meta.label,
+			icon: meta.icon,
+			children: buckets[bucket]
+		}];
+	});
+	if (children.length === 0) return null;
+	return {
+		id: "plugins",
+		label: "Plugins",
+		icon: PluginIcon,
+		children
+	};
+}
+/**
+* The full standardized wheel for non-Vault faces:
+* Plugins | Playback | Share | Agents.
+*/
+function buildStandardTrackArcActions({ activePluginIds = [], entitlements } = {}) {
+	const plugins = buildPluginsArcBranch(activePluginIds);
+	return [
+		...plugins ? [plugins] : [],
+		buildPlaybackArcBranch(),
+		buildShareArcBranch(),
+		buildAgentsArcBranch(entitlements)
+	];
+}
+//#endregion
 //#region src/audio-player/menu/vaultTrackMenu.ts
 /**
-* The Vault face's selected-track command wheel:
+* The Vault face's command wheel — the standardized arc with one deliberate
+* difference: the Plugins arm is replaced by a dedicated Vault arm, because a
+* vault row's primary actions are about organizing the track, not configuring
+* the player:
 *
-*     Add to Queue › Play Next / Play Later     (immediate queue commands)
-*     Share        › Email / URL                (immediate share commands)
-*     Vault        › Add To / Playlist          (SAP Controller workspaces)
-*     Agent        › Demo Scout / Studio Scout / Memoir (SAP Controller workspaces)
+*     Vault    › Tag / Rename / Playlist / Radio   (SAP Controller workspaces)
+*     Playback › Up Next / Controls / Debug        (SAP Controller workspaces)
+*     Share    › Link / Add to / Favorite          (immediate + workspace)
+*     Agents   › Scout / Memoir                    (SAP Controller workspaces)
 *
 * Every leaf carries an explicit `target`, so the arc renders it only when the
 * host actually wires that destination — there are no dead buttons, and the
 * only surfaces reachable from here are immediate commands, the SEI Canvas,
 * and the SAP Controller. A builder (not a constant) so entitlement state can
-* flip Studio Scout between routed and locked per render.
+* point the Agents › Scout leaf at the right Scout tier per render.
 */
 function buildVaultTrackArcActions({ entitlements } = {}) {
-	const hasStudioScout = entitlements?.studioScout === true;
 	return [
-		{
-			id: "add-to-queue",
-			label: "Add to Queue",
-			icon: QueueIcon,
-			children: [{
-				id: "play-next",
-				label: "Play Next",
-				icon: NextIcon$1,
-				target: "immediate-action",
-				action: "queue.insertAfterCurrent"
-			}, {
-				id: "play-later",
-				label: "Play Later",
-				icon: QueueIcon,
-				target: "immediate-action",
-				action: "queue.append"
-			}]
-		},
-		{
-			id: "share",
-			label: "Share",
-			icon: ShareIcon,
-			children: [{
-				id: "share-email",
-				label: "Email",
-				icon: MailIcon,
-				target: "immediate-action",
-				action: "share.email"
-			}, {
-				id: "share-url",
-				label: "URL",
-				icon: LinkIcon,
-				target: "immediate-action",
-				action: "share.url"
-			}]
-		},
 		{
 			id: "vault",
 			label: "Vault",
 			icon: VaultIcon,
-			children: [{
-				id: "vault-add-to",
-				label: "Add To",
-				icon: VaultIcon,
-				target: "sap-controller",
-				workspaceRoute: "library:vault"
-			}, {
-				id: "vault-playlist",
-				label: "Playlist",
-				icon: QueueIcon,
-				target: "sap-controller",
-				workspaceRoute: "library:playlists"
-			}]
-		},
-		{
-			id: "agent",
-			label: "Agent",
-			icon: AgentIcon,
 			children: [
 				{
-					id: "agent-demo-scout",
-					label: "Demo Scout",
-					icon: AgentIcon,
+					id: "vault-tag",
+					label: "Tag",
+					icon: TagIcon,
 					target: "sap-controller",
-					workspaceRoute: "agent:demo-scout"
+					workspaceRoute: "vault:tag"
 				},
 				{
-					id: "agent-studio-scout",
-					label: "Studio Scout",
-					icon: AgentIcon,
-					target: hasStudioScout ? "sap-controller" : "locked-entitlement",
-					workspaceRoute: "agent:studio-scout"
+					id: "vault-rename",
+					label: "Rename",
+					icon: RenameIcon,
+					target: "sap-controller",
+					workspaceRoute: "vault:rename"
 				},
 				{
-					id: "agent-memoir",
-					label: "Memoir",
-					icon: LyricsIcon,
+					id: "vault-playlist",
+					label: "Playlist",
+					icon: QueueIcon,
 					target: "sap-controller",
-					workspaceRoute: "agent:memoir"
+					workspaceRoute: "library:playlists"
+				},
+				{
+					id: "vault-radio",
+					label: "Radio",
+					icon: RadioIcon,
+					target: "sap-controller",
+					workspaceRoute: "vault:radio"
 				}
 			]
-		}
+		},
+		buildPlaybackArcBranch(),
+		buildShareArcBranch(),
+		buildAgentsArcBranch(entitlements)
 	];
 }
 //#endregion
@@ -19165,169 +20154,6 @@ function useActivityLogRecording({ engine, currentTrack, repeatMode, shuffle, tr
 	}, [shuffle, log]);
 }
 //#endregion
-//#region src/audio-player/plugins/surfaces/pluginSurfaceHelpers.ts
-/** True when the plugin exposes a (enabled) settings surface. */
-function hasSettingsSurface(definition) {
-	if (definition.kind !== "settings" && definition.kind !== "dual") return false;
-	return definition.settings?.enabled === true;
-}
-/** True when the plugin exposes a (enabled) SEI Canvas surface. */
-function hasCanvasSurface(definition) {
-	if (definition.kind !== "canvas" && definition.kind !== "dual") return false;
-	return definition.canvas?.enabled === true;
-}
-/** True when the plugin renders no UI at all. */
-function isHeadlessPlugin(definition) {
-	return definition.kind === "headless";
-}
-/** The declarative settings route, when the plugin has an enabled settings surface. */
-function getPluginSettingsRoute(definition) {
-	return hasSettingsSurface(definition) ? definition.settings?.route : void 0;
-}
-/** The SEI Canvas surface id, when the plugin has an enabled canvas surface. */
-function getPluginCanvasSurfaceId(definition) {
-	return hasCanvasSurface(definition) ? definition.canvas?.surfaceId : void 0;
-}
-/**
-* Return a new array sorted by menu order (ascending), tie-broken by pluginId.
-* Stable and non-mutating — the input array is left untouched.
-*/
-function sortPluginSurfaceDefinitions(definitions) {
-	return [...definitions].sort((a, b) => {
-		const orderA = a.menu?.order ?? Number.MAX_SAFE_INTEGER;
-		const orderB = b.menu?.order ?? Number.MAX_SAFE_INTEGER;
-		if (orderA !== orderB) return orderA - orderB;
-		return a.pluginId.localeCompare(b.pluginId);
-	});
-}
-//#endregion
-//#region src/audio-player/plugins/surfaces/defaultPluginSurfaces.ts
-var DEFAULT_PLUGIN_SURFACES = [
-	{
-		pluginId: "keyboard-shortcuts",
-		label: "Keyboard Shortcuts",
-		description: "Space / arrow / JKL transport controls.",
-		category: "utility",
-		kind: "headless"
-	},
-	{
-		pluginId: "analytics",
-		label: "Analytics",
-		description: "Playback event reporting.",
-		category: "analytics",
-		kind: "settings",
-		settings: {
-			enabled: true,
-			route: "plugin-settings:analytics",
-			label: "Analytics"
-		},
-		menu: {
-			branch: "plugin:analytics",
-			order: 40
-		}
-	},
-	{
-		pluginId: "lyrics",
-		label: "Lyrics",
-		description: "Synced lyrics — primary UI lives in SEI Canvas.",
-		category: "visual",
-		kind: "dual",
-		settings: {
-			enabled: true,
-			route: "plugin-settings:lyrics",
-			label: "Lyrics"
-		},
-		canvas: {
-			enabled: true,
-			surfaceId: "lyrics",
-			label: "Lyrics",
-			requiresActiveTrack: true,
-			preferredHeight: "standard"
-		},
-		menu: {
-			showInArc: true,
-			branch: "plugin:visual",
-			order: 10
-		}
-	},
-	{
-		pluginId: "sleep-timer",
-		label: "Sleep Timer",
-		description: "Auto-stop after a chosen duration.",
-		category: "utility",
-		kind: "settings",
-		settings: {
-			enabled: true,
-			route: "plugin-settings:sleep-timer",
-			label: "Sleep Timer"
-		},
-		menu: {
-			branch: "playback",
-			order: 30
-		}
-	},
-	{
-		pluginId: "automix",
-		label: "Automix",
-		description: "Beat-aware crossfades between tracks.",
-		category: "playback",
-		kind: "settings",
-		settings: {
-			enabled: true,
-			route: "playback:automix",
-			label: "Automix"
-		},
-		menu: {
-			branch: "playback",
-			order: 20
-		}
-	},
-	{
-		pluginId: "auto-theme",
-		label: "Auto Theme",
-		description: "Derives player colors from album art.",
-		category: "visual",
-		kind: "settings",
-		settings: {
-			enabled: true,
-			route: "plugin-settings:auto-theme",
-			label: "Auto Theme"
-		},
-		menu: {
-			branch: "plugin:visual",
-			order: 50
-		}
-	},
-	{
-		pluginId: "waveform",
-		label: "Waveform",
-		description: "Interactive waveform scrubber (no SEI Canvas surface yet).",
-		category: "visual",
-		kind: "settings",
-		settings: {
-			enabled: true,
-			route: "plugin-settings:waveform",
-			label: "Waveform"
-		},
-		menu: {
-			branch: "plugin:visual",
-			order: 60
-		}
-	}
-];
-/** Look up a single plugin's surface definition by its plugin id. */
-function getPluginSurfaceDefinition(pluginId) {
-	return DEFAULT_PLUGIN_SURFACES.find((def) => def.pluginId === pluginId);
-}
-/** All surface definitions in a given category, sorted by menu order. */
-function getPluginSurfaceDefinitionsByCategory(category) {
-	return sortPluginSurfaceDefinitions(DEFAULT_PLUGIN_SURFACES.filter((def) => def.category === category));
-}
-/** All surface definitions whose menu placement targets a given branch, sorted. */
-function getPluginSurfaceDefinitionsForMenuBranch(branch) {
-	return sortPluginSurfaceDefinitions(DEFAULT_PLUGIN_SURFACES.filter((def) => def.menu?.branch === branch));
-}
-//#endregion
 //#region src/audio-player/properties/propertyRegistry.ts
 /**
 * The shared property model. Every editable property is declared here exactly
@@ -19666,6 +20492,6 @@ function getPropertyDefaults() {
 	return acc;
 }
 //#endregion
-export { ARC_RADIUS, AUTOMIX_FADE_MS, ActivityLogContext, ActivityLogPanel, ActivityLogProvider, ActivityLogWorkspace, AgentQueueDirectorWorkspace, AnalyticsPlugin, ArcActionButton, AudioPlayer, AudioPlayer as default, AudioSessionProvider, AudioSpriteEngine, AutoThemePlugin, AutomixPlugin, BUILTIN_VISUAL_COMPONENTS, BackgroundMedia, ControllerPanelRenderer, CueManifestPlugin, CueRuntime, DEFAULT_ACTIVITY_LOG_CONFIG, DEFAULT_PLUGIN_SURFACES, DefaultPluginErrorHandler, ExplicitBadge, FAMILY_DEFAULTS, FullCardPlayer, GracefulDegradation, HTML5AudioBackend, INITIAL_SURFACE_STATE, KeyboardShortcutPlugin, LYRIC_DISPLAY_ID, LibraryPlaylistsWorkspace, LibraryQueueWorkspace, LyricDisplay, LyricSettingsPanel, LyricsPlugin, MAJOR_FACES, MiniSidebarPlayer, NarrativeFace, PLAYER_FACE_CAPABILITIES, PROPERTY_GROUPS, PROPERTY_GROUP_LABELS, PROPERTY_REGISTRY, PRO_CONFIDENCE_MIN, PlaybackAutomixWorkspace, PlayerHero, PlayerSurfaceButtons, PluginError, PluginErrorBoundary, PluginErrorBoundaryFactory, PluginManager, PluginManagerPanel, PluginRegistryProvider, PluginSettingsWorkspace, ProgressBar, QueueDrawer, QueueSurface, SAPController, SCENE_FADE_MS, SEICanvasActionMenu, SEICanvasHost, SEICanvasRenderer, SceneMixEngine, ScrubberCanvasHost, ScrubberCanvasRenderer, SeaCardPlayer, SleepTimerPlugin, StickyBottomPlayer, SurfaceButton, TextMarquee, TrackMetadata, VAULT_CATEGORY_META, VaultRowPlayer, VisualLyricsWorkspace, VisualSlotPicker, VisualSlotsProvider, VolumeControl, WORKSPACE_ROUTES, WaveformAdapter, WaveformPlugin, WaveformProgress, WebAudioBackend, WorkspaceShell, arcOffsets, bpmCompatibility, buildMenuTree, buildVaultTrackArcActions, canEnterCanvas, checkCodecSupport, clearCustomCategories, composeEventHandlers, computePeaksFromUrl, computeTransitionPoints, contrastText, createActivityLogStore, createAnalyticsPlugin, createAudioBackend, createAudioSpriteEngine, createAutoThemePlugin, createAutomixPlugin, createCueManifestPlugin, createKeyboardShortcutPlugin, createLyricsPlugin, createPluginErrorBoundary, createSceneMixEngine, createSleepTimerPlugin, createWaveformPlugin, defaultShowVolume, deriveHeroCollapsed, deserializeSession, ensureMuted, ensureProTrackAnalysis, ensureTrackAnalysis, extractPalette, extractPeaks, faceSupportsAction, faceSupportsContextualActions, faceSupportsHeroCollapse, faceSupportsSEICanvas, faceSupportsScrubberCanvas, faceSupportsWaveform, formatFeatured, formatSecondaryLine, formatTime, formatVersionedTitle, getAllVaultCategories, getAllVisualComponents, getByPropPath, getDefaultComponentForSlot, getDisplayArtist, getDisplayTitle, getFaceCapability, getFaceFamily, getGlobalErrorBoundaryFactory, getPluginCanvasSurfaceId, getPluginSettingsRoute, getPluginSurfaceDefinition, getPluginSurfaceDefinitionsByCategory, getPluginSurfaceDefinitionsForMenuBranch, getPreferredCanvasPlacement, getPrimaryTrackSource, getPropertiesForFace, getPropertiesForGroup, getPropertyDefaults, getScrubberDensity, getScrubberHeight, getTrackAnalysis, getTrackSources, getTrackTrims, getVaultCategoryMeta, getVisualComponent, getVisualComponentsForSlot, gradient, hasCanvasSurface, hasSettingsSurface, isArcActionLive, isHeadlessPlugin, isIOS, isMobileDevice, isNodeInteractive, isPluginError, isSAPDefaultPrevented, isSessionEngine, isWorkspaceRoute, lyricDefaultSettings, lyricDisplayDefinition, mergeRefs, normalizeRhythmConfidence, parseWorkspaceRoute, planTransition, pruneDeadArcActions, quantizePixels, registerVaultCategory, registerVisualComponent, relativeLuminance, resolveArcActionState, resolveMedia, rgbToCss, routeArcAction, serializeSession, setByPropPath, setGlobalErrorHandler, shouldEnableMarquee, snapToBeat, sortPluginSurfaceDefinitions, surfaceReducer, trackKey, trackSourcesSignature, useActivePluginInstances, useActivityLog, useActivityLogRecording, useAudioPlayer, useAudioSession, useAutomix, useMediaSessionObserver, useNarrativeAudio, useNarrativeCueController, usePlayerSurface, usePluginManager, usePluginRegistry, useReducedMotion, useSAPPropGetters, useShareTrack, useVisualSlots, validateCueManifest, validateTrackSource, withErrorBoundary };
+export { ARC_RADIUS, AUTOMIX_FADE_MS, ActivityLogContext, ActivityLogPanel, ActivityLogProvider, ActivityLogWorkspace, AgentQueueDirectorWorkspace, AnalyticsPlugin, ArcActionButton, AudioPlayer, AudioPlayer as default, AudioSessionProvider, AudioSpriteEngine, AutoThemePlugin, AutomixPlugin, BUILTIN_VISUAL_COMPONENTS, BackgroundMedia, ControllerPanelRenderer, CueManifestPlugin, CueRuntime, DEFAULT_ACTIVITY_LOG_CONFIG, DEFAULT_PLUGIN_SURFACES, DefaultPluginErrorHandler, ExplicitBadge, FAMILY_DEFAULTS, FullCardPlayer, GracefulDegradation, HTML5AudioBackend, INITIAL_SURFACE_STATE, KeyboardShortcutPlugin, LYRIC_DISPLAY_ID, LibraryPlaylistsWorkspace, LibraryQueueWorkspace, LyricDisplay, LyricSettingsPanel, LyricsPlugin, MAJOR_FACES, MiniSidebarPlayer, NarrativeFace, PLAYER_FACE_CAPABILITIES, PROPERTY_GROUPS, PROPERTY_GROUP_LABELS, PROPERTY_REGISTRY, PRO_CONFIDENCE_MIN, PlaybackAutomixWorkspace, PlayerHero, PlayerSurfaceButtons, PluginError, PluginErrorBoundary, PluginErrorBoundaryFactory, PluginManager, PluginManagerPanel, PluginRegistryProvider, PluginSettingsWorkspace, ProgressBar, QueueDrawer, QueueSurface, SAPController, SCENE_FADE_MS, SEICanvasActionMenu, SEICanvasHost, SEICanvasRenderer, SceneMixEngine, ScrubberCanvasHost, ScrubberCanvasRenderer, SeaCardPlayer, SleepTimerPlugin, StickyBottomPlayer, SurfaceButton, TextMarquee, TrackMetadata, VAULT_CATEGORY_META, VaultRowPlayer, VisualLyricsWorkspace, VisualSlotPicker, VisualSlotsProvider, VolumeControl, WORKSPACE_ROUTES, WaveformAdapter, WaveformPlugin, WaveformProgress, WebAudioBackend, WorkspaceShell, arcOffsets, bpmCompatibility, buildAgentsArcBranch, buildMenuTree, buildPlaybackArcBranch, buildPluginsArcBranch, buildShareArcBranch, buildStandardTrackArcActions, buildVaultTrackArcActions, canEnterCanvas, checkCodecSupport, clearCustomCategories, composeEventHandlers, computePeaksFromUrl, computeTransitionPoints, contrastText, createActivityLogStore, createAnalyticsPlugin, createAudioBackend, createAudioSpriteEngine, createAutoThemePlugin, createAutomixPlugin, createCueManifestPlugin, createKeyboardShortcutPlugin, createLyricsPlugin, createPluginErrorBoundary, createSceneMixEngine, createSleepTimerPlugin, createWaveformPlugin, defaultShowVolume, deriveHeroCollapsed, deserializeSession, ensureMuted, ensureProTrackAnalysis, ensureTrackAnalysis, extractPalette, extractPeaks, faceSupportsAction, faceSupportsContextualActions, faceSupportsHeroCollapse, faceSupportsSEICanvas, faceSupportsScrubberCanvas, faceSupportsWaveform, formatFeatured, formatSecondaryLine, formatTime, formatVersionedTitle, getAllVaultCategories, getAllVisualComponents, getByPropPath, getDefaultComponentForSlot, getDisplayArtist, getDisplayTitle, getFaceCapability, getFaceFamily, getGlobalErrorBoundaryFactory, getPluginCanvasSurfaceId, getPluginSettingsRoute, getPluginSurfaceDefinition, getPluginSurfaceDefinitionsByCategory, getPluginSurfaceDefinitionsForMenuBranch, getPreferredCanvasPlacement, getPrimaryTrackSource, getPropertiesForFace, getPropertiesForGroup, getPropertyDefaults, getScrubberDensity, getScrubberHeight, getTrackAnalysis, getTrackSources, getTrackTrims, getVaultCategoryMeta, getVisualComponent, getVisualComponentsForSlot, gradient, hasCanvasSurface, hasSettingsSurface, isArcActionLive, isHeadlessPlugin, isIOS, isMobileDevice, isNodeInteractive, isPluginError, isSAPDefaultPrevented, isSessionEngine, isWorkspaceRoute, lyricDefaultSettings, lyricDisplayDefinition, mergeRefs, normalizeRhythmConfidence, parseWorkspaceRoute, planTransition, pruneDeadArcActions, quantizePixels, registerVaultCategory, registerVisualComponent, relativeLuminance, resolveArcActionState, resolveMedia, rgbToCss, routeArcAction, serializeSession, setByPropPath, setGlobalErrorHandler, shouldEnableMarquee, snapToBeat, sortPluginSurfaceDefinitions, surfaceReducer, trackKey, trackSourcesSignature, useActivePluginInstances, useActivityLog, useActivityLogRecording, useAudioPlayer, useAudioSession, useAutomix, useMediaSessionObserver, useNarrativeAudio, useNarrativeCueController, usePlayerSurface, usePluginManager, usePluginRegistry, useReducedMotion, useSAPPropGetters, useShareTrack, useVisualSlots, validateCueManifest, validateTrackSource, withErrorBoundary };
 
 //# sourceMappingURL=index.js.map

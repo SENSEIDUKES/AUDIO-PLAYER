@@ -14,11 +14,11 @@
  * data model.
  */
 /** Every workspace route the shell knows how to render. */
-export declare const WORKSPACE_ROUTES: readonly ["options", "library:playlists", "library:queue", "library:vault", "plugin-settings:lyrics", "plugin-settings:waveform", "playback:automix", "agent:queue-director", "agent:demo-scout", "agent:studio-scout", "agent:memoir", "visual:canvas", "visual:lyrics", "diagnostics:activity-log"];
+export declare const WORKSPACE_ROUTES: readonly ["options", "library:playlists", "library:queue", "library:vault", "plugin-settings:lyrics", "plugin-settings:waveform", "plugin-settings:analytics", "plugin-settings:sleep-timer", "plugin-settings:auto-theme", "playback:automix", "playback:controls", "agent:queue-director", "agent:demo-scout", "agent:studio-scout", "agent:memoir", "visual:canvas", "visual:lyrics", "vault:tag", "vault:rename", "vault:radio", "diagnostics:activity-log"];
 /** A validated workspace destination. `"options"` is the legacy default. */
 export type WorkspaceRoute = (typeof WORKSPACE_ROUTES)[number];
 /** The top-level grouping of a route, taken from the part before the `:`. */
-export type WorkspaceRouteCategory = "options" | "library" | "plugin-settings" | "playback" | "agent" | "visual" | "diagnostics";
+export type WorkspaceRouteCategory = "options" | "library" | "plugin-settings" | "playback" | "agent" | "visual" | "vault" | "diagnostics";
 /** A route broken into its category + target for the shell to dispatch on. */
 export interface ParsedWorkspaceRoute {
     /** The full, validated route string. */
