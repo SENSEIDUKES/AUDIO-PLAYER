@@ -499,6 +499,8 @@ export function FullCardPlayer({
                 <PlayerSurfaceButtons
                     surface={surface}
                     onOpenQueue={handleOpenQueue}
+                    activePluginIds={s.pluginNames}
+                    onShareLink={currentTrack ? handleShareClick : undefined}
                     onOpenFocusedController={handleOpenFocusedController}
                 />
             </div>

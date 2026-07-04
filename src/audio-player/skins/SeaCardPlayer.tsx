@@ -16,7 +16,8 @@ import {
 } from "../utils/formatMetadata"
 import { getScrubberDensity, faceSupportsAction } from "../surfaces/faceCapabilities"
 import { ArcActionButton } from "../surfaces/ArcActionButton"
-import type { ArcAction } from "../surfaces/ArcActionButton"
+import type { ArcAction, ArcCommandHost } from "../surfaces/ArcActionButton"
+import type { WorkspaceRoute } from "../components/workspace/workspaceRoutes"
 import { buildThemeVars } from "./themeVars"
 import { PauseIcon, PlayIcon, SpinnerIcon, WaveIcon } from "./icons"
 import "./skins.css"
@@ -41,6 +42,19 @@ export interface SeaCardPlayerProps extends AudioPlayerTheme {
      * behavior stays consistent across faces.
      */
     actions?: ArcAction[]
+    /**
+     * Immediate command implementations for this card's arc (e.g.
+     * `"share.url"` / `"track.favorite"`). Leaves whose command isn't wired
+     * are pruned, never rendered dead. Mirrors the Vault row's `commands` API.
+     */
+    commands?: ArcCommandHost["commands"]
+    /**
+     * Opens a focused workspace in the SAP Controller shell — the destination
+     * of the arc's `"sap-controller"` leaves (the standardized Plugins,
+     * Playback, Agents arms). Without it those leaves are pruned from the
+     * wheel rather than rendered dead.
+     */
+    onOpenWorkspace?: (route: WorkspaceRoute) => void
     /** Inline typography for the card title. */
     titleFont?: CSSProperties
     /** Inline typography for the card artist line. */
@@ -74,6 +88,8 @@ export function SeaCardPlayer({
     artMedia,
     tag,
     actions,
+    commands,
+    onOpenWorkspace,
     titleFont,
     artistFont,
     className,
@@ -186,6 +202,8 @@ export function SeaCardPlayer({
                     {showAction && (
                         <ArcActionButton
                             actions={actions!}
+                            commands={commands}
+                            onOpenWorkspace={onOpenWorkspace}
                             ariaLabel={`Actions for ${track.title}`}
                             className="ap-sea__action"
                         />

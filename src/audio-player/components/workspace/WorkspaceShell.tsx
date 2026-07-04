@@ -6,9 +6,12 @@ import { LibraryPlaylistsWorkspace } from "./LibraryPlaylistsWorkspace"
 import { LibraryQueueWorkspace } from "./LibraryQueueWorkspace"
 import { PluginSettingsWorkspace } from "./PluginSettingsWorkspace"
 import { PlaybackAutomixWorkspace } from "./PlaybackAutomixWorkspace"
+import { PlaybackControlsWorkspace } from "./PlaybackControlsWorkspace"
+import type { PlaybackControlsState } from "./PlaybackControlsWorkspace"
 import { AgentQueueDirectorWorkspace } from "./AgentQueueDirectorWorkspace"
 import { AgentScoutWorkspace } from "./AgentScoutWorkspace"
 import { LibraryVaultWorkspace } from "./LibraryVaultWorkspace"
+import { VaultActionWorkspace } from "./VaultActionWorkspace"
 import { ActivityLogWorkspace } from "../../diagnostics/ActivityLogWorkspace"
 import { ControllerPanelRenderer } from "../../visual-slots/ControllerPanelRenderer"
 import { LYRIC_DISPLAY_ID } from "../../visual-slots/components/LyricDisplay"
@@ -29,6 +32,8 @@ export interface WorkspaceShellProps {
     onClose: () => void
     /** Optional lyrics snapshot forwarded to the lyrics workspace. */
     lyrics?: string
+    /** Optional playback state forwarded to the Controls workspace. */
+    playback?: PlaybackControlsState
 }
 
 /** Human title for the sheet header, keyed by route. */
@@ -45,8 +50,22 @@ function titleForRoute(route: WorkspaceRoute): string {
             return "Lyrics"
         case "plugin-settings:waveform":
             return "Waveform"
+        case "plugin-settings:analytics":
+            return "Analytics"
+        case "plugin-settings:sleep-timer":
+            return "Sleep Timer"
+        case "plugin-settings:auto-theme":
+            return "Auto Theme"
         case "playback:automix":
             return "Automix"
+        case "playback:controls":
+            return "Controls"
+        case "vault:tag":
+            return "Tag"
+        case "vault:rename":
+            return "Rename"
+        case "vault:radio":
+            return "Radio"
         case "agent:queue-director":
             return "Queue Director"
         case "agent:demo-scout":
@@ -99,7 +118,11 @@ function VisualCanvasWorkspace({ lyrics }: { lyrics?: string }) {
  * or `playback:*` route can't silently fall through to the wrong surface; the
  * `default` only parses for the genuinely dynamic `plugin-settings:<id>` case.
  */
-function contentForRoute(route: WorkspaceRoute, lyrics?: string): ReactNode {
+function contentForRoute(
+    route: WorkspaceRoute,
+    lyrics?: string,
+    playback?: PlaybackControlsState
+): ReactNode {
     switch (route) {
         case "library:playlists":
             return <LibraryPlaylistsWorkspace />
@@ -120,6 +143,14 @@ function contentForRoute(route: WorkspaceRoute, lyrics?: string): ReactNode {
             )
         case "playback:automix":
             return <PlaybackAutomixWorkspace />
+        case "playback:controls":
+            return <PlaybackControlsWorkspace playback={playback} />
+        case "vault:tag":
+            return <VaultActionWorkspace variant="tag" />
+        case "vault:rename":
+            return <VaultActionWorkspace variant="rename" />
+        case "vault:radio":
+            return <VaultActionWorkspace variant="radio" />
         case "agent:queue-director":
             return <AgentQueueDirectorWorkspace />
         case "agent:demo-scout":
@@ -143,7 +174,12 @@ function contentForRoute(route: WorkspaceRoute, lyrics?: string): ReactNode {
     }
 }
 
-export function WorkspaceShell({ route, onClose, lyrics }: WorkspaceShellProps) {
+export function WorkspaceShell({
+    route,
+    onClose,
+    lyrics,
+    playback,
+}: WorkspaceShellProps) {
     return (
         <>
             <header className="sap-ctl__header">
@@ -158,7 +194,7 @@ export function WorkspaceShell({ route, onClose, lyrics }: WorkspaceShellProps) 
                 </button>
             </header>
             <div className="sap-ctl__workspace" data-route={route}>
-                {contentForRoute(route, lyrics)}
+                {contentForRoute(route, lyrics, playback)}
             </div>
         </>
     )

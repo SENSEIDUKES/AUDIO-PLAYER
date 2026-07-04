@@ -1,100 +1,67 @@
 import {
-    AgentIcon,
-    LinkIcon,
-    LyricsIcon,
-    MailIcon,
-    NextIcon,
     QueueIcon,
-    ShareIcon,
+    RadioIcon,
+    RenameIcon,
+    TagIcon,
     VaultIcon,
 } from "../skins/icons"
 import type { ArcAction } from "./arcRouting"
+import type { ArcMenuEntitlements } from "./menuData"
+import {
+    buildAgentsArcBranch,
+    buildPlaybackArcBranch,
+    buildShareArcBranch,
+} from "./standardArcActions"
 
 /**
- * Entitlements that gate parts of the Vault command wheel. Absent/false means
- * the corresponding leaf renders locked (visible, honest, not tappable).
+ * Entitlements that gate parts of the Vault command wheel. Kept as an alias of
+ * the shared arc-menu entitlements so existing callers keep compiling.
  */
-export interface VaultTrackEntitlements {
-    /** Studio Scout is a paid agent; without this it renders locked. */
-    studioScout?: boolean
-}
+export type VaultTrackEntitlements = ArcMenuEntitlements
 
 export interface BuildVaultTrackArcActionsOptions {
     entitlements?: VaultTrackEntitlements
 }
 
 /**
- * The Vault face's selected-track command wheel:
+ * The Vault face's command wheel — the standardized arc with one deliberate
+ * difference: the Plugins arm is replaced by a dedicated Vault arm, because a
+ * vault row's primary actions are about organizing the track, not configuring
+ * the player:
  *
- *     Add to Queue › Play Next / Play Later     (immediate queue commands)
- *     Share        › Email / URL                (immediate share commands)
- *     Vault        › Add To / Playlist          (SAP Controller workspaces)
- *     Agent        › Demo Scout / Studio Scout / Memoir (SAP Controller workspaces)
+ *     Vault    › Tag / Rename / Playlist / Radio   (SAP Controller workspaces)
+ *     Playback › Up Next / Controls / Debug        (SAP Controller workspaces)
+ *     Share    › Link / Add to / Favorite          (immediate + workspace)
+ *     Agents   › Scout / Memoir                    (SAP Controller workspaces)
  *
  * Every leaf carries an explicit `target`, so the arc renders it only when the
  * host actually wires that destination — there are no dead buttons, and the
  * only surfaces reachable from here are immediate commands, the SEI Canvas,
  * and the SAP Controller. A builder (not a constant) so entitlement state can
- * flip Studio Scout between routed and locked per render.
+ * point the Agents › Scout leaf at the right Scout tier per render.
  */
 export function buildVaultTrackArcActions({
     entitlements,
 }: BuildVaultTrackArcActionsOptions = {}): ArcAction[] {
-    const hasStudioScout = entitlements?.studioScout === true
     return [
-        {
-            id: "add-to-queue",
-            label: "Add to Queue",
-            icon: QueueIcon,
-            children: [
-                {
-                    id: "play-next",
-                    label: "Play Next",
-                    icon: NextIcon,
-                    target: "immediate-action",
-                    action: "queue.insertAfterCurrent",
-                },
-                {
-                    id: "play-later",
-                    label: "Play Later",
-                    icon: QueueIcon,
-                    target: "immediate-action",
-                    action: "queue.append",
-                },
-            ],
-        },
-        {
-            id: "share",
-            label: "Share",
-            icon: ShareIcon,
-            children: [
-                {
-                    id: "share-email",
-                    label: "Email",
-                    icon: MailIcon,
-                    target: "immediate-action",
-                    action: "share.email",
-                },
-                {
-                    id: "share-url",
-                    label: "URL",
-                    icon: LinkIcon,
-                    target: "immediate-action",
-                    action: "share.url",
-                },
-            ],
-        },
         {
             id: "vault",
             label: "Vault",
             icon: VaultIcon,
             children: [
                 {
-                    id: "vault-add-to",
-                    label: "Add To",
-                    icon: VaultIcon,
+                    id: "vault-tag",
+                    label: "Tag",
+                    icon: TagIcon,
                     target: "sap-controller",
-                    workspaceRoute: "library:vault",
+                    workspaceRoute: "vault:tag",
+                },
+                {
+                    id: "vault-rename",
+                    label: "Rename",
+                    icon: RenameIcon,
+                    target: "sap-controller",
+                    workspaceRoute: "vault:rename",
                 },
                 {
                     id: "vault-playlist",
@@ -103,37 +70,17 @@ export function buildVaultTrackArcActions({
                     target: "sap-controller",
                     workspaceRoute: "library:playlists",
                 },
-            ],
-        },
-        {
-            id: "agent",
-            label: "Agent",
-            icon: AgentIcon,
-            children: [
                 {
-                    id: "agent-demo-scout",
-                    label: "Demo Scout",
-                    icon: AgentIcon,
+                    id: "vault-radio",
+                    label: "Radio",
+                    icon: RadioIcon,
                     target: "sap-controller",
-                    workspaceRoute: "agent:demo-scout",
-                },
-                {
-                    id: "agent-studio-scout",
-                    label: "Studio Scout",
-                    icon: AgentIcon,
-                    // Paid agent: routed when entitled, locked (visible, honest,
-                    // not tappable) when the entitlement is missing.
-                    target: hasStudioScout ? "sap-controller" : "locked-entitlement",
-                    workspaceRoute: "agent:studio-scout",
-                },
-                {
-                    id: "agent-memoir",
-                    label: "Memoir",
-                    icon: LyricsIcon,
-                    target: "sap-controller",
-                    workspaceRoute: "agent:memoir",
+                    workspaceRoute: "vault:radio",
                 },
             ],
         },
+        buildPlaybackArcBranch(),
+        buildShareArcBranch(),
+        buildAgentsArcBranch(entitlements),
     ]
 }

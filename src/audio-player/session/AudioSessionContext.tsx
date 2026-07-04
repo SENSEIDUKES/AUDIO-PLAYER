@@ -648,6 +648,13 @@ export function AudioSessionProvider({
         sharedAudioBufferCache.setMaxSize(maxBuffers)
     }, [])
 
+    // Stable list of active plugin instance names for the arc menu's Plugins
+    // branch (only re-derived when the plugin set itself changes).
+    const pluginNames = useMemo<readonly string[]>(
+        () => allPlugins.map((plugin) => plugin.name),
+        [allPlugins]
+    )
+
     const value = useMemo<SessionEngine>(
         () => ({
             ...pluginAwareEngine,
@@ -659,6 +666,7 @@ export function AudioSessionProvider({
             automix,
             canNext,
             canPrevious,
+            pluginNames,
             setQueue,
             playTrack,
             enqueue,
@@ -687,6 +695,7 @@ export function AudioSessionProvider({
             automix,
             canNext,
             canPrevious,
+            pluginNames,
             setQueue,
             playTrack,
             enqueue,

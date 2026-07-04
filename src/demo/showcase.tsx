@@ -10,6 +10,7 @@ import {
     SeaCardPlayer,
     SAPController,
     buildVaultTrackArcActions,
+    buildStandardTrackArcActions,
     registerVaultCategory,
     useAudioSession,
 } from "../audio-player"
@@ -44,29 +45,30 @@ const vaultShowcaseTracks: Track[] = noLuckTracks.map((track, i) => ({
     vaultCategory: VAULT_SHOWCASE_CATEGORIES[i % VAULT_SHOWCASE_CATEGORIES.length],
 }))
 
-/* Real share commands for a track: Email opens a prefilled mail draft, URL
-   copies the track's link. These back the arc's Share › Email / URL leaves. */
-function shareCommands(track: Track): ArcCommandHost["commands"] {
+/* Real immediate commands for a track's arc: Link copies the track URL,
+   Favorite is a demo-level acknowledgment. These back the standardized arc's
+   Share › Link / Favorite leaves. */
+function trackCommands(track: Track): ArcCommandHost["commands"] {
     const url = track.audioFile ?? ""
     return {
-        "share.email": () => {
-            window.location.href = `mailto:?subject=${encodeURIComponent(
-                `${track.title} — ${track.artist ?? ""}`
-            )}&body=${encodeURIComponent(url)}`
-        },
         "share.url": () => {
             void navigator.clipboard?.writeText(url)
+        },
+        "track.favorite": () => {
+            console.info(`Favorited: ${track.title}`)
         },
     }
 }
 
-/* The Vault rows with the selected-track command wheel. Queue leaves run on the
-   shared session inside the row; share leaves use the commands above; Vault and
-   Agent leaves route into the one SAP Controller instance owned here. */
+/* The Vault rows with the standardized command wheel — the Vault face swaps
+   the Plugins arm for its dedicated Vault arm (Tag / Rename / Playlist /
+   Radio). Share leaves use the commands above; every workspace leaf routes
+   into the one SAP Controller instance owned here. */
 function ShowcaseVaultRows() {
+    const s = useAudioSession()
     const [route, setRoute] = useState<WorkspaceRoute | null>(null)
-    // Studio Scout entitlement is deliberately absent here so the showcase
-    // demonstrates the locked (paid) state on the Agent branch.
+    // Studio Scout entitlement is deliberately absent here, so Agents › Scout
+    // routes to its free Demo tier.
     const arcActions = useMemo(
         () => buildVaultTrackArcActions({ entitlements: { studioScout: false } }),
         []
@@ -79,7 +81,7 @@ function ShowcaseVaultRows() {
                     track={t}
                     number={i + 1}
                     actions={arcActions}
-                    commands={shareCommands(t)}
+                    commands={trackCommands(t)}
                     onOpenWorkspace={setRoute}
                     {...SEA_THEME}
                 />
@@ -88,16 +90,28 @@ function ShowcaseVaultRows() {
                 open={route !== null}
                 route={route ?? "options"}
                 onClose={() => setRoute(null)}
+                // Live session playback state so the arc's Playback › Controls
+                // section shows real switches, not the empty placeholder.
+                playback={{
+                    shuffle: s.shuffle,
+                    onToggleShuffle: s.toggleShuffle,
+                    repeatMode: s.repeatMode,
+                    onCycleRepeat: s.cycleRepeat,
+                    automix: s.automix,
+                    onToggleAutomix: s.toggleAutomix,
+                }}
                 {...SEA_THEME}
             />
         </div>
     )
 }
 
-/* SEA cards keep a lean immediate-action list: queue commands wired straight to
-   the shared session (no dead demo buttons). */
+/* SEA cards carry the standardized wheel (Plugins | Playback | Share | Agents)
+   plus two lean queue immediates wired straight to the shared session, and
+   route workspace leaves into a shared SAP Controller owned here. */
 function ShowcaseSeaCards() {
     const s = useAudioSession()
+    const [route, setRoute] = useState<WorkspaceRoute | null>(null)
     const cardActions = (track: Track): ArcAction[] => [
         {
             id: "play-next",
@@ -113,6 +127,7 @@ function ShowcaseSeaCards() {
             target: "immediate-action",
             onSelect: () => s.enqueue(track),
         },
+        ...buildStandardTrackArcActions({ activePluginIds: s.pluginNames }),
     ]
     return (
         <div className="showcase-face__sea">
@@ -123,9 +138,27 @@ function ShowcaseSeaCards() {
                     art={NO_LUCK_ART}
                     tag="SEA"
                     actions={cardActions(t)}
+                    commands={trackCommands(t)}
+                    onOpenWorkspace={setRoute}
                     {...SEA_THEME}
                 />
             ))}
+            <SAPController
+                open={route !== null}
+                route={route ?? "options"}
+                onClose={() => setRoute(null)}
+                // Live session playback state so the arc's Playback › Controls
+                // section shows real switches, not the empty placeholder.
+                playback={{
+                    shuffle: s.shuffle,
+                    onToggleShuffle: s.toggleShuffle,
+                    repeatMode: s.repeatMode,
+                    onCycleRepeat: s.cycleRepeat,
+                    automix: s.automix,
+                    onToggleAutomix: s.toggleAutomix,
+                }}
+                {...SEA_THEME}
+            />
         </div>
     )
 }

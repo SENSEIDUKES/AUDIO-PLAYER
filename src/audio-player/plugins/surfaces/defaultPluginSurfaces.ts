@@ -168,3 +168,58 @@ export function getPluginSurfaceDefinitionsForMenuBranch(
         DEFAULT_PLUGIN_SURFACES.filter((def) => def.menu?.branch === branch),
     )
 }
+
+/**
+ * Map a plugin instance name back to its catalog plugin id. Registry-created
+ * instances are named `"registry-<id>"` (see usePluginRegistry); bare ids pass
+ * through unchanged, so hosts can supply either form.
+ */
+export function normalizePluginId(nameOrId: string): string {
+    return nameOrId.startsWith("registry-")
+        ? nameOrId.slice("registry-".length)
+        : nameOrId
+}
+
+/**
+ * The standardized arc menu's Plugins sub-branches. Every non-agent plugin
+ * category folds into one of these three buckets.
+ */
+export type ArcPluginBucket = "audio" | "visual" | "analytics"
+
+/**
+ * Which Plugins sub-branch (Audio / Visual / Analytics) a plugin surfaces
+ * under in the standardized arc menu. Playback- and utility-category plugins
+ * are audio-affecting, so they fold into Audio. Agent-category plugins return
+ * `null` — agents live under the arc's dedicated Agents branch, never Plugins.
+ */
+export function getArcPluginBucket(
+    definition: PluginSurfaceDefinition,
+): ArcPluginBucket | null {
+    switch (definition.category) {
+        case "visual":
+            return "visual"
+        case "analytics":
+            return "analytics"
+        case "playback":
+        case "utility":
+            return "audio"
+        default:
+            return null
+    }
+}
+
+/**
+ * The surface definitions for the currently active plugins, sorted by menu
+ * order. `activePluginIds` accepts catalog ids ("lyrics") or registry instance
+ * names ("registry-lyrics"); unknown ids are ignored. This is what the arc
+ * menu's Plugins branch renders — only plugins that are actually active, never
+ * the full catalog.
+ */
+export function getActivePluginSurfaceDefinitions(
+    activePluginIds: readonly string[],
+): PluginSurfaceDefinition[] {
+    const ids = new Set(activePluginIds.map(normalizePluginId))
+    return sortPluginSurfaceDefinitions(
+        DEFAULT_PLUGIN_SURFACES.filter((def) => ids.has(def.pluginId)),
+    )
+}

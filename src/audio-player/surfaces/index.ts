@@ -65,11 +65,21 @@ export type {
     BuildVaultTrackArcActionsOptions,
 } from "../menu/vaultTrackMenu"
 
+export {
+    buildStandardTrackArcActions,
+    buildPluginsArcBranch,
+    buildPlaybackArcBranch,
+    buildShareArcBranch,
+    buildAgentsArcBranch,
+} from "../menu/standardArcActions"
+export type { BuildStandardArcActionsOptions } from "../menu/standardArcActions"
+
 export { buildMenuTree, isNodeInteractive } from "../menu/menuData"
 export type {
     MenuNode,
     MenuItemState,
     MenuActionId,
+    ArcMenuEntitlements,
     BuildMenuTreeOptions,
 } from "../menu/menuData"
 

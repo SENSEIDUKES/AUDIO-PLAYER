@@ -3,7 +3,7 @@ import { CanvasIcon } from "../skins/icons"
 import { SurfaceButton } from "./SurfaceButton"
 import { SEICanvasActionMenu } from "./SEICanvasActionMenu"
 import { buildMenuTree } from "../menu/menuData"
-import type { MenuNode } from "../menu/menuData"
+import type { ArcMenuEntitlements, MenuNode } from "../menu/menuData"
 import type { WorkspaceRoute } from "../components/workspace/workspaceRoutes"
 import type { UsePlayerSurfaceResult } from "./usePlayerSurface"
 
@@ -35,6 +35,21 @@ export interface PlayerSurfaceButtonsProps {
     onPrevious?: () => void
     onNext?: () => void
     /**
+     * Ids of the plugins currently active on this player — catalog ids
+     * ("lyrics") or registry instance names ("registry-lyrics"). Drives the
+     * menu's Plugins › Audio / Visual / Analytics branches: only currently
+     * active plugins render.
+     */
+    activePluginIds?: readonly string[]
+    /** Wires the menu's Share › Link leaf (copy/share the track URL). */
+    onShareLink?: () => void
+    /** Wires the menu's Share › Favorite leaf. */
+    onToggleFavorite?: () => void
+    /** Marks the Favorite leaf active (the track is already a favorite). */
+    isFavorite?: boolean
+    /** Entitlements gating the menu's Agents branch (Scout tier). */
+    entitlements?: ArcMenuEntitlements
+    /**
      * Callback when a workspace route is selected from the arc menu. The parent
      * face should manage a single SAPController instance and update its route.
      * This component no longer owns/renders a separate SAPController.
@@ -46,8 +61,9 @@ export interface PlayerSurfaceButtonsProps {
 /**
  * The shared left/right surface controls. LEFT reveals the SEICanvas (only on
  * faces that support it). RIGHT is the SEI Canvas Action Menu — a bottom-arc
- * command wheel that replaces the old flat "Up Next" toggle. Queue lives inside
- * it under Playback › Up Next; the canvas under Plugin › Visual › Canvas.
+ * command wheel carrying the standardized arc arms (Plugins | Playback | Share
+ * | Agents). Queue lives inside it under Playback › Up Next; the canvas under
+ * Plugins › Visual › Canvas.
  */
 export function PlayerSurfaceButtons({
     surface,
@@ -59,6 +75,11 @@ export function PlayerSurfaceButtons({
     canNext = false,
     onPrevious,
     onNext,
+    activePluginIds,
+    onShareLink,
+    onToggleFavorite,
+    isFavorite = false,
+    entitlements,
     onOpenFocusedController,
     className,
 }: PlayerSurfaceButtonsProps) {
@@ -75,10 +96,16 @@ export function PlayerSurfaceButtons({
                       includeTransport: showTransport,
                       canPrevious,
                       canNext,
-                      // Workspace-only nodes (Lyrics, Automix, Agent, Activity
-                      // Log) exist only when the host actually routes into the
-                      // SAP Controller shell — otherwise they'd be dead buttons.
+                      // Workspace-only nodes (the Plugins leaves, Controls,
+                      // Debug, Share › Add to, Agents) exist only when the host
+                      // actually routes into the SAP Controller shell —
+                      // otherwise they'd be dead buttons.
                       canRouteWorkspaces: Boolean(onOpenFocusedController),
+                      activePluginIds,
+                      canShareLink: Boolean(onShareLink),
+                      canFavorite: Boolean(onToggleFavorite),
+                      isFavorite,
+                      entitlements,
                   })
                 : [],
         [
@@ -89,17 +116,24 @@ export function PlayerSurfaceButtons({
             canPrevious,
             canNext,
             onOpenFocusedController,
+            activePluginIds,
+            onShareLink,
+            onToggleFavorite,
+            isFavorite,
+            entitlements,
         ]
     )
 
-    // Resolve the transport leaves (no workspaceRoute, so they fall through to
+    // Resolve the immediate leaves (no workspaceRoute, so they fall through to
     // the menu's `onSelect`). Other unknown leaves are intentionally ignored.
     const handleSelect = useCallback(
         (node: MenuNode) => {
             if (node.actionId === "previous-track") onPrevious?.()
             else if (node.actionId === "next-track") onNext?.()
+            else if (node.actionId === "share-link") onShareLink?.()
+            else if (node.actionId === "toggle-favorite") onToggleFavorite?.()
         },
-        [onNext, onPrevious]
+        [onNext, onPrevious, onShareLink, onToggleFavorite]
     )
 
     // The radial menu opens focused workspace routes via the parent's callback.

@@ -968,6 +968,8 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
                 <PlayerSurfaceButtons
                     surface={surface}
                     onOpenQueue={() => setQueueOpen(true)}
+                    activePluginIds={s.pluginNames}
+                    onShareLink={handleShareClick}
                     onOpenFocusedController={handleOpenFocusedController}
                 />
 

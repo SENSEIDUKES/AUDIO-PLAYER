@@ -10,6 +10,7 @@ import {
     NarrativeFace,
     SAPController,
     buildVaultTrackArcActions,
+    useAudioSession,
 } from "../audio-player"
 import type {
     ArcCommandHost,
@@ -150,9 +151,9 @@ function workshopShareCommands(track: Track): ArcCommandHost["commands"] {
     }
 }
 
-/* The workshop's Vault preview: rows carry the selected-track command wheel
-   (Add to Queue / Share / Vault / Agent) and route Vault/Agent leaves into one
-   shared SAP Controller instance owned here. */
+/* The workshop's Vault preview: rows carry the standardized command wheel with
+   the Vault face's dedicated Vault arm (Vault / Playback / Share / Agents) and
+   route workspace leaves into one shared SAP Controller instance owned here. */
 function WorkshopVaultRows({
     tracks,
     theme,
@@ -160,8 +161,10 @@ function WorkshopVaultRows({
     tracks: Track[]
     theme: AudioPlayerTheme
 }) {
+    const s = useAudioSession()
     const [route, setRoute] = useState<WorkspaceRoute | null>(null)
-    // No Studio Scout entitlement in the workshop — the leaf renders locked.
+    // No Studio Scout entitlement in the workshop — Agents › Scout routes to
+    // its free Demo tier.
     const arcActions = useMemo(
         () => buildVaultTrackArcActions({ entitlements: { studioScout: false } }),
         []
@@ -192,6 +195,16 @@ function WorkshopVaultRows({
                 open={route !== null}
                 route={route ?? "options"}
                 onClose={() => setRoute(null)}
+                // Live session playback state so the arc's Playback › Controls
+                // section shows real switches, not the empty placeholder.
+                playback={{
+                    shuffle: s.shuffle,
+                    onToggleShuffle: s.toggleShuffle,
+                    repeatMode: s.repeatMode,
+                    onCycleRepeat: s.cycleRepeat,
+                    automix: s.automix,
+                    onToggleAutomix: s.toggleAutomix,
+                }}
                 {...theme}
             />
         </div>

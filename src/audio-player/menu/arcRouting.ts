@@ -27,6 +27,7 @@ export type ArcCommandId =
     | "queue.append"
     | "share.email"
     | "share.url"
+    | "track.favorite"
     | (string & {})
 
 /**
