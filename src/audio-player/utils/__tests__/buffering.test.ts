@@ -105,6 +105,42 @@ describe("createBufferingDebounce", () => {
         expect(show).toHaveBeenCalledTimes(2)
     })
 
+    it("default scheduler never invokes the global timers with a bound `this`", () => {
+        // Browsers throw "TypeError: Illegal invocation" when setTimeout /
+        // clearTimeout are called with anything but undefined/globalThis as
+        // `this` — which is exactly what happens if the defaults are passed as
+        // bare references on the scheduler object. Simulate that strictness.
+        const realSetTimeout = setTimeout
+        const realClearTimeout = clearTimeout
+        const strictSetTimeout = function (
+            this: unknown,
+            cb: () => void,
+            ms?: number
+        ) {
+            if (this !== undefined && this !== globalThis)
+                throw new TypeError("Illegal invocation")
+            return realSetTimeout(cb, ms)
+        }
+        const strictClearTimeout = function (
+            this: unknown,
+            handle: ReturnType<typeof setTimeout>
+        ) {
+            if (this !== undefined && this !== globalThis)
+                throw new TypeError("Illegal invocation")
+            return realClearTimeout(handle)
+        }
+        vi.stubGlobal("setTimeout", strictSetTimeout)
+        vi.stubGlobal("clearTimeout", strictClearTimeout)
+        try {
+            const show = vi.fn()
+            const debounce = createBufferingDebounce()
+            expect(() => debounce.schedule(show)).not.toThrow()
+            expect(() => debounce.cancel()).not.toThrow()
+        } finally {
+            vi.unstubAllGlobals()
+        }
+    })
+
     it("cancel after firing is a harmless no-op", () => {
         const show = vi.fn()
         const debounce = createBufferingDebounce()

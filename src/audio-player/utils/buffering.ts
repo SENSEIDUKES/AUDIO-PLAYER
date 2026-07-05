@@ -77,7 +77,13 @@ export function createBufferingDebounce(
     scheduler: {
         setTimer: (cb: () => void, ms: number) => ReturnType<typeof setTimeout>
         clearTimer: (handle: ReturnType<typeof setTimeout>) => void
-    } = { setTimer: setTimeout, clearTimer: clearTimeout }
+    } = {
+        // Wrap rather than reference: passing `setTimeout`/`clearTimeout` bare
+        // would invoke them with the scheduler object as `this`, which browsers
+        // reject with "TypeError: Illegal invocation".
+        setTimer: (cb, ms) => setTimeout(cb, ms),
+        clearTimer: (handle) => clearTimeout(handle),
+    }
 ): BufferingDebounce {
     let handle: ReturnType<typeof setTimeout> | null = null
     return {
