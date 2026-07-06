@@ -217,10 +217,7 @@ export class HTML5AudioBackend implements AudioBackend {
 
     setStereo(_pan: number): void {
         // No-op: HTML5 <audio> element has no spatial audio support
-        console.warn(
-            "[HTML5AudioBackend] setStereo() called but spatial audio is not supported. " +
-                "Use webaudio backend for spatial features."
-        )
+        this.warnUnsupportedFeature("setStereo", "spatial audio", true)
     }
 
     getStereo(): number {
@@ -229,10 +226,7 @@ export class HTML5AudioBackend implements AudioBackend {
 
     setPos(_x: number, _y: number, _z: number): void {
         // No-op
-        console.warn(
-            "[HTML5AudioBackend] setPos() called but spatial audio is not supported. " +
-                "Use webaudio backend for spatial features."
-        )
+        this.warnUnsupportedFeature("setPos", "spatial audio", true)
     }
 
     getPos(): [number, number, number] {
@@ -241,9 +235,7 @@ export class HTML5AudioBackend implements AudioBackend {
 
     setOrientation(_x: number, _y: number, _z: number): void {
         // No-op
-        console.warn(
-            "[HTML5AudioBackend] setOrientation() called but spatial audio is not supported."
-        )
+        this.warnUnsupportedFeature("setOrientation", "spatial audio")
     }
 
     getOrientation(): [number, number, number] {
@@ -252,10 +244,7 @@ export class HTML5AudioBackend implements AudioBackend {
 
     setRate(_rate: number): void {
         // No-op: playbackRate would affect HTML5 element but we keep it simple
-        console.warn(
-            "[HTML5AudioBackend] setRate() called but rate control is not supported. " +
-                "Use webaudio backend for rate control."
-        )
+        this.warnUnsupportedFeature("setRate", "rate control", true)
     }
 
     getRate(): number {
@@ -264,9 +253,7 @@ export class HTML5AudioBackend implements AudioBackend {
 
     setDistanceModel(_model: DistanceModelType): void {
         // No-op
-        console.warn(
-            "[HTML5AudioBackend] setDistanceModel() called but spatial audio is not supported."
-        )
+        this.warnUnsupportedFeature("setDistanceModel", "spatial audio")
     }
 
     getDistanceModel(): DistanceModelType {
@@ -275,9 +262,7 @@ export class HTML5AudioBackend implements AudioBackend {
 
     setRefDistance(_distance: number): void {
         // No-op
-        console.warn(
-            "[HTML5AudioBackend] setRefDistance() called but spatial audio is not supported."
-        )
+        this.warnUnsupportedFeature("setRefDistance", "spatial audio")
     }
 
     getRefDistance(): number {
@@ -286,9 +271,7 @@ export class HTML5AudioBackend implements AudioBackend {
 
     setMaxDistance(_distance: number): void {
         // No-op
-        console.warn(
-            "[HTML5AudioBackend] setMaxDistance() called but spatial audio is not supported."
-        )
+        this.warnUnsupportedFeature("setMaxDistance", "spatial audio")
     }
 
     getMaxDistance(): number {
@@ -297,9 +280,7 @@ export class HTML5AudioBackend implements AudioBackend {
 
     setRolloffFactor(_factor: number): void {
         // No-op
-        console.warn(
-            "[HTML5AudioBackend] setRolloffFactor() called but spatial audio is not supported."
-        )
+        this.warnUnsupportedFeature("setRolloffFactor", "spatial audio")
     }
 
     getRolloffFactor(): number {
@@ -308,9 +289,7 @@ export class HTML5AudioBackend implements AudioBackend {
 
     setConeInnerAngle(_angle: number): void {
         // No-op
-        console.warn(
-            "[HTML5AudioBackend] setConeInnerAngle() called but spatial audio is not supported."
-        )
+        this.warnUnsupportedFeature("setConeInnerAngle", "spatial audio")
     }
 
     getConeInnerAngle(): number {
@@ -319,9 +298,7 @@ export class HTML5AudioBackend implements AudioBackend {
 
     setConeOuterAngle(_angle: number): void {
         // No-op
-        console.warn(
-            "[HTML5AudioBackend] setConeOuterAngle() called but spatial audio is not supported."
-        )
+        this.warnUnsupportedFeature("setConeOuterAngle", "spatial audio")
     }
 
     getConeOuterAngle(): number {
@@ -330,9 +307,7 @@ export class HTML5AudioBackend implements AudioBackend {
 
     setConeOuterGain(_gain: number): void {
         // No-op
-        console.warn(
-            "[HTML5AudioBackend] setConeOuterGain() called but spatial audio is not supported."
-        )
+        this.warnUnsupportedFeature("setConeOuterGain", "spatial audio")
     }
 
     getConeOuterGain(): number {
@@ -341,6 +316,21 @@ export class HTML5AudioBackend implements AudioBackend {
 
     setLiteMode(_enabled: boolean): void {
         // No-op: already in "lite mode" by not supporting spatial at all
+    }
+
+
+    private warnUnsupportedFeature(
+        methodName: string,
+        featureName: string,
+        includeSuggestion = false
+    ): void {
+        let message = `[HTML5AudioBackend] ${methodName}() called but ${featureName} is not supported.`
+        if (includeSuggestion) {
+            const suggestionFeature =
+                featureName === "rate control" ? "rate control" : "spatial features"
+            message += ` Use webaudio backend for ${suggestionFeature}.`
+        }
+        console.warn(message)
     }
 
     isLiteMode(): boolean {
