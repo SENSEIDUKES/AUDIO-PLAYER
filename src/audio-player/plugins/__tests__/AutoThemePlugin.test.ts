@@ -158,7 +158,7 @@ describe("AutoThemePlugin", () => {
             
             // Now load track 2 immediately
             bgElement.style.backgroundImage = "url('track2.jpg')"
-            plugin.onTrackLoad?.({ id: "2" } as any)
+            plugin.onTrackLoad?.({ id: "2", title: "Test Title", artist: "Test Artist" })
             
             // Resolve the first extraction
             resolveExtraction({ primary: [0, 0, 0], secondary: [0, 0, 0], accent: [0, 0, 0], isDark: true })
