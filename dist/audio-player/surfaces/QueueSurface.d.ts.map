@@ -1,0 +1,1 @@
+{"version":3,"file":"QueueSurface.d.ts","sourceRoot":"","sources":["../../../src/audio-player/surfaces/QueueSurface.tsx"],"names":[],"mappings":"AAEA,MAAM,WAAW,iBAAiB;IAC9B,wDAAwD;IACxD,QAAQ,CAAC,EAAE,MAAM,CAAA;IACjB,SAAS,CAAC,EAAE,MAAM,CAAA;CACrB;AAED;;;;;GAKG;AACH,wBAAgB,YAAY,CAAC,EAAE,QAAQ,EAAE,SAAS,EAAE,EAAE,iBAAiB,+BA8CtE;AAED,eAAe,YAAY,CAAA"}
