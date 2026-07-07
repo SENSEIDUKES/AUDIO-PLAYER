@@ -17,25 +17,22 @@ import "./sample-skin.css"
 // ─── Settings ────────────────────────────────────────────────────────────────
 
 /** Default settings for this skin. Edit to match your component's API. */
-export const sampleSkinDefaultSettings: SampleSkinSettings = {
-    primaryColor: "#7cc4ff",
-    label: "Hello Skin"
-};
-
-type SampleSkinSettings = {
-    primaryColor?: string;
-    label?: string;
+export const sampleSkinDefaultSettings: Record<string, unknown> = {
+    // TODO(skin): add default settings that your component needs.
 }
+
+type SampleSkinSettings = Record<string, unknown>
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function SampleSkin({ settings, playback }: VisualComponentProps<SampleSkinSettings>) {
     // TODO(skin): map `settings` and `playback` to props your raw component expects.
     // Example: <RawComponent primaryColor={settings.primaryColor as string} />
+    void settings
     void playback
     return (
         <div className="sap-visual-sample-skin">
-            <RawComponent primaryColor={settings.primaryColor} label={settings.label} />
+            <RawComponent />
         </div>
     )
 }
