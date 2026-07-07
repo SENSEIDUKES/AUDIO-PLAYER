@@ -144,18 +144,20 @@ Keep the style poetic, storytelling-focused, and highly artistic.`
     }
 }
 
-function parseInlineStyles(text: string): string {
-    // Parse bold (**text**) safely
-    return text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+function renderTextWithInlineStyles(text: string) {
+    // Parse bold (**text**) safely without using dangerouslySetInnerHTML.
+    // We split by the bold markers and alternate between text and <strong>.
+    const parts = text.split(/(\*\*.*?\*\*)/g)
+    return parts.map((part, i) => {
+        if (i % 2 === 1) {
+            return <strong key={i}>{part.slice(2, -2)}</strong>
+        }
+        return part
+    })
 }
 
 function formatMessageContent(text: string) {
-    const escaped = text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-
-    const blocks = escaped.split(/\n\n+/)
+    const blocks = text.split(/\n\n+/)
 
     return blocks.map((block, i) => {
         const trimmed = block.trim()
@@ -176,13 +178,13 @@ function formatMessageContent(text: string) {
             return (
                 <ul key={i}>
                     {items.map((item, j) => (
-                        <li key={j} dangerouslySetInnerHTML={{ __html: parseInlineStyles(item.replace(/^[-*]\s+/, "")) }} />
+                        <li key={j}>{renderTextWithInlineStyles(item.replace(/^[-*]\s+/, ""))}</li>
                     ))}
                 </ul>
             )
         }
 
-        return <p key={i} dangerouslySetInnerHTML={{ __html: parseInlineStyles(trimmed) }} />
+        return <p key={i}>{renderTextWithInlineStyles(trimmed)}</p>
     })
 }
 
