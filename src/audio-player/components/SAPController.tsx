@@ -267,7 +267,10 @@ export function SAPController({
 
     useEffect(() => {
         const sheet = sheetRef.current
-        if (!sheet || !open) return
+        if (!sheet || !open) {
+            focusablesCache.current = null
+            return
+        }
         const observer = new MutationObserver(() => {
             focusablesCache.current = null
         })
@@ -277,7 +280,10 @@ export function SAPController({
             attributes: true,
             attributeFilter: ["disabled", "tabindex", "href"],
         })
-        return () => observer.disconnect()
+        return () => {
+            observer.disconnect()
+            focusablesCache.current = null
+        }
     }, [open])
 
     // Trap Tab inside the sheet — the page behind is inert while it's open.
