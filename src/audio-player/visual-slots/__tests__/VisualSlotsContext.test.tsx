@@ -18,10 +18,11 @@ describe('VisualSlotsContext Functional Tests', () => {
 
         registerVisualComponent({
             id: componentId,
+            name: 'Late Functional Component',
             slot: 'seiCanvas',
             defaultSettings,
-            component: () => null,
-        } as any);
+            Component: () => null,
+        });
 
         const settings = result.current.getSettings(componentId);
         expect(settings).toEqual(defaultSettings);
@@ -41,10 +42,11 @@ describe('VisualSlotsContext Functional Tests', () => {
 
         registerVisualComponent({
             id: componentId,
+            name: 'Update Test Component',
             slot: 'seiCanvas',
             defaultSettings,
-            component: () => null,
-        } as any);
+            Component: () => null,
+        });
 
         act(() => {
             result.current.updateSettings(componentId, { volume: 0.9 });

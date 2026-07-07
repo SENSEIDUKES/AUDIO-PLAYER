@@ -18,10 +18,11 @@ describe('VisualSlots Performance Benchmark', () => {
         for (let i = 0; i < componentCount; i++) {
             registerVisualComponent({
                 id: `late-comp-${i}`,
+                name: `Late Component ${i}`,
                 slot: 'seiCanvas',
                 defaultSettings: { i },
-                component: () => null,
-            } as any);
+                Component: () => null,
+            });
         }
 
         // Measure O(1) lookup
