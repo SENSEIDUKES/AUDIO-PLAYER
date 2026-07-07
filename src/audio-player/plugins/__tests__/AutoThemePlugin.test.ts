@@ -1,3 +1,4 @@
+import type { Track } from "../../types"
 /**
  * @vitest-environment jsdom
  */
