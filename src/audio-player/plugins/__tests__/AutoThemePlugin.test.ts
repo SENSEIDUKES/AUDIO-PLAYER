@@ -1,7 +1,7 @@
-import type { Track } from "../../types"
 /**
  * @vitest-environment jsdom
  */
+import type { Track } from "../../types"
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { createAutoThemePlugin } from "../AutoThemePlugin"
 import type { PluginPlayerContext } from "../../core/plugins/PluginInterface"
@@ -13,6 +13,14 @@ vi.mock("../../utils/colorExtraction", () => ({
     gradient: vi.fn().mockReturnValue("linear-gradient(red, blue)"),
     rgbToCss: vi.fn().mockImplementation(([r, g, b]) => `rgb(${r}, ${g}, ${b})`),
 }))
+
+const createTrack = (id: string): Track => ({
+    id,
+    title: "Test Title",
+    artist: "Test Artist",
+})
+
+type ResolvePalette = (palette: colorExtraction.ArtworkPalette | null) => void
 
 describe("AutoThemePlugin", () => {
     let mockContext: PluginPlayerContext
@@ -27,7 +35,7 @@ describe("AutoThemePlugin", () => {
 
         mockContext = {
             getRootElement: vi.fn().mockReturnValue(rootElement),
-            getCurrentTrack: vi.fn().mockReturnValue({ id: "1" }),
+            getCurrentTrack: vi.fn().mockReturnValue(createTrack("1")),
         } as unknown as PluginPlayerContext
 
         vi.mocked(colorExtraction.extractPalette).mockResolvedValue({
@@ -86,7 +94,7 @@ describe("AutoThemePlugin", () => {
             
             // Now remove
             bgElement.style.backgroundImage = ""
-            plugin2.onTrackLoad?.({ id: "1", title: "Test Title", artist: "Test Artist" })
+            plugin2.onTrackLoad?.(createTrack("1"))
             await Promise.resolve()
             
             expect(colorExtraction.extractPalette).toHaveBeenCalled() // The valid loads
@@ -144,7 +152,7 @@ describe("AutoThemePlugin", () => {
             const onPaletteChange = vi.fn()
             const plugin = createAutoThemePlugin({ onPaletteChange })
             
-            let resolveExtraction: any
+            let resolveExtraction!: ResolvePalette
             vi.mocked(colorExtraction.extractPalette).mockImplementationOnce(() => {
                 return new Promise(resolve => {
                     resolveExtraction = resolve
@@ -155,7 +163,7 @@ describe("AutoThemePlugin", () => {
             
             // Now load track 2 immediately
             bgElement.style.backgroundImage = "url('track2.jpg')"
-            plugin.onTrackLoad?.({ id: "2", title: "Test Title", artist: "Test Artist" })
+            plugin.onTrackLoad?.(createTrack("2"))
             
             // Resolve the first extraction
             resolveExtraction({ primary: [0, 0, 0], secondary: [0, 0, 0], accent: [0, 0, 0], isDark: true })
@@ -179,7 +187,7 @@ describe("AutoThemePlugin", () => {
             bgElement.style.backgroundImage = "url('track1.jpg')"
             const plugin = createAutoThemePlugin()
             
-            let resolveExtraction: any
+            let resolveExtraction!: ResolvePalette
             vi.mocked(colorExtraction.extractPalette).mockImplementationOnce(() => {
                 return new Promise(resolve => {
                     resolveExtraction = resolve
