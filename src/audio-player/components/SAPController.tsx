@@ -263,14 +263,35 @@ export function SAPController({
         if (!open) setLyricsOpen(false)
     }, [open])
 
+    const focusablesCache = useRef<HTMLElement[] | null>(null)
+
+    useEffect(() => {
+        const sheet = sheetRef.current
+        if (!sheet || !open) return
+        const observer = new MutationObserver(() => {
+            focusablesCache.current = null
+        })
+        observer.observe(sheet, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ["disabled", "tabindex", "href"],
+        })
+        return () => observer.disconnect()
+    }, [open])
+
     // Trap Tab inside the sheet — the page behind is inert while it's open.
     const handleTrapKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
         if (event.key !== "Tab" || !sheetRef.current) return
-        const focusables = Array.from(
-            sheetRef.current.querySelectorAll<HTMLElement>(
-                "button:not([disabled]), [href], [tabindex]:not([tabindex='-1'])"
+
+        if (!focusablesCache.current) {
+            focusablesCache.current = Array.from(
+                sheetRef.current.querySelectorAll<HTMLElement>(
+                    "button:not([disabled]), [href], [tabindex]:not([tabindex='-1'])"
+                )
             )
-        )
+        }
+        const focusables = focusablesCache.current
         if (focusables.length === 0) return
         const first = focusables[0]
         const last = focusables[focusables.length - 1]
