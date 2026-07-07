@@ -1,3 +1,4 @@
+import type { Track } from "../../types"
 /**
  * @vitest-environment jsdom
  */
@@ -72,26 +73,23 @@ describe("AutoThemePlugin", () => {
             plugin.init(mockContext)
             await Promise.resolve()
             
-            // Now missing artwork
-            bgElement.style.backgroundImage = ""
             const onPaletteChange = vi.fn()
-            
-            // Re-create to inject spy, wait no, just mock the spy on an existing plugin, or use plugin.onTrackLoad
             const plugin2 = createAutoThemePlugin({ onPaletteChange })
             
             // Initial state: root has variables from previous plugin maybe, or just manually set
             rootElement.style.setProperty("--ap-accent", "black")
-            ;(plugin2 as any).currentSrc = "something_else" // private field hack
-            // Better: just trigger a valid load then clear
+
+            // Trigger a valid load then clear to simulate track change
+            bgElement.style.backgroundImage = "url('something_else.jpg')"
             plugin2.init(mockContext)
             await Promise.resolve()
             
             // Now remove
             bgElement.style.backgroundImage = ""
-            plugin2.onTrackLoad?.({ id: "1" } as any)
+            plugin2.onTrackLoad?.({ id: "1" } as Track)
             await Promise.resolve()
             
-            expect(colorExtraction.extractPalette).toHaveBeenCalled() // The first valid load
+            expect(colorExtraction.extractPalette).toHaveBeenCalled() // The valid loads
             expect(rootElement.style.getPropertyValue("--ap-accent")).toBe("")
             expect(onPaletteChange).toHaveBeenCalledWith(null, expect.any(Object))
         })
@@ -157,7 +155,7 @@ describe("AutoThemePlugin", () => {
             
             // Now load track 2 immediately
             bgElement.style.backgroundImage = "url('track2.jpg')"
-            plugin.onTrackLoad?.({ id: "2" } as any)
+            plugin.onTrackLoad?.({ id: "2" } as Track)
             
             // Resolve the first extraction
             resolveExtraction({ primary: [0, 0, 0], secondary: [0, 0, 0], accent: [0, 0, 0], isDark: true })
