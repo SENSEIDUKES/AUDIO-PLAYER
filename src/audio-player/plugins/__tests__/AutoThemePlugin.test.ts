@@ -86,7 +86,7 @@ describe("AutoThemePlugin", () => {
             
             // Now remove
             bgElement.style.backgroundImage = ""
-            plugin2.onTrackLoad?.({ id: "1" } as Track)
+            plugin2.onTrackLoad?.({ id: "1", title: "Test Title", artist: "Test Artist" })
             await Promise.resolve()
             
             expect(colorExtraction.extractPalette).toHaveBeenCalled() // The valid loads
