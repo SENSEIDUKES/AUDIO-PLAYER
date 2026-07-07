@@ -91,7 +91,7 @@ const cueActionSchema = z.discriminatedUnion("command", [
 ])
 
 const cueEventSchema = z.object({
-    id: z.string().optional().transform(val => val || `cue-${Math.random().toString(36).slice(2, 9)}`),
+    id: z.string().optional().transform(val => val || "cue-" + (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : Math.random().toString(36).slice(2, 9))),
     trigger: cueTriggerSchema,
     actions: z.array(
         z.any().transform((val) => {
