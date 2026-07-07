@@ -149,7 +149,7 @@ function renderTextWithInlineStyles(text: string) {
     // We split by the bold markers and alternate between text and <strong>.
     const parts = text.split(/(\*\*.*?\*\*)/g)
     return parts.map((part, i) => {
-        if (part.startsWith("**") && part.endsWith("**")) {
+        if (i % 2 === 1) {
             return <strong key={i}>{part.slice(2, -2)}</strong>
         }
         return part
