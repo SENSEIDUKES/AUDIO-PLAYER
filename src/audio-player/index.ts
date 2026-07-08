@@ -186,6 +186,7 @@ export {
     getVisualComponentsForSlot,
     getDefaultComponentForSlot,
     getAllVisualComponents,
+    getVisualComponentIterator,
     VisualSlotsProvider,
     useVisualSlots,
     SEICanvasRenderer,

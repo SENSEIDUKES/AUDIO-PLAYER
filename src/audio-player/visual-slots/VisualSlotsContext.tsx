@@ -2,8 +2,8 @@ import { createContext, useCallback, useContext, useMemo, useState } from "react
 import type { ReactNode } from "react"
 import { BUILTIN_VISUAL_COMPONENTS } from "./builtins"
 import {
-    getAllVisualComponents,
     getVisualComponent,
+    getVisualComponentIterator,
     getDefaultComponentForSlot,
     registerVisualComponent,
 } from "./visualRegistry"
@@ -43,7 +43,7 @@ function seedActive(): Record<string, string | null> {
 /** Seed `settingsById` from every registered component's defaultSettings. */
 function seedSettings(): Record<string, Record<string, unknown>> {
     const out: Record<string, Record<string, unknown>> = {}
-    for (const def of getAllVisualComponents()) {
+    for (const def of getVisualComponentIterator()) {
         out[def.id] = { ...(def.defaultSettings as Record<string, unknown>) }
     }
     return out

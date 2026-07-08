@@ -58,3 +58,8 @@ export function getDefaultComponentForSlot(
 export function getAllVisualComponents(): AnyVisualComponentDefinition[] {
     return Array.from(REGISTRY.values())
 }
+
+/** Iterator over all registered components. Prefer this over getAllVisualComponents() for iteration to avoid array allocation. */
+export function getVisualComponentIterator(): IterableIterator<AnyVisualComponentDefinition> {
+    return REGISTRY.values()
+}
