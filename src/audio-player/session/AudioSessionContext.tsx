@@ -46,8 +46,18 @@ const EMPTY_PLUGINS: readonly AudioPlayerPlugin[] = []
 function buildOrder(length: number, startIndex: number, shuffle: boolean): number[] {
     const indices = Array.from({ length }, (_, i) => i)
     if (!shuffle || length <= 1) return indices
+
+    // Allocate buffer outside the loop for performance
+    const randomBuffer = new Uint32Array(1)
     for (let i = indices.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1))
+        let randomFraction: number
+        if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+            crypto.getRandomValues(randomBuffer)
+            randomFraction = randomBuffer[0] / (0xffffffff + 1)
+        } else {
+            randomFraction = Math.random()
+        }
+        const j = Math.floor(randomFraction * (i + 1))
         ;[indices[i], indices[j]] = [indices[j], indices[i]]
     }
     const at = indices.indexOf(startIndex)

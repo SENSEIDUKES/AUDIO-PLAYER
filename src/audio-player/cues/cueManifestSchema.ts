@@ -90,8 +90,22 @@ const cueActionSchema = z.discriminatedUnion("command", [
     }),
 ])
 
+function generateSecureId(): string {
+    if (typeof crypto !== "undefined") {
+        if (typeof crypto.randomUUID === "function") {
+            return crypto.randomUUID();
+        }
+        if (typeof crypto.getRandomValues === "function") {
+            const buffer = new Uint8Array(4);
+            crypto.getRandomValues(buffer);
+            return Array.from(buffer).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+    }
+    return Math.random().toString(36).slice(2, 9);
+}
+
 const cueEventSchema = z.object({
-    id: z.string().optional().transform(val => val || "cue-" + (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : Math.random().toString(36).slice(2, 9))),
+    id: z.string().optional().transform(val => val || "cue-" + generateSecureId()),
     trigger: cueTriggerSchema,
     actions: z.array(
         z.any().transform((val) => {
