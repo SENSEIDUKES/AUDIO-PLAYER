@@ -1,0 +1,4 @@
+## 2026-07-08 - [Enhance secure randomness usage in queue shuffling and ID generation]
+**Vulnerability:** Used Math.random() for ID generation fallback and Fisher-Yates array shuffling, which relies on a predictably seeded pseudorandom number generator (PRNG) and increases risk of ID collision or reverse engineering.
+**Learning:** Not all environments polyfill global.crypto, so robust security enhancements need defensive `typeof crypto !== 'undefined'` feature detection to avoid ReferenceError crashes in SSR/older environments while executing crypto.getRandomValues().
+**Prevention:** For features requiring cryptographically secure randomness, always implement explicit availability checks for the `crypto` API or `crypto.getRandomValues` before attempting to use it, falling back to a standard Math.random() if acceptable or throwing an explicit error.
