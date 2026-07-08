@@ -17,6 +17,7 @@ export {
     getVisualComponentsForSlot,
     getDefaultComponentForSlot,
     getAllVisualComponents,
+    getVisualComponentIterator,
 } from "./visualRegistry"
 
 export {
