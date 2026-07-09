@@ -3,6 +3,7 @@ import type { ReactNode } from "react"
 import { BUILTIN_VISUAL_COMPONENTS } from "./builtins"
 import {
     getVisualComponentIterator,
+    getVisualComponent,
     getDefaultComponentForSlot,
     registerVisualComponent,
 } from "./visualRegistry"
@@ -115,12 +116,11 @@ function getDefaultsFor(id: string): Record<string, unknown> | undefined {
     const cached = defaultsCache.get(id)
     if (cached) return cached
 
-    for (const def of getVisualComponentIterator()) {
-        if (def.id === id) {
-            const defaults = { ...(def.defaultSettings as Record<string, unknown>) }
-            defaultsCache.set(id, defaults)
-            return defaults
-        }
+    const def = getVisualComponent(id)
+    if (def) {
+        const defaults = { ...(def.defaultSettings as Record<string, unknown>) }
+        defaultsCache.set(id, defaults)
+        return defaults
     }
     return undefined
 }
