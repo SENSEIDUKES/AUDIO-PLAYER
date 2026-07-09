@@ -87,6 +87,20 @@ const DEFAULT_AUDIO =
     "https://framerusercontent.com/assets/8w3IUatLX9a5JVJ6XPCVuHi94.mp3"
 const EMPTY_PLUGINS: readonly AudioPlayerPlugin[] = []
 
+/**
+ * Validates URLs for safe use in href attributes to prevent XSS.
+ * Rejects javascript: and data: URIs.
+ */
+function isSafeUrl(url: string | undefined): boolean {
+    if (!url) return false
+    try {
+        const parsed = new URL(url, "https://example.com")
+        return ["http:", "https:", "mailto:", "tel:"].includes(parsed.protocol)
+    } catch {
+        return false
+    }
+}
+
 
 function trackPeaksSignature(peaks: Track["peaks"]): string {
     if (!peaks) return ""
@@ -973,7 +987,7 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
                     onOpenFocusedController={handleOpenFocusedController}
                 />
 
-                {currentTrack.purchaseUrl && (
+                {currentTrack.purchaseUrl && isSafeUrl(currentTrack.purchaseUrl) && (
                     <a
                         className="ap-wide-btn ap-wide-btn--solid ap-tap"
                         href={currentTrack.purchaseUrl}
