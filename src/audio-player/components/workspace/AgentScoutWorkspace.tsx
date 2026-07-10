@@ -425,6 +425,7 @@ export function AgentScoutWorkspace({ variant }: { variant: AgentScoutVariant })
                                 }
                             }}
                             placeholder="Ask follow-up questions..."
+                            aria-label="Ask follow-up questions"
                             className="sap-ctl__agent-input"
                             rows={1}
                             disabled={loading}
@@ -433,6 +434,7 @@ export function AgentScoutWorkspace({ variant }: { variant: AgentScoutVariant })
                             type="submit"
                             disabled={loading || !input.trim()}
                             className="sap-ctl__agent-send-btn ap-tap"
+                            aria-label={loading ? "Sending message" : "Send message"}
                         >
                             {loading ? <SpinnerIcon /> : "Send"}
                         </button>
