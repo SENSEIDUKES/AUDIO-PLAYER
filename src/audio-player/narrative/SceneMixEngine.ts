@@ -45,7 +45,19 @@ export interface SceneMixEngineOptions {
     loop?: boolean
     /** Default crossfade length in ms. Defaults to {@link SCENE_FADE_MS}. */
     fadeMs?: number
+    /**
+     * `crossOrigin` attribute for the deck `Audio` elements. Leave unset (the
+     * default) unless the host needs CORS-clean element data (e.g. piping decks
+     * through Web Audio). Forcing `"anonymous"` makes the media request require
+     * `Access-Control-Allow-Origin` from the file host — scores served from a
+     * plain storage bucket/CDN without CORS headers then fail to load at all,
+     * while a bare `<audio>` element would have played them fine.
+     */
+    crossOrigin?: "anonymous" | "use-credentials"
 }
+
+/** User gestures that can unlock media playback after an autoplay rejection. */
+const UNLOCK_GESTURES = ["pointerdown", "keydown", "touchend"] as const
 
 export interface SceneCrossfadeOptions {
     /** Crossfade length for this switch only. */
@@ -80,12 +92,16 @@ export class SceneMixEngine {
     private muted = false
     private loop: boolean
     private defaultFadeMs: number
+    private crossOrigin?: "anonymous" | "use-credentials"
     private tickTimer: ReturnType<typeof setInterval> | null = null
     private disposed = false
+    /** Removes the armed unlock-gesture listeners, when armed. */
+    private disarmGestureRetry: (() => void) | null = null
 
     constructor(options: SceneMixEngineOptions = {}) {
         this.loop = options.loop ?? true
         this.defaultFadeMs = Math.max(0, options.fadeMs ?? SCENE_FADE_MS)
+        this.crossOrigin = options.crossOrigin
     }
 
     /** Key of the track currently owning the mix (fading in or steady). */
@@ -138,12 +154,20 @@ export class SceneMixEngine {
         const el = new Audio()
         el.loop = this.loop
         el.preload = "auto"
-        el.crossOrigin = "anonymous"
+        // Only tag the request as CORS when the host asked for it: a forced
+        // crossOrigin turns "no ACAO header on the file host" into a hard media
+        // error, silencing scores a bare <audio> would play.
+        if (this.crossOrigin) el.crossOrigin = this.crossOrigin
         el.muted = this.muted
-        try {
-            el.volume = 0
-        } catch {
-            volumeWritesUnsupported = true
+        // On volume-locked browsers the fade degrades to a hard swap that
+        // relies on the element keeping its default full volume — so the
+        // fade-in's zero start must not be written once the latch is known.
+        if (!volumeWritesUnsupported) {
+            try {
+                el.volume = 0
+            } catch {
+                volumeWritesUnsupported = true
+            }
         }
 
         const abort = new AbortController()
@@ -204,14 +228,23 @@ export class SceneMixEngine {
             this.releaseDeck(deck)
             return
         }
-        playPromise?.catch(() => {
-            // Autoplay policy rejected the new deck: give up on this switch
-            // and let whatever was playing keep playing. Every other deck was
-            // just marked retiring, so the newest of them — the score that was
-            // audible before this call — is the one to bring back. If a later
-            // crossfadeTo already superseded this deck, it owns the mix; only
-            // recover a survivor when the rejected deck was still the newest.
+        playPromise?.catch((error: unknown) => {
             if (!this.decks.includes(deck)) return
+            // Autoplay policy (NotAllowedError): the browser is waiting for a
+            // user gesture, not rejecting the media. Keep the deck loaded and
+            // parked, and retry the active deck on the first gesture — so the
+            // score starts the moment the user touches the page instead of
+            // staying silent for the whole session.
+            if ((error as { name?: string } | null)?.name === "NotAllowedError") {
+                this.armGestureRetry()
+                return
+            }
+            // Any other failure: give up on this switch and let whatever was
+            // playing keep playing. Every other deck was just marked retiring,
+            // so the newest of them — the score that was audible before this
+            // call — is the one to bring back. If a later crossfadeTo already
+            // superseded this deck, it owns the mix; only recover a survivor
+            // when the rejected deck was still the newest.
             const wasNewest = this.decks[this.decks.length - 1] === deck
             this.releaseDeck(deck)
             if (!wasNewest) return
@@ -236,8 +269,50 @@ export class SceneMixEngine {
     dispose(): void {
         this.disposed = true
         this.stopTicking()
+        this.disarmGestureRetry?.()
         for (const deck of [...this.decks]) this.releaseDeck(deck)
         this.active = null
+    }
+
+    /**
+     * Arm a one-shot retry of the active deck on the next user gesture.
+     * Autoplay policies reject `play()` until the user interacts with the
+     * page; without this, a scene score started from lifecycle code (scene
+     * change, chapter load) would stay silent forever.
+     */
+    private armGestureRetry(): void {
+        if (this.disarmGestureRetry || this.disposed) return
+        if (typeof document === "undefined") return
+        const retry = () => {
+            disarm()
+            if (this.disposed) return
+            const deck = this.active
+            if (!deck || !deck.el.paused) return
+            deck.el.play().catch((error: unknown) => {
+                // Some browsers need a "louder" gesture (e.g. keydown on a
+                // page that only counts pointer input); stay armed for the
+                // next one instead of giving up.
+                if (
+                    (error as { name?: string } | null)?.name ===
+                    "NotAllowedError"
+                ) {
+                    this.armGestureRetry()
+                }
+            })
+        }
+        const disarm = () => {
+            this.disarmGestureRetry = null
+            for (const type of UNLOCK_GESTURES) {
+                document.removeEventListener(type, retry, true)
+            }
+        }
+        this.disarmGestureRetry = disarm
+        for (const type of UNLOCK_GESTURES) {
+            document.addEventListener(type, retry, {
+                capture: true,
+                passive: true,
+            })
+        }
     }
 
     private retire(deck: Deck, fadeMs: number): void {

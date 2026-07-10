@@ -85,6 +85,8 @@ export class AudioSpriteEngine {
      * `ensureContext` builds a fresh `output` GainNode at unity otherwise.
      */
     private masterVolume = 1
+    /** Removes the armed unlock-gesture listeners, when armed. */
+    private disarmGestureResume: (() => void) | null = null
 
     private ensureContext(): AudioContext {
         if (this.ctx && this.ctx.state !== "closed") return this.ctx
@@ -95,6 +97,44 @@ export class AudioSpriteEngine {
         this.output.gain.value = this.masterVolume
         this.output.connect(this.ctx.destination)
         return this.ctx
+    }
+
+    /**
+     * Resume a context that autoplay policy left suspended on the next user
+     * gesture. Ambience/FX are typically started from lifecycle code (scene
+     * changes), where `resume()` is silently rejected — sources scheduled on
+     * the suspended timeline then never make a sound. Buffer sources started
+     * while suspended begin playing when the context resumes, so one resume on
+     * the first real interaction un-silences the whole layer.
+     */
+    private armGestureResume(): void {
+        if (this.disarmGestureResume) return
+        if (typeof document === "undefined") return
+        const gestures = ["pointerdown", "keydown", "touchend"] as const
+        const resume = () => {
+            disarm()
+            const ctx = this.ctx
+            if (!ctx || ctx.state !== "suspended") return
+            void ctx.resume().then(
+                () => {
+                    if (this.ctx?.state === "suspended") this.armGestureResume()
+                },
+                () => this.armGestureResume()
+            )
+        }
+        const disarm = () => {
+            this.disarmGestureResume = null
+            for (const type of gestures) {
+                document.removeEventListener(type, resume, true)
+            }
+        }
+        this.disarmGestureResume = disarm
+        for (const type of gestures) {
+            document.addEventListener(type, resume, {
+                capture: true,
+                passive: true,
+            })
+        }
     }
 
     /**
@@ -177,7 +217,15 @@ export class AudioSpriteEngine {
         if (!clip) return null
 
         const ctx = this.ensureContext()
-        void ctx.resume().catch(() => {})
+        void ctx.resume().then(
+            () => {
+                // Chrome resolves resume() while leaving the context suspended
+                // when there has been no user gesture yet; recover on the first
+                // real interaction instead of playing into a frozen timeline.
+                if (ctx.state === "suspended") this.armGestureResume()
+            },
+            () => this.armGestureResume()
+        )
         const output = this.output
         if (!output) return null
 
@@ -286,6 +334,7 @@ export class AudioSpriteEngine {
 
     dispose(): void {
         this.generation += 1
+        this.disarmGestureResume?.()
         this.loadAbort?.abort()
         this.loadAbort = null
         this.loadPromise = null
