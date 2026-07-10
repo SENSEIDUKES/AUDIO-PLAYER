@@ -110,6 +110,8 @@ export class AudioSpriteEngine {
     private armGestureResume(): void {
         if (this.disarmGestureResume) return
         if (typeof document === "undefined") return
+        // Disposed or closed engines must not (re)attach document listeners.
+        if (!this.ctx || this.ctx.state === "closed") return
         const gestures = ["pointerdown", "keydown", "touchend"] as const
         const resume = () => {
             disarm()
@@ -117,9 +119,15 @@ export class AudioSpriteEngine {
             if (!ctx || ctx.state !== "suspended") return
             void ctx.resume().then(
                 () => {
-                    if (this.ctx?.state === "suspended") this.armGestureResume()
+                    // A stale callback from a replaced/disposed context must
+                    // not re-arm against the live engine.
+                    if (ctx !== this.ctx) return
+                    if (this.ctx.state === "suspended") this.armGestureResume()
                 },
-                () => this.armGestureResume()
+                () => {
+                    if (ctx !== this.ctx) return
+                    this.armGestureResume()
+                }
             )
         }
         const disarm = () => {
@@ -219,12 +227,17 @@ export class AudioSpriteEngine {
         const ctx = this.ensureContext()
         void ctx.resume().then(
             () => {
+                // Ignore stale callbacks from a replaced/disposed context.
+                if (ctx !== this.ctx) return
                 // Chrome resolves resume() while leaving the context suspended
                 // when there has been no user gesture yet; recover on the first
                 // real interaction instead of playing into a frozen timeline.
                 if (ctx.state === "suspended") this.armGestureResume()
             },
-            () => this.armGestureResume()
+            () => {
+                if (ctx !== this.ctx) return
+                this.armGestureResume()
+            }
         )
         const output = this.output
         if (!output) return null
