@@ -45,6 +45,77 @@ The player currently supports:
 
 ---
 
+## Install / download this player into another app
+
+This repo is already configured as the package **`@seihouse/audio-player`**. Until the package is officially published to npm, the easiest way to use it inside another SEIHouse app is to install it straight from GitHub.
+
+### 1. Install from GitHub
+
+From the app that needs the audio player, run:
+
+```bash
+npm install git+https://github.com/SENSEIDUKES/AUDIO-PLAYER.git
+```
+
+Or add it manually to that app's `package.json`:
+
+```json
+{
+  "dependencies": {
+    "@seihouse/audio-player": "github:SENSEIDUKES/AUDIO-PLAYER#main"
+  }
+}
+```
+
+Then run:
+
+```bash
+npm install
+```
+
+### 2. Use it in React
+
+Import the player and its CSS once in your app:
+
+```tsx
+import { AudioPlayer } from '@seihouse/audio-player'
+import '@seihouse/audio-player/styles.css'
+
+const tracks = [
+  {
+    id: 'demo-track',
+    title: 'Demo Track',
+    artist: 'SEIHouse',
+    audioFile: 'https://example.com/audio/demo-track.mp3',
+    artwork: 'https://example.com/art/demo-cover.jpg',
+  },
+]
+
+export function PlayerExample() {
+  return <AudioPlayer tracks={tracks} />
+}
+```
+
+A track needs at least `title`, `artist`, and either `audioFile` or `sources`. Use `id` whenever possible so the player can reliably tell tracks apart.
+
+### 3. Use a specific version later
+
+When this repo starts using tags, install a locked release like this:
+
+```bash
+npm install git+https://github.com/SENSEIDUKES/AUDIO-PLAYER.git#v1.0.0
+```
+
+When the package is eventually published to npm, installs can become:
+
+```bash
+npm install @seihouse/audio-player
+```
+
+For the full publish and linking workflow, see [`PUBLISHING_GUIDE.md`](./PUBLISHING_GUIDE.md).
+
+---
+
 ## Planned direction
 
 This repo is still in active development. Planned and ongoing directions include:
@@ -169,6 +240,7 @@ Open the printed Vite preview URL to inspect the production build. The preview s
 - `npm run dev` — start the Vite dev server on `0.0.0.0`.
 - `npm run typecheck` — run TypeScript without emitting files.
 - `npm run build` — type-check and build the production demo into `dist/`.
+- `npm run build:lib` — build the package version for installing into other apps.
 - `npm run preview` — serve the built `dist/` output with Vite preview.
 - `npm run preview:smoke` — start Vite preview on `127.0.0.1:4173`, fetch the demo page, and verify referenced built assets return HTTP 200.
 - `npm test` — run type-checking, production build, and the preview smoke test.
