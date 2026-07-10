@@ -50,13 +50,13 @@ function seedActive(): Record<string, string | null> {
   return out;
 }
 
-/** Seed `settingsById` from every registered component's defaultSettings. */
+/**
+ * Initial settings for components. We start empty and lazily populate from
+ * `getDefaultsFor` in `getSettings` / `updateSettings` to avoid a full registry
+ * scan on provider mount.
+ */
 function seedSettings(): Record<string, Record<string, unknown>> {
-  const out: Record<string, Record<string, unknown>> = {};
-  for (const def of getVisualComponentIterator()) {
-    out[def.id] = { ...(def.defaultSettings as Record<string, unknown>) };
-  }
-  return out;
+  return {};
 }
 
 const VisualSlotsContext = createContext<VisualSlotsContextValue | null>(null);
@@ -74,6 +74,8 @@ export interface VisualSlotsProviderProps {
 export function VisualSlotsProvider({ children }: VisualSlotsProviderProps) {
   const [activeBySlot, setActiveBySlot] =
     useState<Record<string, string | null>>(seedActive);
+  // We initialize settingsById to an empty object. Values are lazily pulled
+  // from getDefaultsFor(id) and cached in this state once modified.
   const [settingsById, setSettingsById] =
     useState<Record<string, Record<string, unknown>>>(seedSettings);
 
@@ -119,7 +121,10 @@ export function VisualSlotsProvider({ children }: VisualSlotsProviderProps) {
 // instead of a fresh object each time.
 const defaultsCache = new Map<string, Record<string, unknown>>();
 
-/** Defaults lookup that tolerates components registered after seeding. */
+/**
+ * Defaults lookup that tolerates components registered after seeding. Performs
+ * an O(1) Map lookup through the registry.
+ */
 function getDefaultsFor(id: string): Record<string, unknown> | undefined {
   const cached = defaultsCache.get(id);
   if (cached) return cached;
