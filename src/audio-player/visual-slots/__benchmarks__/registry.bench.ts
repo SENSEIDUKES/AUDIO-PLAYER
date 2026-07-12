@@ -41,8 +41,16 @@ describe("Visual Registry Performance", () => {
     getVisualComponentsForSlot("controllerPanel");
   });
 
+  bench("getVisualComponentsForSlot (populated seiCanvas slot)", () => {
+    getVisualComponentsForSlot("seiCanvas");
+  });
+
   // getDefaultComponentForSlot now uses BY_SLOT Map index (O(1))
   bench("getDefaultComponentForSlot (Optimized O(1) lookup)", () => {
     getDefaultComponentForSlot("controllerPanel");
+  });
+
+  bench("getDefaultComponentForSlot (populated seiCanvas slot)", () => {
+    getDefaultComponentForSlot("seiCanvas");
   });
 });

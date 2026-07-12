@@ -72,7 +72,7 @@ export function getVisualComponent(
 export function getVisualComponentsForSlot(
   slot: VisualSlot,
 ): AnyVisualComponentDefinition[] {
-  return BY_SLOT.get(slot) ?? [];
+  return [...(BY_SLOT.get(slot) ?? [])];
 }
 
 /**
