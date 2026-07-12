@@ -145,7 +145,9 @@ export function ActivityLogPanel() {
     )
 
     const handleClear = useCallback(() => {
-        log.clear()
+        if (window.confirm("Are you sure you want to clear the activity log?")) {
+            log.clear()
+        }
     }, [log])
 
     const handleCopy = useCallback(() => {
