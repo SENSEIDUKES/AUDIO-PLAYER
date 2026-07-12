@@ -33,7 +33,11 @@ export {
   AudioSpriteEngine,
   createAudioSpriteEngine,
 } from "./core/audio/AudioSpriteEngine";
-export { AutomixPlugin, createAutomixPlugin } from "./plugins/AutomixPlugin";
+export {
+  AutomixPlugin,
+  createAutomixPlugin,
+  AUTOMIX_FADE_MS,
+} from "./plugins/AutomixPlugin";
 export {
   AutoThemePlugin,
   createAutoThemePlugin,
