@@ -87,7 +87,7 @@ export function getDefaultComponentForSlot(
 
 /** All registered components (any slot). Used to seed the settings store. */
 export function getAllVisualComponents(): AnyVisualComponentDefinition[] {
-  return Array.from(REGISTRY.values());
+  return [...REGISTRY.values()];
 }
 
 /** Iterator over all registered components. Prefer this over getAllVisualComponents() for iteration to avoid array allocation. */
