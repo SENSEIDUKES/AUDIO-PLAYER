@@ -54,7 +54,7 @@ export interface AutomixPluginConfig {
  * silence-trim crossfades whenever rhythm analysis is unavailable, the browser
  * locks element volume, or confidence is below `confidenceMin`.
  *
- * The implementation intentionally mirrors the legacy `useAutomix` hook: the
+ * The implementation intentionally mirrors the legacy automix hook: the
  * main engine audio element remains deck A/source-of-truth, while this plugin
  * owns one detached deck B only around a transition.
  */
@@ -164,7 +164,7 @@ export class AutomixPlugin implements AudioPlayerPlugin {
 
     onTrackEnded = () => this.handleTrackEnded()
 
-    /** Legacy controller bridge used by `useAutomix`. */
+    /** Legacy controller bridge used by the host. */
     handleTrackEnded(): boolean {
         if (this.phase === "fading") {
             // A ran out mid-fade (trim estimate was short). Let the host run
