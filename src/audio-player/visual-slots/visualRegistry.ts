@@ -21,6 +21,8 @@ const REGISTRY = new Map<string, AnyVisualComponentDefinition>();
  */
 const BY_SLOT = new Map<VisualSlot, AnyVisualComponentDefinition[]>();
 
+const EMPTY_ARRAY: AnyVisualComponentDefinition[] = [];
+
 /** Register (or replace) a visual component definition. */
 export function registerVisualComponent<S>(
   definition: VisualComponentDefinition<S>,
@@ -53,12 +55,12 @@ export function registerVisualComponent<S>(
   }
 
   // Add to new slot list (preserves registration order for new components)
-  let list = BY_SLOT.get(slot);
-  if (!list) {
-    list = [];
-    BY_SLOT.set(slot, list);
+  let slotList = BY_SLOT.get(slot);
+  if (!slotList) {
+    slotList = [];
+    BY_SLOT.set(slot, slotList);
   }
-  list.push(anyDef);
+  slotList.push(anyDef);
 }
 
 /** Look up a component by id, or `undefined` if not registered. */
@@ -73,8 +75,7 @@ export function getVisualComponent(
 export function getVisualComponentsForSlot(
   slot: VisualSlot,
 ): AnyVisualComponentDefinition[] {
-  const list = BY_SLOT.get(slot);
-  return list ? [...list] : [];
+  return BY_SLOT.get(slot) ?? EMPTY_ARRAY;
 }
 
 /**
@@ -90,7 +91,7 @@ export function getDefaultComponentForSlot(
 
 /** All registered components (any slot). Used to seed the settings store. */
 export function getAllVisualComponents(): AnyVisualComponentDefinition[] {
-  return Array.from(REGISTRY.values());
+  return [...REGISTRY.values()];
 }
 
 /** Iterator over all registered components. Prefer this over getAllVisualComponents() for iteration to avoid array allocation. */

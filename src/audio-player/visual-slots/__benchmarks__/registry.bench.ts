@@ -18,10 +18,10 @@ describe("Visual Registry Performance (10,000 components)", () => {
   for (let i = 0; i < COUNT; i++) {
     registerVisualComponent({
       id: `comp-${i}`,
+      name: `Component ${i}`,
       slot: SLOTS[i % SLOTS.length],
       defaultSettings: { i },
-      // @ts-ignore - minimal mock
-      component: () => null,
+      Component: () => null,
     });
   }
 

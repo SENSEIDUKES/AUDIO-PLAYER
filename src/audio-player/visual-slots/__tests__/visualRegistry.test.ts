@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   registerVisualComponent,
   getVisualComponent,
   getVisualComponentsForSlot,
   getDefaultComponentForSlot,
 } from "../visualRegistry";
-import type { VisualComponentDefinition } from "../types";
+import type { VisualComponentDefinition, VisualSlot } from "../types";
 
 describe("visualRegistry", () => {
   const mockComp = () => null;
@@ -13,19 +13,38 @@ describe("visualRegistry", () => {
   it("should register and retrieve a component", () => {
     const def: VisualComponentDefinition<any> = {
       id: "test-1",
+      name: "Test 1",
       slot: "seiCanvas",
       defaultSettings: { a: 1 },
-      component: mockComp,
+      Component: mockComp,
     };
     registerVisualComponent(def);
     expect(getVisualComponent("test-1")).toBe(def);
   });
 
   it("should maintain registration order in getVisualComponentsForSlot", () => {
-    const slot = "scrubberCanvas";
-    const def1 = { id: "s1", slot, defaultSettings: {}, component: mockComp };
-    const def2 = { id: "s2", slot, defaultSettings: {}, component: mockComp };
-    const def3 = { id: "s3", slot, defaultSettings: {}, component: mockComp };
+    const slot: VisualSlot = "scrubberCanvas";
+    const def1 = {
+      id: "s1",
+      name: "S1",
+      slot,
+      defaultSettings: {},
+      Component: mockComp,
+    };
+    const def2 = {
+      id: "s2",
+      name: "S2",
+      slot,
+      defaultSettings: {},
+      Component: mockComp,
+    };
+    const def3 = {
+      id: "s3",
+      name: "S3",
+      slot,
+      defaultSettings: {},
+      Component: mockComp,
+    };
 
     registerVisualComponent(def1);
     registerVisualComponent(def2);
@@ -40,24 +59,27 @@ describe("visualRegistry", () => {
   });
 
   it("should be idempotent and preserve order when replacing", () => {
-    const slot = "controllerPanel";
+    const slot: VisualSlot = "controllerPanel";
     const def1 = {
       id: "c1",
+      name: "C1",
       slot,
       defaultSettings: { v: 1 },
-      component: mockComp,
+      Component: mockComp,
     };
     const def2 = {
       id: "c2",
+      name: "C2",
       slot,
       defaultSettings: { v: 1 },
-      component: mockComp,
+      Component: mockComp,
     };
     const def1_alt = {
       id: "c1",
+      name: "C1 alternate",
       slot,
       defaultSettings: { v: 2 },
-      component: mockComp,
+      Component: mockComp,
     };
 
     registerVisualComponent(def1);
@@ -73,9 +95,10 @@ describe("visualRegistry", () => {
   it("should handle slot changes during re-registration", () => {
     const def = {
       id: "move-me",
+      name: "Move Me",
       slot: "seiCanvas" as const,
       defaultSettings: {},
-      component: mockComp,
+      Component: mockComp,
     };
     registerVisualComponent(def);
     // Might already have things in seiCanvas from other tests, so just check it's there
@@ -83,9 +106,10 @@ describe("visualRegistry", () => {
 
     const defMoved = {
       id: "move-me",
+      name: "Move Me",
       slot: "scrubberCanvas" as const,
       defaultSettings: {},
-      component: mockComp,
+      Component: mockComp,
     };
     registerVisualComponent(defMoved);
 
@@ -99,15 +123,17 @@ describe("visualRegistry", () => {
     const slot = ("unique-slot-" + Math.random()) as any;
     const def1 = {
       id: "first",
+      name: "First",
       slot,
       defaultSettings: {},
-      component: mockComp,
+      Component: mockComp,
     };
     const def2 = {
       id: "second",
+      name: "Second",
       slot,
       defaultSettings: {},
-      component: mockComp,
+      Component: mockComp,
     };
 
     registerVisualComponent(def1);
