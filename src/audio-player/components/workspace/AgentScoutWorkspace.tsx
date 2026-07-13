@@ -314,7 +314,7 @@ export function AgentScoutWorkspace({ variant }: { variant: AgentScoutVariant })
     }
 
     const clearChat = () => {
-        if (window.confirm("Are you sure you want to reset the chat?")) {
+        if (typeof window !== "undefined" && window.confirm("Are you sure you want to reset the chat?")) {
             setMessages([])
             safeSessionStorage.removeItem(storageKey)
             setError(null)
