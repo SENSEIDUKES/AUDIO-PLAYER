@@ -166,7 +166,7 @@ export function WaveformProgress({
                 const wrapper = wrapperRef.current
                 if (!container || !wrapper) return
                 wsRef.current?.destroy()
-                container.innerHTML = ""
+                container.textContent = ""
 
                 const ws = WaveSurferCtor.create({
                     container,
