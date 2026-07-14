@@ -50,13 +50,12 @@ function seedActive(): Record<string, string | null> {
   return out;
 }
 
-/** Seed `settingsById` from every registered component's defaultSettings. */
+/**
+ * Seed `settingsById` with an empty object to implement lazy initialization.
+ * Component defaults are merged in on first access via `getSettings`.
+ */
 function seedSettings(): Record<string, Record<string, unknown>> {
-  const out: Record<string, Record<string, unknown>> = {};
-  for (const def of getVisualComponentIterator()) {
-    out[def.id] = { ...(def.defaultSettings as Record<string, unknown>) };
-  }
-  return out;
+  return {};
 }
 
 const VisualSlotsContext = createContext<VisualSlotsContextValue | null>(null);
@@ -119,12 +118,15 @@ export function VisualSlotsProvider({ children }: VisualSlotsProviderProps) {
 // instead of a fresh object each time.
 const defaultsCache = new Map<string, Record<string, unknown>>();
 
-/** Defaults lookup that tolerates components registered after seeding. */
+/**
+ * Defaults lookup that tolerates components registered after seeding.
+ * Performs an O(1) Map lookup via the registry.
+ */
 function getDefaultsFor(id: string): Record<string, unknown> | undefined {
   const cached = defaultsCache.get(id);
   if (cached) return cached;
 
-  const def = getVisualComponent(id);
+  const def = getVisualComponent(id); // O(1) registry lookup
   if (def) {
     const defaults = { ...(def.defaultSettings as Record<string, unknown>) };
     defaultsCache.set(id, defaults);
