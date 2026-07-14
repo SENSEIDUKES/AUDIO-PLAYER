@@ -750,7 +750,7 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
 
             <div className="ap-content">
                 {!hasAudio && (
-                    <div className="ap-banner ap-banner--error ap-anim-in">
+                    <div className="ap-banner ap-banner--error ap-anim-in" role="alert">
                         <ErrorIcon />
                         <span>Audio file missing</span>
                     </div>
@@ -779,7 +779,7 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
                 )}
 
                 {hasError && hasAudio && (
-                    <div className="ap-banner ap-banner--error ap-banner--col ap-anim-in">
+                    <div className="ap-banner ap-banner--error ap-banner--col ap-anim-in" role="alert">
                         <div className="ap-banner__row">
                             <ErrorIcon />
                             <span>{errorMessage}</span>
