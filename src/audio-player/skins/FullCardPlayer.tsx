@@ -336,7 +336,7 @@ export function FullCardPlayer({
             )}
 
             {hasError && hasAudio && (
-                <div className="ap-banner ap-banner--error ap-banner--col ap-anim-in">
+                <div className="ap-banner ap-banner--error ap-banner--col ap-anim-in" role="alert">
                     <div className="ap-banner__row">
                         <ErrorIcon />
                         <span>{errorMessage}</span>
