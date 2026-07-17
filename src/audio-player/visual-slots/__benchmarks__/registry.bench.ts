@@ -4,6 +4,7 @@ import {
   getVisualComponent,
   getVisualComponentsForSlot,
   getDefaultComponentForSlot,
+  getAllVisualComponents,
 } from "../visualRegistry";
 import type { VisualComponentDefinition } from "../types";
 
@@ -44,5 +45,30 @@ describe("Visual Registry Performance", () => {
   // getDefaultComponentForSlot now uses BY_SLOT Map index (O(1))
   bench("getDefaultComponentForSlot (Optimized O(1) lookup)", () => {
     getDefaultComponentForSlot("controllerPanel");
+  });
+
+  // Benchmark the O(N) linear search (reconstructed from the original getDefaultsFor implementation)
+  bench("getDefaultsFor (O(N) registry scan baseline)", () => {
+    const id = "comp-500";
+    for (const def of getAllVisualComponents()) {
+      if (def.id === id) {
+        const defaults = {
+          ...(def.defaultSettings as Record<string, unknown>),
+        };
+        return defaults;
+      }
+    }
+    return undefined;
+  });
+
+  // Benchmark the O(1) Map lookup (current optimized getDefaultsFor implementation)
+  bench("getDefaultsFor (O(1) Map lookup optimized)", () => {
+    const id = "comp-500";
+    const def = getVisualComponent(id);
+    if (def) {
+      const defaults = { ...(def.defaultSettings as Record<string, unknown>) };
+      return defaults;
+    }
+    return undefined;
   });
 });
