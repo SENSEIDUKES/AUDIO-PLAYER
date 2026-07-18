@@ -124,6 +124,8 @@ function getDefaultsFor(id: string): Record<string, unknown> | undefined {
   const cached = defaultsCache.get(id);
   if (cached) return cached;
 
+  // Optimized lookup: getVisualComponent provides O(1) Map-based access,
+  // avoiding O(N) array allocation and search of getAllVisualComponents().
   const def = getVisualComponent(id);
   if (def) {
     const defaults = { ...(def.defaultSettings as Record<string, unknown>) };
