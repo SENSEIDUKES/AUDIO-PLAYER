@@ -119,11 +119,16 @@ export function VisualSlotsProvider({ children }: VisualSlotsProviderProps) {
 // instead of a fresh object each time.
 const defaultsCache = new Map<string, Record<string, unknown>>();
 
-/** Defaults lookup that tolerates components registered after seeding. */
+/**
+ * Defaults lookup that tolerates components registered after seeding.
+ * Optimizes the lookup using O(1) Map lookup via getVisualComponent(id)
+ * instead of an O(N) array search scan over getAllVisualComponents().
+ */
 function getDefaultsFor(id: string): Record<string, unknown> | undefined {
   const cached = defaultsCache.get(id);
   if (cached) return cached;
 
+  // Optimized O(1) Map lookup to avoid redundant O(N) registry scans
   const def = getVisualComponent(id);
   if (def) {
     const defaults = { ...(def.defaultSettings as Record<string, unknown>) };
