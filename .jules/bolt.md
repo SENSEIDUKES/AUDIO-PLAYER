@@ -4,3 +4,6 @@
 ## 2026-07-10 - Add React.memo to TrackMetadata
 **Learning:** The global audio engine (`useAudioPlayer`) updates `currentTime` playback state via a ~60fps `requestAnimationFrame` loop, triggering frequent re-renders in subscribing components.
 **Action:** Always use `React.memo` on purely presentational components like `TrackMetadata` that are rendered inside containers tracking high-frequency audio state updates.
+## 2026-07-11 - Add React.memo to ProgressBar
+**Learning:** The global audio engine (`useAudioPlayer`) drives `currentTime` playback state via a ~60fps `requestAnimationFrame` loop. Any component rendering inside a player face without `memo` will re-render continuously during playback.
+**Action:** Always apply `React.memo` to purely presentational scrubber/progress components (like `ProgressBar`) to prevent unnecessary re-renders when their props haven't structurally changed.
