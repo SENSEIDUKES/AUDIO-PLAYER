@@ -124,6 +124,16 @@ function getDefaultsFor(id: string): Record<string, unknown> | undefined {
   const cached = defaultsCache.get(id);
   if (cached) return cached;
 
+  // Before optimization:
+  // for (const def of getAllVisualComponents()) {
+  //   if (def.id === id) {
+  //     const defaults = { ...(def.defaultSettings as Record<string, unknown>) };
+  //     defaultsCache.set(id, defaults);
+  //     return defaults;
+  //   }
+  // }
+  //
+  // Optimized lookup: use getVisualComponent(id) for O(1) Map-based lookup instead of O(N) linear array scan
   const def = getVisualComponent(id);
   if (def) {
     const defaults = { ...(def.defaultSettings as Record<string, unknown>) };
