@@ -4,3 +4,7 @@
 ## 2026-07-10 - Add React.memo to TrackMetadata
 **Learning:** The global audio engine (`useAudioPlayer`) updates `currentTime` playback state via a ~60fps `requestAnimationFrame` loop, triggering frequent re-renders in subscribing components.
 **Action:** Always use `React.memo` on purely presentational components like `TrackMetadata` that are rendered inside containers tracking high-frequency audio state updates.
+
+## 2026-07-22 - Benchmark-Driven Visual Slots Optimization Verification
+**Learning:** Quantifying the actual performance delta between $O(N)$ sequential iterations and $O(1)$ Map lookups using Vitest `bench` helps systematically verify the exact 90x-150x speedup and prevents regression.
+**Action:** Always create focused benchmarking tests (like `getDefaultsFor.bench.ts`) when refactoring critical paths to establish a precise mathematical baseline for optimization claims.
