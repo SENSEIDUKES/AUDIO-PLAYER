@@ -164,7 +164,11 @@ function WorkshopInner() {
     }
   };
 
-  const handleDelete = (name: string) => setPresets(deletePreset(name));
+  const handleDelete = (name: string) => {
+    if (window.confirm(`Are you sure you want to delete the preset "${name}"?`)) {
+      setPresets(deletePreset(name));
+    }
+  };
 
   return (
     <div className="lab-shell">
