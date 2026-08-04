@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import type { PointerEvent as ReactPointerEvent, KeyboardEvent } from "react"
 import { formatTime } from "../utils/formatTime"
 
@@ -27,7 +27,7 @@ interface ProgressBarProps {
  * `useEffect` cleanup so a drag that ends in an unmount cannot leak a captured
  * pointer back to the document.
  */
-export const ProgressBar = memo(function ProgressBar({
+export function ProgressBar({
     currentTime,
     duration,
     buffered,
@@ -241,4 +241,4 @@ export const ProgressBar = memo(function ProgressBar({
             />
         </div>
     )
-})
+}
