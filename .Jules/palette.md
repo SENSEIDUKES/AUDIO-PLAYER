@@ -4,6 +4,9 @@
 ## 2026-07-12 - Destructive Action Confirmation
 **Learning:** Destructive actions like clearing logs or chat history lacked confirmation dialogues. This could lead to accidental data loss for users.
 **Action:** Added `window.confirm` to these destructive actions to ensure users are aware of the consequence.
+## 2024-05-15 - Explicit Action Labels for List Buttons
+**Learning:** Row buttons in lists acting as play triggers need explicit action verbs in their ARIA labels so screen reader users know it's a playback action, not just a static list item.
+**Action:** Always add action-oriented labels like "Play [Item]" to interactive list rows.
 
 ## 2024-05-18 - Dynamically Injected Error Banners
 **Learning:** Banners dynamically injected into the DOM (such as error banners `ap-banner--error` when an audio file is missing or playback fails) will not be automatically announced by screen readers when they appear unless they have a `role="alert"` or `role="status"` attribute.
