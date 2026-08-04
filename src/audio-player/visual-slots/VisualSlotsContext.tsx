@@ -3,12 +3,12 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type { ReactNode } from "react";
 import { BUILTIN_VISUAL_COMPONENTS } from "./builtins";
 import {
-  getVisualComponentIterator,
   getVisualComponent,
   getDefaultComponentForSlot,
   registerVisualComponent,
@@ -50,13 +50,12 @@ function seedActive(): Record<string, string | null> {
   return out;
 }
 
-/** Seed `settingsById` from every registered component's defaultSettings. */
+/**
+ * Seed `settingsById` with an empty object to implement lazy initialization.
+ * Component defaults are resolved dynamically on first access via `getSettings`.
+ */
 function seedSettings(): Record<string, Record<string, unknown>> {
-  const out: Record<string, Record<string, unknown>> = {};
-  for (const def of getVisualComponentIterator()) {
-    out[def.id] = { ...(def.defaultSettings as Record<string, unknown>) };
-  }
-  return out;
+  return {};
 }
 
 const VisualSlotsContext = createContext<VisualSlotsContextValue | null>(null);
@@ -76,6 +75,18 @@ export function VisualSlotsProvider({ children }: VisualSlotsProviderProps) {
     useState<Record<string, string | null>>(seedActive);
   const [settingsById, setSettingsById] =
     useState<Record<string, Record<string, unknown>>>(seedSettings);
+  const defaultsByIdRef = useRef<
+    Record<string, Record<string, unknown>>
+  >({});
+
+  const getProviderDefaults = useCallback((id: string) => {
+    const cached = defaultsByIdRef.current[id];
+    if (cached) return cached;
+
+    const localDefaults = { ...(getDefaultsFor(id) ?? {}) };
+    defaultsByIdRef.current[id] = localDefaults;
+    return localDefaults;
+  }, []);
 
   const getActive = useCallback(
     (slot: VisualSlot) => activeBySlot[slot] ?? null,
@@ -88,18 +99,18 @@ export function VisualSlotsProvider({ children }: VisualSlotsProviderProps) {
 
   const getSettings = useCallback(
     (id: string): Record<string, unknown> =>
-      settingsById[id] ?? getDefaultsFor(id) ?? EMPTY_OBJECT,
-    [settingsById],
+      settingsById[id] ?? getProviderDefaults(id),
+    [getProviderDefaults, settingsById],
   );
 
   const updateSettings = useCallback(
     (id: string, partial: Record<string, unknown>) => {
       setSettingsById((prev) => {
-        const base = prev[id] ?? getDefaultsFor(id) ?? {};
+        const base = prev[id] ?? getProviderDefaults(id);
         return { ...prev, [id]: { ...base, ...partial } };
       });
     },
-    [],
+    [getProviderDefaults],
   );
 
   const value = useMemo<VisualSlotsContextValue>(
@@ -119,12 +130,15 @@ export function VisualSlotsProvider({ children }: VisualSlotsProviderProps) {
 // instead of a fresh object each time.
 const defaultsCache = new Map<string, Record<string, unknown>>();
 
-/** Defaults lookup that tolerates components registered after seeding. */
+/**
+ * Defaults lookup that tolerates components registered after seeding.
+ * Performs an O(1) Map lookup via the registry.
+ */
 function getDefaultsFor(id: string): Record<string, unknown> | undefined {
   const cached = defaultsCache.get(id);
   if (cached) return cached;
 
-  const def = getVisualComponent(id);
+  const def = getVisualComponent(id); // O(1) registry lookup
   if (def) {
     const defaults = { ...(def.defaultSettings as Record<string, unknown>) };
     defaultsCache.set(id, defaults);
