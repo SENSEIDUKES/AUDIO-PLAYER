@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react"
+import { memo, useCallback, useEffect, useRef } from "react"
 import type { PointerEvent as ReactPointerEvent, KeyboardEvent } from "react"
 
 interface VolumeControlProps {
@@ -23,7 +23,7 @@ interface VolumeControlProps {
  * there; the slider is effectively desktop-only. We surface a small hint to
  * users when we detect that the browser is not honoring the slider.
  */
-export function VolumeControl({
+export const VolumeControl = memo(function VolumeControl({
     volume,
     isMuted,
     disabled,
@@ -206,4 +206,4 @@ export function VolumeControl({
             )}
         </div>
     )
-}
+})
