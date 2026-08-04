@@ -10,3 +10,7 @@
 ## 2026-07-20 - Context-Specific aria-labels on Repeated Action Buttons
 **Learning:** In lists of items with actions (like presets), simple "Load" and "Delete" button labels lack sufficient context for screen reader users when navigating the buttons out of the surrounding text flow.
 **Action:** Always append specific contextual information (like the item name) to the `aria-label` of generic action buttons repeated in a list or table (e.g. `aria-label="Load preset MyPreset"` instead of just "Load").
+
+## 2024-05-18 - Dynamically Injected Error Banners
+**Learning:** Banners dynamically injected into the DOM (such as error banners `ap-banner--error` when an audio file is missing or playback fails) will not be automatically announced by screen readers when they appear unless they have a `role="alert"` or `role="status"` attribute.
+**Action:** Always add `role="alert"` to dynamically injected error banners and `role="status"` for non-critical information to ensure changes in the UI state are communicated to assistive technologies.
