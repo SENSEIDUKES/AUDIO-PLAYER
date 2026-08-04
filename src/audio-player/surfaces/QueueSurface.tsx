@@ -34,6 +34,7 @@ export function QueueSurface({ maxItems, className }: QueueSurfaceProps) {
         <ul className="ap-queue-surface__list">
           {items.map(({ track, index }) => {
             const isCurrent = index === currentIndex;
+            const isNowPlaying = s.isPlaying && isCurrent;
             return (
               <li key={track.id ?? `${track.title}-${index}`}>
                 <button
