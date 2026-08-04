@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { usePluginRegistry } from "./usePluginRegistry";
 import type { PluginRegistryEntry } from "./usePluginRegistry";
 
@@ -16,6 +17,8 @@ export function PluginManagerPanel() {
     toggleActive,
     activeInstances,
   } = usePluginRegistry();
+
+  const [pendingUninstallId, setPendingUninstallId] = useState<string | null>(null);
 
   const installedIds = new Set(installed.map((r) => r.entry.id));
   const availableButNotInstalled = available.filter(
@@ -66,6 +69,8 @@ export function PluginManagerPanel() {
         >
           {installed.map((record) => {
             const active = record.active;
+            const isConfirmingUninstall =
+              pendingUninstallId === record.entry.id;
             return (
               <PluginCard
                 key={record.entry.id}
@@ -89,22 +94,38 @@ export function PluginManagerPanel() {
                       {active ? "Active" : "Inactive"}
                     </button>
                     {/* Uninstall */}
-                    <button
-                      type="button"
-                      className="lab-plugin-card__btn lab-plugin-card__btn--uninstall"
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            `Are you sure you want to uninstall ${record.entry.label}?`,
-                          )
-                        ) {
-                          uninstall(record.entry.id);
-                        }
-                      }}
-                      aria-label={`Uninstall ${record.entry.label}`}
-                    >
-                      ×
-                    </button>
+                    {isConfirmingUninstall ? (
+                      <>
+                        <button
+                          type="button"
+                          className="lab-plugin-card__btn lab-plugin-card__btn--uninstall"
+                          onClick={() => {
+                            uninstall(record.entry.id);
+                            setPendingUninstallId(null);
+                          }}
+                          aria-label={`Confirm uninstall ${record.entry.label}`}
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          type="button"
+                          className="lab-plugin-card__btn lab-plugin-card__btn--inactive"
+                          onClick={() => setPendingUninstallId(null)}
+                          aria-label={`Cancel uninstall ${record.entry.label}`}
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        className="lab-plugin-card__btn lab-plugin-card__btn--uninstall"
+                        onClick={() => setPendingUninstallId(record.entry.id)}
+                        aria-label={`Uninstall ${record.entry.label}`}
+                      >
+                        ×
+                      </button>
+                    )}
                   </>
                 }
               />
