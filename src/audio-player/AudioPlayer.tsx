@@ -545,9 +545,7 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
     // don't spam the live region on every rAF tick. `isBuffering` is
     // intentionally debounced: a brief buffer burst is not interesting.
     const lastPlayedRef = useRef<boolean | null>(null)
-    const lastErrorRef = useRef<string | null>(null)
     const lastAutoplayRef = useRef<boolean | null>(null)
-    const lastMissingRef = useRef<boolean | null>(null)
     useEffect(() => {
         // Track play/pause transitions, not levels.
         if (lastPlayedRef.current !== isPlaying) {
@@ -561,16 +559,6 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
     }, [isPlaying, currentTrack.title, currentTrack.artist])
 
     useEffect(() => {
-        const msg = errorMessage || ""
-        if (lastErrorRef.current !== msg && hasError) {
-            lastErrorRef.current = msg
-            setAnnouncement(`Error: ${msg}`)
-        } else if (!hasError) {
-            lastErrorRef.current = null
-        }
-    }, [hasError, errorMessage])
-
-    useEffect(() => {
         if (lastAutoplayRef.current !== autoplayBlocked) {
             lastAutoplayRef.current = autoplayBlocked
             if (autoplayBlocked) {
@@ -580,13 +568,6 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
             }
         }
     }, [autoplayBlocked])
-
-    useEffect(() => {
-        if (lastMissingRef.current !== hasAudio) {
-            lastMissingRef.current = hasAudio
-            if (!hasAudio) setAnnouncement("Audio file missing")
-        }
-    }, [hasAudio])
 
     // ── Media Session API (progressive enhancement) ──
     // Artwork priority: track-level artwork > backgroundMedia > backgroundImage.
