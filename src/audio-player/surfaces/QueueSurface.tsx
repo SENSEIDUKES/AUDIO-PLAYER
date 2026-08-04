@@ -43,16 +43,16 @@ export function QueueSurface({ maxItems, className }: QueueSurfaceProps) {
                   }`}
                   onClick={() => s.playTrack(index)}
                   aria-current={isCurrent ? "true" : undefined}
-                  aria-label={`${isCurrent ? "Now playing:" : "Play"} ${track.title ?? "Unknown Track"} by ${track.artist ?? "Unknown Artist"}`}
+                  aria-label={`${isCurrent ? "Now playing:" : "Play"} ${track.title || "Unknown Track"} by ${track.artist || "Unknown Artist"}`}
                 >
-                  <span className="ap-queue-surface__title" title={track.title}>
-                    {track.title}
+                  <span className="ap-queue-surface__title" title={track.title || "Unknown Track"}>
+                    {track.title || "Unknown Track"}
                   </span>
                   <span
                     className="ap-queue-surface__artist"
-                    title={track.artist}
+                    title={track.artist || "Unknown Artist"}
                   >
-                    {track.artist}
+                    {track.artist || "Unknown Artist"}
                   </span>
                 </button>
               </li>
