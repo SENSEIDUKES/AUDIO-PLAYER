@@ -14,7 +14,7 @@ export interface QueueSurfaceProps {
  */
 export function QueueSurface({ maxItems, className }: QueueSurfaceProps) {
   const s = useAudioSession();
-  const { queue, currentIndex } = s;
+  const { queue, currentIndex, isPlaying } = s;
   const upcoming = queue
     .map((track, index) => ({ track, index }))
     .filter(({ index }) => index >= currentIndex);
@@ -34,7 +34,6 @@ export function QueueSurface({ maxItems, className }: QueueSurfaceProps) {
         <ul className="ap-queue-surface__list">
           {items.map(({ track, index }) => {
             const isCurrent = index === currentIndex;
-            const isNowPlaying = s.isPlaying && isCurrent;
             return (
               <li key={track.id ?? `${track.title}-${index}`}>
                 <button
@@ -44,16 +43,19 @@ export function QueueSurface({ maxItems, className }: QueueSurfaceProps) {
                   }`}
                   onClick={() => s.playTrack(index)}
                   aria-current={isCurrent ? "true" : undefined}
-                  aria-label={`${isNowPlaying ? "Now playing:" : "Play"} ${track.title || "Unknown Track"} by ${track.artist || "Unknown Artist"}`}
+                  aria-label={`${isCurrent && isPlaying ? "Now playing:" : "Play"} ${track.title ?? "Unknown Track"} by ${track.artist ?? "Unknown Artist"}`}
                 >
-                  <span className="ap-queue-surface__title" title={track.title || "Unknown Track"}>
-                    {track.title || "Unknown Track"}
+                  <span
+                    className="ap-queue-surface__title"
+                    title={track.title ?? "Unknown Track"}
+                  >
+                    {track.title ?? "Unknown Track"}
                   </span>
                   <span
                     className="ap-queue-surface__artist"
-                    title={track.artist || "Unknown Artist"}
+                    title={track.artist ?? "Unknown Artist"}
                   >
-                    {track.artist || "Unknown Artist"}
+                    {track.artist ?? "Unknown Artist"}
                   </span>
                 </button>
               </li>
