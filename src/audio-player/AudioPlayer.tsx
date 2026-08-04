@@ -545,9 +545,7 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
     // don't spam the live region on every rAF tick. `isBuffering` is
     // intentionally debounced: a brief buffer burst is not interesting.
     const lastPlayedRef = useRef<boolean | null>(null)
-    const lastErrorRef = useRef<string | null>(null)
     const lastAutoplayRef = useRef<boolean | null>(null)
-    const lastMissingRef = useRef<boolean | null>(null)
     useEffect(() => {
         // Track play/pause transitions, not levels.
         if (lastPlayedRef.current !== isPlaying) {
