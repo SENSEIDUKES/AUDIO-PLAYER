@@ -4,3 +4,6 @@
 ## 2026-07-12 - Destructive Action Confirmation
 **Learning:** Destructive actions like clearing logs or chat history lacked confirmation dialogues. This could lead to accidental data loss for users.
 **Action:** Added `window.confirm` to these destructive actions to ensure users are aware of the consequence.
+## 2024-05-15 - Explicit Action Labels for List Buttons
+**Learning:** Row buttons in lists acting as play triggers need explicit action verbs in their ARIA labels so screen reader users know it's a playback action, not just a static list item.
+**Action:** Always add action-oriented labels like "Play [Item]" to interactive list rows.
