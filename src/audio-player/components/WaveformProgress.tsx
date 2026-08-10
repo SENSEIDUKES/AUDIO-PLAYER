@@ -6,6 +6,7 @@ import type { KeyboardEvent } from "react"
 import type WaveSurfer from "wavesurfer.js"
 import { ProgressBar } from "./ProgressBar"
 import { computePeaksFromUrl, extractPeaks } from "../core/waveform/peaks"
+import { useAudioTime } from "../session/AudioSessionContext"
 import { formatTime } from "../utils/formatTime"
 
 export interface WaveformProgressProps {
@@ -78,9 +79,9 @@ function resolveColor(
  * always works and the layout never shifts.
  */
 export function WaveformProgress({
-    currentTime,
-    duration,
-    buffered,
+    currentTime: fallbackCurrentTime,
+    duration: fallbackDuration,
+    buffered: fallbackBuffered,
     disabled,
     isSeeking,
     onSeek,
@@ -96,6 +97,11 @@ export function WaveformProgress({
     progressColor,
     cursorColor,
 }: WaveformProgressProps) {
+    const { currentTime, duration, buffered } = useAudioTime({
+        currentTime: fallbackCurrentTime,
+        duration: fallbackDuration,
+        buffered: fallbackBuffered,
+    })
     const wrapperRef = useRef<HTMLDivElement>(null)
     const containerRef = useRef<HTMLDivElement>(null)
     const wsRef = useRef<WaveSurfer | null>(null)

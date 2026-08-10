@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import { useAudioTime } from "../session/AudioSessionContext"
 import { getVisualComponent } from "./visualRegistry"
 import { useVisualSlots } from "./VisualSlotsContext"
 
@@ -21,8 +22,8 @@ export interface ScrubberCanvasRendererProps {
  * scrubberCanvas component ships in V1, so the default path is the fallback.
  */
 export function ScrubberCanvasRenderer({
-    currentTime,
-    duration,
+    currentTime: fallbackCurrentTime,
+    duration: fallbackDuration,
     onSeek,
     children,
 }: ScrubberCanvasRendererProps) {
@@ -32,13 +33,43 @@ export function ScrubberCanvasRenderer({
 
     if (!def) return <>{children}</>
 
-    const { Component } = def
+    return (
+        <ActiveScrubberCanvas
+            fallbackCurrentTime={fallbackCurrentTime}
+            fallbackDuration={fallbackDuration}
+            onSeek={onSeek}
+            definition={def}
+            settings={slots.getSettings(def.id)}
+        />
+    )
+}
+
+function ActiveScrubberCanvas({
+    fallbackCurrentTime,
+    fallbackDuration,
+    onSeek,
+    definition,
+    settings,
+}: {
+    fallbackCurrentTime: number
+    fallbackDuration: number
+    onSeek: (time: number) => void
+    definition: NonNullable<ReturnType<typeof getVisualComponent>>
+    settings: Record<string, unknown>
+}) {
+    const { currentTime, duration } = useAudioTime({
+        currentTime: fallbackCurrentTime,
+        duration: fallbackDuration,
+        buffered: 0,
+    })
+    const { Component } = definition
+
     // Scrubber visuals receive the same settings contract plus timeline context
     // via props; the component decides what to do with them.
     return (
         <Component
             settings={{
-                ...slots.getSettings(def.id),
+                ...settings,
                 currentTime,
                 duration,
                 onSeek,

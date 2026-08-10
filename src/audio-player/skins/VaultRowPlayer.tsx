@@ -3,7 +3,7 @@ import type { CSSProperties } from "react"
 import type { AudioPlayerTheme, Track } from "../types"
 import { useAudioSession } from "../session/AudioSessionContext"
 import { ExplicitBadge } from "../components/TrackMetadata"
-import { formatTime } from "../utils/formatTime"
+import { AudioTimeText } from "../components/AudioTimeText"
 import {
     formatSecondaryLine,
     formatVersionedTitle,
@@ -165,7 +165,7 @@ export function VaultRowPlayer({
             </div>
             {isActive && (
                 <span className="ap-vr__time" aria-hidden="true">
-                    {formatTime(s.currentTime)}
+                    <AudioTimeText value="currentTime" fallback={s.currentTime} />
                 </span>
             )}
             {isPlayingThis && (

@@ -9,7 +9,7 @@ import { SAPController } from "../components/SAPController"
 import { HoldSkipButton } from "../components/HoldSkipButton"
 import { useShareTrack } from "../components/useShareTrack"
 import { ExplicitBadge } from "../components/TrackMetadata"
-import { formatTime } from "../utils/formatTime"
+import { AudioTimeText } from "../components/AudioTimeText"
 import {
     formatSecondaryLine,
     formatVersionedTitle,
@@ -200,7 +200,9 @@ export function StickyBottomPlayer({
                         </button>
                     </div>
                     <div className="ap-sb__scrub">
-                        <span className="ap-sb__t" aria-hidden="true">{formatTime(s.currentTime)}</span>
+                        <span className="ap-sb__t" aria-hidden="true">
+                            <AudioTimeText value="currentTime" fallback={s.currentTime} />
+                        </span>
                         {/* ScrubberCanvasHost (Phase 3): the timeline render zone /
                             future plugin mount point. The bespoke ProgressBar is
                             passed as children, so seeking is byte-identical. */}
@@ -227,7 +229,9 @@ export function StickyBottomPlayer({
                                 onSeekEnd={() => s.setSeeking(false)}
                             />
                         </ScrubberCanvasHost>
-                        <span className="ap-sb__t" aria-hidden="true">{formatTime(s.duration)}</span>
+                        <span className="ap-sb__t" aria-hidden="true">
+                            <AudioTimeText value="duration" fallback={s.duration} />
+                        </span>
                     </div>
                 </div>
 

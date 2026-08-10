@@ -1,3 +1,4 @@
+import { useAudioTime } from "../session/AudioSessionContext"
 import { getVisualComponent } from "./visualRegistry"
 import { useVisualSlots } from "./VisualSlotsContext"
 import "./visualSlots.css"
@@ -21,8 +22,8 @@ export interface SEICanvasRendererProps {
  * component, so visual components stay decoupled from the global audio session.
  */
 export function SEICanvasRenderer({
-    currentTime = 0,
-    duration = 0,
+    currentTime: fallbackCurrentTime = 0,
+    duration: fallbackDuration = 0,
     lyrics,
 }: SEICanvasRendererProps = {}) {
     const slots = useVisualSlots()
@@ -38,10 +39,40 @@ export function SEICanvasRenderer({
         )
     }
 
-    const { Component } = def
+    return (
+        <ActiveSEICanvas
+            fallbackCurrentTime={fallbackCurrentTime}
+            fallbackDuration={fallbackDuration}
+            lyrics={lyrics}
+            definition={def}
+            settings={slots.getSettings(def.id)}
+        />
+    )
+}
+
+function ActiveSEICanvas({
+    fallbackCurrentTime,
+    fallbackDuration,
+    lyrics,
+    definition,
+    settings,
+}: {
+    fallbackCurrentTime: number
+    fallbackDuration: number
+    lyrics?: string | null
+    definition: NonNullable<ReturnType<typeof getVisualComponent>>
+    settings: Record<string, unknown>
+}) {
+    const { currentTime, duration } = useAudioTime({
+        currentTime: fallbackCurrentTime,
+        duration: fallbackDuration,
+        buffered: 0,
+    })
+    const { Component } = definition
+
     return (
         <Component
-            settings={slots.getSettings(def.id)}
+            settings={settings}
             playback={{ currentTime, duration, lyrics }}
         />
     )

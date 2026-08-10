@@ -40,7 +40,7 @@ import { SAPController } from "./components/SAPController"
 import { HoldSkipButton } from "./components/HoldSkipButton"
 import { useShareTrack } from "./components/useShareTrack"
 import { ExplicitBadge } from "./components/TrackMetadata"
-import { formatTime } from "./utils/formatTime"
+import { AudioTimeText } from "./components/AudioTimeText"
 import {
     formatSecondaryLine,
     formatVersionedTitle,
@@ -869,8 +869,12 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
                         </ScrubberCanvasRenderer>
                     </ScrubberCanvasHost>
                     <div className="ap-times" aria-hidden="true">
-                        <span>{formatTime(currentTime)}</span>
-                        <span>{formatTime(duration)}</span>
+                        <span>
+                            <AudioTimeText value="currentTime" fallback={currentTime} />
+                        </span>
+                        <span>
+                            <AudioTimeText value="duration" fallback={duration} />
+                        </span>
                     </div>
                 </div>
 
