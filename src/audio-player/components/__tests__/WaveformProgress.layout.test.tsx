@@ -31,8 +31,24 @@ describe("WaveformProgress resolved color cache", () => {
             "--progress": "rgb(40, 50, 60)",
             "--cursor": "rgb(70, 80, 90)",
         }
-        getComputedStyleMock = vi.fn(() => ({
-            getPropertyValue: (name: string) => colors[name] ?? "",
+        getComputedStyleMock = vi.fn((element: HTMLElement) => ({
+            getPropertyValue: (name: string) => {
+                const themeRoot = element.closest<HTMLElement>(
+                    '[data-testid="theme-root"]'
+                )
+                const inlineValue = themeRoot?.style
+                    .getPropertyValue(name)
+                    .trim()
+                const reference = inlineValue?.match(
+                    /var\(\s*(--[^,)\s]+)/
+                )?.[1]
+                if (reference) {
+                    return (
+                        themeRoot?.style.getPropertyValue(reference).trim() ?? ""
+                    )
+                }
+                return colors[name] ?? inlineValue ?? ""
+            },
         }))
         vi.stubGlobal("getComputedStyle", getComputedStyleMock)
         vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1))
@@ -124,6 +140,16 @@ describe("WaveformProgress resolved color cache", () => {
         expect(getComputedStyleMock).toHaveBeenCalledTimes(3)
 
         const themeRoot = view.getByTestId("theme-root")
+        const setOptionsCallCount = waveSurfer.instance.setOptions.mock.calls.length
+        await act(async () => {
+            themeRoot.style.setProperty("--ap-blur", "12px")
+            await Promise.resolve()
+        })
+        expect(getComputedStyleMock).toHaveBeenCalledTimes(3)
+        expect(waveSurfer.instance.setOptions).toHaveBeenCalledTimes(
+            setOptionsCallCount
+        )
+
         await act(async () => {
             themeRoot.classList.add("highlighted")
             themeRoot.style.setProperty("color", "red")
@@ -162,7 +188,6 @@ describe("WaveformProgress resolved color cache", () => {
         })
         await waitFor(() => expect(getComputedStyleMock).toHaveBeenCalledTimes(9))
 
-        colors["--wave"] = "rgb(13, 23, 33)"
         await act(async () => {
             themeRoot.style.setProperty("--wave", "var(--brand-wave)")
             themeRoot.style.setProperty("--brand-wave", "rgb(13, 23, 33)")
@@ -172,7 +197,6 @@ describe("WaveformProgress resolved color cache", () => {
 
         // The direct --wave declaration is unchanged. Updating only its
         // indirect custom-property dependency must still invalidate colors.
-        colors["--wave"] = "rgb(14, 24, 34)"
         await act(async () => {
             themeRoot.style.setProperty("--brand-wave", "rgb(14, 24, 34)")
             await Promise.resolve()

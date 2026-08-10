@@ -80,6 +80,7 @@ function resolveColor(
 const THEME_CLASS_PATTERN = /(?:^|[-_:])(dark|light|theme)(?:$|[-_:])/i
 const DEFAULT_COLOR_VARIABLES = ["--ap-track", "--ap-progress", "--ap-accent"]
 
+/** Return the theme-related classes that can change inherited color tokens. */
 function getThemeClassSignature(el: HTMLElement): string {
     return Array.from(el.classList)
         .filter((className) => THEME_CLASS_PATTERN.test(className))
@@ -87,6 +88,7 @@ function getThemeClassSignature(el: HTMLElement): string {
         .join(" ")
 }
 
+/** Collect the direct custom properties used by waveform color resolution. */
 function getColorVariableNames(...colors: Array<string | undefined>): string[] {
     const names = new Set(DEFAULT_COLOR_VARIABLES)
     for (const color of colors) {
@@ -98,37 +100,66 @@ function getColorVariableNames(...colors: Array<string | undefined>): string[] {
     return Array.from(names).sort()
 }
 
+/** Extract custom-property references from a CSS value, including fallbacks. */
+function getReferencedVariableNames(value: string): string[] {
+    const names: string[] = []
+    for (const match of value.matchAll(/var\(\s*(--[^,)\s]+)/g)) {
+        if (match[1]) names.push(match[1])
+    }
+    return names
+}
+
+/** Expand the color properties through inline custom-property dependencies. */
+function getRelevantInlineVariableNames(
+    elements: readonly HTMLElement[],
+    colorVariableNames: readonly string[]
+): string[] {
+    const relevantNames = new Set(colorVariableNames)
+    const pendingNames = Array.from(relevantNames)
+
+    for (let index = 0; index < pendingNames.length; index += 1) {
+        const name = pendingNames[index]
+        if (!name) continue
+
+        for (const element of elements) {
+            const value = element.style.getPropertyValue(name).trim()
+            for (const referencedName of getReferencedVariableNames(value)) {
+                if (relevantNames.has(referencedName)) continue
+                relevantNames.add(referencedName)
+                pendingNames.push(referencedName)
+            }
+        }
+    }
+
+    return Array.from(relevantNames).sort()
+}
+
+/** Build a layout-free fingerprint of relevant ancestor theme inputs. */
 function getThemeSignature(
     wrapper: HTMLElement,
     colorVariableNames: readonly string[]
 ): string {
+    const elements = getElementAncestors(wrapper)
+    const inlineVariableNames = getRelevantInlineVariableNames(
+        elements,
+        colorVariableNames
+    )
     const parts: string[] = []
-    let element: HTMLElement | null = wrapper
-    let depth = 0
-
-    while (element) {
-        const currentElement: HTMLElement = element
+    for (const [depth, currentElement] of elements.entries()) {
         const themeClasses = getThemeClassSignature(currentElement)
-        const inlineVariableNames = new Set(colorVariableNames)
-        for (let index = 0; index < currentElement.style.length; index += 1) {
-            const name = currentElement.style.item(index)
-            if (name.startsWith("--")) inlineVariableNames.add(name)
-        }
-        const inlineVariables = Array.from(inlineVariableNames)
-            .sort()
+        const inlineVariables = inlineVariableNames
             .map(
                 (name) =>
                     `${name}:${currentElement.style.getPropertyValue(name).trim()}`
             )
             .join(";")
         parts.push(`${depth}|${themeClasses}|${inlineVariables}`)
-        element = currentElement.parentElement
-        depth += 1
     }
 
     return parts.join("\n")
 }
 
+/** Return the wrapper and each ancestor that can provide inherited tokens. */
 function getElementAncestors(wrapper: HTMLElement): HTMLElement[] {
     const elements: HTMLElement[] = []
     let element: HTMLElement | null = wrapper
@@ -204,7 +235,8 @@ export function WaveformProgress({
     // Computed CSS variables stay valid across playback and seeking updates.
     // Theme tokens are inherited from player roots, so observe the wrapper and
     // its ancestors. The signature reads only bounded theme classes and inline
-    // custom properties; it never asks the browser for computed layout/style.
+    // color properties and their inline dependencies; it never asks the
+    // browser for computed layout/style.
     useEffect(() => {
         const wrapper = wrapperRef.current
         if (!wrapper || typeof MutationObserver === "undefined") return
