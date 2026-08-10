@@ -18,6 +18,10 @@ export default defineConfig({
             rollupTypes: true,
         }),
     ],
+    esbuild: {
+        legalComments: "none",
+        drop: ["debugger"],
+    },
     build: {
         lib: {
             entry: "src/audio-player/index.ts",
@@ -50,7 +54,7 @@ export default defineConfig({
             },
         },
         sourcemap: true,
-        minify: false,
+        minify: "esbuild",
         cssCodeSplit: true,
     },
 })
