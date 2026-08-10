@@ -15,7 +15,8 @@ import type {
     Track,
     PlayerEventType,
     PlayerEventPayload,
-    FallbackSourceEvent
+    FallbackSourceEvent,
+    PreloadConfig,
 } from "../types"
 import type {
     AudioPlayerPlugin,
@@ -35,7 +36,22 @@ import { getTrackSources, getPrimaryTrackSource, trackSourcesSignature } from ".
 import { sharedAudioBufferCache, sharedHTML5AudioPool } from "../core/audio/audioCaches"
 
 const AudioSessionContext = createContext<SessionEngine | null>(null)
+export interface AudioTimeValue {
+    currentTime: number
+    duration: number
+    buffered: number
+}
+
+const DEFAULT_AUDIO_TIME: AudioTimeValue = {
+    currentTime: 0,
+    duration: 0,
+    buffered: 0,
+}
+
+const AudioTimeContext = createContext<AudioTimeValue>(DEFAULT_AUDIO_TIME)
+const AudioTimeProviderContext = createContext(false)
 const EMPTY_PLUGINS: readonly AudioPlayerPlugin[] = []
+const DEFAULT_PRELOAD_CONFIG: PreloadConfig = { strategy: "next" }
 
 /**
  * Build a playback order (a list of queue indices). When shuffle is off this is
@@ -165,6 +181,30 @@ export function AudioSessionProvider({
         onFallbackSource: handleFallbackSource,
         audioBackend,
     })
+    const timeValue = useMemo<AudioTimeValue>(
+        () => ({
+            currentTime: engine.currentTime,
+            duration: engine.duration,
+            buffered: engine.buffered,
+        }),
+        [engine.currentTime, engine.duration, engine.buffered]
+    )
+    const timeValueRef = useRef(timeValue)
+    useEffect(() => {
+        timeValueRef.current = {
+            currentTime: engine.currentTime,
+            duration: engine.duration,
+            buffered: engine.buffered,
+        }
+    }, [engine.currentTime, engine.duration, engine.buffered])
+    const {
+        duration: engineDuration,
+        isPlaying: engineIsPlaying,
+        pause: enginePause,
+        play: enginePlay,
+        preload: enginePreload,
+        seek: engineSeek,
+    } = engine
 
     // Clamp the index if the queue shrinks out from under it.
     useEffect(() => {
@@ -209,13 +249,13 @@ export function AudioSessionProvider({
             if (index < 0 || index >= queue.length) return
             if (index === currentIndex) {
                 // Same source: the [src] effect won't re-fire, so act directly.
-                if (wantPlay && !engine.isPlaying) engine.play(true)
+                if (wantPlay && !engineIsPlaying) enginePlay(true)
                 return
             }
-            if (wantPlay && !engine.isPlaying) pendingPlayRef.current = true
+            if (wantPlay && !engineIsPlaying) pendingPlayRef.current = true
             setCurrentIndex(index)
         },
-        [queue.length, currentIndex, engine]
+        [queue.length, currentIndex, engineIsPlaying, enginePlay]
     )
 
     // Raw queue advance shared by the natural end-of-track path and Automix
@@ -311,19 +351,20 @@ export function AudioSessionProvider({
     const seekWithPlugins = useCallback(
         (time: number) => {
             const nextPosition =
-                engine.duration > 0 ? Math.max(0, Math.min(engine.duration, time)) : time
-            engine.seek(time)
+                engineDuration > 0 ? Math.max(0, Math.min(engineDuration, time)) : time
+            engineSeek(time)
             pluginManager.trigger("onSeek", nextPosition)
         },
-        [engine, pluginManager]
+        [engineDuration, engineSeek, pluginManager]
     )
 
     const seekByWithPlugins = useCallback(
         (delta: number) => {
-            const base = engine.audioRef.current?.currentTime ?? engine.currentTime
+            const base =
+                engine.audioRef.current?.currentTime ?? timeValueRef.current.currentTime
             seekWithPlugins(base + delta)
         },
-        [engine.audioRef, engine.currentTime, seekWithPlugins]
+        [engine.audioRef, seekWithPlugins]
     )
 
     const pluginAwareEngine = useMemo<AudioPlayerEngine>(
@@ -365,9 +406,9 @@ export function AudioSessionProvider({
     }, [pluginManager, sourceKey, currentTrack])
 
     // Warm the next queue item as soon as the active track starts playing.
-    const preloadConfigProp = preloadConfig || { strategy: 'next' }
+    const preloadConfigProp = preloadConfig ?? DEFAULT_PRELOAD_CONFIG
     useEffect(() => {
-        if (!engine.isPlaying || repeatMode === "one") return
+        if (!engineIsPlaying || repeatMode === "one") return
         
         const strategy = preloadConfigProp.strategy || 'next'
         if (strategy === 'none') return
@@ -378,18 +419,18 @@ export function AudioSessionProvider({
         }
 
         if (strategy === 'next' && pluginNextTrack) {
-            engine.preload(pluginNextTrack)
+            enginePreload(pluginNextTrack)
         } else if (strategy === 'aggressive') {
             const max = preloadConfigProp.maxConcurrent || 2
             let current = currentIndex
             for (let i = 0; i < max; i++) {
                 const nextIdx = stepIndex(current, 1)
                 if (nextIdx === null || nextIdx === currentIndex) break
-                engine.preload(queue[nextIdx]!)
+                enginePreload(queue[nextIdx]!)
                 current = nextIdx
             }
         }
-    }, [engine, engine.isPlaying, pluginNextTrack, repeatMode, sourceKey, preloadConfigProp, currentIndex, queue, stepIndex])
+    }, [engineIsPlaying, enginePreload, pluginNextTrack, repeatMode, sourceKey, preloadConfigProp, currentIndex, queue, stepIndex])
 
     const previousPluginPlayingRef = useRef(engine.isPlaying)
     useEffect(() => {
@@ -398,11 +439,11 @@ export function AudioSessionProvider({
         pluginManager.trigger(engine.isPlaying ? "onPlay" : "onPause")
         
         if (engine.isPlaying) {
-            emit('play', { track: currentTrack!, currentTime: engine.currentTime })
+            emit('play', { track: currentTrack!, currentTime: timeValueRef.current.currentTime })
         } else {
-            emit('pause', { track: currentTrack, currentTime: engine.currentTime })
+            emit('pause', { track: currentTrack, currentTime: timeValueRef.current.currentTime })
         }
-    }, [pluginManager, engine.isPlaying, engine.currentTime, currentTrack, emit])
+    }, [pluginManager, engine.isPlaying, currentTrack, emit])
 
     useEffect(() => {
         pluginManager.trigger("onTimeUpdate", engine.currentTime)
@@ -498,7 +539,7 @@ export function AudioSessionProvider({
                     if (existing === currentIndex) {
                         const nextSrc = getPrimaryTrackSource(track)
                         const sourceChanged = nextSrc !== src
-                        if (!engine.isPlaying) {
+                        if (!engineIsPlaying) {
                             if (sourceChanged) {
                                 // Same stable id, new active URL: sourceKey is
                                 // unchanged, so consume the deferred play on the
@@ -506,7 +547,7 @@ export function AudioSessionProvider({
                                 // navigation.
                                 pendingPlayRef.current = true
                             } else {
-                                engine.play(true)
+                                enginePlay(true)
                             }
                         }
                         return
@@ -518,11 +559,11 @@ export function AudioSessionProvider({
             const nextIndex = queue.length
             // If paused, arm a deferred play; if already playing, the engine
             // continues into the appended track on its own.
-            if (!engine.isPlaying) pendingPlayRef.current = true
+            if (!engineIsPlaying) pendingPlayRef.current = true
             setQueueState((q) => [...q, track])
             setCurrentIndex(nextIndex)
         },
-        [queue, goTo, engine, currentIndex, src]
+        [queue, goTo, engineIsPlaying, enginePlay, currentIndex, src]
     )
 
     const next = useCallback(() => {
@@ -532,13 +573,13 @@ export function AudioSessionProvider({
 
     const previous = useCallback(() => {
         // Restart the current track if we're more than 3s in.
-        if (engine.currentTime > 3) {
+        if (timeValueRef.current.currentTime > 3) {
             seekWithPlugins(0)
             return
         }
         const target = stepIndex(currentIndex, -1)
         if (target !== null) goTo(target, engine.isPlaying)
-    }, [stepIndex, currentIndex, goTo, engine.currentTime, engine.isPlaying, seekWithPlugins])
+    }, [stepIndex, currentIndex, goTo, engine.isPlaying, seekWithPlugins])
 
     // Move a queue item from one index to another (drag-and-drop reorder).
     // Preserves the current index pointing to the active track.
@@ -624,10 +665,10 @@ export function AudioSessionProvider({
     }
 
     const clearQueue = useCallback(() => {
-        engine.pause()
+        enginePause()
         setQueueState([])
         setCurrentIndex(-1)
-    }, [engine])
+    }, [enginePause])
 
     const toggleShuffle = useCallback(() => setShuffle((s) => !s), [])
 
@@ -667,7 +708,48 @@ export function AudioSessionProvider({
 
     const value = useMemo<SessionEngine>(
         () => ({
-            ...pluginAwareEngine,
+            audioRef: engine.audioRef,
+            // These getters preserve imperative SessionEngine compatibility
+            // without making the main context reactive to the 60 Hz timeline.
+            get currentTime() {
+                return timeValueRef.current.currentTime
+            },
+            get duration() {
+                return timeValueRef.current.duration
+            },
+            get buffered() {
+                return timeValueRef.current.buffered
+            },
+            bufferedRanges: engine.bufferedRanges,
+            isPlaying: engine.isPlaying,
+            volume: engine.volume,
+            isMuted: engine.isMuted,
+            isBuffering: engine.isBuffering,
+            isSeeking: engine.isSeeking,
+            hasError: engine.hasError,
+            errorMessage: engine.errorMessage,
+            hasAudio: engine.hasAudio,
+            currentSrc: engine.currentSrc,
+            currentSourceIndex: engine.currentSourceIndex,
+            sourceCount: engine.sourceCount,
+            volumeUnsupported: engine.volumeUnsupported,
+            autoplayBlocked: engine.autoplayBlocked,
+            play: engine.play,
+            pause: engine.pause,
+            toggle: engine.toggle,
+            seek: seekWithPlugins,
+            seekBy: seekByWithPlugins,
+            setSeeking: engine.setSeeking,
+            setVolume: engine.setVolume,
+            toggleMute: engine.toggleMute,
+            retry: engine.retry,
+            loadAndPlay: engine.loadAndPlay,
+            dismissAutoplayBlocked: engine.dismissAutoplayBlocked,
+            preload: engine.preload,
+            unload: engine.unload,
+            fade: engine.fade,
+            getBackendInfo: engine.getBackendInfo,
+            getDecodedData: engine.getDecodedData,
             queue,
             currentIndex,
             currentTrack,
@@ -696,7 +778,37 @@ export function AudioSessionProvider({
             setCacheLimit,
         }),
         [
-            pluginAwareEngine,
+            engine.audioRef,
+            engine.bufferedRanges,
+            engine.isPlaying,
+            engine.volume,
+            engine.isMuted,
+            engine.isBuffering,
+            engine.isSeeking,
+            engine.hasError,
+            engine.errorMessage,
+            engine.hasAudio,
+            engine.currentSrc,
+            engine.currentSourceIndex,
+            engine.sourceCount,
+            engine.volumeUnsupported,
+            engine.autoplayBlocked,
+            engine.play,
+            engine.pause,
+            engine.toggle,
+            engine.setSeeking,
+            engine.setVolume,
+            engine.toggleMute,
+            engine.retry,
+            engine.loadAndPlay,
+            engine.dismissAutoplayBlocked,
+            engine.preload,
+            engine.unload,
+            engine.fade,
+            engine.getBackendInfo,
+            engine.getDecodedData,
+            seekWithPlugins,
+            seekByWithPlugins,
             queue,
             currentIndex,
             currentTrack,
@@ -728,16 +840,24 @@ export function AudioSessionProvider({
 
     return (
         <AudioSessionContext.Provider value={value}>
-            {/* The single, app-wide audio element. Skins never render their own. */}
-            {engine.getBackendInfo().active === "html5" && (
-                <audio ref={engine.audioRef} src={engine.currentSrc || undefined} />
-            )}
-            {children}
+            <AudioTimeProviderContext.Provider value>
+                <AudioTimeContext.Provider value={timeValue}>
+                    {/* The single, app-wide audio element. Skins never render their own. */}
+                    {engine.getBackendInfo().active === "html5" && (
+                        <audio ref={engine.audioRef} src={engine.currentSrc || undefined} />
+                    )}
+                    {children}
+                </AudioTimeContext.Provider>
+            </AudioTimeProviderContext.Provider>
         </AudioSessionContext.Provider>
     )
 }
 
-/** Read the global audio session. Throws if used outside an AudioSessionProvider. */
+/**
+ * Read the global audio session. Throws if used outside an AudioSessionProvider.
+ * Timeline fields remain readable snapshots for compatibility; useAudioTime is
+ * the reactive subscription for currentTime, duration, and buffered.
+ */
 export function useAudioSession(): SessionEngine {
     const ctx = useContext(AudioSessionContext)
     if (!ctx) {
@@ -746,4 +866,17 @@ export function useAudioSession(): SessionEngine {
         )
     }
     return ctx
+}
+
+/**
+ * Subscribe to the high-frequency playback timeline without re-rendering
+ * consumers of the main audio session context.
+ *
+ * Presentational controls may pass a fallback to retain standalone usage
+ * outside an AudioSessionProvider; inside a provider the live session wins.
+ */
+export function useAudioTime(fallback?: AudioTimeValue): AudioTimeValue {
+    const value = useContext(AudioTimeContext)
+    const hasProvider = useContext(AudioTimeProviderContext)
+    return hasProvider || !fallback ? value : fallback
 }

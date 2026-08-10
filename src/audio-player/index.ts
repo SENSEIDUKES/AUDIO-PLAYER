@@ -239,7 +239,9 @@ export type {
 export {
   AudioSessionProvider,
   useAudioSession,
+  useAudioTime,
 } from "./session/AudioSessionContext";
+export type { AudioTimeValue } from "./session/AudioSessionContext";
 export {
   serializeSession,
   deserializeSession,

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { PointerEvent as ReactPointerEvent, KeyboardEvent } from "react"
+import { useAudioTime } from "../session/AudioSessionContext"
 import { formatTime } from "../utils/formatTime"
 
 interface ProgressBarProps {
@@ -28,15 +29,20 @@ interface ProgressBarProps {
  * pointer back to the document.
  */
 export function ProgressBar({
-    currentTime,
-    duration,
-    buffered,
+    currentTime: fallbackCurrentTime,
+    duration: fallbackDuration,
+    buffered: fallbackBuffered,
     disabled,
     isSeeking,
     onSeek,
     onSeekStart,
     onSeekEnd,
 }: ProgressBarProps) {
+    const { currentTime, duration, buffered } = useAudioTime({
+        currentTime: fallbackCurrentTime,
+        duration: fallbackDuration,
+        buffered: fallbackBuffered,
+    })
     const trackRef = useRef<HTMLDivElement>(null)
     // Local drag position for instant visual feedback during scrub.
     const dragTimeRef = useRef<number | null>(null)

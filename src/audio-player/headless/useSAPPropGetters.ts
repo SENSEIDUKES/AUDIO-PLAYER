@@ -6,6 +6,7 @@ import type {
     Ref,
 } from "react"
 import type { AudioPlayerEngine, SessionEngine } from "../types"
+import { useAudioTime } from "../session/AudioSessionContext"
 import { composeEventHandlers } from "./composeEventHandlers"
 import { mergeRefs } from "./mergeRefs"
 import { formatTime } from "../utils/formatTime"
@@ -67,9 +68,17 @@ export function useSAPPropGetters(
     options: UseSAPPropGettersOptions = {}
 ) {
     const { seekStep = 10 } = options
+    const isSession = isSessionEngine(engine)
+    const sessionTime = useAudioTime({
+        currentTime: engine.currentTime,
+        duration: engine.duration,
+        buffered: engine.buffered,
+    })
+    const currentTime = isSession ? sessionTime.currentTime : engine.currentTime
+    const duration = isSession ? sessionTime.duration : engine.duration
 
     return useMemo(() => {
-        const session = isSessionEngine(engine) ? engine : null
+        const session = isSession ? engine : null
         const noAudio = !engine.hasAudio
 
         // Native buttons already fire click on Enter/Space; this only fills
@@ -181,10 +190,10 @@ export function useSAPPropGetters(
          */
         const getProgressBarProps = (user: SAPProgressBarProps = {}) => {
             const { onKeyDown, ...rest } = user
-            const duration = engine.duration || 0
+            const totalDuration = duration || 0
             const now =
-                duration > 0
-                    ? Math.min(Math.max(engine.currentTime, 0), duration)
+                totalDuration > 0
+                    ? Math.min(Math.max(currentTime, 0), totalDuration)
                     : 0
             const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
                 if (noAudio) return
@@ -204,9 +213,9 @@ export function useSAPPropGetters(
                         engine.seek(0)
                         break
                     case "End":
-                        if (duration > 0) {
+                        if (totalDuration > 0) {
                             event.preventDefault()
-                            engine.seek(duration)
+                            engine.seek(totalDuration)
                         }
                         break
                 }
@@ -216,9 +225,9 @@ export function useSAPPropGetters(
                 tabIndex: noAudio ? -1 : 0,
                 "aria-label": "Seek slider",
                 "aria-valuemin": 0,
-                "aria-valuemax": Math.max(0, Math.floor(duration)),
+                "aria-valuemax": Math.max(0, Math.floor(totalDuration)),
                 "aria-valuenow": Math.floor(now),
-                "aria-valuetext": `${formatTime(now)} of ${formatTime(duration)}`,
+                "aria-valuetext": `${formatTime(now)} of ${formatTime(totalDuration)}`,
                 "aria-disabled": noAudio || undefined,
                 ...rest,
                 onKeyDown: composeEventHandlers(onKeyDown, handleKeyDown),
@@ -251,7 +260,7 @@ export function useSAPPropGetters(
             getProgressBarProps,
             getAudioElementProps,
         }
-    }, [engine, seekStep])
+    }, [currentTime, duration, engine, isSession, seekStep])
 }
 
 export type SAPPropGetters = ReturnType<typeof useSAPPropGetters>

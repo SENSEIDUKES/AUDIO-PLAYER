@@ -3,7 +3,6 @@ import type { KeyboardEvent, ReactNode } from "react"
 import { createPortal } from "react-dom"
 import type { AudioPlayerTheme, RepeatMode } from "../types"
 import { buildThemeVars } from "../skins/themeVars"
-import { formatTime } from "../utils/formatTime"
 import {
     AutomixIcon,
     AutoPlayIcon,
@@ -19,7 +18,8 @@ import {
 } from "../skins/icons"
 import { WorkspaceShell } from "./workspace/WorkspaceShell"
 import type { WorkspaceRoute } from "./workspace/workspaceRoutes"
-import { useAudioSession } from "../session/AudioSessionContext"
+import { useAudioTime } from "../session/AudioSessionContext"
+import { AudioTimeText } from "./AudioTimeText"
 import "./sap-controller.css"
 
 /* The SAP Controller: one shared, screen-level command sheet for the advanced
@@ -131,7 +131,7 @@ const CloseIcon = () => (
 )
 
 function KaraokeLyrics({ lyrics }: { lyrics: string }) {
-    const { currentTime } = useAudioSession()
+    const { currentTime } = useAudioTime()
     const parsed = useMemo(() => {
         const lines = lyrics.split('\n')
         const result: { time: number; text: string }[] = []
@@ -439,9 +439,11 @@ export function SAPController({
                             <div className="sap-ctl__meta-row">
                                 <span className="sap-ctl__meta-key">Length</span>
                                 <span className="sap-ctl__meta-val">
-                                    {Number.isFinite(info.duration) && info.duration > 0
-                                        ? formatTime(info.duration)
-                                        : "–:––"}
+                                    <AudioTimeText
+                                        value="duration"
+                                        fallback={info.duration}
+                                        placeholder="–:––"
+                                    />
                                 </span>
                             </div>
                         </div>
