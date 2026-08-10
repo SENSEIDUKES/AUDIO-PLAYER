@@ -1,18 +1,32 @@
 import {
+    memo,
     useCallback,
     useEffect,
+    useMemo,
     useRef,
     useState,
 } from "react"
 import { FixedSizeList } from "react-window"
-// @ts-ignore
-import { AutoSizer as _AutoSizer } from "react-virtualized-auto-sizer"
-
-const AutoSizer: any = _AutoSizer
+import type { ListChildComponentProps } from "react-window"
+import { AutoSizer } from "react-virtualized-auto-sizer"
 import type { Track } from "../types"
 import { trackKey } from "../utils/trackKey"
 
-const QueueRowWrapper = ({ index, style, data }: { index: number; style: React.CSSProperties; data: any }) => {
+interface QueueItemData {
+    visibleQueue: Track[]
+    upcomingStart: number
+    currentIndex: number
+    drag: ReturnType<typeof useQueueDrag>
+    onPlayTrack: (index: number) => void
+    onRemove: (index: number) => void
+    isPlaying: boolean
+}
+
+const QueueRowWrapper = memo(function QueueRowWrapper({
+    index,
+    style,
+    data,
+}: ListChildComponentProps<QueueItemData>) {
     const {
         visibleQueue,
         upcomingStart,
@@ -44,7 +58,7 @@ const QueueRowWrapper = ({ index, style, data }: { index: number; style: React.C
             isPlaying={isPlaying}
         />
     )
-}
+})
 
 /* ----------------------------- QueueDrawer props ----------------------------- */
 
@@ -161,16 +175,24 @@ function useQueueDrag(
         [computeTarget, onReorder]
     )
 
-    return {
-        drag,
-        setContainerRef: containerRef,
-        getRowHandlers: (index: number) => ({
+    const getRowHandlers = useCallback(
+        (index: number) => ({
             onPointerDown: (e: React.PointerEvent<HTMLElement>) =>
                 handlePointerDown(index, e),
             onPointerMove: handlePointerMove,
             onPointerUp: handlePointerUp,
         }),
-    }
+        [handlePointerDown, handlePointerMove, handlePointerUp]
+    )
+
+    return useMemo(
+        () => ({
+            drag,
+            setContainerRef: containerRef,
+            getRowHandlers,
+        }),
+        [drag, getRowHandlers]
+    )
 }
 
 /* ----------------------------- Icons (inline) ----------------------------- */
@@ -329,9 +351,48 @@ export function QueueDrawer({
     const prevQueueRef = useRef(queue)
 
     const upcomingStart = currentIndex
-    const visibleQueue = queue.slice(upcomingStart)
+    const visibleQueue = useMemo(
+        () => queue.slice(upcomingStart),
+        [queue, upcomingStart]
+    )
 
     const drag = useQueueDrag(queue.length, onReorder, 56, upcomingStart)
+    const handlePlayTrack = useCallback(
+        (index: number) => onPlayTrack(index),
+        [onPlayTrack]
+    )
+    const handleRemove = useCallback(
+        (index: number) => onRemove(index),
+        [onRemove]
+    )
+    const itemData = useMemo<QueueItemData>(
+        () => ({
+            visibleQueue,
+            upcomingStart,
+            currentIndex,
+            drag,
+            onPlayTrack: handlePlayTrack,
+            onRemove: handleRemove,
+            isPlaying,
+        }),
+        [
+            visibleQueue,
+            upcomingStart,
+            currentIndex,
+            drag,
+            handlePlayTrack,
+            handleRemove,
+            isPlaying,
+        ]
+    )
+    const getItemKey = useCallback(
+        (index: number, data: QueueItemData) => {
+            const actualIndex = data.upcomingStart + index
+            const track = data.visibleQueue[index]
+            return actualIndex + ":" + trackKey(track)
+        },
+        []
+    )
 
     // Lock body scroll when open.
     useEffect(() => {
@@ -401,33 +462,26 @@ export function QueueDrawer({
                     aria-label="Queue tracks"
                     style={{ touchAction: "pan-y" }}
                 >
-                    <AutoSizer>
-                        {({ height, width }: { height: number; width: number }) => (
-                            <FixedSizeList
-                                outerRef={drag.setContainerRef}
-                                height={height}
-                                width={width}
-                                itemCount={visibleQueue.length}
-                                itemSize={56}
-                                itemData={{
-                                    visibleQueue,
-                                    upcomingStart,
-                                    currentIndex,
-                                    drag,
-                                    onPlayTrack,
-                                    onRemove,
-                                    isPlaying,
-                                }}
-                                itemKey={(index, data) => {
-                                    const actualIndex = data.upcomingStart + index
-                                    const track = data.visibleQueue[index]
-                                    return actualIndex + ":" + trackKey(track)
-                                }}
-                            >
-                                {QueueRowWrapper}
-                            </FixedSizeList>
-                        )}
-                    </AutoSizer>
+                    <AutoSizer
+                        renderProp={({ height, width }) => {
+                            if (height === undefined || width === undefined) {
+                                return null
+                            }
+                            return (
+                                <FixedSizeList
+                                    outerRef={drag.setContainerRef}
+                                    height={height}
+                                    width={width}
+                                    itemCount={visibleQueue.length}
+                                    itemSize={56}
+                                    itemData={itemData}
+                                    itemKey={getItemKey}
+                                >
+                                    {QueueRowWrapper}
+                                </FixedSizeList>
+                            )
+                        }}
+                    />
                 </div>
 
                 {/* Empty state */}
