@@ -561,7 +561,7 @@ export interface SessionEngine extends AudioPlayerEngine {
     /** Clear decoded buffers not in current queue */
     pruneAudioCache: (keepRecent?: number) => void
     
-    /** Set max decoded buffer count (default: 10) */
+    /** Set max decoded buffer count (default: 4) */
     setCacheLimit: (maxBuffers: number) => void
 }
 

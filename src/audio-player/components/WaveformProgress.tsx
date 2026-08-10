@@ -51,20 +51,86 @@ function resolveColor(
     el: HTMLElement,
     explicit: string | undefined,
     cssVar: string,
-    fallback: string
+    fallback: string,
+    cache: Map<string, string>
 ): string {
     if (explicit) {
         if (!explicit.includes("var(")) return explicit
         const match = explicit.match(/var\(\s*([^,)]+)/)
         if (match?.[1]) {
-            const resolved = getComputedStyle(el)
-                .getPropertyValue(match[1].trim())
-                .trim()
+            const variableName = match[1].trim()
+            let resolved = cache.get(variableName)
+            if (resolved === undefined && !cache.has(variableName)) {
+                resolved = getComputedStyle(el)
+                    .getPropertyValue(variableName)
+                    .trim()
+                cache.set(variableName, resolved)
+            }
             if (resolved) return resolved
         }
     }
-    const fromVar = getComputedStyle(el).getPropertyValue(cssVar).trim()
+    let fromVar = cache.get(cssVar)
+    if (fromVar === undefined && !cache.has(cssVar)) {
+        fromVar = getComputedStyle(el).getPropertyValue(cssVar).trim()
+        cache.set(cssVar, fromVar)
+    }
     return fromVar || fallback
+}
+
+const THEME_CLASS_PATTERN = /(?:^|[-_:])(dark|light|theme)(?:$|[-_:])/i
+const DEFAULT_COLOR_VARIABLES = ["--ap-track", "--ap-progress", "--ap-accent"]
+
+function getThemeClassSignature(el: HTMLElement): string {
+    return Array.from(el.classList)
+        .filter((className) => THEME_CLASS_PATTERN.test(className))
+        .sort()
+        .join(" ")
+}
+
+function getColorVariableNames(...colors: Array<string | undefined>): string[] {
+    const names = new Set(DEFAULT_COLOR_VARIABLES)
+    for (const color of colors) {
+        if (!color) continue
+        for (const match of color.matchAll(/var\(\s*([^,)\s]+)/g)) {
+            if (match[1]) names.add(match[1])
+        }
+    }
+    return Array.from(names).sort()
+}
+
+function getThemeSignature(
+    wrapper: HTMLElement,
+    colorVariableNames: readonly string[]
+): string {
+    const parts: string[] = []
+    let element: HTMLElement | null = wrapper
+    let depth = 0
+
+    while (element) {
+        const currentElement: HTMLElement = element
+        const themeClasses = getThemeClassSignature(currentElement)
+        const inlineVariables = colorVariableNames
+            .map(
+                (name) =>
+                    `${name}:${currentElement.style.getPropertyValue(name).trim()}`
+            )
+            .join(";")
+        parts.push(`${depth}|${themeClasses}|${inlineVariables}`)
+        element = currentElement.parentElement
+        depth += 1
+    }
+
+    return parts.join("\n")
+}
+
+function getElementAncestors(wrapper: HTMLElement): HTMLElement[] {
+    const elements: HTMLElement[] = []
+    let element: HTMLElement | null = wrapper
+    while (element) {
+        elements.push(element)
+        element = element.parentElement
+    }
+    return elements
 }
 
 /**
@@ -105,9 +171,11 @@ export function WaveformProgress({
     const wrapperRef = useRef<HTMLDivElement>(null)
     const containerRef = useRef<HTMLDivElement>(null)
     const wsRef = useRef<WaveSurfer | null>(null)
+    const resolvedColorCacheRef = useRef<Map<string, string>>(new Map())
     const draggingRef = useRef(false)
     const lastDragEndRef = useRef(0)
     const [status, setStatus] = useState<WaveformStatus>("pending")
+    const [themeRevision, setThemeRevision] = useState(0)
 
     // Callback/value refs so the create effect doesn't re-run when the host
     // re-renders with new closures (engine state changes every frame).
@@ -126,6 +194,38 @@ export function WaveformProgress({
     // Flips false→true when the engine loads metadata — for the webaudio
     // backend that is the moment getDecodedData() starts returning the buffer.
     const hasDuration = duration > 0
+
+    // Computed CSS variables stay valid across playback and seeking updates.
+    // Theme tokens are inherited from player roots, so observe the wrapper and
+    // its ancestors. The signature reads only bounded theme classes and inline
+    // custom properties; it never asks the browser for computed layout/style.
+    useEffect(() => {
+        const wrapper = wrapperRef.current
+        if (!wrapper || typeof MutationObserver === "undefined") return
+
+        const colorVariableNames = getColorVariableNames(
+            waveColor,
+            progressColor,
+            cursorColor
+        )
+        let themeSignature = getThemeSignature(wrapper, colorVariableNames)
+        const observer = new MutationObserver(() => {
+            const nextSignature = getThemeSignature(wrapper, colorVariableNames)
+            if (nextSignature === themeSignature) return
+
+            themeSignature = nextSignature
+            resolvedColorCacheRef.current.clear()
+            setThemeRevision((revision) => revision + 1)
+        })
+        for (const element of getElementAncestors(wrapper)) {
+            observer.observe(element, {
+                attributes: true,
+                attributeFilter: ["class", "style"],
+            })
+        }
+
+        return () => observer.disconnect()
+    }, [waveColor, progressColor, cursorColor])
 
     // Create / destroy the wavesurfer instance per logical source.
     useEffect(() => {
@@ -190,19 +290,22 @@ export function WaveformProgress({
                         wrapper,
                         waveColor,
                         "--ap-track",
-                        "rgba(204, 204, 204, 0.35)"
+                        "rgba(204, 204, 204, 0.35)",
+                        resolvedColorCacheRef.current
                     ),
                     progressColor: resolveColor(
                         wrapper,
                         progressColor,
                         "--ap-progress",
-                        "#FFFFFF"
+                        "#FFFFFF",
+                        resolvedColorCacheRef.current
                     ),
                     cursorColor: resolveColor(
                         wrapper,
                         cursorColor,
                         "--ap-accent",
-                        "#FFFFFF"
+                        "#FFFFFF",
+                        resolvedColorCacheRef.current
                     ),
                 })
 
@@ -291,22 +394,25 @@ export function WaveformProgress({
                 wrapper,
                 waveColor,
                 "--ap-track",
-                "rgba(204, 204, 204, 0.35)"
+                "rgba(204, 204, 204, 0.35)",
+                resolvedColorCacheRef.current
             ),
             progressColor: resolveColor(
                 wrapper,
                 progressColor,
                 "--ap-progress",
-                "#FFFFFF"
+                "#FFFFFF",
+                resolvedColorCacheRef.current
             ),
             cursorColor: resolveColor(
                 wrapper,
                 cursorColor,
                 "--ap-accent",
-                "#FFFFFF"
+                "#FFFFFF",
+                resolvedColorCacheRef.current
             ),
         })
-    }, [height, waveColor, progressColor, cursorColor, status])
+    }, [height, waveColor, progressColor, cursorColor, status, themeRevision])
 
     // Keyboard seeking — mirrors ProgressBar's handler verbatim so the
     // waveform scrubber has full slider-key parity (see ProgressBar.tsx).

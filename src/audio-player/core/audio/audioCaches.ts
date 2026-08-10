@@ -1,20 +1,37 @@
 /** Shared decoded-buffer LRU cache for Web Audio playback. */
 export class LRUAudioCache {
     private cache = new Map<string, AudioBuffer>()
-    private order: string[] = []
+    private decodedBufferBytes = 0
 
-    constructor(private maxSize = 12) {}
+    constructor(
+        private maxSize = 4,
+        private readonly maxDecodedBufferBytes = 250 * 1024 * 1024
+    ) {}
+
+    private getBufferBytes(buffer: AudioBuffer): number {
+        const bytes =
+            buffer.length *
+            buffer.numberOfChannels *
+            Float32Array.BYTES_PER_ELEMENT
+        return Number.isFinite(bytes) && bytes > 0 ? bytes : 0
+    }
+
+    private deleteEntry(url: string): boolean {
+        const buffer = this.cache.get(url)
+        if (!buffer) return false
+
+        this.decodedBufferBytes = Math.max(
+            0,
+            this.decodedBufferBytes - this.getBufferBytes(buffer)
+        )
+        return this.cache.delete(url)
+    }
 
     getStats() {
-        let size = 0
-        for (const buffer of this.cache.values()) {
-            // approx bytes: length * channels * 32-bit float (4 bytes)
-            size += buffer.length * buffer.numberOfChannels * 4
-        }
         return {
             decodedBufferCount: this.cache.size,
-            decodedBufferBytes: size,
-            lruOrder: [...this.order]
+            decodedBufferBytes: this.decodedBufferBytes,
+            lruOrder: [...this.cache.keys()]
         }
     }
 
@@ -25,50 +42,48 @@ export class LRUAudioCache {
 
     prune(keepKeys: string[], keepRecent: number = 0) {
         const toKeep = new Set(keepKeys)
+        const keys = [...this.cache.keys()]
         let recentKept = 0
-        
-        for (let i = this.order.length - 1; i >= 0; i--) {
-            const key = this.order[i]
+
+        for (let i = keys.length - 1; i >= 0; i--) {
+            const key = keys[i]
             if (toKeep.has(key)) continue
-            
+
             if (recentKept < keepRecent) {
                 recentKept++
                 continue
             }
-            
-            this.cache.delete(key)
-            this.order.splice(i, 1)
+
+            this.deleteEntry(key)
         }
     }
 
     private enforceSize() {
-        while (this.cache.size > this.maxSize && this.order.length > 0) {
-            const oldestKey = this.order.shift()!
-            this.cache.delete(oldestKey)
+        while (
+            this.cache.size > 0 &&
+            (this.cache.size > this.maxSize ||
+                this.decodedBufferBytes > this.maxDecodedBufferBytes)
+        ) {
+            const oldestKey = this.cache.keys().next().value as string
+            // A single oversized buffer is evicted too, keeping the byte cap strict.
+            this.deleteEntry(oldestKey)
         }
     }
 
     get(url: string): AudioBuffer | null {
         const buffer = this.cache.get(url)
         if (!buffer) return null
-        
-        const index = this.order.indexOf(url)
-        if (index > -1) {
-            this.order.splice(index, 1)
-        }
-        this.order.push(url)
-        
+
+        this.cache.delete(url)
+        this.cache.set(url, buffer)
+
         return buffer
     }
 
     set(url: string, buffer: AudioBuffer): void {
-        if (this.cache.has(url)) {
-            this.cache.delete(url)
-            const index = this.order.indexOf(url)
-            if (index > -1) this.order.splice(index, 1)
-        }
-        this.order.push(url)
+        this.deleteEntry(url)
         this.cache.set(url, buffer)
+        this.decodedBufferBytes += this.getBufferBytes(buffer)
         this.enforceSize()
     }
 
@@ -77,14 +92,12 @@ export class LRUAudioCache {
     }
 
     delete(url: string): void {
-        this.cache.delete(url)
-        const index = this.order.indexOf(url)
-        if (index > -1) this.order.splice(index, 1)
+        this.deleteEntry(url)
     }
 
     clear(): void {
         this.cache.clear()
-        this.order = []
+        this.decodedBufferBytes = 0
     }
 }
 
@@ -122,7 +135,7 @@ export class PersistentAudioCache {
         if (!this.isAvailable) return
         try {
             const cache = await caches.open(this.cacheName)
-            const response = new Response(buffer.slice(0), {
+            const response = new Response(buffer, {
                 headers: {
                     "Content-Type": getMimeType(url),
                     "Content-Length": buffer.byteLength.toString(),
