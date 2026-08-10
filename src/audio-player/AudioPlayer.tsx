@@ -48,13 +48,25 @@ import {
 import { useArtworkColor } from "./utils/useArtworkColor"
 import { defaultShowVolume } from "./utils/device"
 import { FixedSizeList } from "react-window"
+import type { ListChildComponentProps } from "react-window"
 import { resolveTrackList } from "./utils/trackList"
 import { trackKey } from "./utils/trackKey"
 import { trackSourcesSignature } from "./utils/sources"
 import type { WorkspaceRoute } from "./components/workspace/workspaceRoutes"
 import "./audio-player.css"
 
-const TrackRow = memo(({ index, style, data }: { index: number; style: React.CSSProperties; data: any }) => {
+interface TrackListItemData {
+    queue: Track[]
+    currentIndex: number
+    onPlay: (index: number) => void
+    isPlaying: boolean
+}
+
+const TrackRow = memo(function TrackRow({
+    index,
+    style,
+    data,
+}: ListChildComponentProps<TrackListItemData>) {
     const { queue, currentIndex, onPlay, isPlaying } = data
     const track = queue[index]
     if (!track) return null
@@ -348,6 +360,7 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
     } = props
 
     const s = useAudioSession()
+    const { playTrack, removeFromQueue, moveQueueItem } = s
 
     const [announcement, setAnnouncement] = useState("")
     const [controllerOpen, setControllerOpen] = useState(false)
@@ -473,11 +486,21 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
     // affordance the bare session `playTrack` doesn't provide).
     const handleQueuePlayTrack = useCallback(
         (index: number) => {
-            s.playTrack(index)
+            playTrack(index)
             setQueueOpen(false)
         },
-        [s]
+        [playTrack]
     )
+    const handleQueueRemove = useCallback(
+        (index: number) => removeFromQueue(index),
+        [removeFromQueue]
+    )
+    const handleQueueReorder = useCallback(
+        (fromIndex: number, toIndex: number) =>
+            moveQueueItem(fromIndex, toIndex),
+        [moveQueueItem]
+    )
+    const handleQueueClose = useCallback(() => setQueueOpen(false), [])
 
     const { share, copied: shareCopied, nativeShare } = useShareTrack(
         currentTrack.title ?? "",
@@ -635,9 +658,9 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
     // Memoized data for the virtualized tracklist so React.memo on TrackRow
     // can shallow-compare a stable reference instead of a fresh inline object
     // every render.
-    const trackListData = useMemo(
-        () => ({ queue, currentIndex, onPlay: s.playTrack, isPlaying }),
-        [queue, currentIndex, s.playTrack, isPlaying]
+    const trackListData = useMemo<TrackListItemData>(
+        () => ({ queue, currentIndex, onPlay: playTrack, isPlaying }),
+        [queue, currentIndex, playTrack, isPlaying]
     )
 
     return (
@@ -659,10 +682,10 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
                     currentIndex={currentIndex}
                     isPlaying={isPlaying}
                     open={queueOpen}
-                    onClose={() => setQueueOpen(false)}
+                    onClose={handleQueueClose}
                     onPlayTrack={handleQueuePlayTrack}
-                    onReorder={s.moveQueueItem}
-                    onRemove={s.removeFromQueue}
+                    onReorder={handleQueueReorder}
+                    onRemove={handleQueueRemove}
                 />
             )}
 
