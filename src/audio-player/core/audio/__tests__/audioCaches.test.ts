@@ -13,6 +13,13 @@ function fakeBuffer(id: string): AudioBuffer {
     return { id } as unknown as AudioBuffer
 }
 
+function sizedBuffer(bytes: number): AudioBuffer {
+    return {
+        length: bytes / Float32Array.BYTES_PER_ELEMENT,
+        numberOfChannels: 1,
+    } as AudioBuffer
+}
+
 const originalAudio = globalThis.Audio
 const originalCaches = globalThis.caches
 const originalFetch = globalThis.fetch
@@ -77,9 +84,10 @@ describe("LRUAudioCache", () => {
         }
 
         expect(cache.get("track-0.mp3")).toBeNull()
-        expect(cache.get("track-7.mp3")).toBeNull()
-        expect(cache.get("track-8.mp3")).not.toBeNull()
+        expect(cache.get("track-15.mp3")).toBeNull()
+        expect(cache.get("track-16.mp3")).not.toBeNull()
         expect(cache.get("track-19.mp3")).not.toBeNull()
+        expect(cache.getStats().decodedBufferCount).toBe(4)
     })
 
     it("should track stats and lruOrder correctly", () => {
@@ -139,6 +147,68 @@ describe("LRUAudioCache", () => {
         const stats = cache.getStats()
         expect(stats.lruOrder).toEqual(["c", "d", "e"])
     })
+
+    it("evicts the least-recently-used buffers when the byte budget is exceeded", () => {
+        const cache = new LRUAudioCache(10, 12)
+
+        cache.set("a", sizedBuffer(4))
+        cache.set("b", sizedBuffer(4))
+        cache.get("a")
+        cache.set("c", sizedBuffer(8))
+
+        expect(cache.get("b")).toBeNull()
+        expect(cache.getStats()).toEqual({
+            decodedBufferCount: 2,
+            decodedBufferBytes: 12,
+            lruOrder: ["a", "c"],
+        })
+    })
+
+    it("defaults to a 250 MiB decoded-buffer budget", () => {
+        const cache = new LRUAudioCache(10)
+        const mib = 1024 * 1024
+
+        cache.set("older", sizedBuffer(200 * mib))
+        cache.set("newer", sizedBuffer(60 * mib))
+
+        expect(cache.get("older")).toBeNull()
+        expect(cache.getStats()).toEqual({
+            decodedBufferCount: 1,
+            decodedBufferBytes: 60 * mib,
+            lruOrder: ["newer"],
+        })
+    })
+
+    it("updates byte accounting when entries are replaced, deleted, and cleared", () => {
+        const cache = new LRUAudioCache(10, 12)
+
+        cache.set("a", sizedBuffer(8))
+        cache.set("b", sizedBuffer(4))
+        cache.set("a", sizedBuffer(4))
+        cache.set("c", sizedBuffer(4))
+
+        expect(cache.getStats().decodedBufferBytes).toBe(12)
+        expect(cache.getStats().lruOrder).toEqual(["b", "a", "c"])
+
+        cache.delete("b")
+        expect(cache.getStats().decodedBufferBytes).toBe(8)
+
+        cache.clear()
+        expect(cache.getStats()).toEqual({
+            decodedBufferCount: 0,
+            decodedBufferBytes: 0,
+            lruOrder: [],
+        })
+    })
+
+    it("does not retain a single buffer larger than the byte budget", () => {
+        const cache = new LRUAudioCache(4, 8)
+
+        cache.set("oversized", sizedBuffer(12))
+
+        expect(cache.get("oversized")).toBeNull()
+        expect(cache.getStats().decodedBufferBytes).toBe(0)
+    })
 })
 
 describe("AudioStorageCache", () => {
@@ -182,6 +252,29 @@ describe("AudioStorageCache", () => {
             cache.putArrayBuffer("song.wav", new ArrayBuffer(4))
         ).resolves.toBeUndefined()
         expect(warn).toHaveBeenCalled()
+    })
+
+    it("writes the source ArrayBuffer without explicitly cloning it", async () => {
+        const put = vi.fn(
+            async (_url: RequestInfo | URL, _response: Response) => undefined
+        )
+        const open = vi.fn(async () => ({ put }))
+        Object.defineProperty(globalThis, "caches", {
+            configurable: true,
+            writable: true,
+            value: { open },
+        })
+        const buffer = new Uint8Array([1, 2, 3, 4]).buffer
+        const slice = vi.spyOn(buffer, "slice")
+
+        await new AudioStorageCache().putArrayBuffer("song.wav", buffer)
+
+        expect(slice).not.toHaveBeenCalled()
+        const [, response] = put.mock.calls[0]
+        expect(response.headers.get("Content-Length")).toBe("4")
+        expect(new Uint8Array(await response.arrayBuffer())).toEqual(
+            new Uint8Array([1, 2, 3, 4])
+        )
     })
 })
 

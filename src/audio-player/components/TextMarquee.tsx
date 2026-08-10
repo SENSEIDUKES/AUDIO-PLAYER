@@ -36,6 +36,10 @@ export function TextMarquee({
 }: TextMarqueeProps) {
     const containerRef = useRef<HTMLDivElement>(null)
     const innerRef = useRef<HTMLSpanElement>(null)
+    const containerWidthRef = useRef(0)
+    const contentWidthRef = useRef(0)
+    const hasMeasuredRef = useRef(false)
+    const distanceRef = useRef(0)
     const reducedMotion = useReducedMotion()
     const [distance, setDistance] = useState(0)
 
@@ -44,21 +48,48 @@ export function TextMarquee({
         const inner = innerRef.current
         if (!container || !inner) return
         if (disabled || reducedMotion || typeof ResizeObserver === "undefined") {
-            setDistance(0)
+            if (distanceRef.current !== 0) {
+                distanceRef.current = 0
+                setDistance(0)
+            }
             return
         }
 
         let rafId = 0
         const measure = () => {
+            // Batch all layout reads before updating refs or React state.
             const containerWidth = container.clientWidth
             const contentWidth = inner.scrollWidth
+            const overflow = contentWidth - containerWidth
             const active = shouldEnableMarquee({
                 contentWidth,
                 containerWidth,
                 reducedMotion,
                 minWidth,
             })
-            setDistance(active ? contentWidth - containerWidth : 0)
+            const activeChanged = active !== (distanceRef.current > 0)
+            const previousOverflow =
+                contentWidthRef.current - containerWidthRef.current
+
+            // Keep the last significant measurement so repeated observer
+            // callbacks and one-pixel resize jitter do not enqueue state work.
+            if (
+                hasMeasuredRef.current &&
+                !activeChanged &&
+                Math.abs(overflow - previousOverflow) <= 1
+            ) {
+                return
+            }
+
+            containerWidthRef.current = containerWidth
+            contentWidthRef.current = contentWidth
+            hasMeasuredRef.current = true
+
+            const nextDistance = active ? overflow : 0
+            if (Math.abs(nextDistance - distanceRef.current) <= 1) return
+
+            distanceRef.current = nextDistance
+            setDistance(nextDistance)
         }
         const schedule = () => {
             cancelAnimationFrame(rafId)
