@@ -8,6 +8,7 @@ import {
     useAudioTime,
 } from "../AudioSessionContext"
 import type { SessionEngine } from "../../types"
+import { AudioTimeText } from "../../components/AudioTimeText"
 
 describe("AudioSessionContext timeline isolation", () => {
     afterEach(() => {
@@ -88,6 +89,27 @@ describe("AudioSessionContext timeline isolation", () => {
         expect(session!.currentTime).toBe(1)
 
         paused = true
+        await React.act(async () => {
+            root.unmount()
+        })
+    })
+
+    it("renders a zero current time instead of an optional placeholder", async () => {
+        const container = document.createElement("div")
+        const root = createRoot(container)
+
+        await React.act(async () => {
+            root.render(
+                <AudioTimeText
+                    value="currentTime"
+                    fallback={0}
+                    placeholder="–:––"
+                />
+            )
+        })
+
+        expect(container.textContent).toBe("0:00")
+
         await React.act(async () => {
             root.unmount()
         })

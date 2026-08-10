@@ -190,7 +190,13 @@ export function AudioSessionProvider({
         [engine.currentTime, engine.duration, engine.buffered]
     )
     const timeValueRef = useRef(timeValue)
-    timeValueRef.current = timeValue
+    useEffect(() => {
+        timeValueRef.current = {
+            currentTime: engine.currentTime,
+            duration: engine.duration,
+            buffered: engine.buffered,
+        }
+    }, [engine.currentTime, engine.duration, engine.buffered])
     const {
         duration: engineDuration,
         isPlaying: engineIsPlaying,

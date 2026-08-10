@@ -21,7 +21,10 @@ export function AudioTimeText({
         buffered: 0,
     })
     const seconds = time[value]
-    if (placeholder !== undefined && (!Number.isFinite(seconds) || seconds <= 0)) {
+    const isInvalidPlaceholderValue =
+        !Number.isFinite(seconds) ||
+        (value === "currentTime" ? seconds < 0 : seconds <= 0)
+    if (placeholder !== undefined && isInvalidPlaceholderValue) {
         return <>{placeholder}</>
     }
     return <>{formatTime(seconds)}</>
