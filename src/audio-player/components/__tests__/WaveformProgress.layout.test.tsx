@@ -161,5 +161,28 @@ describe("WaveformProgress resolved color cache", () => {
             await Promise.resolve()
         })
         await waitFor(() => expect(getComputedStyleMock).toHaveBeenCalledTimes(9))
+
+        colors["--wave"] = "rgb(13, 23, 33)"
+        await act(async () => {
+            themeRoot.style.setProperty("--wave", "var(--brand-wave)")
+            themeRoot.style.setProperty("--brand-wave", "rgb(13, 23, 33)")
+            await Promise.resolve()
+        })
+        await waitFor(() => expect(getComputedStyleMock).toHaveBeenCalledTimes(12))
+
+        // The direct --wave declaration is unchanged. Updating only its
+        // indirect custom-property dependency must still invalidate colors.
+        colors["--wave"] = "rgb(14, 24, 34)"
+        await act(async () => {
+            themeRoot.style.setProperty("--brand-wave", "rgb(14, 24, 34)")
+            await Promise.resolve()
+        })
+        await waitFor(() => expect(getComputedStyleMock).toHaveBeenCalledTimes(15))
+        expect(waveSurfer.instance.setOptions).toHaveBeenLastCalledWith({
+            height: 48,
+            waveColor: "rgb(14, 24, 34)",
+            progressColor: "rgb(42, 52, 62)",
+            cursorColor: "rgb(72, 82, 92)",
+        })
     })
 })

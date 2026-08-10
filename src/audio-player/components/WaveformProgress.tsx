@@ -109,7 +109,13 @@ function getThemeSignature(
     while (element) {
         const currentElement: HTMLElement = element
         const themeClasses = getThemeClassSignature(currentElement)
-        const inlineVariables = colorVariableNames
+        const inlineVariableNames = new Set(colorVariableNames)
+        for (let index = 0; index < currentElement.style.length; index += 1) {
+            const name = currentElement.style.item(index)
+            if (name.startsWith("--")) inlineVariableNames.add(name)
+        }
+        const inlineVariables = Array.from(inlineVariableNames)
+            .sort()
             .map(
                 (name) =>
                     `${name}:${currentElement.style.getPropertyValue(name).trim()}`
