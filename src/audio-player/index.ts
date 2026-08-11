@@ -273,6 +273,15 @@ export type {
   SceneMixEngineOptions,
   SceneCrossfadeOptions,
 } from "./narrative/SceneMixEngine";
+// Cached detached-element pool for standalone narrative cues and sound FX.
+export {
+  OneShotEngine,
+  createOneShotEngine,
+} from "./narrative/OneShotEngine";
+export type {
+  OneShotEngineOptions,
+  PlayOneShotOptions,
+} from "./narrative/OneShotEngine";
 export {
   VAULT_CATEGORY_META,
   getVaultCategoryMeta,
