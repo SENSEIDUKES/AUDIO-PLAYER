@@ -53,6 +53,12 @@ const AudioTimeProviderContext = createContext(false)
 const EMPTY_PLUGINS: readonly AudioPlayerPlugin[] = []
 const DEFAULT_PRELOAD_CONFIG: PreloadConfig = { strategy: "next" }
 
+function sanitizeInitialIndex(index: number, queueLength: number): number {
+    if (queueLength === 0) return -1
+    if (!Number.isFinite(index) || !Number.isInteger(index)) return 0
+    return Math.min(Math.max(index, 0), queueLength - 1)
+}
+
 /**
  * Build a playback order (a list of queue indices). When shuffle is off this is
  * the natural order. When on it is a Fisher–Yates shuffle with `startIndex`
@@ -92,6 +98,7 @@ export function AudioSessionProvider({
     children,
     initialQueue = [],
     initialIndex = 0,
+    initialCurrentTime = 0,
     autoPlay = false,
     repeatMode: initialRepeat = "off",
     shuffle: initialShuffle = false,
@@ -104,9 +111,7 @@ export function AudioSessionProvider({
 }: AudioSessionProviderProps) {
     const [queue, setQueueState] = useState<Track[]>(initialQueue)
     const [currentIndex, setCurrentIndex] = useState<number>(
-        initialQueue.length > 0
-            ? Math.min(Math.max(initialIndex, 0), initialQueue.length - 1)
-            : -1
+        sanitizeInitialIndex(initialIndex, initialQueue.length)
     )
     const [shuffle, setShuffle] = useState(initialShuffle)
     const [repeatMode, setRepeatMode] = useState<RepeatMode>(initialRepeat)
@@ -177,6 +182,7 @@ export function AudioSessionProvider({
         sources: currentTrackSources,
         sourceKey,
         autoPlay,
+        initialCurrentTime,
         loop: repeatMode === "one", // native loop suppresses `ended` (no double-advance)
         onEnded: () => advanceRef.current(),
         onFallbackSource: handleFallbackSource,

@@ -45,6 +45,29 @@ function isValidRepeatMode(mode: any): mode is RepeatMode {
     return mode === "off" || mode === "all" || mode === "one"
 }
 
+function sanitizeCurrentIndex(value: unknown, queueLength: number): number {
+    if (queueLength === 0) return -1
+    if (
+        typeof value !== "number" ||
+        !Number.isFinite(value) ||
+        !Number.isInteger(value)
+    ) {
+        return 0
+    }
+    return Math.min(Math.max(value, 0), queueLength - 1)
+}
+
+function sanitizeCurrentTime(value: unknown): number {
+    return typeof value === "number" && Number.isFinite(value) && value >= 0
+        ? value
+        : 0
+}
+
+function sanitizeTimestamp(value: unknown): number {
+    if (typeof value !== "number") return Date.now()
+    return Number.isFinite(value) && value >= 0 ? value : 0
+}
+
 /**
  * Deserializes a session state, validating its structure.
  * Returns the validated session, or null if the data is invalid or expired.
@@ -56,11 +79,11 @@ export function deserializeSession(
     if (!data || typeof data !== "object") return null
 
     const session = data as Partial<SerializedSession>
+    const timestamp = sanitizeTimestamp(session.timestamp)
 
     if (
         options?.maxAgeMs !== undefined &&
-        typeof session.timestamp === "number" &&
-        Date.now() - session.timestamp > options.maxAgeMs
+        Date.now() - timestamp > options.maxAgeMs
     ) {
         return null
     }
@@ -97,10 +120,10 @@ export function deserializeSession(
 
     return {
         queue: validQueue,
-        currentIndex: typeof session.currentIndex === "number" ? session.currentIndex : -1,
-        currentTime: typeof session.currentTime === "number" ? session.currentTime : 0,
+        currentIndex: sanitizeCurrentIndex(session.currentIndex, validQueue.length),
+        currentTime: sanitizeCurrentTime(session.currentTime),
         shuffle: typeof session.shuffle === "boolean" ? session.shuffle : false,
         repeatMode: isValidRepeatMode(session.repeatMode) ? session.repeatMode : "off",
-        timestamp: typeof session.timestamp === "number" ? session.timestamp : Date.now(),
+        timestamp,
     }
 }
