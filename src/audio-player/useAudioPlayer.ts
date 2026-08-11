@@ -17,6 +17,7 @@ import {
     getTrackSources,
     normalizeSourceResolution,
     onceSourceRelease,
+    sourceUrlsMatch,
 } from "./utils/sources"
 
 type ActiveSourceState = {
@@ -104,6 +105,7 @@ export function useAudioPlayer(
         loop = false,
         onEnded,
         onFallbackSource,
+        onTerminalError,
         audioBackend = "html5",
         sourceResolver,
     } = options
@@ -188,6 +190,8 @@ export function useAudioPlayer(
     onEndedRef.current = onEnded
     const onFallbackSourceRef = useRef(onFallbackSource)
     onFallbackSourceRef.current = onFallbackSource
+    const onTerminalErrorRef = useRef(onTerminalError)
+    onTerminalErrorRef.current = onTerminalError
     const sourceResolverRef = useRef(sourceResolver)
     sourceResolverRef.current = sourceResolver
     const sourceListRef = useRef(resolvedSources)
@@ -219,6 +223,7 @@ export function useAudioPlayer(
      * affordance, so we don't spam a state update for every rejected promise.
      */
     const lastAutoplayBlockedTokenRef = useRef(-1)
+    const lastTerminalErrorTokenRef = useRef(-1)
 
     const [isPlaying, setIsPlaying] = useState(false)
     const [currentTime, setCurrentTime] = useState(0)
@@ -282,6 +287,50 @@ export function useAudioPlayer(
         bufferingDebounceRef.current?.cancel()
     }, [])
 
+    const reportTerminalError = useCallback(
+        (
+            message: string,
+            playbackRequested: boolean,
+            token = playbackTokenRef.current
+        ) => {
+            if (
+                token !== playbackTokenRef.current ||
+                lastTerminalErrorTokenRef.current === token
+            ) {
+                return
+            }
+            lastTerminalErrorTokenRef.current = token
+            clearBufferingTimer()
+            setIsBuffering(false)
+            stopLoop()
+            isPlayingRef.current = false
+            setIsPlaying(false)
+            setHasError(true)
+            setErrorMessage(message)
+            onTerminalErrorRef.current?.({
+                error: message,
+                sourceKey: sourceKeyRef.current,
+                playbackRequested,
+            })
+        },
+        [clearBufferingTimer, stopLoop]
+    )
+
+    const reportAutoplayBlocked = useCallback(
+        (token: number) => {
+            if (playbackTokenRef.current !== token) return
+            if (lastAutoplayBlockedTokenRef.current !== token) {
+                lastAutoplayBlockedTokenRef.current = token
+                setAutoplayBlocked(true)
+            }
+            isPlayingRef.current = false
+            setIsPlaying(false)
+            clearBufferingTimer()
+            setIsBuffering(false)
+        },
+        [clearBufferingTimer]
+    )
+
     const tryFallbackSource = useCallback(
         (
             failedSource: string,
@@ -293,8 +342,18 @@ export function useAudioPlayer(
             const previousActiveSource = currentSrcRef.current
             const activeIndex = currentSourceIndexRef.current
             const failedIndex = failedUrl
-                ? sourceList.findIndex((source) => source.url === failedUrl)
+                ? sourceList.findIndex((source) =>
+                      sourceUrlsMatch(source.url, failedUrl)
+                  )
                 : -1
+            const failedActiveSource = sourceUrlsMatch(
+                previousActiveSource,
+                failedUrl
+            )
+
+            // An error from a detached/replaced URL must not consume a source
+            // candidate on the current logical track.
+            if (failedUrl && failedIndex < 0 && !failedActiveSource) return true
             const declaredFailedSource =
                 sourceList[failedIndex >= 0 ? failedIndex : activeIndex]?.url ??
                 (failedUrl || previousActiveSource)
@@ -451,13 +510,12 @@ export function useAudioPlayer(
                     return
                 }
 
+                const playbackRequested = resolutionShouldPlayRef.current
                 resolutionShouldPlayRef.current = false
-                clearBufferingTimer()
-                setIsBuffering(false)
-                setIsPlaying(false)
-                isPlayingRef.current = false
-                setHasError(true)
-                setErrorMessage("Failed to resolve audio source. Please try again.")
+                reportTerminalError(
+                    "Failed to resolve audio source. Please try again.",
+                    playbackRequested
+                )
             }
         })()
 
@@ -503,7 +561,7 @@ export function useAudioPlayer(
         releaseActiveSource,
         stopLoop,
         tryFallbackSource,
-        clearBufferingTimer,
+        reportTerminalError,
     ])
 
     const setSeeking = useCallback((active: boolean) => {
@@ -539,12 +597,21 @@ export function useAudioPlayer(
             } catch (error: unknown) {
                 if (playbackTokenRef.current !== token) return
                 const name = error instanceof Error ? error.name : ""
+                if (name === "NotAllowedError") {
+                    reportAutoplayBlocked(token)
+                    return
+                }
                 if (tryFallbackSource(currentSrcRef.current, name || "unknown", true)) {
                     return
                 }
                 if (reportError) {
-                    setHasError(true)
-                    setErrorMessage("Playback failed. Please try again.")
+                    reportTerminalError(
+                        name === "NotSupportedError"
+                            ? "Audio file not found or format not supported."
+                            : "Playback failed. Please try again.",
+                        true,
+                        token
+                    )
                 }
                 return
             }
@@ -569,13 +636,7 @@ export function useAudioPlayer(
                     // Surface this through a dedicated UI flag rather than the
                     // generic error banner.
                     if (name === "NotAllowedError") {
-                        if (lastAutoplayBlockedTokenRef.current !== token) {
-                            lastAutoplayBlockedTokenRef.current = token
-                            setAutoplayBlocked(true)
-                        }
-                        setIsPlaying(false)
-                        clearBufferingTimer()
-                        setIsBuffering(false)
+                        reportAutoplayBlocked(token)
                         return
                     }
 
@@ -589,15 +650,13 @@ export function useAudioPlayer(
                         return
                     }
 
-                    setIsPlaying(false)
-                    clearBufferingTimer()
-                    setIsBuffering(false)
                     if (reportError) {
-                        setHasError(true)
-                        setErrorMessage(
+                        reportTerminalError(
                             name === "NotSupportedError"
                                 ? "Audio file not found or format not supported."
-                                : "Playback failed. Please try again."
+                                : "Playback failed. Please try again.",
+                            true,
+                            token
                         )
                     }
                 })
@@ -608,7 +667,8 @@ export function useAudioPlayer(
             hasAudio,
             hasSourceResolver,
             tryFallbackSource,
-            clearBufferingTimer,
+            reportTerminalError,
+            reportAutoplayBlocked,
         ]
     )
 
@@ -950,6 +1010,16 @@ export function useAudioPlayer(
             setCurrentTime(backend.getCurrentTime())
         }
         const handleEnded = () => {
+            const mediaElement = backend.getMediaElement()
+            const endedSource =
+                mediaElement?.currentSrc || mediaElement?.getAttribute("src") || ""
+            if (
+                endedSource &&
+                currentSrcRef.current &&
+                !sourceUrlsMatch(endedSource, currentSrcRef.current)
+            ) {
+                return
+            }
             isPlayingRef.current = false
             setIsPlaying(false)
             clearBufferingTimer()
@@ -1024,38 +1094,35 @@ export function useAudioPlayer(
         }
         const handleError = () => {
             const error = backend.getError()
-            const failedSource = currentSrcRef.current
+            const mediaElement = backend.getMediaElement()
+            const failedSource =
+                mediaElement?.currentSrc ||
+                mediaElement?.getAttribute("src") ||
+                currentSrcRef.current
             const shouldPlayFallback =
                 isPlayingRef.current || playPromiseRef.current !== null
             if (tryFallbackSource(failedSource, error, shouldPlayFallback)) {
                 return
             }
 
-            clearBufferingTimer()
-            setIsBuffering(false)
-            isPlayingRef.current = false
-            setIsPlaying(false)
-            setHasError(true)
+            let message: string
             switch (error) {
                 case "aborted":
-                    setErrorMessage("Playback was aborted. Please try again.")
+                    message = "Playback was aborted. Please try again."
                     break
                 case "network":
-                    setErrorMessage(
-                        "Network error. Check your connection and try again."
-                    )
+                    message = "Network error. Check your connection and try again."
                     break
                 case "decode":
-                    setErrorMessage("Audio file is corrupted or unsupported.")
+                    message = "Audio file is corrupted or unsupported."
                     break
                 case "src-not-supported":
-                    setErrorMessage(
-                        "Audio file not found or format not supported."
-                    )
+                    message = "Audio file not found or format not supported."
                     break
                 default:
-                    setErrorMessage("Failed to load audio. Please try again.")
+                    message = "Failed to load audio. Please try again."
             }
+            reportTerminalError(message, shouldPlayFallback)
         }
         const handleLoadStart = () => {
             setHasError(false)
@@ -1105,7 +1172,7 @@ export function useAudioPlayer(
             backend.removeEventListener("error", handleError)
             backend.removeEventListener("loadstart", handleLoadStart)
         }
-    }, [stopLoop, tryFallbackSource, clearBufferingTimer])
+    }, [stopLoop, tryFallbackSource, clearBufferingTimer, reportTerminalError])
 
     // Reset + load whenever the source changes. Continues playing across track
     // changes; the initial load only plays when autoPlay is requested.
@@ -1147,7 +1214,7 @@ export function useAudioPlayer(
 
         // Bump the token up front so any in-flight play() / error handlers
         // from the previous source become no-ops.
-        const token = bumpToken()
+        bumpToken()
         clearPendingPlay()
         stopLoop()
         backend.pause()
@@ -1197,59 +1264,7 @@ export function useAudioPlayer(
         if (!isFirstLoad) {
             backend.load()
         }
-        if (shouldPlay) {
-            // Don't surface an error toast for autoplay blocked on first load;
-            // the autoplay-blocked affordance handles that case.
-            if (isFirstLoad) {
-                let playPromise: Promise<void> | null
-                try {
-                    playPromise = backend.play()
-                } catch {
-                    return
-                }
-                if (playPromise) {
-                    playPromiseRef.current = playPromise
-                    playPromise
-                        .then(() => {
-                            if (playbackTokenRef.current !== token) return
-                            if (playPromiseRef.current === playPromise) {
-                                playPromiseRef.current = null
-                            }
-                        })
-                        .catch((error: unknown) => {
-                            if (playbackTokenRef.current !== token) return
-                            if (playPromiseRef.current === playPromise) {
-                                playPromiseRef.current = null
-                            }
-                            const name =
-                                error instanceof Error ? error.name : ""
-                            if (name === "AbortError") return
-                            if (name === "NotAllowedError") {
-                                if (
-                                    lastAutoplayBlockedTokenRef.current !==
-                                    token
-                                ) {
-                                    lastAutoplayBlockedTokenRef.current =
-                                        token
-                                    setAutoplayBlocked(true)
-                                }
-                                setIsPlaying(false)
-                                clearBufferingTimer()
-                                setIsBuffering(false)
-                                return
-                            }
-                            setHasError(true)
-                            setErrorMessage(
-                                name === "NotSupportedError"
-                                    ? "Audio file not found or format not supported."
-                                    : "Playback failed. Please try again."
-                            )
-                        })
-                }
-            } else {
-                play(!isFirstLoad)
-            }
-        }
+        if (shouldPlay) play(true)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         currentSrc,

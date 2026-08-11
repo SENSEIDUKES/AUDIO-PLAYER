@@ -300,6 +300,11 @@ export interface UseAudioPlayerOptions {
     onEnded?: () => void
     /** Fired when the engine switches from a failed source to a fallback URL. */
     onFallbackSource?: (event: FallbackSourceEvent) => void
+    /**
+     * Fired after every declared source for the logical track has failed.
+     * Autoplay-policy rejections are reported through `autoplayBlocked` instead.
+     */
+    onTerminalError?: (event: TerminalTrackErrorEvent) => void
     /** Playback backend. Defaults to `"html5"`. Fixed at mount. */
     audioBackend?: AudioBackendKind
 }
@@ -424,6 +429,19 @@ export interface AudioPlayerEngine {
 
 /** How the global session behaves when a track ends. */
 export type RepeatMode = "off" | "all" | "one"
+
+/** How the global session responds after every source for a track has failed. */
+export type TrackErrorPolicy = "stop" | "skip"
+
+/** Terminal engine failure forwarded to the session queue policy. */
+export interface TerminalTrackErrorEvent {
+    /** User-facing normalized error message. */
+    error: string
+    /** Logical source identity supplied to `useAudioPlayer`. */
+    sourceKey: string
+    /** Whether playback was active or explicitly requested for this attempt. */
+    playbackRequested: boolean
+}
 
 /** Distance modeling algorithms for spatial audio (Web Audio API standard). */
 export type DistanceModelType = "linear" | "inverse" | "exponential"
@@ -634,6 +652,12 @@ export interface AudioSessionProviderProps {
     shuffle?: boolean
     /** Initial Automix Lite state. Defaults to false. */
     automix?: boolean
+    /**
+     * Queue behavior after every declared source for the active track fails.
+     * `"stop"` preserves the existing behavior; `"skip"` advances only when
+     * playback was requested. Defaults to `"stop"`.
+     */
+    trackErrorPolicy?: TrackErrorPolicy
     /** Optional lifecycle plugins for the shared session. Empty by default. */
     plugins?: readonly AudioPlayerPlugin[]
     /** Playback backend for the shared session. Defaults to `"html5"`. */

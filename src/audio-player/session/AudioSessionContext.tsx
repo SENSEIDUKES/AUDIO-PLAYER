@@ -17,6 +17,7 @@ import type {
     PlayerEventPayload,
     FallbackSourceEvent,
     PreloadConfig,
+    TerminalTrackErrorEvent,
 } from "../types"
 import type {
     AudioPlayerPlugin,
@@ -57,6 +58,10 @@ function sanitizeInitialIndex(index: number, queueLength: number): number {
     if (queueLength === 0) return -1
     if (!Number.isFinite(index) || !Number.isInteger(index)) return 0
     return Math.min(Math.max(index, 0), queueLength - 1)
+}
+
+function queueSourceKey(index: number, track: Track): string {
+    return `${index}:${trackKey(track)}:${trackSourcesSignature(track)}`
 }
 
 /**
@@ -103,6 +108,7 @@ export function AudioSessionProvider({
     repeatMode: initialRepeat = "off",
     shuffle: initialShuffle = false,
     automix: initialAutomix = false,
+    trackErrorPolicy = "stop",
     plugins: externalPlugins = EMPTY_PLUGINS,
     audioBackend = "html5",
     sourceResolver,
@@ -131,6 +137,12 @@ export function AudioSessionProvider({
     // the engine's "continue if it was playing" path here because the engine
     // flips isPlaying to false *before* firing onEnded.
     const pendingPlayRef = useRef(false)
+    const settledSourceKeyRef = useRef<string | null>(null)
+    const failedSourceKeysRef = useRef(new Set<string>())
+    const resetTrackFailureRecovery = useCallback(() => {
+        settledSourceKeyRef.current = null
+        failedSourceKeysRef.current.clear()
+    }, [])
 
     const currentTrack = currentIndex >= 0 ? queue[currentIndex] ?? null : null
     const currentTrackSources = useMemo(
@@ -143,8 +155,12 @@ export function AudioSessionProvider({
     // audio URL still resets currentTime/duration/buffered/error state — `src`
     // alone wouldn't change in that case.
     const sourceKey = currentTrack
-        ? `${currentIndex}:${trackKey(currentTrack)}:${trackSourcesSignature(currentTrack)}`
+        ? queueSourceKey(currentIndex, currentTrack)
         : "empty"
+    const sourceKeyRef = useRef(sourceKey)
+    sourceKeyRef.current = sourceKey
+    const currentTrackRef = useRef(currentTrack)
+    currentTrackRef.current = currentTrack
 
     // Pub/Sub system
     const subscribersRef = useRef(new Map<PlayerEventType, Set<(payload: any) => void>>())
@@ -176,6 +192,24 @@ export function AudioSessionProvider({
 
     // Forward declaration: onEnded needs the latest queue navigation logic.
     const advanceRef = useRef<() => void>(() => {})
+    const settleTrackErrorRef = useRef<
+        (failedSourceKey: string, shouldSkip: boolean) => void
+    >(() => {})
+
+    const handleTerminalError = useCallback(
+        (event: TerminalTrackErrorEvent) => {
+            if (event.sourceKey !== sourceKeyRef.current) return
+            emit("error", {
+                error: event.error,
+                track: currentTrackRef.current,
+            })
+            settleTrackErrorRef.current(
+                event.sourceKey,
+                trackErrorPolicy === "skip" && event.playbackRequested
+            )
+        },
+        [emit, trackErrorPolicy]
+    )
 
     const engine = useAudioPlayer({
         src,
@@ -186,6 +220,7 @@ export function AudioSessionProvider({
         loop: repeatMode === "one", // native loop suppresses `ended` (no double-advance)
         onEnded: () => advanceRef.current(),
         onFallbackSource: handleFallbackSource,
+        onTerminalError: handleTerminalError,
         audioBackend,
         sourceResolver,
     })
@@ -210,9 +245,31 @@ export function AudioSessionProvider({
         isPlaying: engineIsPlaying,
         pause: enginePause,
         play: enginePlay,
+        toggle: engineToggle,
+        retry: engineRetry,
+        loadAndPlay: engineLoadAndPlay,
         preload: enginePreload,
         seek: engineSeek,
     } = engine
+    const playWithRecoveryReset = useCallback(
+        (reportError = true) => {
+            resetTrackFailureRecovery()
+            enginePlay(reportError)
+        },
+        [enginePlay, resetTrackFailureRecovery]
+    )
+    const toggleWithRecoveryReset = useCallback(() => {
+        resetTrackFailureRecovery()
+        engineToggle()
+    }, [engineToggle, resetTrackFailureRecovery])
+    const retryWithRecoveryReset = useCallback(() => {
+        resetTrackFailureRecovery()
+        engineRetry()
+    }, [engineRetry, resetTrackFailureRecovery])
+    const loadAndPlayWithRecoveryReset = useCallback(() => {
+        resetTrackFailureRecovery()
+        engineLoadAndPlay()
+    }, [engineLoadAndPlay, resetTrackFailureRecovery])
 
     // Clamp the index if the queue shrinks out from under it.
     useEffect(() => {
@@ -269,21 +326,58 @@ export function AudioSessionProvider({
     // Raw queue advance shared by the natural end-of-track path and Automix
     // handoffs. Kept in a ref so the automix hook always calls the latest
     // closure without routing back through the onEnded guard below.
-    const advanceToNextRef = useRef<() => void>(() => {})
-    advanceToNextRef.current = () => {
+    const advanceToNextRef = useRef<
+        (reason?: "ended" | "error", expectedSourceKey?: string) => void
+    >(() => {})
+    advanceToNextRef.current = (reason = "ended", expectedSourceKey = sourceKey) => {
+        if (expectedSourceKey !== sourceKey) return
+        if (settledSourceKeyRef.current === expectedSourceKey) return
+        settledSourceKeyRef.current = expectedSourceKey
+
+        if (reason === "ended") {
+            // A natural completion proves the recovery sweep reached a usable
+            // track, so repeat-all may consider failed items again next cycle.
+            failedSourceKeysRef.current.clear()
+        } else {
+            failedSourceKeysRef.current.add(expectedSourceKey)
+        }
+
         const next = stepIndex(currentIndex, 1)
         if (next === null) {
             emit('queue-end', { reason: repeatMode === 'off' ? 'repeat-off' : 'normal' })
             return
         }
+        const nextTrack = queue[next]
+        if (
+            reason === "error" &&
+            (!nextTrack ||
+                failedSourceKeysRef.current.has(queueSourceKey(next, nextTrack)))
+        ) {
+            emit("queue-end", { reason: "normal" })
+            return
+        }
         if (next === currentIndex) {
+            if (reason === "error") {
+                emit("queue-end", { reason: "normal" })
+                return
+            }
             // Single-track repeat-all: restart in place.
             engine.seek(0)
+            settledSourceKeyRef.current = null
             engine.play(true)
             return
         }
         pendingPlayRef.current = true
         setCurrentIndex(next)
+    }
+    settleTrackErrorRef.current = (failedSourceKey, shouldSkip) => {
+        if (failedSourceKey !== sourceKey) return
+        if (settledSourceKeyRef.current === failedSourceKey) return
+        if (!shouldSkip) {
+            settledSourceKeyRef.current = failedSourceKey
+            return
+        }
+        advanceToNextRef.current("error", failedSourceKey)
     }
     const requestAdvance = useCallback(() => advanceToNextRef.current(), [])
 
@@ -406,7 +500,7 @@ export function AudioSessionProvider({
     // advance must not run again.
     advanceRef.current = () => {
         if (pluginManager.triggerUntilHandled("onTrackEnded", currentTrack)) return
-        advanceToNextRef.current()
+        advanceToNextRef.current("ended", sourceKey)
     }
 
     useEffect(() => {
@@ -447,6 +541,10 @@ export function AudioSessionProvider({
         pluginManager.trigger(engine.isPlaying ? "onPlay" : "onPause")
         
         if (engine.isPlaying) {
+            // A new successful play attempt starts a fresh settlement window.
+            // Keep the failed-track sweep intact until a natural end so an
+            // all-bad repeat-all queue still terminates.
+            settledSourceKeyRef.current = null
             emit('play', { track: currentTrack!, currentTime: timeValueRef.current.currentTime })
         } else {
             emit('pause', { track: currentTrack, currentTime: timeValueRef.current.currentTime })
@@ -456,14 +554,6 @@ export function AudioSessionProvider({
     useEffect(() => {
         pluginManager.trigger("onTimeUpdate", engine.currentTime)
     }, [pluginManager, engine.currentTime])
-
-    const prevErrorRef = useRef(engine.hasError)
-    useEffect(() => {
-        if (engine.hasError && !prevErrorRef.current) {
-            emit('error', { error: engine.errorMessage, track: currentTrack })
-        }
-        prevErrorRef.current = engine.hasError
-    }, [engine.hasError, engine.errorMessage, currentTrack, emit])
 
     useEffect(() => {
         if (!engine.hasAudio || queue.length === 0) pluginManager.trigger("onStop")
@@ -490,6 +580,7 @@ export function AudioSessionProvider({
 
     const setQueue = useCallback(
         (tracks: Track[], startIndex = 0, autoPlayNext = false) => {
+            resetTrackFailureRecovery()
             const idx = tracks.length > 0
                 ? Math.min(Math.max(startIndex, 0), tracks.length - 1)
                 : -1
@@ -502,12 +593,15 @@ export function AudioSessionProvider({
             setQueueState(tracks)
             setCurrentIndex(idx)
         },
-        [engine.isPlaying]
+        [engine.isPlaying, resetTrackFailureRecovery]
     )
 
     const playTrack = useCallback(
-        (index: number) => goTo(index, true),
-        [goTo]
+        (index: number) => {
+            resetTrackFailureRecovery()
+            goTo(index, true)
+        },
+        [goTo, resetTrackFailureRecovery]
     )
 
     const enqueue = useCallback((track: Track) => {
@@ -533,6 +627,7 @@ export function AudioSessionProvider({
 
     const playNow = useCallback(
         (track: Track) => {
+            resetTrackFailureRecovery()
             const key = trackKey(track)
             const existing = queue.findIndex((t) => trackKey(t) === key)
             if (existing !== -1) {
@@ -571,15 +666,25 @@ export function AudioSessionProvider({
             setQueueState((q) => [...q, track])
             setCurrentIndex(nextIndex)
         },
-        [queue, goTo, engineIsPlaying, enginePlay, currentIndex, src]
+        [
+            queue,
+            goTo,
+            engineIsPlaying,
+            enginePlay,
+            currentIndex,
+            src,
+            resetTrackFailureRecovery,
+        ]
     )
 
     const next = useCallback(() => {
+        resetTrackFailureRecovery()
         const target = stepIndex(currentIndex, 1)
         if (target !== null) goTo(target, engine.isPlaying)
-    }, [stepIndex, currentIndex, goTo, engine.isPlaying])
+    }, [stepIndex, currentIndex, goTo, engine.isPlaying, resetTrackFailureRecovery])
 
     const previous = useCallback(() => {
+        resetTrackFailureRecovery()
         // Restart the current track if we're more than 3s in.
         if (timeValueRef.current.currentTime > 3) {
             seekWithPlugins(0)
@@ -587,7 +692,14 @@ export function AudioSessionProvider({
         }
         const target = stepIndex(currentIndex, -1)
         if (target !== null) goTo(target, engine.isPlaying)
-    }, [stepIndex, currentIndex, goTo, engine.isPlaying, seekWithPlugins])
+    }, [
+        stepIndex,
+        currentIndex,
+        goTo,
+        engine.isPlaying,
+        seekWithPlugins,
+        resetTrackFailureRecovery,
+    ])
 
     // Move a queue item from one index to another (drag-and-drop reorder).
     // Preserves the current index pointing to the active track.
@@ -673,10 +785,11 @@ export function AudioSessionProvider({
     }
 
     const clearQueue = useCallback(() => {
+        resetTrackFailureRecovery()
         enginePause()
         setQueueState([])
         setCurrentIndex(-1)
-    }, [enginePause])
+    }, [enginePause, resetTrackFailureRecovery])
 
     const toggleShuffle = useCallback(() => setShuffle((s) => !s), [])
 
@@ -743,17 +856,17 @@ export function AudioSessionProvider({
             sourceCount: engine.sourceCount,
             volumeUnsupported: engine.volumeUnsupported,
             autoplayBlocked: engine.autoplayBlocked,
-            play: engine.play,
+            play: playWithRecoveryReset,
             pause: engine.pause,
-            toggle: engine.toggle,
+            toggle: toggleWithRecoveryReset,
             seek: seekWithPlugins,
             seekBy: seekByWithPlugins,
             setSeeking: engine.setSeeking,
             setVolume: engine.setVolume,
             setPlaybackRate: engine.setPlaybackRate,
             toggleMute: engine.toggleMute,
-            retry: engine.retry,
-            loadAndPlay: engine.loadAndPlay,
+            retry: retryWithRecoveryReset,
+            loadAndPlay: loadAndPlayWithRecoveryReset,
             dismissAutoplayBlocked: engine.dismissAutoplayBlocked,
             preload: engine.preload,
             unload: engine.unload,
@@ -804,15 +917,15 @@ export function AudioSessionProvider({
             engine.sourceCount,
             engine.volumeUnsupported,
             engine.autoplayBlocked,
-            engine.play,
+            playWithRecoveryReset,
             engine.pause,
-            engine.toggle,
+            toggleWithRecoveryReset,
             engine.setSeeking,
             engine.setVolume,
             engine.setPlaybackRate,
             engine.toggleMute,
-            engine.retry,
-            engine.loadAndPlay,
+            retryWithRecoveryReset,
+            loadAndPlayWithRecoveryReset,
             engine.dismissAutoplayBlocked,
             engine.preload,
             engine.unload,

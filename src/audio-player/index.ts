@@ -518,6 +518,8 @@ export type {
   AudioPlayerEngine,
   SessionEngine,
   RepeatMode,
+  TrackErrorPolicy,
+  TerminalTrackErrorEvent,
   AudioSessionProviderProps,
   DistanceModelType,
   SpatialAudioOptions,
