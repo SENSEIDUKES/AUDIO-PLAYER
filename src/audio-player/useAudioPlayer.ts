@@ -199,6 +199,7 @@ export function useAudioPlayer(
     const sourcesSignatureRef = useRef(sourcesSignature)
     const currentSourceIndexRef = useRef(currentSourceIndex)
     const currentSrcRef = useRef(currentSrc)
+    const isUnloadedRef = useRef(false)
     const fallbackShouldPlayRef = useRef<boolean | null>(null)
     const resolutionShouldPlayRef = useRef(false)
     const resolutionPendingRef = useRef(false)
@@ -869,6 +870,7 @@ export function useAudioPlayer(
         releaseActiveSource()
         resolutionShouldPlayRef.current = false
         resolutionResetKeyRef.current = null
+        isUnloadedRef.current = true
         currentSrcRef.current = ""
         setEffectiveSourceState(null)
         currentTimeRef.current = 0
@@ -1014,9 +1016,10 @@ export function useAudioPlayer(
             const endedSource =
                 mediaElement?.currentSrc || mediaElement?.getAttribute("src") || ""
             if (
-                endedSource &&
-                currentSrcRef.current &&
-                !sourceUrlsMatch(endedSource, currentSrcRef.current)
+                isUnloadedRef.current ||
+                !currentSrcRef.current ||
+                (endedSource &&
+                    !sourceUrlsMatch(endedSource, currentSrcRef.current))
             ) {
                 return
             }
@@ -1260,6 +1263,7 @@ export function useAudioPlayer(
 
         // Ensure both backends hold the effective URL. HTML5 normally already
         // received it from host JSX; Web Audio is armed here for fetch/decode.
+        isUnloadedRef.current = false
         backend.setSource(currentSrc)
         if (!isFirstLoad) {
             backend.load()

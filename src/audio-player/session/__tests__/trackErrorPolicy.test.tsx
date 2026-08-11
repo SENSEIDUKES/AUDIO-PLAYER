@@ -383,4 +383,27 @@ describe("AudioSessionProvider track error policy", () => {
     expect(changes).toHaveBeenCalledOnce();
     expect(playSpy).toHaveBeenCalledTimes(2);
   });
+
+  it("ignores a late ended event after the player is unloaded", async () => {
+    const audio = await mount({
+      initialQueue: TRACKS,
+      trackErrorPolicy: "skip",
+    });
+    const changes = vi.fn();
+    session.subscribe("track-change", changes);
+
+    await React.act(async () => session.play());
+    const unloadedSource = audio.src;
+    await React.act(async () => session.unload());
+    Object.defineProperty(audio, "currentSrc", {
+      configurable: true,
+      value: unloadedSource,
+    });
+    await React.act(async () => audio.dispatchEvent(new Event("ended")));
+
+    expect(session.currentIndex).toBe(0);
+    expect(session.isPlaying).toBe(false);
+    expect(changes).not.toHaveBeenCalled();
+    expect(playSpy).toHaveBeenCalledOnce();
+  });
 });
