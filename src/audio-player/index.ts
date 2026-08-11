@@ -504,6 +504,9 @@ export type { TransitionPlan } from "./automix/transitionPlanner";
 export type {
   Track,
   TrackSource,
+  ResolvedTrackSource,
+  TrackSourceResolution,
+  TrackSourceResolver,
   FallbackSourceEvent,
   VaultCategory,
   TrackTrims,

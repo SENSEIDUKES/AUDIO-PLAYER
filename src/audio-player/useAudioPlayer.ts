@@ -13,12 +13,20 @@ import {
     createBufferingDebounce,
     type BufferingDebounce,
 } from "./utils/buffering"
-import { getTrackSources } from "./utils/sources"
+import {
+    getTrackSources,
+    normalizeSourceResolution,
+    onceSourceRelease,
+} from "./utils/sources"
 
 type ActiveSourceState = {
     sourceKey: string
     signature: string
     index: number
+}
+
+type EffectiveSourceState = ActiveSourceState & {
+    url: string
 }
 
 function normalizeSource(source: TrackSource): TrackSource | null {
@@ -90,6 +98,7 @@ export function useAudioPlayer(
         onEnded,
         onFallbackSource,
         audioBackend = "html5",
+        sourceResolver,
     } = options
 
     const resolvedSources = useMemo(
@@ -113,7 +122,18 @@ export function useAudioPlayer(
           )
         : 0
     const currentSource = resolvedSources[currentSourceIndex] ?? null
-    const currentSrc = currentSource?.url ?? ""
+    const hasSourceResolver = typeof sourceResolver === "function"
+    const [effectiveSourceState, setEffectiveSourceState] =
+        useState<EffectiveSourceState | null>(null)
+    const effectiveSourceMatches =
+        effectiveSourceState?.sourceKey === sourceKey &&
+        effectiveSourceState.signature === sourcesSignature &&
+        effectiveSourceState.index === currentSourceIndex
+    const currentSrc = hasSourceResolver
+        ? effectiveSourceMatches
+            ? effectiveSourceState.url
+            : ""
+        : currentSource?.url ?? ""
 
     const audioRef = useRef<HTMLAudioElement>(null)
     const backendRef = useRef<AudioBackend | null>(null)
@@ -153,12 +173,20 @@ export function useAudioPlayer(
     onEndedRef.current = onEnded
     const onFallbackSourceRef = useRef(onFallbackSource)
     onFallbackSourceRef.current = onFallbackSource
+    const sourceResolverRef = useRef(sourceResolver)
+    sourceResolverRef.current = sourceResolver
     const sourceListRef = useRef(resolvedSources)
     const sourceKeyRef = useRef(sourceKey)
     const sourcesSignatureRef = useRef(sourcesSignature)
     const currentSourceIndexRef = useRef(currentSourceIndex)
     const currentSrcRef = useRef(currentSrc)
     const fallbackShouldPlayRef = useRef<boolean | null>(null)
+    const resolutionShouldPlayRef = useRef(false)
+    const resolutionPendingRef = useRef(false)
+    const resolutionGenerationRef = useRef(0)
+    const resolutionAbortRef = useRef<AbortController | null>(null)
+    const activeSourceReleaseRef = useRef<(() => void) | null>(null)
+    const resolutionResetKeyRef = useRef<string | null>(null)
     sourceListRef.current = resolvedSources
     sourceKeyRef.current = sourceKey
     sourcesSignatureRef.current = sourcesSignature
@@ -192,14 +220,28 @@ export function useAudioPlayer(
     const [hasError, setHasError] = useState(false)
     const [errorMessage, setErrorMessage] = useState("")
     const [autoplayBlocked, setAutoplayBlocked] = useState(false)
+    const [resolutionAttempt, setResolutionAttempt] = useState(0)
     const volumeUnsupportedRef = useRef(false)
     const [volumeUnsupported, setVolumeUnsupported] = useState(false)
 
-    const hasAudio = currentSrc.trim().length > 0
+    const hasAudio = currentSource !== null
 
     const bumpToken = useCallback(() => {
         playbackTokenRef.current += 1
         return playbackTokenRef.current
+    }, [])
+
+    const releaseActiveSource = useCallback(() => {
+        const release = activeSourceReleaseRef.current
+        activeSourceReleaseRef.current = null
+        release?.()
+    }, [])
+
+    const cancelSourceResolution = useCallback(() => {
+        resolutionGenerationRef.current += 1
+        resolutionPendingRef.current = false
+        resolutionAbortRef.current?.abort()
+        resolutionAbortRef.current = null
     }, [])
 
     const clearPendingPlay = useCallback(() => {
@@ -238,6 +280,9 @@ export function useAudioPlayer(
             const failedIndex = failedUrl
                 ? sourceList.findIndex((source) => source.url === failedUrl)
                 : -1
+            const declaredFailedSource =
+                sourceList[failedIndex >= 0 ? failedIndex : activeIndex]?.url ??
+                (failedUrl || previousActiveSource)
             const nextIndex = (failedIndex >= 0 ? failedIndex : activeIndex) + 1
 
             // If a stale error from a previous URL arrives after we've already
@@ -272,7 +317,9 @@ export function useAudioPlayer(
             })
 
             onFallbackSourceRef.current?.({
-                failedSource: failedUrl || previousActiveSource,
+                failedSource: sourceResolverRef.current
+                    ? declaredFailedSource
+                    : failedUrl || previousActiveSource,
                 nextSource: nextSource.url,
                 nextSourceType: nextSource.type,
                 sourceIndex: nextIndex,
@@ -285,6 +332,165 @@ export function useAudioPlayer(
         [bumpToken, clearPendingPlay, stopLoop, clearBufferingTimer]
     )
 
+    // Resolve only the active declared source. Preload intentionally stays on
+    // declared URLs so resolver-owned object URLs/private leases cannot outlive
+    // an active playback slot.
+    useEffect(() => {
+        const backend = backendRef.current!
+
+        if (!hasSourceResolver) {
+            cancelSourceResolution()
+            releaseActiveSource()
+            setEffectiveSourceState(null)
+            return
+        }
+
+        resolutionShouldPlayRef.current =
+            resolutionShouldPlayRef.current ||
+            fallbackShouldPlayRef.current === true ||
+            (isFirstLoadRef.current ? autoPlay : isPlayingRef.current)
+
+        bumpToken()
+        clearPendingPlay()
+        stopLoop()
+        backend.pause()
+        backend.clearSource()
+        currentSrcRef.current = ""
+        cancelSourceResolution()
+        releaseActiveSource()
+        setEffectiveSourceState(null)
+
+        if (!currentSource) {
+            resolutionShouldPlayRef.current = false
+            return
+        }
+
+        const controller = new AbortController()
+        const generation = resolutionGenerationRef.current
+        const declaredSource = currentSource
+        const resolver = sourceResolverRef.current!
+        resolutionAbortRef.current = controller
+        resolutionPendingRef.current = true
+
+        void (async () => {
+            try {
+                const rawResolution = await resolver(
+                    declaredSource,
+                    controller.signal
+                )
+                const rawRelease =
+                    typeof rawResolution === "string"
+                        ? undefined
+                        : rawResolution?.release
+                const release = onceSourceRelease(rawRelease)
+                const resolution = normalizeSourceResolution(rawResolution)
+
+                if (
+                    generation !== resolutionGenerationRef.current ||
+                    controller.signal.aborted
+                ) {
+                    release?.()
+                    return
+                }
+
+                if (!resolution) {
+                    release?.()
+                    throw new Error("Source resolver returned an empty URL.")
+                }
+
+                resolutionPendingRef.current = false
+                if (resolutionAbortRef.current === controller) {
+                    resolutionAbortRef.current = null
+                }
+                activeSourceReleaseRef.current = release
+                currentSrcRef.current = resolution.url
+                setEffectiveSourceState({
+                    sourceKey,
+                    signature: sourcesSignature,
+                    index: currentSourceIndex,
+                    url: resolution.url,
+                })
+            } catch (error: unknown) {
+                if (
+                    generation !== resolutionGenerationRef.current ||
+                    controller.signal.aborted
+                ) {
+                    return
+                }
+
+                resolutionPendingRef.current = false
+                if (resolutionAbortRef.current === controller) {
+                    resolutionAbortRef.current = null
+                }
+                const errorName =
+                    error instanceof Error && error.name
+                        ? error.name
+                        : "source-resolution"
+                if (
+                    tryFallbackSource(
+                        declaredSource.url,
+                        errorName,
+                        resolutionShouldPlayRef.current
+                    )
+                ) {
+                    return
+                }
+
+                resolutionShouldPlayRef.current = false
+                clearBufferingTimer()
+                setIsBuffering(false)
+                setIsPlaying(false)
+                isPlayingRef.current = false
+                setHasError(true)
+                setErrorMessage("Failed to resolve audio source. Please try again.")
+            }
+        })()
+
+        return () => {
+            controller.abort()
+            if (resolutionAbortRef.current === controller) {
+                resolutionAbortRef.current = null
+            }
+            if (resolutionGenerationRef.current === generation) {
+                resolutionGenerationRef.current += 1
+            }
+            resolutionPendingRef.current = false
+            // On source replacement/unmount the backend must detach before the
+            // object URL is released. When the resolver prop is removed, React
+            // has already committed the new direct HTML5 URL, so leave it intact.
+            resolutionShouldPlayRef.current =
+                resolutionShouldPlayRef.current ||
+                isPlayingRef.current ||
+                playPromiseRef.current !== null
+            if (
+                sourceResolverRef.current ||
+                backend.getInfo().active === "webaudio"
+            ) {
+                backend.pause()
+                backend.clearSource()
+            }
+            releaseActiveSource()
+        }
+        // Resolver identity is intentionally read through a ref: inline
+        // callbacks should not restart active audio on every render.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [
+        hasSourceResolver,
+        currentSource?.url,
+        currentSource?.type,
+        currentSourceIndex,
+        sourceKey,
+        sourcesSignature,
+        resolutionAttempt,
+        bumpToken,
+        cancelSourceResolution,
+        clearPendingPlay,
+        releaseActiveSource,
+        stopLoop,
+        tryFallbackSource,
+        clearBufferingTimer,
+    ])
+
     const setSeeking = useCallback((active: boolean) => {
         isSeekingRef.current = active
         setIsSeekingState(active)
@@ -294,6 +500,18 @@ export function useAudioPlayer(
         (reportError = true) => {
             const backend = backendRef.current!
             if (!backend.isAttached() || !hasAudio) return
+
+            if (hasSourceResolver && !currentSrcRef.current) {
+                resolutionShouldPlayRef.current = true
+                setHasError(false)
+                setErrorMessage("")
+                setAutoplayBlocked(false)
+                setIsBuffering(true)
+                if (!resolutionPendingRef.current) {
+                    setResolutionAttempt((attempt) => attempt + 1)
+                }
+                return
+            }
 
             const token = bumpToken()
             clearPendingPlay()
@@ -369,30 +587,44 @@ export function useAudioPlayer(
                     }
                 })
         },
-        [bumpToken, clearPendingPlay, hasAudio, tryFallbackSource, clearBufferingTimer]
+        [
+            bumpToken,
+            clearPendingPlay,
+            hasAudio,
+            hasSourceResolver,
+            tryFallbackSource,
+            clearBufferingTimer,
+        ]
     )
 
     const pause = useCallback(() => {
         const backend = backendRef.current!
         if (!backend.isAttached()) return
 
+        resolutionShouldPlayRef.current = false
+        if (resolutionPendingRef.current) {
+            bumpToken()
+            clearBufferingTimer()
+            setIsBuffering(false)
+            setIsPlaying(false)
+            isPlayingRef.current = false
+            return
+        }
+
         const pending = playPromiseRef.current
         if (pending) {
             // Bump the token so the in-flight play() does not flip state back
             // to "playing" once the browser finally resolves it.
             bumpToken()
-            pending
-                .catch(() => {})
-                .finally(() => {
-                    if (playPromiseRef.current === pending) {
-                        playPromiseRef.current = null
-                    }
-                    backend.pause()
-                })
+            playPromiseRef.current = null
+            pending.catch(() => {
+                // An explicit pause commonly aborts a pending media play.
+            })
+            backend.pause()
             return
         }
         backend.pause()
-    }, [bumpToken])
+    }, [bumpToken, clearBufferingTimer])
 
     const toggle = useCallback(() => {
         if (!hasAudio) return
@@ -404,8 +636,12 @@ export function useAudioPlayer(
                 // Ignore vibration failures (e.g. blocked by permissions policy)
             }
         }
-        if (isPlayingRef.current) pause()
-        else play(true)
+        if (
+            isPlayingRef.current ||
+            (resolutionPendingRef.current && resolutionShouldPlayRef.current)
+        ) {
+            pause()
+        } else play(true)
     }, [hasAudio, pause, play])
 
     const seek = useCallback(
@@ -491,6 +727,15 @@ export function useAudioPlayer(
     const retry = useCallback(() => {
         const backend = backendRef.current!
         if (!backend.isAttached() || !hasAudio) return
+        if (hasSourceResolver) {
+            resolutionShouldPlayRef.current = true
+            setHasError(false)
+            setErrorMessage("")
+            setAutoplayBlocked(false)
+            setIsBuffering(true)
+            setResolutionAttempt((attempt) => attempt + 1)
+            return
+        }
         bumpToken()
         clearPendingPlay()
         setHasError(false)
@@ -500,21 +745,36 @@ export function useAudioPlayer(
         setIsBuffering(true)
         backend.load()
         play(true)
-    }, [bumpToken, clearPendingPlay, clearBufferingTimer, hasAudio, play])
+    }, [
+        bumpToken,
+        clearPendingPlay,
+        clearBufferingTimer,
+        hasAudio,
+        hasSourceResolver,
+        play,
+    ])
 
     const loadAndPlay = useCallback(() => {
         const backend = backendRef.current!
         if (!backend.isAttached() || !hasAudio) return
+        if (hasSourceResolver) {
+            resolutionShouldPlayRef.current = true
+            setIsBuffering(true)
+            setResolutionAttempt((attempt) => attempt + 1)
+            return
+        }
         bumpToken()
         backend.load()
         play(true)
-    }, [bumpToken, hasAudio, play])
+    }, [bumpToken, hasAudio, hasSourceResolver, play])
 
     const dismissAutoplayBlocked = useCallback(() => {
         setAutoplayBlocked(false)
     }, [])
 
     const preload = useCallback((track: Track) => {
+        // Deliberately bypass sourceResolver. A preloaded resolver result has no
+        // active owner and could retain an object URL/private URL indefinitely.
         for (const source of getTrackSources(track)) {
             backendRef.current!.preload(source.url)
         }
@@ -528,6 +788,12 @@ export function useAudioPlayer(
         stopLoop()
         backend.pause()
         backend.clearSource()
+        cancelSourceResolution()
+        releaseActiveSource()
+        resolutionShouldPlayRef.current = false
+        resolutionResetKeyRef.current = null
+        currentSrcRef.current = ""
+        setEffectiveSourceState(null)
         currentTimeRef.current = 0
         setCurrentTime(0)
         setDuration(0)
@@ -546,7 +812,14 @@ export function useAudioPlayer(
             fadeFrameRef.current = null
         }
         backend.releasePreload()
-    }, [bumpToken, clearPendingPlay, stopLoop, clearBufferingTimer])
+    }, [
+        bumpToken,
+        cancelSourceResolution,
+        clearPendingPlay,
+        releaseActiveSource,
+        stopLoop,
+        clearBufferingTimer,
+    ])
 
     const fade = useCallback((to: number, durationMs: number) => {
         const backend = backendRef.current!
@@ -795,16 +1068,28 @@ export function useAudioPlayer(
         const backend = backendRef.current!
         if (!backend.isAttached()) return
 
+        const resolutionKey = `${sourceKey}:${sourcesSignature}`
+        const isAwaitingResolution =
+            hasSourceResolver && hasAudio && !currentSrc
+        const didResetForResolution =
+            resolutionResetKeyRef.current === resolutionKey
         const isFallbackSwitch = fallbackShouldPlayRef.current !== null
         const isFirstLoad = isFirstLoadRef.current
-        isFirstLoadRef.current = false
         const wasPlaying = isPlayingRef.current
-        const shouldPlay = isFallbackSwitch
+        const shouldPlayWithoutResolution = isFallbackSwitch
             ? fallbackShouldPlayRef.current === true
             : isFirstLoad
               ? autoPlay
               : wasPlaying
-        fallbackShouldPlayRef.current = null
+        const shouldPlay =
+            resolutionShouldPlayRef.current || shouldPlayWithoutResolution
+        if (isAwaitingResolution) {
+            resolutionShouldPlayRef.current = shouldPlay
+        } else {
+            isFirstLoadRef.current = false
+            resolutionShouldPlayRef.current = false
+            fallbackShouldPlayRef.current = null
+        }
 
         // Bump the token up front so any in-flight play() / error handlers
         // from the previous source become no-ops.
@@ -821,7 +1106,7 @@ export function useAudioPlayer(
         // is already loaded/loading from a cache hit. Resetting would discard
         // the browser's preloaded data and make the hasMetadata() synchronous
         // check in the event-listener effect useless.
-        if (!isFirstLoad) {
+        if (!isFirstLoad && !didResetForResolution) {
             backend.setCurrentTime(0)
             currentTimeRef.current = 0
             setSeeking(false)
@@ -839,12 +1124,21 @@ export function useAudioPlayer(
         }
 
         if (!hasAudio) {
+            resolutionResetKeyRef.current = null
             backend.clearSource()
             return
         }
 
-        // No-op for html5 (the host JSX owns the src attribute); arms the URL
-        // for the webaudio backend.
+        if (isAwaitingResolution) {
+            if (!isFirstLoad) resolutionResetKeyRef.current = resolutionKey
+            backend.clearSource()
+            return
+        }
+
+        resolutionResetKeyRef.current = null
+
+        // Ensure both backends hold the effective URL. HTML5 normally already
+        // received it from host JSX; Web Audio is armed here for fetch/decode.
         backend.setSource(currentSrc)
         if (!isFirstLoad) {
             backend.load()
@@ -903,7 +1197,14 @@ export function useAudioPlayer(
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentSrc, sourceKey, sourcesSignature])
+    }, [
+        currentSrc,
+        currentSourceIndex,
+        hasAudio,
+        hasSourceResolver,
+        sourceKey,
+        sourcesSignature,
+    ])
 
     // Keep the backend's volume/loop in sync with state on mount + changes.
     useEffect(() => {
