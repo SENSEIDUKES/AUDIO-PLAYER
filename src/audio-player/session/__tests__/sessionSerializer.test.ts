@@ -52,6 +52,80 @@ describe("sessionSerializer", () => {
         expect(deserialized).toEqual(data)
     })
 
+    it.each([
+        ["negative", -10],
+        ["NaN", Number.NaN],
+        ["positive infinity", Number.POSITIVE_INFINITY],
+        ["negative infinity", Number.NEGATIVE_INFINITY],
+    ])("sanitizes a %s restored currentTime", (_label, currentTime) => {
+        const deserialized = deserializeSession({
+            queue: [mockTrack],
+            currentIndex: 0,
+            currentTime,
+            shuffle: false,
+            repeatMode: "off",
+            timestamp: Date.now(),
+        })
+
+        expect(deserialized?.currentTime).toBe(0)
+    })
+
+    it.each([
+        ["negative", -1, 0],
+        ["past the queue", 99, 1],
+        ["NaN", Number.NaN, 0],
+        ["infinite", Number.POSITIVE_INFINITY, 0],
+        ["fractional", 1.5, 0],
+        ["non-numeric", "1", 0],
+    ])(
+        "sanitizes a %s restored currentIndex",
+        (_label, currentIndex, expectedIndex) => {
+            const deserialized = deserializeSession({
+                queue: [mockTrack, { ...mockTrack, title: "Second Track" }],
+                currentIndex,
+                currentTime: 0,
+                shuffle: false,
+                repeatMode: "off",
+                timestamp: Date.now(),
+            })
+
+            expect(deserialized?.currentIndex).toBe(expectedIndex)
+        }
+    )
+
+    it("normalizes an empty queue without discarding it", () => {
+        const deserialized = deserializeSession({
+            queue: [],
+            currentIndex: 42,
+            currentTime: 120,
+            shuffle: false,
+            repeatMode: "off",
+            timestamp: Date.now(),
+        })
+
+        expect(deserialized).toMatchObject({
+            queue: [],
+            currentIndex: -1,
+            currentTime: 120,
+        })
+    })
+
+    it.each([-1, Number.NaN, Number.POSITIVE_INFINITY])(
+        "sanitizes an invalid numeric timestamp (%s)",
+        (timestamp) => {
+            const deserialized = deserializeSession({
+                queue: [mockTrack],
+                currentIndex: 0,
+                currentTime: 0,
+                shuffle: false,
+                repeatMode: "off",
+                timestamp,
+            })
+
+            expect(deserialized?.timestamp).toBe(0)
+        }
+    )
+
     it("should reject invalid data", () => {
         expect(deserializeSession(null)).toBeNull()
         expect(deserializeSession("invalid")).toBeNull()

@@ -290,6 +290,11 @@ export interface UseAudioPlayerOptions {
      */
     sourceResolver?: TrackSourceResolver
     autoPlay?: boolean
+    /**
+     * Initial playback position in seconds. Applied once to the initial logical
+     * source after its duration is known; finite values clamp to that duration.
+     */
+    initialCurrentTime?: number
     loop?: boolean
     /** Fired when the current track reaches its end. */
     onEnded?: () => void
@@ -616,6 +621,11 @@ export interface AudioSessionProviderProps {
     initialQueue?: Track[]
     /** Index within `initialQueue` to start on. Defaults to 0. */
     initialIndex?: number
+    /**
+     * Playback position restored for the initial queue item. Applied once after
+     * metadata loads and does not imply autoplay. Defaults to 0.
+     */
+    initialCurrentTime?: number
     /** Best-effort autoplay of the first track on mount. */
     autoPlay?: boolean
     /** Initial repeat mode. Defaults to "off". */

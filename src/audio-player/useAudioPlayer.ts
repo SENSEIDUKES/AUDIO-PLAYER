@@ -66,6 +66,12 @@ function sourceListSignature(sources: readonly TrackSource[]): string {
     return JSON.stringify(sources.map((source) => [source.url, source.type ?? ""]))
 }
 
+function sanitizeInitialCurrentTime(value: number | undefined): number | null {
+    return typeof value === "number" && Number.isFinite(value) && value > 0
+        ? value
+        : null
+}
+
 /**
  * Headless audio engine. Owns a playback backend (HTML5 `<audio>` element by
  * default, Web Audio API on request) and is the sole source of truth for
@@ -94,6 +100,7 @@ export function useAudioPlayer(
         sources,
         sourceKey = src,
         autoPlay = false,
+        initialCurrentTime,
         loop = false,
         onEnded,
         onFallbackSource,
@@ -169,6 +176,14 @@ export function useAudioPlayer(
     const isFirstLoadRef = useRef(true)
     const previousVolumeRef = useRef(1)
     const pendingSeekRef = useRef<number | null>(null)
+    const initialSeekRef = useRef({
+        sourceKey,
+        sourcesSignature,
+        time:
+            resolvedSources.length > 0
+                ? sanitizeInitialCurrentTime(initialCurrentTime)
+                : null,
+    })
     const onEndedRef = useRef(onEnded)
     onEndedRef.current = onEnded
     const onFallbackSourceRef = useRef(onFallbackSource)
@@ -648,6 +663,8 @@ export function useAudioPlayer(
         (time: number) => {
             const backend = backendRef.current!
             if (!backend.isAttached() || !hasAudio) return
+            // An explicit seek supersedes any still-pending hydration position.
+            initialSeekRef.current.time = null
             if (duration <= 0) {
                 pendingSeekRef.current = time
                 return
@@ -868,6 +885,7 @@ export function useAudioPlayer(
         if (!backend.isAttached()) return
 
         let lastUpdate = 0
+        let disposed = false
 
         const readBuffered = () => {
             try {
@@ -942,18 +960,44 @@ export function useAudioPlayer(
             setCurrentTime(backend.getDuration() || backend.getCurrentTime())
             onEndedRef.current?.()
         }
-        const handleLoadedMetadata = () => {
+        const applyPendingSeek = (loadedDuration: number) => {
+            const pending = pendingSeekRef.current
+            const initial = initialSeekRef.current
+            const initialMatchesSource =
+                initial.time !== null &&
+                initial.sourceKey === sourceKeyRef.current &&
+                initial.sourcesSignature === sourcesSignatureRef.current
+            const requested = pending ?? (initialMatchesSource ? initial.time : null)
+            if (requested === null || loadedDuration <= 0) return
+
+            pendingSeekRef.current = null
+            initial.time = null
+            const finiteRequest = Number.isFinite(requested) ? requested : 0
+            const clamped = Math.max(0, Math.min(loadedDuration, finiteRequest))
+            backend.setCurrentTime(clamped)
+            currentTimeRef.current = clamped
+            setCurrentTime(clamped)
+        }
+        const readMetadata = () => {
             const rawDuration = backend.getDuration()
             const loadedDuration = Number.isFinite(rawDuration) ? rawDuration : 0
             setDuration(loadedDuration)
-            const pending = pendingSeekRef.current
-            if (pending !== null && loadedDuration > 0) {
-                pendingSeekRef.current = null
-                const clamped = Math.max(0, Math.min(loadedDuration, pending))
-                backend.setCurrentTime(clamped)
-                currentTimeRef.current = clamped
-                setCurrentTime(clamped)
-            }
+            return loadedDuration
+        }
+        const handleLoadedMetadata = () => {
+            applyPendingSeek(readMetadata())
+        }
+        const handleCachedMetadata = () => {
+            readMetadata()
+            // Effects are replayed in React StrictMode. Deferring only the seek
+            // lets the replayed source-reset settle first, then commits one
+            // hydration seek from the surviving effect instance.
+            queueMicrotask(() => {
+                if (disposed || !backend.isAttached() || !backend.hasMetadata()) {
+                    return
+                }
+                applyPendingSeek(readMetadata())
+            })
         }
         const handleWaiting = () => {
             // `waiting`/`stalled` also fire during passive preload while paused;
@@ -1035,11 +1079,12 @@ export function useAudioPlayer(
         // If the source was already cached the loadedmetadata event fires before
         // the effect runs. Catch that case by reading the metadata synchronously.
         if (backend.hasMetadata()) {
-            handleLoadedMetadata()
+            handleCachedMetadata()
             readBuffered()
         }
 
         return () => {
+            disposed = true
             stopLoop()
             clearBufferingTimer()
             if (fadeFrameRef.current !== null) {
@@ -1066,6 +1111,15 @@ export function useAudioPlayer(
     // changes; the initial load only plays when autoPlay is requested.
     useEffect(() => {
         const backend = backendRef.current!
+        const initialSeek = initialSeekRef.current
+        if (
+            initialSeek.time !== null &&
+            (initialSeek.sourceKey !== sourceKey ||
+                initialSeek.sourcesSignature !== sourcesSignature)
+        ) {
+            // Hydration belongs only to the logical source mounted initially.
+            initialSeek.time = null
+        }
         if (!backend.isAttached()) return
 
         const resolutionKey = `${sourceKey}:${sourcesSignature}`
