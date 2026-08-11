@@ -164,6 +164,7 @@ export function useAudioPlayer(
     const currentTimeRef = useRef(0)
     const isSeekingRef = useRef(false)
     const isPlayingRef = useRef(false)
+    const playbackRequestedRef = useRef(false)
     const playPromiseRef = useRef<Promise<void> | null>(null)
     const animationFrameRef = useRef<number | null>(null)
     const fadeFrameRef = useRef<number | null>(null)
@@ -301,6 +302,7 @@ export function useAudioPlayer(
                 return
             }
             lastTerminalErrorTokenRef.current = token
+            playbackRequestedRef.current = false
             clearBufferingTimer()
             setIsBuffering(false)
             stopLoop()
@@ -320,6 +322,7 @@ export function useAudioPlayer(
     const reportAutoplayBlocked = useCallback(
         (token: number) => {
             if (playbackTokenRef.current !== token) return
+            playbackRequestedRef.current = false
             if (lastAutoplayBlockedTokenRef.current !== token) {
                 lastAutoplayBlockedTokenRef.current = token
                 setAutoplayBlocked(true)
@@ -574,6 +577,7 @@ export function useAudioPlayer(
         (reportError = true) => {
             const backend = backendRef.current!
             if (!backend.isAttached() || !hasAudio) return
+            playbackRequestedRef.current = true
 
             if (hasSourceResolver && !currentSrcRef.current) {
                 resolutionShouldPlayRef.current = true
@@ -677,6 +681,7 @@ export function useAudioPlayer(
         const backend = backendRef.current!
         if (!backend.isAttached()) return
 
+        playbackRequestedRef.current = false
         resolutionShouldPlayRef.current = false
         if (resolutionPendingRef.current) {
             bumpToken()
@@ -870,6 +875,7 @@ export function useAudioPlayer(
         releaseActiveSource()
         resolutionShouldPlayRef.current = false
         resolutionResetKeyRef.current = null
+        playbackRequestedRef.current = false
         isUnloadedRef.current = true
         currentSrcRef.current = ""
         setEffectiveSourceState(null)
@@ -1001,6 +1007,10 @@ export function useAudioPlayer(
         }
         const handlePause = () => {
             isPlayingRef.current = false
+            // A media failure can synchronously pause before dispatching its
+            // error event. Preserve intent in that case so error recovery can
+            // still distinguish requested playback from a passive load.
+            if (!backend.getError()) playbackRequestedRef.current = false
             setIsPlaying(false)
             // Pausing ends any active playback wait; never leave the spinner
             // armed (or about to arm) once playback has stopped.
@@ -1024,6 +1034,7 @@ export function useAudioPlayer(
                 return
             }
             isPlayingRef.current = false
+            playbackRequestedRef.current = false
             setIsPlaying(false)
             clearBufferingTimer()
             setIsBuffering(false)
@@ -1102,8 +1113,7 @@ export function useAudioPlayer(
                 mediaElement?.currentSrc ||
                 mediaElement?.getAttribute("src") ||
                 currentSrcRef.current
-            const shouldPlayFallback =
-                isPlayingRef.current || playPromiseRef.current !== null
+            const shouldPlayFallback = playbackRequestedRef.current
             if (tryFallbackSource(failedSource, error, shouldPlayFallback)) {
                 return
             }
@@ -1217,6 +1227,7 @@ export function useAudioPlayer(
 
         // Bump the token up front so any in-flight play() / error handlers
         // from the previous source become no-ops.
+        playbackRequestedRef.current = false
         bumpToken()
         clearPendingPlay()
         stopLoop()
