@@ -98,10 +98,10 @@ const INITIAL_STATUS: SceneMixStatusSnapshot = Object.freeze({
 })
 
 const MEDIA_ERROR_MESSAGES: Readonly<Record<number, string>> = Object.freeze({
-    1: "Audio playback aborted.",
-    2: "Network error caused audio download to fail.",
-    3: "Audio decoding failed.",
-    4: "Audio format not supported.",
+    1: "Audio playback aborted. (MediaError code 1)",
+    2: "Network error caused audio download to fail. (MediaError code 2)",
+    3: "Audio decoding failed. (MediaError code 3)",
+    4: "Audio format not supported. (MediaError code 4)",
 })
 
 /**

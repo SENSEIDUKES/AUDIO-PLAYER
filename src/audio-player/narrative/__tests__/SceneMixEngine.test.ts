@@ -49,9 +49,20 @@ class FakeAudio {
         this.volumeValue = value
     }
 
-    addEventListener(type: string, cb: EventListener): void {
+    addEventListener(
+        type: string,
+        cb: EventListener,
+        options?: AddEventListenerOptions | boolean
+    ): void {
+        const signal = typeof options === "object" ? options.signal : undefined
+        if (signal?.aborted) return
         if (!this.listeners.has(type)) this.listeners.set(type, new Set())
         this.listeners.get(type)!.add(cb)
+        signal?.addEventListener(
+            "abort",
+            () => this.listeners.get(type)?.delete(cb),
+            { once: true }
+        )
     }
 
     removeEventListener(type: string, cb: EventListener): void {
@@ -92,6 +103,10 @@ class FakeAudio {
         for (const listener of this.listeners.get(type) ?? []) {
             listener(event)
         }
+    }
+
+    listenerCount(type: string): number {
+        return this.listeners.get(type)?.size ?? 0
     }
 }
 
@@ -231,6 +246,25 @@ describe("SceneMixEngine", () => {
         expect(listener).toHaveBeenCalledTimes(1)
     })
 
+    it("replays stopped once to a listener subscribing after dispose", () => {
+        const mix = createSceneMixEngine()
+        mix.dispose()
+        const listener = vi.fn()
+
+        const unsubscribe = mix.subscribeStatus(listener)
+        expect(listener).toHaveBeenCalledTimes(1)
+        expect(listener.mock.calls[0][0]).toMatchObject({
+            state: "stopped",
+            requestedTrackKey: null,
+            audibleTrackKey: null,
+        })
+
+        expect(() => unsubscribe()).not.toThrow()
+        mix.crossfadeTo(TRACK)
+        mix.stop(0)
+        expect(listener).toHaveBeenCalledTimes(1)
+    })
+
     it("publishes one consistent stopped snapshot across stop and dispose", async () => {
         const mix = createSceneMixEngine({ fadeMs: 0 })
         mix.crossfadeTo(TRACK)
@@ -320,9 +354,16 @@ describe("SceneMixEngine", () => {
             audibleTrackKey: "id:SCENE_1",
             failure: {
                 reason: "media-error",
-                message: "Audio decoding failed.",
+                message: "Audio decoding failed. (MediaError code 3)",
             },
         })
+        expect(incoming.listenerCount("error")).toBe(0)
+        expect(incoming.listenerCount("loadedmetadata")).toBe(0)
+
+        const failedSnapshot = mix.getStatusSnapshot()
+        incoming.dispatch("error")
+        incoming.dispatch("loadedmetadata")
+        expect(mix.getStatusSnapshot()).toBe(failedSnapshot)
 
         // A late play resolution from the failed deck cannot seize ownership.
         pendingPlay.resolve()
