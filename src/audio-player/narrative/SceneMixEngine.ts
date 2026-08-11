@@ -18,13 +18,6 @@ function clamp01(value: number): number {
     return Math.max(0, Math.min(1, value))
 }
 
-/**
- * A latched "this browser ignores programmatic volume" flag (iOS Safari).
- * Once detected, crossfades degrade to hard swaps instead of silently doing
- * nothing — the scene still changes, it just cuts.
- */
-let volumeWritesUnsupported = false
-
 type Deck = {
     el: HTMLAudioElement
     key: string
@@ -90,6 +83,8 @@ export class SceneMixEngine {
     private active: Deck | null = null
     private level = 1
     private muted = false
+    /** Latched per engine so independent narrative layers cannot poison each other. */
+    private volumeWritesUnsupported = false
     private loop: boolean
     private defaultFadeMs: number
     private crossOrigin?: "anonymous" | "use-credentials"
@@ -134,6 +129,11 @@ export class SceneMixEngine {
         return this.muted
     }
 
+    /** Whether this engine has detected ignored or rejected element-volume writes. */
+    getVolumeWritesUnsupported(): boolean {
+        return this.volumeWritesUnsupported
+    }
+
     /**
      * Crossfade the scene score to `track`. The incoming deck parks at the
      * track's silence-trim start (when analysis is available) so the fade
@@ -162,11 +162,11 @@ export class SceneMixEngine {
         // On volume-locked browsers the fade degrades to a hard swap that
         // relies on the element keeping its default full volume — so the
         // fade-in's zero start must not be written once the latch is known.
-        if (!volumeWritesUnsupported) {
+        if (!this.volumeWritesUnsupported) {
             try {
                 el.volume = 0
             } catch {
-                volumeWritesUnsupported = true
+                this.markVolumeWritesUnsupported()
             }
         }
 
@@ -178,7 +178,7 @@ export class SceneMixEngine {
             rampT0: performance.now(),
             rampFromGain: 0,
             rampToGain: 1,
-            rampMs: volumeWritesUnsupported ? 0 : fadeMs,
+            rampMs: this.volumeWritesUnsupported ? 0 : fadeMs,
             retiring: false,
             abort,
         }
@@ -321,7 +321,7 @@ export class SceneMixEngine {
         deck.rampT0 = performance.now()
         deck.rampFromGain = deck.curveGain
         deck.rampToGain = 0
-        deck.rampMs = volumeWritesUnsupported ? 0 : fadeMs
+        deck.rampMs = this.volumeWritesUnsupported ? 0 : fadeMs
         if (this.active === deck) this.active = null
     }
 
@@ -331,7 +331,7 @@ export class SceneMixEngine {
         deck.rampT0 = performance.now()
         deck.rampFromGain = deck.curveGain
         deck.rampToGain = 1
-        deck.rampMs = volumeWritesUnsupported ? 0 : fadeMs
+        deck.rampMs = this.volumeWritesUnsupported ? 0 : fadeMs
         this.startTicking()
     }
 
@@ -368,16 +368,27 @@ export class SceneMixEngine {
     }
 
     private applyDeckGain(deck: Deck): void {
-        if (volumeWritesUnsupported) return
+        if (this.volumeWritesUnsupported) return
         const target = clamp01(deck.curveGain * this.level)
         try {
             deck.el.volume = target
             if (this.level > 0.1 && Math.abs(deck.el.volume - target) > 0.05) {
-                volumeWritesUnsupported = true
+                this.markVolumeWritesUnsupported()
             }
         } catch {
-            volumeWritesUnsupported = true
+            this.markVolumeWritesUnsupported()
         }
+    }
+
+    /**
+     * Latch the capability for this engine and collapse every in-flight ramp.
+     * The next tick releases retiring decks and promotes the active deck at its
+     * native element volume, turning a crossfade into a safe hard swap.
+     */
+    private markVolumeWritesUnsupported(): void {
+        if (this.volumeWritesUnsupported) return
+        this.volumeWritesUnsupported = true
+        for (const deck of this.decks) deck.rampMs = 0
     }
 
     private startTicking(): void {
