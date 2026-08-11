@@ -6,6 +6,10 @@ import type {
     AudioBackendInfo,
     AudioBackendKind,
 } from "./AudioBackend"
+import {
+    DEFAULT_PLAYBACK_RATE,
+    sanitizePlaybackRate,
+} from "./AudioBackend"
 import { sharedAudioBufferCache, sharedAudioStorageCache } from "./audioCaches"
 
 export const WEBAUDIO_CAPABILITIES = {
@@ -31,7 +35,7 @@ const DEFAULT_SPATIAL = {
     stereo: 0,
     pos: [0, 0, 0] as [number, number, number],
     orientation: [1, 0, 0] as [number, number, number],
-    rate: 1,
+    rate: DEFAULT_PLAYBACK_RATE,
     distanceModel: "inverse" as DistanceModelType,
     refDistance: 1,
     maxDistance: 10000,
@@ -369,6 +373,7 @@ export class WebAudioBackend implements AudioBackend {
         const source = ctx.createBufferSource()
         source.buffer = buffer
         source.loop = this.loopFlag
+        source.playbackRate.value = this.rate
         // Connect to panner (first node in chain), not directly to gain
         source.connect(this.panner!)
         const token = (this.sourceToken += 1)
@@ -511,7 +516,7 @@ export class WebAudioBackend implements AudioBackend {
         const duration = this.buffer?.duration ?? 0
         if (this.state === "playing" && this.ctx) {
             const elapsed = this.ctx.currentTime - this.startedAtCtxTime
-            const position = this.offset + elapsed
+            const position = this.offset + elapsed * this.rate
             if (this.loopFlag && duration > 0) {
                 return position % duration
             }
@@ -752,10 +757,17 @@ export class WebAudioBackend implements AudioBackend {
     }
 
     setRate(rate: number): void {
-        const clamped = Math.max(0.5, Math.min(4.0, rate))
-        this.rate = clamped
+        const next = sanitizePlaybackRate(rate)
+        if (next === this.rate) return
+        if (this.state === "playing" && this.ctx) {
+            // Preserve the exact media position accumulated at the old rate,
+            // then measure future context time from this rate-change boundary.
+            this.offset = this.getCurrentTime()
+            this.startedAtCtxTime = this.ctx.currentTime
+        }
+        this.rate = next
         if (this.source) {
-            this.source.playbackRate.value = clamped
+            this.source.playbackRate.value = next
         }
     }
 

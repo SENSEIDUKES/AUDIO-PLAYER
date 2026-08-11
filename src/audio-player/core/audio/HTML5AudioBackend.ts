@@ -7,6 +7,10 @@ import type {
     AudioBackendInfo,
     AudioBackendKind,
 } from "./AudioBackend"
+import {
+    DEFAULT_PLAYBACK_RATE,
+    sanitizePlaybackRate,
+} from "./AudioBackend"
 import { sharedHTML5AudioPool } from "./audioCaches"
 
 export const HTML5_CAPABILITIES = {
@@ -31,6 +35,7 @@ export class HTML5AudioBackend implements AudioBackend {
     private audioRef: RefObject<HTMLAudioElement | null>
     private preloadAudio: HTMLAudioElement | null = null
     private info: AudioBackendInfo
+    private rate = DEFAULT_PLAYBACK_RATE
 
     constructor(
         audioRef: RefObject<HTMLAudioElement | null>,
@@ -49,6 +54,20 @@ export class HTML5AudioBackend implements AudioBackend {
         return this.audioRef.current
     }
 
+    private applyRate(audio: HTMLAudioElement): void {
+        // defaultPlaybackRate preserves the stored value when a source/load
+        // reset occurs; playbackRate applies it immediately to live playback.
+        try {
+            audio.defaultPlaybackRate = this.rate
+            audio.playbackRate = this.rate
+        } catch (error) {
+            console.warn(
+                "[HTML5AudioBackend] Failed to apply playbackRate:",
+                error
+            )
+        }
+    }
+
     isAttached(): boolean {
         return this.audio !== null
     }
@@ -58,14 +77,20 @@ export class HTML5AudioBackend implements AudioBackend {
     }
 
     load(): void {
-        this.audio?.load()
+        const audio = this.audio
+        if (!audio) return
+        this.applyRate(audio)
+        audio.load()
+        this.applyRate(audio)
     }
 
     clearSource(): void {
         const audio = this.audio
         if (!audio) return
+        this.applyRate(audio)
         audio.removeAttribute("src")
         audio.load()
+        this.applyRate(audio)
     }
 
     play(): Promise<void> {
@@ -75,6 +100,7 @@ export class HTML5AudioBackend implements AudioBackend {
             error.name = "NotSupportedError"
             return Promise.reject(error)
         }
+        this.applyRate(audio)
         return audio.play()
     }
 
@@ -242,13 +268,14 @@ export class HTML5AudioBackend implements AudioBackend {
         return [1, 0, 0]
     }
 
-    setRate(_rate: number): void {
-        // No-op: playbackRate would affect HTML5 element but we keep it simple
-        this.warnUnsupportedFeature("setRate", "rate control", true)
+    setRate(rate: number): void {
+        this.rate = sanitizePlaybackRate(rate)
+        const audio = this.audio
+        if (audio) this.applyRate(audio)
     }
 
     getRate(): number {
-        return 1
+        return this.rate
     }
 
     setDistanceModel(_model: DistanceModelType): void {
@@ -326,9 +353,7 @@ export class HTML5AudioBackend implements AudioBackend {
     ): void {
         let message = `[HTML5AudioBackend] ${methodName}() called but ${featureName} is not supported.`
         if (includeSuggestion) {
-            const suggestionFeature =
-                featureName === "rate control" ? "rate control" : "spatial features"
-            message += ` Use webaudio backend for ${suggestionFeature}.`
+            message += " Use webaudio backend for spatial features."
         }
         console.warn(message)
     }

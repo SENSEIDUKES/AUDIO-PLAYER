@@ -183,6 +183,9 @@ export function useAudioPlayer(
     const [buffered, setBuffered] = useState(0)
     const [bufferedRanges, setBufferedRanges] = useState<BufferedRange[]>([])
     const [volume, setVolumeState] = useState(1)
+    const [playbackRate, setPlaybackRateState] = useState(() =>
+        backendRef.current!.getRate()
+    )
     const [isMuted, setIsMuted] = useState(false)
     const [isSeeking, setIsSeekingState] = useState(false)
     const [isBuffering, setIsBuffering] = useState(false)
@@ -459,6 +462,12 @@ export function useAudioPlayer(
                 setIsMuted(false)
             }
         }
+    }, [])
+
+    const setPlaybackRate = useCallback((rate: number) => {
+        const backend = backendRef.current!
+        backend.setRate(rate)
+        setPlaybackRateState(backend.getRate())
     }, [])
 
     const toggleMute = useCallback(() => {
@@ -929,6 +938,7 @@ export function useAudioPlayer(
         buffered,
         bufferedRanges,
         volume,
+        playbackRate,
         isMuted,
         isBuffering,
         isSeeking,
@@ -947,6 +957,7 @@ export function useAudioPlayer(
         seekBy,
         setSeeking,
         setVolume,
+        setPlaybackRate,
         toggleMute,
         retry,
         loadAndPlay,
