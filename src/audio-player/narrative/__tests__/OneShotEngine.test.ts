@@ -57,6 +57,10 @@ class FakeAudio {
     }
   }
 
+  listenerCount(type: string): number {
+    return this.listeners.get(type)?.size ?? 0;
+  }
+
   removeAttribute(name: string): void {
     if (name === "src") this.src = "";
   }
@@ -68,6 +72,7 @@ class FakeAudio {
   pause(): void {
     this.pauseCalls += 1;
     this.paused = true;
+    this.dispatch("pause");
   }
 
   play(): Promise<void> {
@@ -178,6 +183,20 @@ describe("OneShotEngine", () => {
     engine.dispose();
   });
 
+  it("bounds active playbacks and reclaims an externally paused element", () => {
+    const engine = createOneShotEngine({ maxConcurrent: 2 });
+    const first = engine.playOneShot(URL_A) as unknown as FakeAudio;
+    engine.playOneShot(URL_A);
+
+    expect(engine.playOneShot(URL_B)).toBeNull();
+    expect(FakeAudio.created).toHaveLength(2);
+
+    first.pause();
+    expect(engine.playOneShot(URL_A)).toBe(first);
+    expect(FakeAudio.created).toHaveLength(2);
+    engine.dispose();
+  });
+
   it("trims settled overlap and least-recent idle URL pools", () => {
     const engine = createOneShotEngine({
       maxCachedUrls: 1,
@@ -225,6 +244,39 @@ describe("OneShotEngine", () => {
     FakeAudio.created[0].dispatch("loadedmetadata");
     expect(FakeAudio.created[0].currentTime).toBe(0.25);
     engine.dispose();
+  });
+
+  it("applies an eager startTime seek when metadata is available", () => {
+    const engine = createOneShotEngine();
+    const audio = engine.playOneShot(URL_A, {
+      startTime: 1.25,
+    }) as unknown as FakeAudio;
+
+    expect(audio.currentTime).toBe(1.25);
+    engine.dispose();
+  });
+
+  it("updates idle and active mute state and fully disposes the pool", () => {
+    const engine = createOneShotEngine();
+    const idle = engine.playOneShot(URL_A) as unknown as FakeAudio;
+    idle.dispatch("ended");
+    const active = engine.playOneShot(URL_B) as unknown as FakeAudio;
+
+    engine.setMuted(true);
+    expect(idle.muted).toBe(true);
+    expect(active.muted).toBe(true);
+    expect(active.listenerCount("ended")).toBe(1);
+    expect(idle.listenerCount("error")).toBe(1);
+
+    engine.dispose();
+
+    expect(idle.pauseCalls).toBeGreaterThanOrEqual(2);
+    expect(active.pauseCalls).toBe(1);
+    expect(idle.src).toBe("");
+    expect(active.src).toBe("");
+    expect(idle.listenerCount("error")).toBe(0);
+    expect(active.listenerCount("ended")).toBe(0);
+    expect(engine.playOneShot(URL_A)).toBeNull();
   });
 
   it("evicts non-policy play rejections", async () => {

@@ -34,6 +34,8 @@ export interface OneShotEngineOptions {
   maxCachedUrls?: number;
   /** Maximum elements retained per URL after playback settles. Defaults to 4. */
   maxPoolSizePerUrl?: number;
+  /** Maximum one-shots playing at once. Further calls return null. Defaults to 32. */
+  maxConcurrent?: number;
   /**
    * Optional CORS mode for the detached audio elements. It is intentionally
    * unset by default so ordinary media hosts do not require CORS headers.
@@ -60,6 +62,7 @@ export class OneShotEngine {
   private readonly pools = new Map<string, UrlPool>();
   private readonly maxCachedUrls: number;
   private readonly maxPoolSizePerUrl: number;
+  private readonly maxConcurrent: number;
   private readonly crossOrigin?: "anonymous" | "use-credentials";
   private level: number;
   private muted: boolean;
@@ -72,6 +75,7 @@ export class OneShotEngine {
     this.muted = options.muted ?? false;
     this.maxCachedUrls = positiveInteger(options.maxCachedUrls, 32);
     this.maxPoolSizePerUrl = positiveInteger(options.maxPoolSizePerUrl, 4);
+    this.maxConcurrent = positiveInteger(options.maxConcurrent, 32);
     this.crossOrigin = options.crossOrigin;
   }
 
@@ -141,13 +145,18 @@ export class OneShotEngine {
     const onEnded = () => {
       if (this.isCurrent(entry, generation)) this.release(key, entry);
     };
+    const onPause = () => {
+      if (this.isCurrent(entry, generation)) this.release(key, entry);
+    };
     // Attach before assigning src/loading: cached media events may arrive
     // immediately, and no lifecycle event should slip past the pool.
     entry.el.addEventListener("loadedmetadata", seekWhenReady);
     entry.el.addEventListener("ended", onEnded);
+    entry.el.addEventListener("pause", onPause);
     entry.removePlaybackListeners = () => {
       entry.el.removeEventListener("loadedmetadata", seekWhenReady);
       entry.el.removeEventListener("ended", onEnded);
+      entry.el.removeEventListener("pause", onPause);
     };
 
     let playPromise: Promise<void> | undefined;
@@ -195,6 +204,8 @@ export class OneShotEngine {
   }
 
   private acquire(url: string): PoolEntry | null {
+    if (this.getActiveCount() >= this.maxConcurrent) return null;
+
     let pool = this.pools.get(url);
     if (!pool) {
       pool = { entries: [], lastUsed: 0 };
@@ -301,6 +312,10 @@ export class OneShotEngine {
         .sort(([, a], [, b]) => a.lastUsed - b.lastUsed)[0];
       if (!oldestIdlePool) return;
       const [url, pool] = oldestIdlePool;
+      if (pool.entries.length === 0) {
+        this.pools.delete(url);
+        continue;
+      }
       for (const entry of [...pool.entries]) this.evict(url, entry);
     }
   }
@@ -311,6 +326,16 @@ export class OneShotEngine {
 
   private isCurrent(entry: PoolEntry, generation: number): boolean {
     return entry.active && entry.generation === generation;
+  }
+
+  private getActiveCount(): number {
+    let count = 0;
+    for (const pool of this.pools.values()) {
+      for (const entry of pool.entries) {
+        if (entry.active) count += 1;
+      }
+    }
+    return count;
   }
 
   /**
