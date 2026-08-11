@@ -97,6 +97,13 @@ const INITIAL_STATUS: SceneMixStatusSnapshot = Object.freeze({
     failure: null,
 })
 
+const MEDIA_ERROR_MESSAGES: Readonly<Record<number, string>> = Object.freeze({
+    1: "Audio playback aborted.",
+    2: "Network error caused audio download to fail.",
+    3: "Audio decoding failed.",
+    4: "Audio format not supported.",
+})
+
 /**
  * Cue-driven two-deck crossfader for scene scores (reader BGM, ambient beds).
  *
@@ -474,10 +481,18 @@ export class SceneMixEngine {
         try {
             if (typeof error === "string" && error.trim()) {
                 message = error.trim()
-            } else if (error && typeof error === "object" && "message" in error) {
-                const candidate = (error as { message?: unknown }).message
+            } else if (error && typeof error === "object") {
+                const candidate =
+                    "message" in error
+                        ? (error as { message?: unknown }).message
+                        : undefined
                 if (typeof candidate === "string" && candidate.trim()) {
                     message = candidate.trim()
+                } else if ("code" in error) {
+                    const code = (error as { code?: unknown }).code
+                    if (typeof code === "number" && MEDIA_ERROR_MESSAGES[code]) {
+                        message = MEDIA_ERROR_MESSAGES[code]
+                    }
                 }
             }
         } catch {

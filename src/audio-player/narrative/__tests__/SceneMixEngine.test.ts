@@ -24,6 +24,7 @@ class FakeAudio {
     readyState = 0
     currentTime = 0
     src = ""
+    error: MediaError | null = null
     playCalls = 0
     pauseCalls = 0
 
@@ -305,6 +306,7 @@ describe("SceneMixEngine", () => {
         FakeAudio.playBehavior = () => pendingPlay.promise
         mix.crossfadeTo(TRACK_2)
         const incoming = FakeAudio.created[1]
+        incoming.error = { code: 3, message: "" } as MediaError
         incoming.dispatch("error")
 
         expect(mix.getCurrentTrackKey()).toBe("id:SCENE_1")
@@ -316,7 +318,10 @@ describe("SceneMixEngine", () => {
             state: "failed",
             requestedTrackKey: "id:SCENE_2",
             audibleTrackKey: "id:SCENE_1",
-            failure: { reason: "media-error" },
+            failure: {
+                reason: "media-error",
+                message: "Audio decoding failed.",
+            },
         })
 
         // A late play resolution from the failed deck cannot seize ownership.
