@@ -103,6 +103,11 @@ export class OneShotEngine {
     return this.muted;
   }
 
+  /** Whether this engine has detected ignored or rejected element-volume writes. */
+  getVolumeWritesUnsupported(): boolean {
+    return this.volumeWritesUnsupported;
+  }
+
   /**
    * Start a standalone sound without interrupting any cue already playing.
    * Returns the owned element, or `null` when audio is unavailable.

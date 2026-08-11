@@ -2,11 +2,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createOneShotEngine } from "../OneShotEngine";
 
+type VolumeWriteBehavior = "normal" | "ignore" | "throw";
+
 class FakeAudio {
   static created: FakeAudio[] = [];
   static playBehavior: "resolve" | "not-allowed" | "reject" = "resolve";
   static throwOnSeek = false;
-  static throwOnVolumeWrite = false;
+  static volumeWriteBehaviors: VolumeWriteBehavior[] = [];
 
   preload = "";
   crossOrigin: string | null = null;
@@ -17,10 +19,13 @@ class FakeAudio {
   playCalls = 0;
   pauseCalls = 0;
   private time = 0;
+  private readonly volumeWriteBehavior: VolumeWriteBehavior;
   private volumeValue = 1;
   private listeners = new Map<string, Set<EventListener>>();
 
   constructor() {
+    this.volumeWriteBehavior =
+      FakeAudio.volumeWriteBehaviors.shift() ?? "normal";
     FakeAudio.created.push(this);
   }
 
@@ -38,7 +43,10 @@ class FakeAudio {
   }
 
   set volume(value: number) {
-    if (FakeAudio.throwOnVolumeWrite) throw new Error("volume is locked");
+    if (this.volumeWriteBehavior === "throw") {
+      throw new Error("volume is locked");
+    }
+    if (this.volumeWriteBehavior === "ignore") return;
     this.volumeValue = value;
   }
 
@@ -100,7 +108,7 @@ describe("OneShotEngine", () => {
     FakeAudio.created = [];
     FakeAudio.playBehavior = "resolve";
     FakeAudio.throwOnSeek = false;
-    FakeAudio.throwOnVolumeWrite = false;
+    FakeAudio.volumeWriteBehaviors = [];
   });
 
   afterEach(() => {
@@ -139,22 +147,52 @@ describe("OneShotEngine", () => {
   });
 
   it("keeps playing and reusing media when volume writes are locked", () => {
-    FakeAudio.throwOnVolumeWrite = true;
+    FakeAudio.volumeWriteBehaviors = ["throw"];
     const engine = createOneShotEngine();
+    expect(engine.getVolumeWritesUnsupported()).toBe(false);
     const first = engine.playOneShot(URL_A, { volume: 0.25 });
     const audio = FakeAudio.created[0];
     expect(audio.playCalls).toBe(1);
+    expect(engine.getVolumeWritesUnsupported()).toBe(true);
 
     audio.dispatch("ended");
-    FakeAudio.throwOnVolumeWrite = false;
     const second = engine.playOneShot(URL_A, { volume: 0.5 });
 
     expect(second).toBe(first);
+    expect(FakeAudio.created).toHaveLength(1);
     expect(audio.playCalls).toBe(2);
     // The engine latched the mobile-style volume lock and did not retry a
     // write that previously threw.
     expect(audio.volume).toBe(1);
     engine.dispose();
+  });
+
+  it("keeps volume-lock detection isolated between engine instances", () => {
+    FakeAudio.volumeWriteBehaviors = ["ignore", "normal"];
+    const lockedEngine = createOneShotEngine();
+
+    expect(lockedEngine.getVolumeWritesUnsupported()).toBe(false);
+    const lockedAudio = lockedEngine.playOneShot(URL_A, {
+      volume: 0.25,
+    }) as unknown as FakeAudio;
+
+    const independentEngine = createOneShotEngine({ level: 0.5 });
+    expect(independentEngine.getVolumeWritesUnsupported()).toBe(false);
+    const independentAudio = independentEngine.playOneShot(URL_B, {
+      volume: 0.5,
+    }) as unknown as FakeAudio;
+
+    expect(lockedEngine.getVolumeWritesUnsupported()).toBe(true);
+    expect(independentEngine.getVolumeWritesUnsupported()).toBe(false);
+    expect(lockedAudio.volume).toBe(1);
+    expect(independentAudio.volume).toBeCloseTo(0.25);
+
+    lockedEngine.setMuted(true);
+    expect(lockedAudio.muted).toBe(true);
+    expect(independentAudio.muted).toBe(false);
+
+    lockedEngine.dispose();
+    independentEngine.dispose();
   });
 
   it("evicts a failed media element instead of returning it to the cache", () => {

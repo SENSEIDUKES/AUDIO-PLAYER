@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { createSceneMixEngine } from "../SceneMixEngine"
 import type { Track } from "../../types"
 
+type VolumeWriteBehavior = "normal" | "ignore" | "throw"
+
 /**
  * Minimal Audio stand-in: enough surface for SceneMixEngine's deck lifecycle,
  * with a controllable play() so tests can simulate autoplay policy.
@@ -10,22 +12,38 @@ import type { Track } from "../../types"
 class FakeAudio {
     static created: FakeAudio[] = []
     static playBehavior: "resolve" | "not-allowed" = "resolve"
+    static volumeWriteBehaviors: VolumeWriteBehavior[] = []
 
     loop = false
     preload = ""
     crossOrigin: string | null = null
     muted = false
-    volume = 1
     paused = true
     readyState = 0
     currentTime = 0
     src = ""
     playCalls = 0
+    pauseCalls = 0
 
+    private readonly volumeWriteBehavior: VolumeWriteBehavior
+    private volumeValue = 1
     private listeners = new Map<string, Set<EventListener>>()
 
     constructor() {
+        this.volumeWriteBehavior = FakeAudio.volumeWriteBehaviors.shift() ?? "normal"
         FakeAudio.created.push(this)
+    }
+
+    get volume(): number {
+        return this.volumeValue
+    }
+
+    set volume(value: number) {
+        if (this.volumeWriteBehavior === "throw") {
+            throw new Error("volume is locked")
+        }
+        if (this.volumeWriteBehavior === "ignore") return
+        this.volumeValue = value
     }
 
     addEventListener(type: string, cb: EventListener): void {
@@ -44,6 +62,7 @@ class FakeAudio {
     load(): void {}
 
     pause(): void {
+        this.pauseCalls += 1
         this.paused = true
     }
 
@@ -60,6 +79,7 @@ class FakeAudio {
 }
 
 const TRACK: Track = { id: "SCENE_1", title: "Scene 1", artist: "t", audioFile: "https://cdn.example/score.mp3" }
+const TRACK_2: Track = { id: "SCENE_2", title: "Scene 2", artist: "t", audioFile: "https://cdn.example/score-2.mp3" }
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
 
@@ -71,9 +91,11 @@ describe("SceneMixEngine", () => {
         vi.stubGlobal("Audio", FakeAudio as unknown as typeof Audio)
         FakeAudio.created = []
         FakeAudio.playBehavior = "resolve"
+        FakeAudio.volumeWriteBehaviors = []
     })
 
     afterEach(() => {
+        vi.useRealTimers()
         vi.unstubAllGlobals()
         globalThis.Audio = realAudio
     })
@@ -163,5 +185,56 @@ describe("SceneMixEngine", () => {
         await flush()
         // No retry after dispose — the listener is gone.
         expect(deck.playCalls).toBe(1)
+    })
+
+    it("keeps volume-lock detection isolated between engine instances", () => {
+        vi.useFakeTimers()
+        FakeAudio.volumeWriteBehaviors = ["ignore", "normal"]
+        const lockedMix = createSceneMixEngine({ fadeMs: 0 })
+
+        expect(lockedMix.getVolumeWritesUnsupported()).toBe(false)
+        lockedMix.crossfadeTo(TRACK)
+
+        const independentMix = createSceneMixEngine({ fadeMs: 0 })
+        expect(independentMix.getVolumeWritesUnsupported()).toBe(false)
+        independentMix.setLevel(0.4)
+        independentMix.crossfadeTo(TRACK_2)
+        vi.advanceTimersByTime(40)
+
+        expect(lockedMix.getVolumeWritesUnsupported()).toBe(true)
+        expect(independentMix.getVolumeWritesUnsupported()).toBe(false)
+        expect(FakeAudio.created[0].volume).toBe(1)
+        expect(FakeAudio.created[1].volume).toBeCloseTo(0.4)
+
+        lockedMix.dispose()
+        independentMix.dispose()
+    })
+
+    it("hard-swaps at native volume and preserves mute after detecting a lock", () => {
+        vi.useFakeTimers()
+        FakeAudio.volumeWriteBehaviors = ["ignore", "normal"]
+        const mix = createSceneMixEngine({ fadeMs: 2000 })
+
+        mix.crossfadeTo(TRACK)
+        const outgoing = FakeAudio.created[0]
+        expect(mix.getVolumeWritesUnsupported()).toBe(true)
+
+        mix.setMuted(true)
+        mix.crossfadeTo(TRACK_2)
+        const incoming = FakeAudio.created[1]
+        expect(incoming.volume).toBe(1)
+        expect(incoming.muted).toBe(true)
+
+        // The old deck is released on the first tick, not after the configured
+        // two-second fade that cannot be expressed on a locked element.
+        vi.advanceTimersByTime(40)
+        expect(outgoing.pauseCalls).toBeGreaterThan(0)
+        expect(outgoing.src).toBe("")
+        expect(incoming.paused).toBe(false)
+        expect(mix.getCurrentTrackKey()).toBe("id:SCENE_2")
+
+        mix.setMuted(false)
+        expect(incoming.muted).toBe(false)
+        mix.dispose()
     })
 })
