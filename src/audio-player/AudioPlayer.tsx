@@ -251,6 +251,7 @@ function AudioPlayerInner(props: AudioPlayerProps) {
         automix = false,
         plugins: externalPlugins = EMPTY_PLUGINS,
         audioBackend = "html5",
+        sourceResolver,
         onFallbackSource,
     } = props
 
@@ -306,6 +307,7 @@ function AudioPlayerInner(props: AudioPlayerProps) {
             automix={automix}
             plugins={externalPlugins}
             audioBackend={audioBackend}
+            sourceResolver={sourceResolver}
             onFallbackSource={onFallbackSource}
         >
             <AudioPlayerBody

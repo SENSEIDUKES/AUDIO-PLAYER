@@ -72,8 +72,19 @@ export class HTML5AudioBackend implements AudioBackend {
         return this.audio !== null
     }
 
-    setSource(_src: string | null): void {
-        // No-op: the host JSX owns the element's `src` attribute.
+    setSource(src: string | null): void {
+        const audio = this.audio
+        if (!audio) return
+        const next = src?.trim() ?? ""
+        if (!next) {
+            this.clearSource()
+            return
+        }
+        // React normally owns this attribute. Writing the same value here is
+        // intentionally idempotent and repairs cases where clearSource() ran
+        // between two managed resolutions that produced the same URL.
+        if (audio.getAttribute("src") !== next) audio.src = next
+        this.applyRate(audio)
     }
 
     load(): void {

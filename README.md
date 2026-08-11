@@ -98,6 +98,32 @@ export function PlayerExample() {
 
 A track needs at least `title`, `artist`, and either `audioFile` or `sources`. Use `id` whenever possible so the player can reliably tell tracks apart.
 
+### Managed offline or private sources
+
+`AudioPlayer`, `useAudioPlayer`, and `AudioSessionProvider` accept an optional
+`sourceResolver`. It runs before the active URL reaches the playback backend and
+receives the declared `TrackSource` plus an `AbortSignal`. Return a URL string,
+or return `{ url, release }` when the URL owns a resource such as an object URL:
+
+```tsx
+<AudioSessionProvider
+  initialQueue={tracks}
+  sourceResolver={async (source, signal) => {
+    const blob = await narrationStore.get(source.url, { signal })
+    const url = URL.createObjectURL(blob)
+    return { url, release: () => URL.revokeObjectURL(url) }
+  }}
+>
+  {children}
+</AudioSessionProvider>
+```
+
+Changing sources aborts stale work, and the player releases managed results on
+fallback, replacement, unload, and unmount. Preloading intentionally bypasses
+the resolver and warms declared URLs only; resolver-owned resources are acquired
+only for the active playback source. Automix and waveform pre-analysis keep
+their existing declared-URL behavior.
+
 ### 3. Use a specific version later
 
 When this repo starts using tags, install a locked release like this:

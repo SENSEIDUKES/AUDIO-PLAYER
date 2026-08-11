@@ -1,9 +1,11 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import type { Track } from "../../types"
 import {
     getPrimaryTrackSource,
     getTrackSources,
+    normalizeSourceResolution,
     normalizeSourceUrl,
+    onceSourceRelease,
     sourceUrlsMatch,
     trackSourcesSignature,
 } from "../sources"
@@ -64,5 +66,20 @@ describe("source utilities", () => {
         expect(trackSourcesSignature(track)).toBe(
             JSON.stringify([["http://localhost/audio/main.mp3", ""]])
         )
+    })
+
+    it("normalizes managed results and guards release exactly once", () => {
+        const release = vi.fn()
+        const normalized = normalizeSourceResolution({
+            url: "  blob:https://audio.test/chapter  ",
+            release,
+        })
+        const releaseOnce = onceSourceRelease(normalized?.release)
+
+        expect(normalized?.url).toBe("blob:https://audio.test/chapter")
+        releaseOnce?.()
+        releaseOnce?.()
+        expect(release).toHaveBeenCalledTimes(1)
+        expect(normalizeSourceResolution("   ")).toBeNull()
     })
 })

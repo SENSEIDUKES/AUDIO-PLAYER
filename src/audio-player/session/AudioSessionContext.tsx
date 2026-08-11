@@ -98,6 +98,7 @@ export function AudioSessionProvider({
     automix: initialAutomix = false,
     plugins: externalPlugins = EMPTY_PLUGINS,
     audioBackend = "html5",
+    sourceResolver,
     onFallbackSource,
     preloadConfig,
 }: AudioSessionProviderProps) {
@@ -180,6 +181,7 @@ export function AudioSessionProvider({
         onEnded: () => advanceRef.current(),
         onFallbackSource: handleFallbackSource,
         audioBackend,
+        sourceResolver,
     })
     const timeValue = useMemo<AudioTimeValue>(
         () => ({
@@ -475,7 +477,7 @@ export function AudioSessionProvider({
     useEffect(() => {
         if (pendingPlayRef.current) {
             pendingPlayRef.current = false
-            if (engine.currentSrc) engine.play(true)
+            engine.play(true)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sourceKey, engine.currentSrc])

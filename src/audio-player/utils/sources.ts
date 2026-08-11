@@ -1,4 +1,9 @@
-import type { Track, TrackSource } from "../types"
+import type {
+    ResolvedTrackSource,
+    Track,
+    TrackSource,
+    TrackSourceResolution,
+} from "../types"
 
 function getUrlBase(): string {
     if (typeof globalThis !== "undefined") {
@@ -87,4 +92,33 @@ export function trackSourcesSignature(track: Track | null | undefined): string {
     return JSON.stringify(
         getTrackSources(track).map((source) => [source.url, source.type ?? ""])
     )
+}
+
+/** Normalize a resolver result without losing its resource-release callback. */
+export function normalizeSourceResolution(
+    resolution: TrackSourceResolution
+): ResolvedTrackSource | null {
+    const rawUrl =
+        typeof resolution === "string" ? resolution : resolution?.url ?? ""
+    const url = normalizeSourceUrl(rawUrl)
+    if (!url) return null
+    if (typeof resolution === "string" || !resolution.release) return { url }
+    return { url, release: resolution.release }
+}
+
+/** Guard resolver cleanup so every lifecycle path can safely converge on it. */
+export function onceSourceRelease(
+    release: (() => void) | undefined
+): (() => void) | null {
+    if (!release) return null
+    let released = false
+    return () => {
+        if (released) return
+        released = true
+        try {
+            release()
+        } catch (error) {
+            console.warn("[AudioPlayer] Source release callback failed:", error)
+        }
+    }
 }

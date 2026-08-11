@@ -30,17 +30,41 @@ export interface TrackSource {
     type?: string
 }
 
+/** A resolver-owned playback URL and its optional resource cleanup. */
+export interface ResolvedTrackSource {
+    url: string
+    /**
+     * Releases resources owned by this resolution (for example, revoking an
+     * object URL). The engine invokes this exactly once when the source stops
+     * being active, including stale late resolutions and unmount cleanup.
+     */
+    release?: () => void
+}
+
+/** Value returned by an asynchronous `TrackSourceResolver`. */
+export type TrackSourceResolution = string | ResolvedTrackSource
+
+/**
+ * Resolve a declared source into the effective URL attached to the backend.
+ * Implementations should observe `signal`; results that arrive after abort are
+ * never attached and are released immediately when they include `release`.
+ */
+export type TrackSourceResolver = (
+    source: TrackSource,
+    signal: AbortSignal
+) => Promise<TrackSourceResolution>
+
 /** Emitted when playback automatically moves from one source URL to another. */
 export interface FallbackSourceEvent {
-    /** URL that failed to load/play. */
+    /** Declared source URL that failed to resolve, load, or play. */
     failedSource: string
-    /** URL the engine is switching to. */
+    /** Declared source URL the engine is switching to next. */
     nextSource: string
     /** Optional MIME type hint from the selected fallback source. */
     nextSourceType?: string
-    /** Zero-based index of `nextSource` in the resolved source list. */
+    /** Zero-based index of `nextSource` in the declared source list. */
     sourceIndex: number
-    /** Total number of resolved sources for the current track. */
+    /** Total number of declared source candidates for the current track. */
     sourceCount: number
     /** Normalized backend error, when available. */
     error?: AudioBackendErrorCode | string | null
@@ -192,6 +216,12 @@ export interface AudioPlayerProps extends AudioPlayerTheme {
      * switch.
      */
     audioBackend?: AudioBackendKind
+    /**
+     * Optional asynchronous resolver for offline blobs or expiring private
+     * URLs. Only active playback is resolved; `preload()` intentionally warms
+     * declared URLs directly so resolver-owned resources cannot leak.
+     */
+    sourceResolver?: TrackSourceResolver
     /** Fired when the engine switches from a failed source to a fallback URL. */
     onFallbackSource?: (event: FallbackSourceEvent) => void
 
@@ -253,6 +283,12 @@ export interface UseAudioPlayerOptions {
      * Defaults to `src` when omitted.
      */
     sourceKey?: string
+    /**
+     * Optional asynchronous resolver for offline blobs or expiring private
+     * URLs. Resolution completes before a URL is attached to the backend.
+     * `preload()` bypasses this resolver and warms declared URLs directly.
+     */
+    sourceResolver?: TrackSourceResolver
     autoPlay?: boolean
     loop?: boolean
     /** Fired when the current track reaches its end. */
@@ -328,9 +364,9 @@ export interface AudioPlayerEngine {
     hasAudio: boolean
     /** The currently active resolved source URL, including fallback switches. */
     currentSrc: string
-    /** Zero-based index of `currentSrc` in the resolved source list. */
+    /** Zero-based index of the active candidate in the declared source list. */
     currentSourceIndex: number
-    /** Number of resolved sources available for the current logical track. */
+    /** Number of declared source candidates for the current logical track. */
     sourceCount: number
     /**
      * True when the host environment reports that the browser will not honor
@@ -362,7 +398,11 @@ export interface AudioPlayerEngine {
     /** Acknowledge the autoplay-blocked flag after presenting a UI affordance. */
     dismissAutoplayBlocked: () => void
 
-    // Preload / cache-warm a specific track without switching playback to it.
+    /**
+     * Cache-warm a track without switching playback. When a source resolver is
+     * configured, preload deliberately bypasses it and uses declared URLs only;
+     * resolver-owned resources are acquired only for the active source.
+     */
     preload: (track: Track) => void
     // Explicitly clear the active source, stop playback, and release refs.
     unload: () => void
@@ -588,6 +628,11 @@ export interface AudioSessionProviderProps {
     plugins?: readonly AudioPlayerPlugin[]
     /** Playback backend for the shared session. Defaults to `"html5"`. */
     audioBackend?: AudioBackendKind
+    /**
+     * Optional asynchronous resolver for offline blobs or expiring private
+     * URLs. Forwarded to the shared headless engine.
+     */
+    sourceResolver?: TrackSourceResolver
     /** Fired when the engine switches from a failed source to a fallback URL. */
     onFallbackSource?: (event: FallbackSourceEvent) => void
     /** Preload behavior configuration. */
