@@ -318,6 +318,8 @@ export interface AudioPlayerEngine {
     /** All buffered ranges for advanced UIs (e.g. multi-segment progress). */
     bufferedRanges: BufferedRange[]
     volume: number
+    /** Current playback rate. Defaults to 1x; supported range is 0.5x-4x. */
+    playbackRate: number
     isMuted: boolean
     isBuffering: boolean
     isSeeking: boolean
@@ -351,6 +353,8 @@ export interface AudioPlayerEngine {
     seekBy: (delta: number) => void
     setSeeking: (active: boolean) => void
     setVolume: (value: number) => void
+    /** Set playback rate; finite values clamp to 0.5x-4x, others reset to 1x. */
+    setPlaybackRate: (rate: number) => void
     toggleMute: () => void
     retry: () => void
     /** Imperatively reload + play (used by playlist track changes). */

@@ -3,6 +3,20 @@ import type { BufferedRange, DistanceModelType } from "../../types"
 /** Available playback backend implementations. */
 export type AudioBackendKind = "html5" | "webaudio"
 
+/** Default and supported playback-rate bounds shared by every backend. */
+export const DEFAULT_PLAYBACK_RATE = 1
+export const MIN_PLAYBACK_RATE = 0.5
+export const MAX_PLAYBACK_RATE = 4
+
+/**
+ * Normalize public playback-rate input. Finite values are clamped to the
+ * supported 0.5x-4x range; non-finite values fall back to the 1x default.
+ */
+export function sanitizePlaybackRate(rate: number): number {
+    if (!Number.isFinite(rate)) return DEFAULT_PLAYBACK_RATE
+    return Math.max(MIN_PLAYBACK_RATE, Math.min(MAX_PLAYBACK_RATE, rate))
+}
+
 /**
  * The media-element-shaped events the engine hook subscribes to. The HTML5
  * backend forwards them 1:1 from the underlying element; the Web Audio backend
@@ -100,6 +114,11 @@ export interface AudioBackend {
     play(): Promise<void>
     pause(): void
 
+    /** Set playback rate from 0.5x to 4x. Invalid values are sanitized. */
+    setRate(rate: number): void
+    /** Get the current playback rate. Defaults to 1x. */
+    getRate(): number
+
     getCurrentTime(): number
     setCurrentTime(seconds: number): void
     /** Raw duration; may be NaN/Infinity for html5 before metadata loads. */
@@ -164,11 +183,6 @@ export interface AudioBackend {
     setOrientation(x: number, y: number, z: number): void
     /** Get current orientation vector [x, y, z]. */
     getOrientation(): [number, number, number]
-
-    /** Set playback rate (pitch) from 0.5 to 4.0. */
-    setRate(rate: number): void
-    /** Get current playback rate. */
-    getRate(): number
 
     /** Set distance model algorithm. */
     setDistanceModel(model: DistanceModelType): void
