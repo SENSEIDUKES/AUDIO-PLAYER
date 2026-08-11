@@ -272,6 +272,11 @@ export {
 export type {
   SceneMixEngineOptions,
   SceneCrossfadeOptions,
+  SceneMixTransitionState,
+  SceneMixFailureReason,
+  SceneMixFailure,
+  SceneMixStatusSnapshot,
+  SceneMixStatusListener,
 } from "./narrative/SceneMixEngine";
 // Cached detached-element pool for standalone narrative cues and sound FX.
 export {
