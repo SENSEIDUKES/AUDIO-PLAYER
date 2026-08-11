@@ -4,8 +4,9 @@ function clamp01(value: number): number {
 }
 
 function positiveInteger(value: number | undefined, fallback: number): number {
-  if (!Number.isFinite(value)) return fallback;
-  return Math.max(1, Math.floor(value!));
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.max(1, Math.floor(value))
+    : fallback;
 }
 
 type PoolEntry = {
@@ -122,9 +123,11 @@ export class OneShotEngine {
     entry.el.muted = this.muted;
     this.applyVolume(entry);
 
-    const startTime = Number.isFinite(options.startTime)
-      ? Math.max(0, options.startTime!)
-      : 0;
+    const startTime =
+      typeof options.startTime === "number" &&
+      Number.isFinite(options.startTime)
+        ? Math.max(0, options.startTime)
+        : 0;
     const seekWhenReady = () => {
       if (!this.isCurrent(entry, generation)) return;
       try {
