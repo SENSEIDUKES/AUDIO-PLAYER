@@ -295,6 +295,64 @@ describe("useAudioPlayer sourceResolver", () => {
         expect(harness.engine.hasError).toBe(false)
     })
 
+    it("preserves a pending seek when resolver fallback stays within a replacement track", async () => {
+        const pendingPrimary = deferred<TrackSourceResolution>()
+        const resolver = vi.fn<TrackSourceResolver>((source) => {
+            if (source.url === "first.mp3") {
+                return Promise.resolve("blob:https://audio.test/first")
+            }
+            if (source.url === "second-primary.mp3") {
+                return pendingPrimary.promise
+            }
+            return Promise.resolve("blob:https://audio.test/second-fallback")
+        })
+        const harness = createHarness(resolver)
+
+        await React.act(async () => {
+            root.render(
+                <harness.Harness
+                    sourceKey="first"
+                    sources={[{ url: "first.mp3" }]}
+                />
+            )
+        })
+        await React.act(async () => {
+            root.render(
+                <harness.Harness
+                    sourceKey="second"
+                    sources={[
+                        { url: "second-primary.mp3" },
+                        { url: "second-fallback.mp3" }
+                    ]}
+                />
+            )
+        })
+        await React.act(async () => harness.engine.seek(42))
+
+        await React.act(async () => {
+            pendingPrimary.reject(new Error("private URL expired"))
+            await pendingPrimary.promise.catch(() => undefined)
+        })
+        await vi.waitFor(() => {
+            expect(harness.engine.currentSourceIndex).toBe(1)
+            expect(harness.engine.currentSrc).toBe(
+                "blob:https://audio.test/second-fallback"
+            )
+        })
+
+        const audio = container.querySelector("audio")!
+        Object.defineProperty(audio, "duration", {
+            configurable: true,
+            value: 100
+        })
+        await React.act(async () =>
+            audio.dispatchEvent(new Event("loadedmetadata"))
+        )
+
+        expect(audio.currentTime).toBe(42)
+        expect(harness.engine.currentTime).toBe(42)
+    })
+
     it("releases the active result exactly once when the backend advances to a fallback", async () => {
         const releases = [vi.fn(), vi.fn()]
         const fallback = vi.fn()

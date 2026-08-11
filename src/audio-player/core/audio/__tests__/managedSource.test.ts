@@ -22,4 +22,20 @@ describe("managed HTML5 sources", () => {
         backend.setSource(url)
         expect(audio.getAttribute("src")).toBe(url)
     })
+
+    it("does not rewrite a relative source that already resolves to the effective URL", () => {
+        vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {})
+        const audio = document.createElement("audio")
+        const backend = new HTML5AudioBackend({ current: audio })
+        const relativeUrl = "chapter.mp3"
+        const absoluteUrl = new URL(relativeUrl, document.baseURI).href
+
+        audio.setAttribute("src", relativeUrl)
+        backend.setSource(absoluteUrl)
+        expect(audio.getAttribute("src")).toBe(relativeUrl)
+
+        backend.clearSource()
+        backend.setSource(absoluteUrl)
+        expect(audio.getAttribute("src")).toBe(absoluteUrl)
+    })
 })

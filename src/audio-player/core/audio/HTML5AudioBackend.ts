@@ -82,8 +82,11 @@ export class HTML5AudioBackend implements AudioBackend {
         }
         // React normally owns this attribute. Writing the same value here is
         // intentionally idempotent and repairs cases where clearSource() ran
-        // between two managed resolutions that produced the same URL.
-        if (audio.getAttribute("src") !== next) audio.src = next
+        // between two managed resolutions that produced the same URL. Compare
+        // the raw attribute and resolved property so equivalent relative and
+        // absolute URLs do not restart the resource.
+        const current = audio.getAttribute("src")
+        if (current !== next && audio.src !== next) audio.src = next
         this.applyRate(audio)
     }
 
