@@ -33,6 +33,11 @@ type Deck = {
     abort: AbortController
 }
 
+type PendingTransition = {
+    incoming: Deck
+    fadeMs: number
+}
+
 export interface SceneMixEngineOptions {
     /** Loop every scene track. Defaults to true — scores are beds, not songs. */
     loop?: boolean
@@ -56,6 +61,48 @@ export interface SceneCrossfadeOptions {
     /** Crossfade length for this switch only. */
     fadeMs?: number
 }
+
+export type SceneMixTransitionState =
+    | "idle"
+    | "loading"
+    | "autoplay-blocked"
+    | "playing"
+    | "stopped"
+    | "failed"
+
+export type SceneMixFailureReason = "playback-failed" | "media-error"
+
+export interface SceneMixFailure {
+    /** Stable reason suitable for retry and UI decisions. */
+    readonly reason: SceneMixFailureReason
+    /** Safe diagnostic detail with a stable fallback when none was provided. */
+    readonly message: string
+}
+
+export interface SceneMixStatusSnapshot {
+    readonly state: SceneMixTransitionState
+    /** Newest requested track, including a candidate that has not started. */
+    readonly requestedTrackKey: string | null
+    /** Track that currently owns the audible mix. */
+    readonly audibleTrackKey: string | null
+    readonly failure: SceneMixFailure | null
+}
+
+export type SceneMixStatusListener = (snapshot: SceneMixStatusSnapshot) => void
+
+const INITIAL_STATUS: SceneMixStatusSnapshot = Object.freeze({
+    state: "idle",
+    requestedTrackKey: null,
+    audibleTrackKey: null,
+    failure: null,
+})
+
+const MEDIA_ERROR_MESSAGES: Readonly<Record<number, string>> = Object.freeze({
+    1: "Audio playback aborted. (MediaError code 1)",
+    2: "Network error caused audio download to fail. (MediaError code 2)",
+    3: "Audio decoding failed. (MediaError code 3)",
+    4: "Audio format not supported. (MediaError code 4)",
+})
 
 /**
  * Cue-driven two-deck crossfader for scene scores (reader BGM, ambient beds).
@@ -90,8 +137,12 @@ export class SceneMixEngine {
     private crossOrigin?: "anonymous" | "use-credentials"
     private tickTimer: ReturnType<typeof setInterval> | null = null
     private disposed = false
+    /** Replacement being prepared. It does not own or alter the audible mix yet. */
+    private pendingTransition: PendingTransition | null = null
     /** Removes the armed unlock-gesture listeners, when armed. */
     private disarmGestureRetry: (() => void) | null = null
+    private statusSnapshot = INITIAL_STATUS
+    private statusListeners = new Set<SceneMixStatusListener>()
 
     constructor(options: SceneMixEngineOptions = {}) {
         this.loop = options.loop ?? true
@@ -99,9 +150,38 @@ export class SceneMixEngine {
         this.crossOrigin = options.crossOrigin
     }
 
-    /** Key of the track currently owning the mix (fading in or steady). */
+    /**
+     * Key of the track currently owning the mix (fading in or steady).
+     * Loading and autoplay-blocked candidates are intentionally excluded until
+     * playback starts; use `getStatusSnapshot()` to also inspect the request.
+     */
     getCurrentTrackKey(): string | null {
         return this.active?.key ?? null
+    }
+
+    /** Immutable current transition status. */
+    getStatusSnapshot(): SceneMixStatusSnapshot {
+        return this.statusSnapshot
+    }
+
+    /**
+     * Subscribe to ordered status snapshots. The current snapshot is replayed
+     * once immediately; the returned function removes the listener.
+     */
+    subscribeStatus(listener: SceneMixStatusListener): () => void {
+        if (this.disposed) {
+            this.notifyStatusListener(listener, this.statusSnapshot)
+            return () => {}
+        }
+
+        this.statusListeners.add(listener)
+        this.notifyStatusListener(listener, this.statusSnapshot)
+        let subscribed = true
+        return () => {
+            if (!subscribed) return
+            subscribed = false
+            this.statusListeners.delete(listener)
+        }
     }
 
     /**
@@ -139,15 +219,26 @@ export class SceneMixEngine {
      * track's silence-trim start (when analysis is available) so the fade
      * never runs through dead air. Calling again mid-fade retires every
      * audible deck toward silence and hands the mix to the newest track; a
-     * repeat call for the already-active track is a no-op.
+     * repeat call for the already-active track is a no-op. A replacement is
+     * transactional: the current mix is not retired until `play()` confirms
+     * that the incoming deck has started.
      */
     crossfadeTo(track: Track, options: SceneCrossfadeOptions = {}): void {
         if (this.disposed || typeof Audio === "undefined") return
         const src = getPrimaryTrackSource(track)
         if (!src) return
         const key = trackKey(track)
+        if (this.pendingTransition?.incoming.key === key) return
         if (this.active && this.active.key === key && !this.active.retiring) {
+            if (this.pendingTransition) {
+                this.rollbackTransition(this.pendingTransition)
+            }
+            this.publishStatus("playing", key, key)
             return
+        }
+
+        if (this.pendingTransition) {
+            this.rollbackTransition(this.pendingTransition)
         }
 
         const fadeMs = Math.max(0, options.fadeMs ?? this.defaultFadeMs)
@@ -182,6 +273,10 @@ export class SceneMixEngine {
             retiring: false,
             abort,
         }
+        const transition: PendingTransition = {
+            incoming: deck,
+            fadeMs,
+        }
 
         // Park at the silence-trim start once metadata (and, later, analysis)
         // is in. Every failure mode falls back to the natural track start.
@@ -202,103 +297,263 @@ export class SceneMixEngine {
         el.addEventListener(
             "error",
             () => {
-                // Bad URL / network: drop the incoming deck, keep what plays.
-                this.releaseDeck(deck)
+                this.handleDeckFailure(deck, transition)
             },
             { signal: abort.signal }
         )
         void ensureTrackAnalysis(track).then(() => {
             if (!abort.signal.aborted && !deck.retiring) applyTrimStart()
         })
-        // Src is assigned after the listeners so a cache-instant
-        // `loadedmetadata` can't slip past the trim-start hook.
-        el.src = src
-
-        // Retire everything currently audible toward silence.
-        for (const other of this.decks) this.retire(other, fadeMs)
-
         this.decks.push(deck)
-        this.active = deck
-
-        let playPromise: Promise<void> | undefined
-        try {
-            el.load()
-            playPromise = el.play()
-        } catch {
-            this.releaseDeck(deck)
-            return
-        }
-        playPromise?.catch((error: unknown) => {
-            if (!this.decks.includes(deck)) return
-            // Autoplay policy (NotAllowedError): the browser is waiting for a
-            // user gesture, not rejecting the media. Keep the deck loaded and
-            // parked, and retry the active deck on the first gesture — so the
-            // score starts the moment the user touches the page instead of
-            // staying silent for the whole session.
-            if ((error as { name?: string } | null)?.name === "NotAllowedError") {
-                this.armGestureRetry()
-                return
-            }
-            // Any other failure: give up on this switch and let whatever was
-            // playing keep playing. Every other deck was just marked retiring,
-            // so the newest of them — the score that was audible before this
-            // call — is the one to bring back. If a later crossfadeTo already
-            // superseded this deck, it owns the mix; only recover a survivor
-            // when the rejected deck was still the newest.
-            const wasNewest = this.decks[this.decks.length - 1] === deck
-            this.releaseDeck(deck)
-            if (!wasNewest) return
-            const survivor = this.decks[this.decks.length - 1]
-            if (survivor) {
-                this.unretire(survivor, fadeMs)
-                this.active = survivor
-            }
-        })
-
-        this.applyGains()
-        this.startTicking()
+        this.pendingTransition = transition
+        this.publishStatus("loading", key, this.active?.key ?? null)
+        // Src is assigned after the listeners and ownership record so
+        // cache-instant metadata/error events cannot slip past either.
+        el.src = src
+        if (this.pendingTransition !== transition) return
+        // Verify the silent preparation write now. If element-volume writes
+        // are locked, the engine latches its hard-swap fallback before commit.
+        this.applyDeckGain(deck)
+        this.attemptPlayback(transition, true)
     }
 
     /** Fade the whole scene layer to silence and release every deck. */
     stop(fadeMs: number = this.defaultFadeMs): void {
+        if (this.pendingTransition) {
+            this.rollbackTransition(this.pendingTransition)
+        }
         for (const deck of this.decks) this.retire(deck, fadeMs)
         this.active = null
         this.startTicking()
+        this.publishStatus("stopped", null, null)
     }
 
     dispose(): void {
         this.disposed = true
         this.stopTicking()
         this.disarmGestureRetry?.()
+        this.pendingTransition = null
         for (const deck of [...this.decks]) this.releaseDeck(deck)
         this.active = null
+        this.publishStatus("stopped", null, null)
+        this.statusListeners.clear()
+    }
+
+    /** Attempt or retry playback without changing ownership of the current mix. */
+    private attemptPlayback(transition: PendingTransition, shouldLoad: boolean): void {
+        if (this.disposed || this.pendingTransition !== transition) return
+
+        let playPromise: Promise<void>
+        try {
+            if (shouldLoad) {
+                transition.incoming.el.load()
+                if (this.pendingTransition !== transition) return
+            }
+            playPromise = transition.incoming.el.play()
+        } catch (error) {
+            this.handlePlaybackFailure(transition, error)
+            return
+        }
+
+        Promise.resolve(playPromise).then(
+            () => this.commitTransition(transition),
+            (error: unknown) => this.handlePlaybackFailure(transition, error)
+        )
+    }
+
+    /** Commit exactly once, only while this is still the newest replacement. */
+    private commitTransition(transition: PendingTransition): void {
+        if (this.disposed || this.pendingTransition !== transition) return
+
+        this.pendingTransition = null
+        this.disarmGestureRetry?.()
+        for (const deck of this.decks) {
+            if (deck !== transition.incoming) {
+                this.retire(deck, transition.fadeMs)
+            }
+        }
+
+        const incoming = transition.incoming
+        incoming.retiring = false
+        incoming.rampT0 = performance.now()
+        incoming.rampFromGain = incoming.curveGain
+        incoming.rampToGain = 1
+        incoming.rampMs = this.volumeWritesUnsupported ? 0 : transition.fadeMs
+        this.active = incoming
+        this.publishStatus("playing", incoming.key, incoming.key)
+        this.applyGains()
+        this.startTicking()
+    }
+
+    private handlePlaybackFailure(transition: PendingTransition, error: unknown): void {
+        if (this.pendingTransition !== transition) return
+        if ((error as { name?: string } | null)?.name === "NotAllowedError") {
+            this.publishStatus(
+                "autoplay-blocked",
+                transition.incoming.key,
+                this.active?.key ?? null
+            )
+            this.armGestureRetry(transition)
+            return
+        }
+        this.failTransition(transition, "playback-failed", error)
     }
 
     /**
-     * Arm a one-shot retry of the active deck on the next user gesture.
+     * Roll back every pre-commit failure path. Since preparation never retires
+     * the existing mix, rollback only has to release the failed candidate.
+     */
+    private rollbackTransition(transition: PendingTransition): void {
+        if (this.pendingTransition !== transition) return
+        this.pendingTransition = null
+        this.disarmGestureRetry?.()
+        this.releaseDeck(transition.incoming)
+    }
+
+    private failTransition(
+        transition: PendingTransition,
+        reason: SceneMixFailureReason,
+        error: unknown
+    ): void {
+        if (this.pendingTransition !== transition) return
+        const requestedTrackKey = transition.incoming.key
+        this.rollbackTransition(transition)
+        this.publishStatus(
+            "failed",
+            requestedTrackKey,
+            this.active?.key ?? null,
+            this.normalizeFailure(reason, error)
+        )
+    }
+
+    /** Media errors share rollback with play failures and never revive stale decks. */
+    private handleDeckFailure(deck: Deck, transition: PendingTransition): void {
+        if (!this.decks.includes(deck)) return
+        if (this.pendingTransition === transition) {
+            this.failTransition(transition, "media-error", deck.el.error)
+            return
+        }
+
+        const mediaError = deck.el.error
+        const wasActive = this.active === deck
+        this.releaseDeck(deck)
+        if (!wasActive) return
+
+        // A post-commit media failure can still recover the newest outgoing
+        // deck while it exists. A stale retiring deck can never displace a
+        // newer active owner.
+        const pendingIncoming = this.pendingTransition?.incoming
+        const survivor = [...this.decks].reverse().find((candidate) => candidate !== pendingIncoming)
+        if (survivor) {
+            this.unretire(survivor, transition.fadeMs)
+            this.active = survivor
+        }
+
+        if (this.pendingTransition) {
+            const pendingState =
+                this.statusSnapshot.state === "autoplay-blocked"
+                    ? "autoplay-blocked"
+                    : "loading"
+            this.publishStatus(
+                pendingState,
+                this.pendingTransition.incoming.key,
+                this.active?.key ?? null
+            )
+        } else {
+            this.publishStatus(
+                "failed",
+                deck.key,
+                this.active?.key ?? null,
+                this.normalizeFailure("media-error", mediaError)
+            )
+        }
+    }
+
+    private normalizeFailure(
+        reason: SceneMixFailureReason,
+        error: unknown
+    ): SceneMixFailure {
+        const fallback =
+            reason === "media-error"
+                ? "Scene audio failed to load or decode."
+                : "Scene audio playback failed."
+        let message = fallback
+        try {
+            if (typeof error === "string" && error.trim()) {
+                message = error.trim()
+            } else if (error && typeof error === "object") {
+                const candidate =
+                    "message" in error
+                        ? (error as { message?: unknown }).message
+                        : undefined
+                if (typeof candidate === "string" && candidate.trim()) {
+                    message = candidate.trim()
+                } else if ("code" in error) {
+                    const code = (error as { code?: unknown }).code
+                    if (typeof code === "number" && MEDIA_ERROR_MESSAGES[code]) {
+                        message = MEDIA_ERROR_MESSAGES[code]
+                    }
+                }
+            }
+        } catch {
+            // Host-provided errors can have throwing getters; use the fallback.
+        }
+        return Object.freeze({ reason, message })
+    }
+
+    private publishStatus(
+        state: SceneMixTransitionState,
+        requestedTrackKey: string | null,
+        audibleTrackKey: string | null,
+        failure: SceneMixFailure | null = null
+    ): void {
+        const previous = this.statusSnapshot
+        if (
+            previous.state === state &&
+            previous.requestedTrackKey === requestedTrackKey &&
+            previous.audibleTrackKey === audibleTrackKey &&
+            previous.failure?.reason === failure?.reason &&
+            previous.failure?.message === failure?.message
+        ) {
+            return
+        }
+
+        const snapshot: SceneMixStatusSnapshot = Object.freeze({
+            state,
+            requestedTrackKey,
+            audibleTrackKey,
+            failure,
+        })
+        this.statusSnapshot = snapshot
+        for (const listener of [...this.statusListeners]) {
+            this.notifyStatusListener(listener, snapshot)
+        }
+    }
+
+    private notifyStatusListener(
+        listener: SceneMixStatusListener,
+        snapshot: SceneMixStatusSnapshot
+    ): void {
+        try {
+            listener(snapshot)
+        } catch {
+            // Status observers cannot break media lifecycle callbacks.
+        }
+    }
+
+    /**
+     * Arm a one-shot retry of the prepared deck on the next user gesture.
      * Autoplay policies reject `play()` until the user interacts with the
      * page; without this, a scene score started from lifecycle code (scene
      * change, chapter load) would stay silent forever.
      */
-    private armGestureRetry(): void {
+    private armGestureRetry(transition: PendingTransition): void {
         if (this.disarmGestureRetry || this.disposed) return
+        if (this.pendingTransition !== transition) return
         if (typeof document === "undefined") return
         const retry = () => {
             disarm()
-            if (this.disposed) return
-            const deck = this.active
-            if (!deck || !deck.el.paused) return
-            deck.el.play().catch((error: unknown) => {
-                // Some browsers need a "louder" gesture (e.g. keydown on a
-                // page that only counts pointer input); stay armed for the
-                // next one instead of giving up.
-                if (
-                    (error as { name?: string } | null)?.name ===
-                    "NotAllowedError"
-                ) {
-                    this.armGestureRetry()
-                }
-            })
+            this.attemptPlayback(transition, false)
         }
         const disarm = () => {
             this.disarmGestureRetry = null
@@ -346,12 +601,18 @@ export class SceneMixEngine {
         const now = performance.now()
         let anyRamping = false
         for (const deck of [...this.decks]) {
+            if (this.pendingTransition?.incoming === deck) {
+                this.applyDeckGain(deck)
+                continue
+            }
             const t = deck.rampMs <= 0 ? 1 : Math.min(1, (now - deck.rampT0) / deck.rampMs)
             if (deck.rampToGain > deck.rampFromGain) {
                 const span = deck.rampToGain - deck.rampFromGain
                 deck.curveGain = deck.rampFromGain + span * Math.sin((t * Math.PI) / 2)
-            } else {
+            } else if (deck.rampToGain < deck.rampFromGain) {
                 deck.curveGain = deck.rampFromGain * Math.cos((t * Math.PI) / 2)
+            } else {
+                deck.curveGain = deck.rampToGain
             }
             if (t < 1) anyRamping = true
             else if (deck.retiring) {
