@@ -38,4 +38,19 @@ describe("managed HTML5 sources", () => {
         backend.setSource(absoluteUrl)
         expect(audio.getAttribute("src")).toBe(absoluteUrl)
     })
+
+    it("clears the element when the source is blank or null", () => {
+        vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {})
+        const audio = document.createElement("audio")
+        const backend = new HTML5AudioBackend({ current: audio })
+        const url = "blob:https://audio.test/pending"
+
+        backend.setSource(url)
+        backend.setSource("   ")
+        expect(audio.getAttribute("src")).toBeNull()
+
+        backend.setSource(url)
+        backend.setSource(null)
+        expect(audio.getAttribute("src")).toBeNull()
+    })
 })
