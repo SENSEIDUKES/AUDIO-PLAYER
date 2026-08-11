@@ -259,6 +259,32 @@ describe("AudioSessionProvider track error policy", () => {
     expect(playSpy).toHaveBeenCalledTimes(3);
   });
 
+  it("scans past previously failed tracks after the play order changes", async () => {
+    const randomValues = [0xffffffff, 0xffffffff, 0];
+    vi.stubGlobal("crypto", {
+      getRandomValues: (values: Uint32Array) => {
+        values[0] = randomValues.shift() ?? 0;
+        return values;
+      },
+    });
+    const audio = await mount({
+      initialQueue: [...TRACKS, { ...TRACKS[0]!, id: "four", title: "Four" }],
+      repeatMode: "all",
+      trackErrorPolicy: "skip",
+    });
+    installMediaError(audio);
+
+    await React.act(async () => session.play());
+    await React.act(async () => audio.dispatchEvent(new Event("error")));
+    await vi.waitFor(() => expect(session.currentIndex).toBe(1));
+    await React.act(async () => session.toggleShuffle());
+    await React.act(async () => audio.dispatchEvent(new Event("error")));
+    await vi.waitFor(() => expect(session.currentIndex).toBe(2));
+
+    expect(session.currentTrack).toEqual(TRACKS[2]);
+    expect(playSpy).toHaveBeenCalledTimes(3);
+  });
+
   it("keeps normal single-track repeat-all restarts working", async () => {
     const audio = await mount({
       initialQueue: TRACKS.slice(0, 1),
@@ -306,9 +332,28 @@ describe("AudioSessionProvider track error policy", () => {
     });
 
     await startAndFail(audio);
-    await vi.waitFor(() => expect(session.currentIndex).toBe(2));
+    await vi.waitFor(() => expect(session.currentIndex).not.toBe(0));
 
-    expect(session.currentTrack).toEqual(TRACKS[2]);
+    expect(session.currentTrack).not.toEqual(TRACKS[0]);
+    expect(TRACKS).toContainEqual(session.currentTrack);
+    expect(playSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("preserves requested playback when failure pauses before error", async () => {
+    const audio = await mount({
+      initialQueue: TRACKS.slice(0, 2),
+      trackErrorPolicy: "skip",
+    });
+    installMediaError(audio);
+
+    await React.act(async () => session.play());
+    await React.act(async () => {
+      audio.dispatchEvent(new Event("pause"));
+      audio.dispatchEvent(new Event("error"));
+    });
+    await vi.waitFor(() => expect(session.currentIndex).toBe(1));
+
+    expect(session.isPlaying).toBe(true);
     expect(playSpy).toHaveBeenCalledTimes(2);
   });
 

@@ -342,19 +342,34 @@ export function AudioSessionProvider({
             failedSourceKeysRef.current.add(expectedSourceKey)
         }
 
-        const next = stepIndex(currentIndex, 1)
+        let next = stepIndex(currentIndex, 1)
         if (next === null) {
             emit('queue-end', { reason: repeatMode === 'off' ? 'repeat-off' : 'normal' })
             return
         }
-        const nextTrack = queue[next]
-        if (
-            reason === "error" &&
-            (!nextTrack ||
-                failedSourceKeysRef.current.has(queueSourceKey(next, nextTrack)))
-        ) {
-            emit("queue-end", { reason: "normal" })
-            return
+        if (reason === "error") {
+            const visited = new Set([currentIndex])
+            while (next !== null) {
+                if (visited.has(next)) {
+                    emit("queue-end", { reason: "normal" })
+                    return
+                }
+                visited.add(next)
+                const nextTrack = queue[next]
+                if (
+                    nextTrack &&
+                    !failedSourceKeysRef.current.has(
+                        queueSourceKey(next, nextTrack)
+                    )
+                ) {
+                    break
+                }
+                next = stepIndex(next, 1)
+            }
+            if (next === null) {
+                emit("queue-end", { reason: "normal" })
+                return
+            }
         }
         if (next === currentIndex) {
             if (reason === "error") {
@@ -812,7 +827,7 @@ export function AudioSessionProvider({
     }, [])
 
     const pruneAudioCache = useCallback((keepRecent = 0) => {
-        const keepKeys = queue.map((t, i) => `${i}:${trackKey(t)}:${trackSourcesSignature(t)}`)
+        const keepKeys = queue.map((t, i) => queueSourceKey(i, t))
         sharedAudioBufferCache.prune(keepKeys, keepRecent)
     }, [queue])
 
