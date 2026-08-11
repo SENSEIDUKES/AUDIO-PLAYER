@@ -57,8 +57,15 @@ export class HTML5AudioBackend implements AudioBackend {
     private applyRate(audio: HTMLAudioElement): void {
         // defaultPlaybackRate preserves the stored value when a source/load
         // reset occurs; playbackRate applies it immediately to live playback.
-        audio.defaultPlaybackRate = this.rate
-        audio.playbackRate = this.rate
+        try {
+            audio.defaultPlaybackRate = this.rate
+            audio.playbackRate = this.rate
+        } catch (error) {
+            console.warn(
+                "[HTML5AudioBackend] Failed to apply playbackRate:",
+                error
+            )
+        }
     }
 
     isAttached(): boolean {

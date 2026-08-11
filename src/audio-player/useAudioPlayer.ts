@@ -916,10 +916,6 @@ export function useAudioPlayer(
         if (backend.isAttached()) backend.setLoop(loop)
     }, [loop])
 
-    useEffect(() => {
-        backendRef.current!.setRate(playbackRate)
-    }, [playbackRate])
-
     // Release backend resources on unmount. destroy() is revivable, so React
     // StrictMode's unmount/remount cycle recreates what it needs lazily.
     useEffect(() => {

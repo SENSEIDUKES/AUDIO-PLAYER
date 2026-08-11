@@ -133,6 +133,34 @@ describe("playback rate backends", () => {
         expect(audio.playbackRate).toBe(DEFAULT_PLAYBACK_RATE)
     })
 
+    it("does not crash when a browser rejects native playback-rate writes", () => {
+        const error = new DOMException("unsupported", "NotSupportedError")
+        const audio = {} as HTMLAudioElement
+        Object.defineProperties(audio, {
+            defaultPlaybackRate: {
+                configurable: true,
+                set: () => {
+                    throw error
+                },
+            },
+            playbackRate: {
+                configurable: true,
+                set: () => {
+                    throw error
+                },
+            },
+        })
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+        const backend = new HTML5AudioBackend({ current: audio })
+
+        expect(() => backend.setRate(2)).not.toThrow()
+        expect(backend.getRate()).toBe(2)
+        expect(warn).toHaveBeenCalledWith(
+            "[HTML5AudioBackend] Failed to apply playbackRate:",
+            error
+        )
+    })
+
     it("re-anchors live Web Audio timing and preserves rate across source nodes", async () => {
         const { context, sources } = installAudioContext()
         const backend = createWebAudioBackend()
