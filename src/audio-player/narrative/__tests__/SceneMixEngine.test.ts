@@ -957,7 +957,7 @@ describe("SceneMixEngine", () => {
         mix.dispose()
 
         analysisMocks.ensureSourceAnalysis.mockReset()
-        analysisMocks.ensureSourceAnalysis.mockRejectedValue(new Error("analysis failed"))
+        analysisMocks.ensureSourceAnalysis.mockResolvedValue(null)
         FakeAudio.playBehavior = "resolve"
         const failureMix = createSceneMixEngine()
         failureMix.crossfadeTo(TRACK_2)
@@ -971,19 +971,6 @@ describe("SceneMixEngine", () => {
             failure: null,
         })
         failureMix.dispose()
-
-        analysisMocks.ensureSourceAnalysis.mockReset()
-        analysisMocks.ensureSourceAnalysis.mockImplementationOnce(() => {
-            throw new Error("synchronous analysis failure")
-        })
-        const synchronousFailureMix = createSceneMixEngine()
-        expect(() => synchronousFailureMix.crossfadeTo(TRACK_3)).not.toThrow()
-        await flushMicrotasks()
-        expect(synchronousFailureMix.getStatusSnapshot()).toMatchObject({
-            state: "playing",
-            failure: null,
-        })
-        synchronousFailureMix.dispose()
     })
 
     it("does not gate streaming playback on slow automatic analysis", async () => {

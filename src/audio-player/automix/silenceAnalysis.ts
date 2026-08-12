@@ -141,16 +141,10 @@ export function ensureTrackAnalysis(track: Track): Promise<TrackTrims | null> {
     if (!key || !url) return Promise.resolve(null)
     const existing = pending.get(key)
     if (existing) return existing
-    const job = ensureSourceAnalysis(url).then(
-        (trims) => {
-            settled.set(key, trims)
-            return trims
-        },
-        () => {
-            settled.set(key, null)
-            return null
-        }
-    )
+    const job = ensureSourceAnalysis(url).then((trims) => {
+        settled.set(key, trims)
+        return trims
+    })
     pending.set(key, job)
     return job
 }

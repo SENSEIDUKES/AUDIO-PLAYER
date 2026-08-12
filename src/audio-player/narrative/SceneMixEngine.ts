@@ -363,16 +363,9 @@ export class SceneMixEngine {
             // Preserve SceneMix's streaming behavior: analysis may improve the
             // start when it settles before playback, but never gates play(). An
             // uncached/slow analysis therefore falls back to the natural start.
-            try {
-                void ensureSourceAnalysis(source.url).then(
-                    (trims) => this.handleCandidateAnalysis(transition, deck, trims),
-                    () => {
-                        // Analysis is an optional enhancement; natural start is safe.
-                    }
-                )
-            } catch {
-                // Analysis is an optional enhancement; natural start is safe.
-            }
+            void ensureSourceAnalysis(source.url).then((trims) => {
+                this.handleCandidateAnalysis(transition, deck, trims)
+            })
         }
 
         // Src is assigned after the listeners and ownership record so
