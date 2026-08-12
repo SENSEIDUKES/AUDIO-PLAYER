@@ -111,7 +111,11 @@ describe("ensureProTrackAnalysis", () => {
     })
 
     it("resolves null when decoding fails", async () => {
-        configureTrackAnalysis({ decode: async () => null, rhythm: async () => null, persist: false })
+        configureTrackAnalysis({
+            decode: async () => null,
+            rhythm: async () => null,
+            persist: false,
+        })
         const analysis = await ensureProTrackAnalysis(track("broken"))
         expect(analysis).toBeNull()
     })

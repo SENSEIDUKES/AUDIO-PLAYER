@@ -7,7 +7,7 @@ import type {
     FallbackSourceEvent,
     TrackSource,
     TrackSourceResolution,
-    TrackSourceResolver
+    TrackSourceResolver,
 } from "../types"
 import { useAudioPlayer } from "../useAudioPlayer"
 
@@ -55,7 +55,7 @@ function installAudioContext() {
         }),
         decodeAudioData: vi.fn(async () => ({ duration: 60 }) as AudioBuffer),
         resume: vi.fn(async () => undefined),
-        close: vi.fn(async () => undefined)
+        close: vi.fn(async () => undefined),
     }
     vi.stubGlobal(
         "AudioContext",
@@ -90,12 +90,12 @@ describe("useAudioPlayer sourceResolver", () => {
         )
         vi.stubGlobal("cancelAnimationFrame", vi.fn())
         vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {})
-        playSpy = vi
-            .spyOn(HTMLMediaElement.prototype, "play")
-            .mockImplementation(function (this: HTMLMediaElement) {
-                this.dispatchEvent(new Event("play"))
-                return Promise.resolve()
-            })
+        playSpy = vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(function (
+            this: HTMLMediaElement
+        ) {
+            this.dispatchEvent(new Event("play"))
+            return Promise.resolve()
+        })
         vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(function (
             this: HTMLMediaElement
         ) {
@@ -116,7 +116,7 @@ describe("useAudioPlayer sourceResolver", () => {
             sourceKey,
             sources,
             onFallbackSource,
-            audioBackend = "html5"
+            audioBackend = "html5",
         }: {
             sourceKey: string
             sources: readonly TrackSource[]
@@ -129,7 +129,7 @@ describe("useAudioPlayer sourceResolver", () => {
                 sourceKey,
                 sourceResolver,
                 onFallbackSource,
-                audioBackend
+                audioBackend,
             })
             return <audio ref={engine.audioRef} src={engine.currentSrc || undefined} />
         }
@@ -138,7 +138,7 @@ describe("useAudioPlayer sourceResolver", () => {
             Harness,
             get engine() {
                 return engine!
-            }
+            },
         }
     }
 
@@ -152,9 +152,7 @@ describe("useAudioPlayer sourceResolver", () => {
             root.render(
                 <harness.Harness
                     sourceKey="chapter-1"
-                    sources={[
-                        { url: "indexeddb://narration/chapter-1", type: "audio/mpeg" }
-                    ]}
+                    sources={[{ url: "indexeddb://narration/chapter-1", type: "audio/mpeg" }]}
                 />
             )
         })
@@ -173,7 +171,7 @@ describe("useAudioPlayer sourceResolver", () => {
         await React.act(async () => {
             pending.resolve({
                 url: "blob:https://audio.test/chapter-1",
-                release
+                release,
             })
             await pending.promise
         })
@@ -187,7 +185,7 @@ describe("useAudioPlayer sourceResolver", () => {
             harness.engine.preload({
                 title: "Next",
                 artist: "Narrator",
-                audioFile: "https://cdn.test/next.mp3"
+                audioFile: "https://cdn.test/next.mp3",
             })
         })
         expect(resolver).toHaveBeenCalledTimes(resolverCalls)
@@ -209,7 +207,7 @@ describe("useAudioPlayer sourceResolver", () => {
         const pendingByUrl = new Map([
             ["a.mp3", pendingA],
             ["b.mp3", pendingB],
-            ["c.mp3", pendingC]
+            ["c.mp3", pendingC],
         ])
         const resolver: TrackSourceResolver = (source, signal) => {
             signals.push(signal)
@@ -228,7 +226,7 @@ describe("useAudioPlayer sourceResolver", () => {
         await React.act(async () => {
             pendingA.resolve({
                 url: "blob:https://audio.test/a",
-                release: releases[0]
+                release: releases[0],
             })
             await pendingA.promise
         })
@@ -238,7 +236,7 @@ describe("useAudioPlayer sourceResolver", () => {
         await React.act(async () => {
             pendingB.resolve({
                 url: "blob:https://audio.test/b",
-                release: releases[1]
+                release: releases[1],
             })
             await pendingB.promise
         })
@@ -252,7 +250,7 @@ describe("useAudioPlayer sourceResolver", () => {
         await React.act(async () => {
             pendingC.resolve({
                 url: "blob:https://audio.test/c",
-                release: releases[2]
+                release: releases[2],
             })
             await pendingC.promise
         })
@@ -286,7 +284,7 @@ describe("useAudioPlayer sourceResolver", () => {
             expect.objectContaining({
                 failedSource: "primary.mp3",
                 nextSource: "backup.mp3",
-                sourceIndex: 1
+                sourceIndex: 1,
             })
         )
         expect(resolver).toHaveBeenCalledTimes(2)
@@ -309,21 +307,13 @@ describe("useAudioPlayer sourceResolver", () => {
         const harness = createHarness(resolver)
 
         await React.act(async () => {
-            root.render(
-                <harness.Harness
-                    sourceKey="first"
-                    sources={[{ url: "first.mp3" }]}
-                />
-            )
+            root.render(<harness.Harness sourceKey="first" sources={[{ url: "first.mp3" }]} />)
         })
         await React.act(async () => {
             root.render(
                 <harness.Harness
                     sourceKey="second"
-                    sources={[
-                        { url: "second-primary.mp3" },
-                        { url: "second-fallback.mp3" }
-                    ]}
+                    sources={[{ url: "second-primary.mp3" }, { url: "second-fallback.mp3" }]}
                 />
             )
         })
@@ -335,19 +325,15 @@ describe("useAudioPlayer sourceResolver", () => {
         })
         await vi.waitFor(() => {
             expect(harness.engine.currentSourceIndex).toBe(1)
-            expect(harness.engine.currentSrc).toBe(
-                "blob:https://audio.test/second-fallback"
-            )
+            expect(harness.engine.currentSrc).toBe("blob:https://audio.test/second-fallback")
         })
 
         const audio = container.querySelector("audio")!
         Object.defineProperty(audio, "duration", {
             configurable: true,
-            value: 100
+            value: 100,
         })
-        await React.act(async () =>
-            audio.dispatchEvent(new Event("loadedmetadata"))
-        )
+        await React.act(async () => audio.dispatchEvent(new Event("loadedmetadata")))
 
         expect(audio.currentTime).toBe(42)
         expect(harness.engine.currentTime).toBe(42)
@@ -358,7 +344,7 @@ describe("useAudioPlayer sourceResolver", () => {
         const fallback = vi.fn()
         const resolver = vi.fn<TrackSourceResolver>(async (source) => ({
             url: `blob:https://audio.test/${source.url}`,
-            release: source.url === "primary.mp3" ? releases[0] : releases[1]
+            release: source.url === "primary.mp3" ? releases[0] : releases[1],
         }))
         const harness = createHarness(resolver)
 
@@ -379,8 +365,8 @@ describe("useAudioPlayer sourceResolver", () => {
                 MEDIA_ERR_ABORTED: 1,
                 MEDIA_ERR_NETWORK: 2,
                 MEDIA_ERR_DECODE: 3,
-                MEDIA_ERR_SRC_NOT_SUPPORTED: 4
-            }
+                MEDIA_ERR_SRC_NOT_SUPPORTED: 4,
+            },
         })
 
         await React.act(async () => audio.dispatchEvent(new Event("error")))
@@ -401,17 +387,14 @@ describe("useAudioPlayer sourceResolver", () => {
             const index = attempt++
             return {
                 url: "blob:https://audio.test/retry",
-                release: releases[index]
+                release: releases[index],
             }
         })
         const harness = createHarness(resolver)
 
         await React.act(async () => {
             root.render(
-                <harness.Harness
-                    sourceKey="retry"
-                    sources={[{ url: "private://chapter" }]}
-                />
+                <harness.Harness sourceKey="retry" sources={[{ url: "private://chapter" }]} />
             )
         })
         expect(harness.engine.currentSrc).toBe("blob:https://audio.test/retry")
@@ -437,23 +420,13 @@ describe("useAudioPlayer sourceResolver", () => {
         const harness = createHarness(resolver)
 
         await React.act(async () => {
-            root.render(
-                <harness.Harness
-                    sourceKey="live-a"
-                    sources={[{ url: "live-a.mp3" }]}
-                />
-            )
+            root.render(<harness.Harness sourceKey="live-a" sources={[{ url: "live-a.mp3" }]} />)
         })
         await React.act(async () => harness.engine.play())
         expect(harness.engine.isPlaying).toBe(true)
 
         await React.act(async () => {
-            root.render(
-                <harness.Harness
-                    sourceKey="live-b"
-                    sources={[{ url: "live-b.mp3" }]}
-                />
-            )
+            root.render(<harness.Harness sourceKey="live-b" sources={[{ url: "live-b.mp3" }]} />)
         })
         expect(harness.engine.currentSrc).toBe("")
 
@@ -470,17 +443,14 @@ describe("useAudioPlayer sourceResolver", () => {
     it("does not re-arm a paused pending play on the replacement track", async () => {
         const pendingPlay = deferred<void>()
         playSpy.mockImplementationOnce(() => pendingPlay.promise)
-        const resolver = vi.fn<TrackSourceResolver>(async (source) =>
-            `blob:https://audio.test/${source.url}`
+        const resolver = vi.fn<TrackSourceResolver>(
+            async (source) => `blob:https://audio.test/${source.url}`
         )
         const harness = createHarness(resolver)
 
         await React.act(async () => {
             root.render(
-                <harness.Harness
-                    sourceKey="pending-a"
-                    sources={[{ url: "pending-a.mp3" }]}
-                />
+                <harness.Harness sourceKey="pending-a" sources={[{ url: "pending-a.mp3" }]} />
             )
         })
         await React.act(async () => {
@@ -489,10 +459,7 @@ describe("useAudioPlayer sourceResolver", () => {
         })
         await React.act(async () => {
             root.render(
-                <harness.Harness
-                    sourceKey="pending-b"
-                    sources={[{ url: "pending-b.mp3" }]}
-                />
+                <harness.Harness sourceKey="pending-b" sources={[{ url: "pending-b.mp3" }]} />
             )
         })
         await React.act(async () => {
@@ -500,9 +467,7 @@ describe("useAudioPlayer sourceResolver", () => {
             await pendingPlay.promise
         })
 
-        expect(harness.engine.currentSrc).toBe(
-            "blob:https://audio.test/pending-b.mp3"
-        )
+        expect(harness.engine.currentSrc).toBe("blob:https://audio.test/pending-b.mp3")
         expect(harness.engine.isPlaying).toBe(false)
         expect(playSpy).toHaveBeenCalledTimes(1)
     })
@@ -517,14 +482,10 @@ describe("useAudioPlayer sourceResolver", () => {
         const harness = createHarness(resolver)
 
         await React.act(async () => {
-            root.render(
-                <harness.Harness sourceKey="a" sources={[{ url: "a.mp3" }]} />
-            )
+            root.render(<harness.Harness sourceKey="a" sources={[{ url: "a.mp3" }]} />)
         })
         await React.act(async () => {
-            root.render(
-                <harness.Harness sourceKey="b" sources={[{ url: "b.mp3" }]} />
-            )
+            root.render(<harness.Harness sourceKey="b" sources={[{ url: "b.mp3" }]} />)
         })
         await React.act(async () => harness.engine.seek(42))
 
@@ -535,11 +496,9 @@ describe("useAudioPlayer sourceResolver", () => {
         const audio = container.querySelector("audio")!
         Object.defineProperty(audio, "duration", {
             configurable: true,
-            value: 100
+            value: 100,
         })
-        await React.act(async () =>
-            audio.dispatchEvent(new Event("loadedmetadata"))
-        )
+        await React.act(async () => audio.dispatchEvent(new Event("loadedmetadata")))
 
         expect(audio.currentTime).toBe(42)
         expect(harness.engine.currentTime).toBe(42)
@@ -549,7 +508,7 @@ describe("useAudioPlayer sourceResolver", () => {
         const release = vi.fn()
         const resolver = vi.fn<TrackSourceResolver>(async () => ({
             url: "blob:https://audio.test/managed",
-            release
+            release,
         }))
         let engine: AudioPlayerEngine | null = null
 
@@ -557,7 +516,7 @@ describe("useAudioPlayer sourceResolver", () => {
             engine = useAudioPlayer({
                 src: "direct.mp3",
                 sourceKey: "direct",
-                sourceResolver: managed ? resolver : undefined
+                sourceResolver: managed ? resolver : undefined,
             })
             return <audio ref={engine.audioRef} src={engine.currentSrc || undefined} />
         }
@@ -569,9 +528,7 @@ describe("useAudioPlayer sourceResolver", () => {
 
         expect(release).toHaveBeenCalledTimes(1)
         expect(engine!.currentSrc).toBe("direct.mp3")
-        expect(container.querySelector("audio")!.getAttribute("src")).toBe(
-            "direct.mp3"
-        )
+        expect(container.querySelector("audio")!.getAttribute("src")).toBe("direct.mp3")
     })
 
     it("feeds only the resolved URL into the Web Audio fetch/decode path", async () => {
@@ -579,12 +536,12 @@ describe("useAudioPlayer sourceResolver", () => {
         const release = vi.fn()
         const fetchMock = vi.fn(async () => ({
             ok: true,
-            arrayBuffer: async () => new ArrayBuffer(8)
+            arrayBuffer: async () => new ArrayBuffer(8),
         }))
         vi.stubGlobal("fetch", fetchMock)
         const resolver = vi.fn<TrackSourceResolver>(async () => ({
             url: "blob:https://audio.test/webaudio",
-            release
+            release,
         }))
         const harness = createHarness(resolver)
 
@@ -609,10 +566,7 @@ describe("useAudioPlayer sourceResolver", () => {
             "blob:https://audio.test/webaudio",
             expect.objectContaining({ mode: "cors", signal: expect.any(AbortSignal) })
         )
-        expect(fetchMock).not.toHaveBeenCalledWith(
-            "private://webaudio-track",
-            expect.anything()
-        )
+        expect(fetchMock).not.toHaveBeenCalledWith("private://webaudio-track", expect.anything())
         expect(sources[0]!.start).toHaveBeenCalled()
 
         await React.act(async () => root.unmount())
@@ -633,10 +587,7 @@ describe("useAudioPlayer sourceResolver", () => {
         await React.act(async () => {
             root.render(
                 <StrictMode>
-                    <harness.Harness
-                        sourceKey="strict"
-                        sources={[{ url: "strict.mp3" }]}
-                    />
+                    <harness.Harness sourceKey="strict" sources={[{ url: "strict.mp3" }]} />
                 </StrictMode>
             )
         })
@@ -645,11 +596,11 @@ describe("useAudioPlayer sourceResolver", () => {
         await React.act(async () => {
             pending[0]!.resolve({
                 url: "blob:https://audio.test/strict-stale",
-                release: releases[0]
+                release: releases[0],
             })
             pending[1]!.resolve({
                 url: "blob:https://audio.test/strict-active",
-                release: releases[1]
+                release: releases[1],
             })
             await Promise.all(pending.map((entry) => entry.promise))
         })

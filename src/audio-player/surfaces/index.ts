@@ -26,11 +26,7 @@ export {
     deriveHeroCollapsed,
     surfaceReducer,
 } from "./surfaceReducer"
-export type {
-    PlayerSurfaceMode,
-    SurfaceAction,
-    SurfaceState,
-} from "./surfaceReducer"
+export type { PlayerSurfaceMode, SurfaceAction, SurfaceState } from "./surfaceReducer"
 
 export { usePlayerSurface } from "./usePlayerSurface"
 export type { UsePlayerSurfaceResult } from "./usePlayerSurface"
@@ -53,11 +49,7 @@ export {
     pruneDeadArcActions,
     routeArcAction,
 } from "../menu/arcRouting"
-export type {
-    ArcActionTarget,
-    ArcCommandId,
-    ArcCommandHost,
-} from "../menu/arcRouting"
+export type { ArcActionTarget, ArcCommandId, ArcCommandHost } from "../menu/arcRouting"
 
 export { buildVaultTrackArcActions } from "../menu/vaultTrackMenu"
 export type {

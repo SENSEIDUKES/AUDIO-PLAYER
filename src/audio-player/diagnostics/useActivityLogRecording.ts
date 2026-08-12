@@ -65,9 +65,7 @@ export function useActivityLogRecording({
             log.record({
                 area: "playback",
                 status: "info",
-                message: trackLabel
-                    ? `Playback started — ${trackLabel}`
-                    : "Playback started",
+                message: trackLabel ? `Playback started — ${trackLabel}` : "Playback started",
                 details: currentTrack
                     ? {
                           title: currentTrack.title,

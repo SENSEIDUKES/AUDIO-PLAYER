@@ -11,9 +11,9 @@ const NOOP_HOST: ArcCommandHost = {}
 
 describe("resolveArcActionState", () => {
     it("derives locked from a locked-entitlement target", () => {
-        expect(
-            resolveArcActionState({ id: "x", label: "X", target: "locked-entitlement" })
-        ).toBe("locked")
+        expect(resolveArcActionState({ id: "x", label: "X", target: "locked-entitlement" })).toBe(
+            "locked"
+        )
     })
 
     it("defaults to available and lets an explicit state win", () => {
@@ -38,9 +38,7 @@ describe("routeArcAction", () => {
             target: "immediate-action",
             action: "queue.insertAfterCurrent",
         }
-        expect(
-            routeArcAction(action, { commands: { "queue.insertAfterCurrent": run } })
-        ).toBe(true)
+        expect(routeArcAction(action, { commands: { "queue.insertAfterCurrent": run } })).toBe(true)
         expect(run).toHaveBeenCalledTimes(1)
     })
 
@@ -151,7 +149,9 @@ describe("pruneDeadArcActions", () => {
     })
 
     it("keeps locked leaves visible — the lock is the honest behavior", () => {
-        expect(isArcActionLive({ id: "s", label: "S", target: "locked-entitlement" }, NOOP_HOST)).toBe(true)
+        expect(
+            isArcActionLive({ id: "s", label: "S", target: "locked-entitlement" }, NOOP_HOST)
+        ).toBe(true)
     })
 
     it("marks a sap-controller leaf without a route as dead", () => {

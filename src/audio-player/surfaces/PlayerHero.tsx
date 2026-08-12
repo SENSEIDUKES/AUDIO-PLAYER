@@ -2,10 +2,7 @@ import type { CSSProperties, ReactNode } from "react"
 import type { PlayerFace } from "./faceCapabilities"
 import { ExplicitBadge } from "../components/TrackMetadata"
 import { TextMarquee } from "../components/TextMarquee"
-import {
-    formatSecondaryLine,
-    formatVersionedTitle,
-} from "../utils/formatMetadata"
+import { formatSecondaryLine, formatVersionedTitle } from "../utils/formatMetadata"
 
 export interface PlayerHeroProps {
     face: PlayerFace
@@ -92,26 +89,14 @@ export function PlayerHero({
         >
             {art && <div className="ap-hero__art">{art}</div>}
             <div className="ap-hero__text">
-                <div
-                    className="ap-hero__title"
-                    title={fullTitle}
-                    dir="auto"
-                    style={titleFont}
-                >
+                <div className="ap-hero__title" title={fullTitle} dir="auto" style={titleFont}>
                     {useMarquee ? (
-                        <TextMarquee className="ap-hero__marquee">
-                            {titleContent}
-                        </TextMarquee>
+                        <TextMarquee className="ap-hero__marquee">{titleContent}</TextMarquee>
                     ) : (
                         titleContent
                     )}
                 </div>
-                <div
-                    className="ap-hero__artist"
-                    title={secondary}
-                    dir="auto"
-                    style={artistFont}
-                >
+                <div className="ap-hero__artist" title={secondary} dir="auto" style={artistFont}>
                     {secondary}
                 </div>
                 {!collapsed && release && release !== album?.trim() && (

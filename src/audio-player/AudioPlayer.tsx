@@ -1,23 +1,8 @@
-import {
-    Component,
-    memo,
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-} from "react"
-import type {
-    CSSProperties,
-    KeyboardEvent,
-    ReactNode,
-} from "react"
+import { Component, memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import type { CSSProperties, KeyboardEvent, ReactNode } from "react"
 import type { AudioPlayerProps, Track } from "./types"
 import type { AudioPlayerPlugin } from "./core/plugins/PluginInterface"
-import {
-    AudioSessionProvider,
-    useAudioSession,
-} from "./session/AudioSessionContext"
+import { AudioSessionProvider, useAudioSession } from "./session/AudioSessionContext"
 import {
     useMediaSessionObserver,
     buildMediaSessionArtwork,
@@ -41,10 +26,7 @@ import { HoldSkipButton } from "./components/HoldSkipButton"
 import { useShareTrack } from "./components/useShareTrack"
 import { ExplicitBadge } from "./components/TrackMetadata"
 import { AudioTimeText } from "./components/AudioTimeText"
-import {
-    formatSecondaryLine,
-    formatVersionedTitle,
-} from "./utils/formatMetadata"
+import { formatSecondaryLine, formatVersionedTitle } from "./utils/formatMetadata"
 import { useArtworkColor } from "./utils/useArtworkColor"
 import { defaultShowVolume } from "./utils/device"
 import { FixedSizeList } from "react-window"
@@ -78,7 +60,7 @@ const TrackRow = memo(function TrackRow({
                 className={"ap-tracklist__item" + (active ? " ap-tracklist__item--active" : "")}
                 onClick={() => onPlay(index)}
                 aria-current={active ? "true" : undefined}
-                style={{ height: 'calc(100% - 4px)', width: '100%', boxSizing: 'border-box' }}
+                style={{ height: "calc(100% - 4px)", width: "100%", boxSizing: "border-box" }}
             >
                 <span className="ap-tracklist__num">{index + 1}</span>
                 <span className="ap-tracklist__meta">
@@ -87,7 +69,9 @@ const TrackRow = memo(function TrackRow({
                 </span>
                 {active && isPlaying && (
                     <span className="ap-eq" aria-hidden="true">
-                        <i /><i /><i />
+                        <i />
+                        <i />
+                        <i />
                     </span>
                 )}
             </button>
@@ -95,8 +79,7 @@ const TrackRow = memo(function TrackRow({
     )
 })
 
-const DEFAULT_AUDIO =
-    "https://framerusercontent.com/assets/8w3IUatLX9a5JVJ6XPCVuHi94.mp3"
+const DEFAULT_AUDIO = "https://framerusercontent.com/assets/8w3IUatLX9a5JVJ6XPCVuHi94.mp3"
 const EMPTY_PLUGINS: readonly AudioPlayerPlugin[] = []
 
 /**
@@ -112,7 +95,6 @@ function isSafeUrl(url: string | undefined): boolean {
         return false
     }
 }
-
 
 function trackPeaksSignature(peaks: Track["peaks"]): string {
     if (!peaks) return ""
@@ -169,17 +151,9 @@ class AudioPlayerErrorBoundary extends Component<
         if (this.state.error) {
             return (
                 <div className="ap-error-boundary" role="alert">
-                    <p className="ap-error-boundary__title">
-                        {this.props.fallbackTitle}
-                    </p>
-                    <p className="ap-error-boundary__message">
-                        {this.state.error.message}
-                    </p>
-                    <button
-                        type="button"
-                        className="ap-retry-btn"
-                        onClick={this.handleReset}
-                    >
+                    <p className="ap-error-boundary__title">{this.props.fallbackTitle}</p>
+                    <p className="ap-error-boundary__message">{this.state.error.message}</p>
+                    <button type="button" className="ap-retry-btn" onClick={this.handleReset}>
                         Retry
                     </button>
                 </div>
@@ -293,10 +267,7 @@ function AudioPlayerInner(props: AudioPlayerProps) {
     // Logical identity of the queue. Drives the body's prop→session re-sync so
     // parent re-renders that merely recreate the array don't wipe session-side
     // edits (reorder/remove).
-    const queueSignature = useMemo(
-        () => trackListSignature(initialQueue),
-        [initialQueue]
-    )
+    const queueSignature = useMemo(() => trackListSignature(initialQueue), [initialQueue])
 
     return (
         <AudioSessionProvider
@@ -396,8 +367,7 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
     // Reset the toggle ON each time the plugin (re)activates. Adjusting state
     // during render (vs. an effect) is the idiomatic pattern and avoids an extra
     // commit/render pass.
-    const [prevHasWaveformPlugin, setPrevHasWaveformPlugin] =
-        useState(hasWaveformPlugin)
+    const [prevHasWaveformPlugin, setPrevHasWaveformPlugin] = useState(hasWaveformPlugin)
     if (hasWaveformPlugin !== prevHasWaveformPlugin) {
         setPrevHasWaveformPlugin(hasWaveformPlugin)
         if (hasWaveformPlugin) setWaveformEnabled(true)
@@ -405,8 +375,7 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
 
     // Scrubber mode: an explicit `showWaveform` prop wins; otherwise the plugin
     // (with its toggle) decides; with neither, the basic progress bar.
-    const effectiveWaveform =
-        showWaveform ?? (hasWaveformPlugin ? waveformEnabled : false)
+    const effectiveWaveform = showWaveform ?? (hasWaveformPlugin ? waveformEnabled : false)
 
     // Re-sync the session queue when the logical track list (or single-track
     // props) changes, preserving the active position. Only fires on a real
@@ -479,10 +448,7 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
     const canPreviousTrack = isPlaylistMode && canPrevious
     const canNextTrack = isPlaylistMode && canNext
 
-    const handleAutoPlayToggle = useCallback(
-        () => setLocalAutoPlay((v) => !v),
-        []
-    )
+    const handleAutoPlayToggle = useCallback(() => setLocalAutoPlay((v) => !v), [])
 
     // Queue drawer: play a track then close the drawer (the drawer-specific
     // affordance the bare session `playTrack` doesn't provide).
@@ -498,16 +464,16 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
         [removeFromQueue]
     )
     const handleQueueReorder = useCallback(
-        (fromIndex: number, toIndex: number) =>
-            moveQueueItem(fromIndex, toIndex),
+        (fromIndex: number, toIndex: number) => moveQueueItem(fromIndex, toIndex),
         [moveQueueItem]
     )
     const handleQueueClose = useCallback(() => setQueueOpen(false), [])
 
-    const { share, copied: shareCopied, nativeShare } = useShareTrack(
-        currentTrack.title ?? "",
-        currentTrack.artist ?? ""
-    )
+    const {
+        share,
+        copied: shareCopied,
+        nativeShare,
+    } = useShareTrack(currentTrack.title ?? "", currentTrack.artist ?? "")
     const handleShareClick = useCallback(() => {
         // The native share sheet takes over the screen, so the controller
         // closes first; the clipboard fallback keeps it open so the inline
@@ -541,9 +507,7 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
         (event: KeyboardEvent<HTMLDivElement>) => {
             if (hasKeyboardShortcutPlugin) return
             const target = event.target as HTMLElement
-            const onInteractive = !!target.closest(
-                "button, a, input, [role='slider']"
-            )
+            const onInteractive = !!target.closest("button, a, input, [role='slider']")
             const key = event.key.toLowerCase()
 
             if ((event.key === " " || key === "k") && !onInteractive) {
@@ -576,9 +540,7 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
         if (lastPlayedRef.current !== isPlaying) {
             lastPlayedRef.current = isPlaying
             if (isPlaying) {
-                setAnnouncement(
-                    `Playing ${currentTrack.title} by ${currentTrack.artist}`
-                )
+                setAnnouncement(`Playing ${currentTrack.title} by ${currentTrack.artist}`)
             }
         }
     }, [isPlaying, currentTrack.title, currentTrack.artist])
@@ -587,9 +549,7 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
         if (lastAutoplayRef.current !== autoplayBlocked) {
             lastAutoplayRef.current = autoplayBlocked
             if (autoplayBlocked) {
-                setAnnouncement(
-                    "Autoplay blocked. Tap play to start audio."
-                )
+                setAnnouncement("Autoplay blocked. Tap play to start audio.")
             }
         }
     }, [autoplayBlocked])
@@ -601,11 +561,7 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
     // former and reject the latter so a non-image background never produces a
     // malformed Media Session artwork entry (which iOS would fail to render).
     const artworkSrc = useMemo(() => {
-        const candidates = [
-            currentTrack.artwork,
-            backgroundMedia?.src,
-            backgroundImage?.src,
-        ]
+        const candidates = [currentTrack.artwork, backgroundMedia?.src, backgroundImage?.src]
         for (const value of candidates) {
             const resolved = resolveArtworkSrc(value)
             if (resolved) return resolved
@@ -614,9 +570,9 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
     }, [currentTrack.artwork, backgroundMedia?.src, backgroundImage?.src])
     const artwork = useMemo(
         () => (artworkSrc ? buildMediaSessionArtwork(artworkSrc) : []),
-        [artworkSrc],
+        [artworkSrc]
     )
-    
+
     // Extract dynamic color from artwork for Chameleon theming
     const dynamicColor = useArtworkColor(artworkSrc)
 
@@ -633,9 +589,7 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
     // Pause the equalizer CSS animation when the tab is hidden so we don't
     // keep the GPU and rAF clock busy in the background.
     const [pageVisible, setPageVisible] = useState(() =>
-        typeof document === "undefined"
-            ? true
-            : document.visibilityState !== "hidden"
+        typeof document === "undefined" ? true : document.visibilityState !== "hidden"
     )
     useEffect(() => {
         if (typeof document === "undefined") return
@@ -645,10 +599,14 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
     }, [])
 
     const themeVars = {
-        "--ap-accent": accentColor?.toUpperCase() === "#FFFFFF" && dynamicColor ? dynamicColor : accentColor,
+        "--ap-accent":
+            accentColor?.toUpperCase() === "#FFFFFF" && dynamicColor ? dynamicColor : accentColor,
         "--ap-play-icon": playIconColor,
         "--ap-text": textColor,
-        "--ap-progress": progressColor?.toUpperCase() === "#FFFFFF" && dynamicColor ? dynamicColor : progressColor,
+        "--ap-progress":
+            progressColor?.toUpperCase() === "#FFFFFF" && dynamicColor
+                ? dynamicColor
+                : progressColor,
         "--ap-track": trackColor,
         "--ap-bg": backgroundColor,
         "--ap-glow": glowColor === "transparent" && dynamicColor ? dynamicColor : glowColor,
@@ -667,368 +625,368 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
 
     return (
         <VisualSlotsProvider>
-        <div
-            ref={rootRef}
-            className={`ap-root${className ? ` ${className}` : ""}${
-                pageVisible ? "" : " ap-root--hidden"
-            }`}
-            style={{ ...themeVars, ...style }}
-            role="region"
-            aria-label="Audio player"
-            onKeyDown={handleRootKeyDown}
-        >
-            {/* Queue drawer (Up Next) */}
-            {isPlaylistMode && (
-                <QueueDrawer
-                    queue={queue}
-                    currentIndex={currentIndex}
-                    isPlaying={isPlaying}
-                    open={queueOpen}
-                    onClose={handleQueueClose}
-                    onPlayTrack={handleQueuePlayTrack}
-                    onReorder={handleQueueReorder}
-                    onRemove={handleQueueRemove}
-                />
-            )}
+            <div
+                ref={rootRef}
+                className={`ap-root${className ? ` ${className}` : ""}${
+                    pageVisible ? "" : " ap-root--hidden"
+                }`}
+                style={{ ...themeVars, ...style }}
+                role="region"
+                aria-label="Audio player"
+                onKeyDown={handleRootKeyDown}
+            >
+                {/* Queue drawer (Up Next) */}
+                {isPlaylistMode && (
+                    <QueueDrawer
+                        queue={queue}
+                        currentIndex={currentIndex}
+                        isPlaying={isPlaying}
+                        open={queueOpen}
+                        onClose={handleQueueClose}
+                        onPlayTrack={handleQueuePlayTrack}
+                        onReorder={handleQueueReorder}
+                        onRemove={handleQueueRemove}
+                    />
+                )}
 
-            {/* Shared SAP Controller: single instance serves both the "..." button
+                {/* Shared SAP Controller: single instance serves both the "..." button
                 (default options route) and arc menu workspace selections (lyrics,
                 automix, plugin settings, etc.). Mirrors FullCardPlayer architecture. */}
-            <SAPController
-                open={controllerOpen}
-                onClose={handleCloseController}
-                route={controllerRoute}
-                playback={{
-                    shuffle,
-                    onToggleShuffle: s.toggleShuffle,
-                    repeatMode,
-                    onCycleRepeat: s.cycleRepeat,
-                    ...(isPlaylistMode
-                        ? {
-                              automix,
-                              onToggleAutomix: s.toggleAutomix,
-                          }
-                        : {}),
-                    autoPlay: localAutoPlay,
-                    onToggleAutoPlay: handleAutoPlayToggle,
-                }}
-                queue={
-                    isPlaylistMode
-                        ? {
-                              count: queue.length,
-                              onOpenQueue: () => setQueueOpen(true),
-                          }
-                        : undefined
-                }
-                info={{
-                    title: currentTrack.title ?? "",
-                    artist: currentTrack.artist ?? "",
-                    duration,
-                    lyrics: currentTrack.lyrics,
-                }}
-                share={{ onShare: handleShareClick, copied: shareCopied }}
-                pluginNames={externalPlugins.map((plugin) => plugin.name)}
-                waveform={
-                    hasWaveformPlugin
-                        ? {
-                              enabled: waveformEnabled,
-                              onToggle: () => setWaveformEnabled((v) => !v),
-                          }
-                        : undefined
-                }
-                accentColor={accentColor}
-                playIconColor={playIconColor}
-                textColor={textColor}
-                progressColor={progressColor}
-                trackColor={trackColor}
-                backgroundColor={backgroundColor}
-            />
+                <SAPController
+                    open={controllerOpen}
+                    onClose={handleCloseController}
+                    route={controllerRoute}
+                    playback={{
+                        shuffle,
+                        onToggleShuffle: s.toggleShuffle,
+                        repeatMode,
+                        onCycleRepeat: s.cycleRepeat,
+                        ...(isPlaylistMode
+                            ? {
+                                  automix,
+                                  onToggleAutomix: s.toggleAutomix,
+                              }
+                            : {}),
+                        autoPlay: localAutoPlay,
+                        onToggleAutoPlay: handleAutoPlayToggle,
+                    }}
+                    queue={
+                        isPlaylistMode
+                            ? {
+                                  count: queue.length,
+                                  onOpenQueue: () => setQueueOpen(true),
+                              }
+                            : undefined
+                    }
+                    info={{
+                        title: currentTrack.title ?? "",
+                        artist: currentTrack.artist ?? "",
+                        duration,
+                        lyrics: currentTrack.lyrics,
+                    }}
+                    share={{ onShare: handleShareClick, copied: shareCopied }}
+                    pluginNames={externalPlugins.map((plugin) => plugin.name)}
+                    waveform={
+                        hasWaveformPlugin
+                            ? {
+                                  enabled: waveformEnabled,
+                                  onToggle: () => setWaveformEnabled((v) => !v),
+                              }
+                            : undefined
+                    }
+                    accentColor={accentColor}
+                    playIconColor={playIconColor}
+                    textColor={textColor}
+                    progressColor={progressColor}
+                    trackColor={trackColor}
+                    backgroundColor={backgroundColor}
+                />
 
-            {/* SR live region */}
-            <div className="ap-sr-only" role="status" aria-live="polite" aria-atomic="true">
-                {announcement}
-            </div>
+                {/* SR live region */}
+                <div className="ap-sr-only" role="status" aria-live="polite" aria-atomic="true">
+                    {announcement}
+                </div>
 
-            <BackgroundMedia
-                {...resolveMedia({ media: backgroundMedia, legacyImage: backgroundImage })}
-                darkenAmount={darkenAmount}
-            />
+                <BackgroundMedia
+                    {...resolveMedia({ media: backgroundMedia, legacyImage: backgroundImage })}
+                    darkenAmount={darkenAmount}
+                />
 
-            <div className="ap-content">
-                {!hasAudio && (
-                    <div className="ap-banner ap-banner--error ap-anim-in" role="alert">
-                        <ErrorIcon />
-                        <span>Audio file missing</span>
-                    </div>
-                )}
-
-                {autoplayBlocked && hasAudio && !hasError && (
-                    <div
-                        className="ap-banner ap-banner--info ap-banner--col ap-anim-in"
-                        role="status"
-                    >
-                        <div className="ap-banner__row">
-                            <InfoIcon />
-                            <span>Autoplay blocked. Tap play to start audio.</span>
-                        </div>
-                        <button
-                            type="button"
-                            className="ap-retry-btn"
-                            onClick={() => {
-                                s.dismissAutoplayBlocked()
-                                s.toggle()
-                            }}
-                        >
-                            Play
-                        </button>
-                    </div>
-                )}
-
-                {hasError && hasAudio && (
-                    <div className="ap-banner ap-banner--error ap-banner--col ap-anim-in" role="alert">
-                        <div className="ap-banner__row">
+                <div className="ap-content">
+                    {!hasAudio && (
+                        <div className="ap-banner ap-banner--error ap-anim-in" role="alert">
                             <ErrorIcon />
-                            <span>{errorMessage}</span>
+                            <span>Audio file missing</span>
                         </div>
-                        <button type="button" className="ap-retry-btn" onClick={s.retry}>
-                            Retry
-                        </button>
-                    </div>
-                )}
+                    )}
 
-                <div className="ap-top-actions">
-                    <div className="ap-menu">
-                        <button
-                            type="button"
-                            className="ap-icon-btn ap-tap ap-menu__btn"
-                            onClick={handleOpenOptions}
-                            aria-label="Player options"
-                            aria-haspopup="dialog"
-                            aria-expanded={controllerOpen}
+                    {autoplayBlocked && hasAudio && !hasError && (
+                        <div
+                            className="ap-banner ap-banner--info ap-banner--col ap-anim-in"
+                            role="status"
                         >
-                            <DotsIcon />
-                        </button>
-                    </div>
-                </div>
+                            <div className="ap-banner__row">
+                                <InfoIcon />
+                                <span>Autoplay blocked. Tap play to start audio.</span>
+                            </div>
+                            <button
+                                type="button"
+                                className="ap-retry-btn"
+                                onClick={() => {
+                                    s.dismissAutoplayBlocked()
+                                    s.toggle()
+                                }}
+                            >
+                                Play
+                            </button>
+                        </div>
+                    )}
 
-                {isPlaylistMode && (
-                    <div className="ap-track-counter">
-                        Track {currentIndex + 1} of {queue.length}
-                        {shuffle ? " · Shuffle" : ""}
-                        {repeatMode !== "off" ? ` · Repeat ${repeatMode}` : ""}
-                        {automix ? " · Automix" : ""}
-                    </div>
-                )}
+                    {hasError && hasAudio && (
+                        <div
+                            className="ap-banner ap-banner--error ap-banner--col ap-anim-in"
+                            role="alert"
+                        >
+                            <div className="ap-banner__row">
+                                <ErrorIcon />
+                                <span>{errorMessage}</span>
+                            </div>
+                            <button type="button" className="ap-retry-btn" onClick={s.retry}>
+                                Retry
+                            </button>
+                        </div>
+                    )}
 
-                <div className="ap-track-info" role="group" aria-label="Track information">
-                    <div
-                        className="ap-track-info__title"
-                        style={titleFont}
-                        title={formatVersionedTitle(
-                            currentTrack.title,
-                            currentTrack.versionLabel
-                        )}
-                    >
-                        {formatVersionedTitle(
-                            currentTrack.title,
-                            currentTrack.versionLabel
-                        )}
-                        {currentTrack.explicit && <ExplicitBadge />}
+                    <div className="ap-top-actions">
+                        <div className="ap-menu">
+                            <button
+                                type="button"
+                                className="ap-icon-btn ap-tap ap-menu__btn"
+                                onClick={handleOpenOptions}
+                                aria-label="Player options"
+                                aria-haspopup="dialog"
+                                aria-expanded={controllerOpen}
+                            >
+                                <DotsIcon />
+                            </button>
+                        </div>
                     </div>
-                    <div
-                        className="ap-track-info__artist"
-                        style={artistFont}
-                        title={formatSecondaryLine(currentTrack)}
-                    >
-                        {formatSecondaryLine(currentTrack)}
-                    </div>
-                </div>
 
-                <div className="ap-progress-group" role="group" aria-label="Playback progress">
-                    {/* ScrubberCanvasHost + WaveformAdapter (Phase 4): the same
+                    {isPlaylistMode && (
+                        <div className="ap-track-counter">
+                            Track {currentIndex + 1} of {queue.length}
+                            {shuffle ? " · Shuffle" : ""}
+                            {repeatMode !== "off" ? ` · Repeat ${repeatMode}` : ""}
+                            {automix ? " · Automix" : ""}
+                        </div>
+                    )}
+
+                    <div className="ap-track-info" role="group" aria-label="Track information">
+                        <div
+                            className="ap-track-info__title"
+                            style={titleFont}
+                            title={formatVersionedTitle(
+                                currentTrack.title,
+                                currentTrack.versionLabel
+                            )}
+                        >
+                            {formatVersionedTitle(currentTrack.title, currentTrack.versionLabel)}
+                            {currentTrack.explicit && <ExplicitBadge />}
+                        </div>
+                        <div
+                            className="ap-track-info__artist"
+                            style={artistFont}
+                            title={formatSecondaryLine(currentTrack)}
+                        >
+                            {formatSecondaryLine(currentTrack)}
+                        </div>
+                    </div>
+
+                    <div className="ap-progress-group" role="group" aria-label="Playback progress">
+                        {/* ScrubberCanvasHost + WaveformAdapter (Phase 4): the same
                         unified scrubber the session faces use. `waveform` is
                         resolved by `effectiveWaveform` — the Waveform plugin's
                         toggle or an explicit `showWaveform` prop, defaulting to
                         the basic progress bar. */}
-                    <ScrubberCanvasHost
-                        face="portable"
-                        density={getScrubberDensity("portable")}
-                        currentTime={currentTime}
-                        duration={duration}
-                        progress={duration > 0 ? currentTime / duration : 0}
-                        onSeek={s.seek}
-                    >
-                        <ScrubberCanvasRenderer
-                            currentTime={currentTime}
-                            duration={duration}
-                            onSeek={s.seek}
-                        >
-                        <WaveformAdapter
+                        <ScrubberCanvasHost
                             face="portable"
                             density={getScrubberDensity("portable")}
-                            waveform={effectiveWaveform}
                             currentTime={currentTime}
                             duration={duration}
-                            buffered={buffered}
-                            disabled={!hasAudio}
-                            isSeeking={isSeeking}
+                            progress={duration > 0 ? currentTime / duration : 0}
                             onSeek={s.seek}
-                            onSeekStart={() => s.setSeeking(true)}
-                            onSeekEnd={() => s.setSeeking(false)}
-                            peaks={currentTrack.peaks}
-                            peaksDuration={currentTrack.waveformDuration}
-                            getDecodedData={s.getDecodedData}
-                            // Only the streaming backend needs the second
-                            // fetch+decode; webaudio supplies decoded PCM.
-                            url={
-                                s.getBackendInfo().active === "html5"
-                                    ? currentSrc
-                                    : undefined
-                            }
-                            sourceKey={sourceKey}
-                            height={waveformHeight}
-                            waveColor={trackColor}
-                            progressColor={progressColor}
-                            cursorColor={accentColor}
-                        />
-                        </ScrubberCanvasRenderer>
-                    </ScrubberCanvasHost>
-                    <div className="ap-times" aria-hidden="true">
-                        <span>
-                            <AudioTimeText value="currentTime" fallback={currentTime} />
-                        </span>
-                        <span>
-                            <AudioTimeText value="duration" fallback={duration} />
-                        </span>
+                        >
+                            <ScrubberCanvasRenderer
+                                currentTime={currentTime}
+                                duration={duration}
+                                onSeek={s.seek}
+                            >
+                                <WaveformAdapter
+                                    face="portable"
+                                    density={getScrubberDensity("portable")}
+                                    waveform={effectiveWaveform}
+                                    currentTime={currentTime}
+                                    duration={duration}
+                                    buffered={buffered}
+                                    disabled={!hasAudio}
+                                    isSeeking={isSeeking}
+                                    onSeek={s.seek}
+                                    onSeekStart={() => s.setSeeking(true)}
+                                    onSeekEnd={() => s.setSeeking(false)}
+                                    peaks={currentTrack.peaks}
+                                    peaksDuration={currentTrack.waveformDuration}
+                                    getDecodedData={s.getDecodedData}
+                                    // Only the streaming backend needs the second
+                                    // fetch+decode; webaudio supplies decoded PCM.
+                                    url={
+                                        s.getBackendInfo().active === "html5"
+                                            ? currentSrc
+                                            : undefined
+                                    }
+                                    sourceKey={sourceKey}
+                                    height={waveformHeight}
+                                    waveColor={trackColor}
+                                    progressColor={progressColor}
+                                    cursorColor={accentColor}
+                                />
+                            </ScrubberCanvasRenderer>
+                        </ScrubberCanvasHost>
+                        <div className="ap-times" aria-hidden="true">
+                            <span>
+                                <AudioTimeText value="currentTime" fallback={currentTime} />
+                            </span>
+                            <span>
+                                <AudioTimeText value="duration" fallback={duration} />
+                            </span>
+                        </div>
                     </div>
-                </div>
 
-                <div className="ap-transport" role="group" aria-label="Playback controls">
-                    <HoldSkipButton
-                        direction="previous"
-                        className="ap-btn ap-btn--ghost ap-tap"
-                        disabled={!hasAudio}
-                        skipDisabled={!isPlaylistMode || !canPreviousTrack}
-                        seekLabel="Skip backward 10 seconds"
-                        skipLabel="Previous track"
-                        onSeek={() => s.seekBy(-10)}
-                        onSkip={s.previous}
-                    >
-                        <PrevIcon />
-                    </HoldSkipButton>
+                    <div className="ap-transport" role="group" aria-label="Playback controls">
+                        <HoldSkipButton
+                            direction="previous"
+                            className="ap-btn ap-btn--ghost ap-tap"
+                            disabled={!hasAudio}
+                            skipDisabled={!isPlaylistMode || !canPreviousTrack}
+                            seekLabel="Skip backward 10 seconds"
+                            skipLabel="Previous track"
+                            onSeek={() => s.seekBy(-10)}
+                            onSkip={s.previous}
+                        >
+                            <PrevIcon />
+                        </HoldSkipButton>
 
-                    <button
-                        type="button"
-                        className={`ap-btn ap-btn--play ap-tap${isPlaying ? " ap-btn--play-active" : ""}`}
-                        onClick={s.toggle}
-                        disabled={!hasAudio}
-                        aria-label={
-                            !hasAudio
-                                ? "Audio file missing"
-                                : showPlaySpinner
-                                  ? "Buffering audio"
-                                  : isPlaying
-                                    ? "Pause"
-                                    : "Play"
-                        }
-                    >
-                        {showPlaySpinner ? (
-                            <SpinnerIcon />
-                        ) : isPlaying ? (
-                            <PauseIcon />
-                        ) : (
-                            <PlayIcon />
-                        )}
-                    </button>
+                        <button
+                            type="button"
+                            className={`ap-btn ap-btn--play ap-tap${isPlaying ? " ap-btn--play-active" : ""}`}
+                            onClick={s.toggle}
+                            disabled={!hasAudio}
+                            aria-label={
+                                !hasAudio
+                                    ? "Audio file missing"
+                                    : showPlaySpinner
+                                      ? "Buffering audio"
+                                      : isPlaying
+                                        ? "Pause"
+                                        : "Play"
+                            }
+                        >
+                            {showPlaySpinner ? (
+                                <SpinnerIcon />
+                            ) : isPlaying ? (
+                                <PauseIcon />
+                            ) : (
+                                <PlayIcon />
+                            )}
+                        </button>
 
-                    <HoldSkipButton
-                        direction="next"
-                        className="ap-btn ap-btn--ghost ap-tap"
-                        disabled={!hasAudio}
-                        skipDisabled={!isPlaylistMode || !canNextTrack}
-                        seekLabel="Skip forward 10 seconds"
-                        skipLabel="Next track"
-                        onSeek={() => s.seekBy(10)}
-                        onSkip={s.next}
-                    >
-                        <NextIcon />
-                    </HoldSkipButton>
-                </div>
+                        <HoldSkipButton
+                            direction="next"
+                            className="ap-btn ap-btn--ghost ap-tap"
+                            disabled={!hasAudio}
+                            skipDisabled={!isPlaylistMode || !canNextTrack}
+                            seekLabel="Skip forward 10 seconds"
+                            skipLabel="Next track"
+                            onSeek={() => s.seekBy(10)}
+                            onSkip={s.next}
+                        >
+                            <NextIcon />
+                        </HoldSkipButton>
+                    </div>
 
-                {showVolume && (
-                    <VolumeControl
-                        volume={volume}
-                        isMuted={isMuted}
-                        disabled={!hasAudio}
-                        volumeUnsupported={volumeUnsupported}
-                        onVolumeChange={s.setVolume}
-                        onToggleMute={s.toggleMute}
-                    />
-                )}
-
-                {/* SEI Canvas visual surface region — hidden by default, opened via the
-                    left surface button (canvas toggle) or right (Up Next queue in-region).
-                    Mirrors the FullCardPlayer SEICanvasHost pattern. */}
-                <SEICanvasHost
-                    open={surface.isCanvasOpen || surface.isQueueOpen}
-                    face="portable"
-                    supported={surface.canvasSupported}
-                    activeSurfaceId={surface.mode === "default" ? undefined : surface.mode}
-                >
-                    {surface.isQueueOpen ? (
-                        <QueueSurface />
-                    ) : (
-                        <SEICanvasRenderer
-                            currentTime={currentTime}
-                            duration={duration}
-                            lyrics={currentTrack?.lyrics}
+                    {showVolume && (
+                        <VolumeControl
+                            volume={volume}
+                            isMuted={isMuted}
+                            disabled={!hasAudio}
+                            volumeUnsupported={volumeUnsupported}
+                            onVolumeChange={s.setVolume}
+                            onToggleMute={s.toggleMute}
                         />
                     )}
-                </SEICanvasHost>
 
-                {/* Surface buttons: left = canvas toggle, right = arc action menu
+                    {/* SEI Canvas visual surface region — hidden by default, opened via the
+                    left surface button (canvas toggle) or right (Up Next queue in-region).
+                    Mirrors the FullCardPlayer SEICanvasHost pattern. */}
+                    <SEICanvasHost
+                        open={surface.isCanvasOpen || surface.isQueueOpen}
+                        face="portable"
+                        supported={surface.canvasSupported}
+                        activeSurfaceId={surface.mode === "default" ? undefined : surface.mode}
+                    >
+                        {surface.isQueueOpen ? (
+                            <QueueSurface />
+                        ) : (
+                            <SEICanvasRenderer
+                                currentTime={currentTime}
+                                duration={duration}
+                                lyrics={currentTrack?.lyrics}
+                            />
+                        )}
+                    </SEICanvasHost>
+
+                    {/* Surface buttons: left = canvas toggle, right = arc action menu
                     (SEICanvasActionMenu). Gate on contextual support — the
                     capability model drives this, matching FullCardPlayer. */}
-                <PlayerSurfaceButtons
-                    surface={surface}
-                    onOpenQueue={() => setQueueOpen(true)}
-                    activePluginIds={s.pluginNames}
-                    onShareLink={handleShareClick}
-                    onOpenFocusedController={handleOpenFocusedController}
-                />
+                    <PlayerSurfaceButtons
+                        surface={surface}
+                        onOpenQueue={() => setQueueOpen(true)}
+                        activePluginIds={s.pluginNames}
+                        onShareLink={handleShareClick}
+                        onOpenFocusedController={handleOpenFocusedController}
+                    />
 
-                {currentTrack.purchaseUrl && isSafeUrl(currentTrack.purchaseUrl) && (
-                    <a
-                        className="ap-wide-btn ap-wide-btn--solid ap-tap"
-                        href={currentTrack.purchaseUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                    >
-                        <HeartIcon />
-                        Support Artist
-                    </a>
-                )}
-
-                {isPlaylistMode && showTracklist && (
-                    <div
-                        className="ap-tracklist ap-anim-in"
-                        role="list"
-                        aria-label="Playlist tracks"
-                        style={{ overflowY: "hidden" }}
-                    >
-                        <FixedSizeList
-                            height={Math.min(276, queue.length * 52)}
-                            itemCount={queue.length}
-                            itemSize={52}
-                            width="100%"
-                            itemData={trackListData}
+                    {currentTrack.purchaseUrl && isSafeUrl(currentTrack.purchaseUrl) && (
+                        <a
+                            className="ap-wide-btn ap-wide-btn--solid ap-tap"
+                            href={currentTrack.purchaseUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
                         >
-                            {TrackRow}
-                        </FixedSizeList>
-                    </div>
-                )}
+                            <HeartIcon />
+                            Support Artist
+                        </a>
+                    )}
+
+                    {isPlaylistMode && showTracklist && (
+                        <div
+                            className="ap-tracklist ap-anim-in"
+                            role="list"
+                            aria-label="Playlist tracks"
+                            style={{ overflowY: "hidden" }}
+                        >
+                            <FixedSizeList
+                                height={Math.min(276, queue.length * 52)}
+                                itemCount={queue.length}
+                                itemSize={52}
+                                width="100%"
+                                itemData={trackListData}
+                            >
+                                {TrackRow}
+                            </FixedSizeList>
+                        </div>
+                    )}
+                </div>
             </div>
-        </div>
         </VisualSlotsProvider>
     )
 }
@@ -1038,14 +996,30 @@ export default AudioPlayer
 /* ----------------------------- Icons ----------------------------- */
 
 const ErrorIcon = () => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+    <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        aria-hidden="true"
+    >
         <circle cx="12" cy="12" r="10" />
         <line x1="12" y1="8" x2="12" y2="12" />
         <line x1="12" y1="16" x2="12.01" y2="16" />
     </svg>
 )
 const InfoIcon = () => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+    <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        aria-hidden="true"
+    >
         <circle cx="12" cy="12" r="10" />
         <line x1="12" y1="16" x2="12" y2="12" />
         <line x1="12" y1="8" x2="12.01" y2="8" />
@@ -1063,7 +1037,16 @@ const PauseIcon = () => (
     </svg>
 )
 const SpinnerIcon = () => (
-    <svg className="ap-spin" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+    <svg
+        className="ap-spin"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        aria-hidden="true"
+    >
         <circle cx="12" cy="12" r="10" opacity="0.25" />
         <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
     </svg>
@@ -1081,7 +1064,17 @@ const NextIcon = () => (
     </svg>
 )
 const HeartIcon = () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+    >
         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
     </svg>
 )

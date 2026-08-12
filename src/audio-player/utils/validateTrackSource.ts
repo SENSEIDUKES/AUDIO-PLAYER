@@ -2,8 +2,8 @@ import { checkCodecSupport } from "./checkCodecSupport"
 
 export interface SourceValidationResult {
     ok: boolean
-    accessible: boolean      // HTTP 200 or opaque response
-    corsEnabled: boolean     // Can read headers
+    accessible: boolean // HTTP 200 or opaque response
+    corsEnabled: boolean // Can read headers
     mimeType?: string
     codecSupported?: boolean
     error?: string
@@ -24,7 +24,7 @@ export async function validateTrackSource(
     options: ValidateTrackSourceOptions = {}
 ): Promise<SourceValidationResult> {
     const { timeoutMs = 5000, checkCodec = true } = options
-    
+
     let response: Response
 
     const controller = new AbortController()
@@ -33,39 +33,39 @@ export async function validateTrackSource(
     try {
         // First try with CORS to extract headers like Content-Type
         response = await fetch(url, {
-            method: 'HEAD',
-            mode: 'cors',
-            signal: controller.signal
+            method: "HEAD",
+            mode: "cors",
+            signal: controller.signal,
         })
-        
+
         clearTimeout(timeoutId)
     } catch (error: any) {
         clearTimeout(timeoutId)
-        
-        if (error.name === 'AbortError') {
+
+        if (error.name === "AbortError") {
             return {
                 ok: false,
                 accessible: false,
                 corsEnabled: false,
-                error: 'Request timed out'
+                error: "Request timed out",
             }
         }
-        
+
         // If the CORS request fails, try no-cors to check if it's reachable at all
         try {
             const fallbackController = new AbortController()
             const fallbackTimeoutId = setTimeout(() => fallbackController.abort(), timeoutMs)
-            
+
             response = await fetch(url, {
-                method: 'HEAD',
-                mode: 'no-cors',
-                signal: fallbackController.signal
+                method: "HEAD",
+                mode: "no-cors",
+                signal: fallbackController.signal,
             })
-            
+
             clearTimeout(fallbackTimeoutId)
-            
+
             // Opaque responses are type 'opaque' and status 0
-            if (response.type === 'opaque') {
+            if (response.type === "opaque") {
                 return {
                     ok: true,
                     accessible: true,
@@ -77,21 +77,21 @@ export async function validateTrackSource(
                 ok: false,
                 accessible: false,
                 corsEnabled: false,
-                error: fallbackError.message || 'Network error'
+                error: fallbackError.message || "Network error",
             }
         }
     }
-    
-    if (!response.ok && response.type !== 'opaque') {
+
+    if (!response.ok && response.type !== "opaque") {
         return {
             ok: false,
             accessible: false,
             corsEnabled: true,
-            error: `HTTP ${response.status} ${response.statusText}`
+            error: `HTTP ${response.status} ${response.statusText}`,
         }
     }
 
-    const mimeType = response.headers.get('content-type')?.split(';')[0]?.trim() || undefined
+    const mimeType = response.headers.get("content-type")?.split(";")[0]?.trim() || undefined
     let codecSupported: boolean | undefined = undefined
 
     if (mimeType && checkCodec) {
@@ -103,6 +103,6 @@ export async function validateTrackSource(
         accessible: true,
         corsEnabled: true,
         mimeType,
-        codecSupported
+        codecSupported,
     }
 }

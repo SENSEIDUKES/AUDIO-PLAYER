@@ -61,11 +61,7 @@ function SwitchRow({
     )
 }
 
-export function PlaybackControlsWorkspace({
-    playback,
-}: {
-    playback?: PlaybackControlsState
-}) {
+export function PlaybackControlsWorkspace({ playback }: { playback?: PlaybackControlsState }) {
     // A host that routes here without wiring playback state gets an honest
     // empty panel rather than dead switches.
     if (!playback) {

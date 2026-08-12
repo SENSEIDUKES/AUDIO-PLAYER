@@ -5,6 +5,4 @@ import { sampleSkinDefinition } from "./components/imported/sample-skin/SampleSk
 
 import type { AnyVisualComponentDefinition } from "./types"
 
-export const IMPORTED_VISUAL_SKINS: AnyVisualComponentDefinition[] = [
-    sampleSkinDefinition,
-]
+export const IMPORTED_VISUAL_SKINS: AnyVisualComponentDefinition[] = [sampleSkinDefinition]

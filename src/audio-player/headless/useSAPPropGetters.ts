@@ -1,10 +1,5 @@
 import { useMemo } from "react"
-import type {
-    AudioHTMLAttributes,
-    HTMLAttributes,
-    KeyboardEvent,
-    Ref,
-} from "react"
+import type { AudioHTMLAttributes, HTMLAttributes, KeyboardEvent, Ref } from "react"
 import type { AudioPlayerEngine, SessionEngine } from "../types"
 import { useAudioTime } from "../session/AudioSessionContext"
 import { composeEventHandlers } from "./composeEventHandlers"
@@ -23,8 +18,7 @@ export interface SAPProgressBarProps extends HTMLAttributes<HTMLElement> {
 }
 
 /** Caller props accepted by `getAudioElementProps`. */
-export interface SAPAudioElementProps
-    extends AudioHTMLAttributes<HTMLAudioElement> {
+export interface SAPAudioElementProps extends AudioHTMLAttributes<HTMLAudioElement> {
     ref?: Ref<HTMLAudioElement>
 }
 
@@ -41,10 +35,7 @@ export function isSessionEngine(
     engine: AudioPlayerEngine | SessionEngine
 ): engine is SessionEngine {
     const candidate = engine as SessionEngine
-    return (
-        typeof candidate.next === "function" &&
-        typeof candidate.previous === "function"
-    )
+    return typeof candidate.next === "function" && typeof candidate.previous === "function"
 }
 
 /**
@@ -83,14 +74,13 @@ export function useSAPPropGetters(
 
         // Native buttons already fire click on Enter/Space; this only fills
         // the gap for button-like hosts (div, span, custom elements).
-        const keyboardActivation =
-            (run: () => void) => (event: KeyboardEvent<HTMLElement>) => {
-                const tag = event.currentTarget.tagName
-                if (tag === "BUTTON" || tag === "INPUT" || tag === "TEXTAREA") return
-                if (event.key !== "Enter" && event.key !== " ") return
-                event.preventDefault()
-                run()
-            }
+        const keyboardActivation = (run: () => void) => (event: KeyboardEvent<HTMLElement>) => {
+            const tag = event.currentTarget.tagName
+            if (tag === "BUTTON" || tag === "INPUT" || tag === "TEXTAREA") return
+            if (event.key !== "Enter" && event.key !== " ") return
+            event.preventDefault()
+            run()
+        }
 
         const buttonProps = (
             sap: {
@@ -114,10 +104,7 @@ export function useSAPPropGetters(
                 "aria-disabled": isDisabled || undefined,
                 ...rest,
                 onClick: composeEventHandlers(onClick, run),
-                onKeyDown: composeEventHandlers(
-                    onKeyDown,
-                    keyboardActivation(run)
-                ),
+                onKeyDown: composeEventHandlers(onKeyDown, keyboardActivation(run)),
             }
         }
 
@@ -191,10 +178,7 @@ export function useSAPPropGetters(
         const getProgressBarProps = (user: SAPProgressBarProps = {}) => {
             const { onKeyDown, ...rest } = user
             const totalDuration = duration || 0
-            const now =
-                totalDuration > 0
-                    ? Math.min(Math.max(currentTime, 0), totalDuration)
-                    : 0
+            const now = totalDuration > 0 ? Math.min(Math.max(currentTime, 0), totalDuration) : 0
             const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
                 if (noAudio) return
                 switch (event.key) {

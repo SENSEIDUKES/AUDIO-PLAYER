@@ -7,14 +7,35 @@ export interface PluginDebugInfo {
     memoryUsage?: number
 }
 
+type AudioPlayerDebugWindow = Window & {
+    AUDIO_PLAYER_DEBUG?: "1" | 1
+}
+
+type AudioPlayerImportMeta = ImportMeta & {
+    env?: {
+        AUDIO_PLAYER_DEBUG?: string
+    }
+}
+
+type PerformanceWithMemory = Performance & {
+    memory?: {
+        usedJSHeapSize?: number
+    }
+}
+
 export class PluginDebugger {
     private debugMode: boolean = false
     private hooks: Map<string, number> = new Map()
 
     constructor() {
         if (typeof window !== "undefined") {
-            // @ts-ignore
-            if (window.AUDIO_PLAYER_DEBUG === "1" || window.AUDIO_PLAYER_DEBUG === 1 || import.meta.env?.AUDIO_PLAYER_DEBUG === "1") {
+            const debugWindow = window as AudioPlayerDebugWindow
+            const debugImportMeta = import.meta as AudioPlayerImportMeta
+            if (
+                debugWindow.AUDIO_PLAYER_DEBUG === "1" ||
+                debugWindow.AUDIO_PLAYER_DEBUG === 1 ||
+                debugImportMeta.env?.AUDIO_PLAYER_DEBUG === "1"
+            ) {
                 this.debugMode = true
             }
         }
@@ -47,9 +68,8 @@ export class PluginDebugger {
     }
 
     getMemoryUsage(): number | undefined {
-        if (typeof performance !== "undefined" && "memory" in performance) {
-            // @ts-ignore
-            return performance.memory.usedJSHeapSize
+        if (typeof performance !== "undefined") {
+            return (performance as PerformanceWithMemory).memory?.usedJSHeapSize
         }
         return undefined
     }

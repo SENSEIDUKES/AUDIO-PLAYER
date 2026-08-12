@@ -59,9 +59,6 @@ export function surfaceReducer(
  * open AND the face declares hero-collapse support — derived, never stored, so
  * it can't drift from `mode`.
  */
-export function deriveHeroCollapsed(
-    mode: PlayerSurfaceMode,
-    face: PlayerFace
-): boolean {
+export function deriveHeroCollapsed(mode: PlayerSurfaceMode, face: PlayerFace): boolean {
     return mode === "canvas" && faceSupportsHeroCollapse(face)
 }

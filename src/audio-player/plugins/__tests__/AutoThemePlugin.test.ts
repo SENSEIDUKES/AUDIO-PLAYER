@@ -54,21 +54,26 @@ describe("AutoThemePlugin", () => {
         it("extracts palette and applies variables on init", async () => {
             bgElement.style.backgroundImage = "url('test.jpg')"
             const onPaletteChange = vi.fn()
-            
+
             const plugin = createAutoThemePlugin({ onPaletteChange })
             plugin.init(mockContext)
-            
+
             // Wait for microtasks
             await Promise.resolve()
-            
-            expect(colorExtraction.extractPalette).toHaveBeenCalledWith("test.jpg", expect.any(Object))
-            
+
+            expect(colorExtraction.extractPalette).toHaveBeenCalledWith(
+                "test.jpg",
+                expect.any(Object)
+            )
+
             expect(rootElement.style.getPropertyValue("--ap-accent")).toBe("rgb(0, 255, 0)")
-            expect(rootElement.style.getPropertyValue("--ap-progress")).toBe("linear-gradient(red, blue)")
+            expect(rootElement.style.getPropertyValue("--ap-progress")).toBe(
+                "linear-gradient(red, blue)"
+            )
             expect(rootElement.style.getPropertyValue("--ap-bg")).toBe("rgba(255, 0, 0, 0.55)")
             expect(rootElement.style.getPropertyValue("--ap-text")).toBe("#ffffff")
             expect(rootElement.style.getPropertyValue("--ap-glow")).toBe("rgba(0, 255, 0, 0.45)")
-            
+
             expect(onPaletteChange).toHaveBeenCalledWith(
                 expect.objectContaining({ isDark: true }),
                 expect.any(Object)
@@ -80,10 +85,10 @@ describe("AutoThemePlugin", () => {
             const plugin = createAutoThemePlugin()
             plugin.init(mockContext)
             await Promise.resolve()
-            
+
             const onPaletteChange = vi.fn()
             const plugin2 = createAutoThemePlugin({ onPaletteChange })
-            
+
             // Initial state: root has variables from previous plugin maybe, or just manually set
             rootElement.style.setProperty("--ap-accent", "black")
 
@@ -91,12 +96,12 @@ describe("AutoThemePlugin", () => {
             bgElement.style.backgroundImage = "url('something_else.jpg')"
             plugin2.init(mockContext)
             await Promise.resolve()
-            
+
             // Now remove
             bgElement.style.backgroundImage = ""
             plugin2.onTrackLoad?.(createTrack("1"))
             await Promise.resolve()
-            
+
             expect(colorExtraction.extractPalette).toHaveBeenCalled() // The valid loads
             expect(rootElement.style.getPropertyValue("--ap-accent")).toBe("")
             expect(onPaletteChange).toHaveBeenCalledWith(null, expect.any(Object))
@@ -106,38 +111,41 @@ describe("AutoThemePlugin", () => {
             bgElement.style.backgroundImage = "url('cors-error.jpg')"
             vi.mocked(colorExtraction.extractPalette).mockResolvedValueOnce(null)
             const onPaletteChange = vi.fn()
-            
+
             const plugin = createAutoThemePlugin({ onPaletteChange })
-            
+
             rootElement.style.setProperty("--ap-accent", "black")
-            
+
             plugin.init(mockContext)
             await Promise.resolve()
-            
+
             expect(rootElement.style.getPropertyValue("--ap-accent")).toBe("")
             expect(onPaletteChange).toHaveBeenCalledWith(null, expect.any(Object))
         })
 
         it("falls back to media session artwork if background image is missing", async () => {
             rootElement.removeChild(bgElement)
-            
+
             // Mock media session
             Object.defineProperty(navigator, "mediaSession", {
                 value: {
                     metadata: {
-                        artwork: [{ src: "mediasession.jpg" }]
-                    }
+                        artwork: [{ src: "mediasession.jpg" }],
+                    },
                 },
                 writable: true,
-                configurable: true
+                configurable: true,
             })
-            
+
             try {
                 const plugin = createAutoThemePlugin()
                 plugin.init(mockContext)
                 await Promise.resolve()
 
-                expect(colorExtraction.extractPalette).toHaveBeenCalledWith("mediasession.jpg", expect.any(Object))
+                expect(colorExtraction.extractPalette).toHaveBeenCalledWith(
+                    "mediasession.jpg",
+                    expect.any(Object)
+                )
             } finally {
                 // Clean up
                 // @ts-ignore
@@ -151,29 +159,34 @@ describe("AutoThemePlugin", () => {
             bgElement.style.backgroundImage = "url('track1.jpg')"
             const onPaletteChange = vi.fn()
             const plugin = createAutoThemePlugin({ onPaletteChange })
-            
+
             let resolveExtraction!: ResolvePalette
             vi.mocked(colorExtraction.extractPalette).mockImplementationOnce(() => {
-                return new Promise(resolve => {
+                return new Promise((resolve) => {
                     resolveExtraction = resolve
                 })
             })
-            
+
             plugin.init(mockContext)
-            
+
             // Now load track 2 immediately
             bgElement.style.backgroundImage = "url('track2.jpg')"
             plugin.onTrackLoad?.(createTrack("2"))
-            
+
             // Resolve the first extraction
-            resolveExtraction({ primary: [0, 0, 0], secondary: [0, 0, 0], accent: [0, 0, 0], isDark: true })
+            resolveExtraction({
+                primary: [0, 0, 0],
+                secondary: [0, 0, 0],
+                accent: [0, 0, 0],
+                isDark: true,
+            })
             await Promise.resolve()
-            
+
             // Second extraction shouldn't be mocked manually, it uses the global mock which resolves immediately.
             // Wait for both to settle
             await Promise.resolve()
             await Promise.resolve()
-            
+
             // The first resolution should be ignored (it returned all 0s)
             // The second one returned the global mock (red, blue, green)
             expect(onPaletteChange).toHaveBeenCalledTimes(1)
@@ -186,21 +199,26 @@ describe("AutoThemePlugin", () => {
         it("cancels stale extraction if plugin is destroyed", async () => {
             bgElement.style.backgroundImage = "url('track1.jpg')"
             const plugin = createAutoThemePlugin()
-            
+
             let resolveExtraction!: ResolvePalette
             vi.mocked(colorExtraction.extractPalette).mockImplementationOnce(() => {
-                return new Promise(resolve => {
+                return new Promise((resolve) => {
                     resolveExtraction = resolve
                 })
             })
-            
+
             plugin.init(mockContext)
             plugin.destroy()
-            
+
             // Resolve extraction after destroy
-            resolveExtraction({ primary: [0, 0, 0], secondary: [0, 0, 0], accent: [0, 0, 0], isDark: true })
+            resolveExtraction({
+                primary: [0, 0, 0],
+                secondary: [0, 0, 0],
+                accent: [0, 0, 0],
+                isDark: true,
+            })
             await Promise.resolve()
-            
+
             expect(rootElement.style.getPropertyValue("--ap-accent")).toBe("")
         })
     })
@@ -211,7 +229,7 @@ describe("AutoThemePlugin", () => {
             const plugin = createAutoThemePlugin({ applyGradient: false })
             plugin.init(mockContext)
             await Promise.resolve()
-            
+
             // When applyGradient is false, it uses the accent color instead of gradient
             expect(rootElement.style.getPropertyValue("--ap-progress")).toBe("rgb(0, 255, 0)")
         })
@@ -221,7 +239,7 @@ describe("AutoThemePlugin", () => {
             const plugin = createAutoThemePlugin({ applyGlow: false })
             plugin.init(mockContext)
             await Promise.resolve()
-            
+
             expect(rootElement.style.getPropertyValue("--ap-glow")).toBe("")
         })
 
@@ -233,21 +251,21 @@ describe("AutoThemePlugin", () => {
                 accent: [0, 255, 0],
                 isDark: false, // light theme uses secondary
             })
-            
+
             const plugin = createAutoThemePlugin()
             plugin.init(mockContext)
             await Promise.resolve()
-            
+
             // Surface is secondary (blue), so bg tint should be blue
             expect(rootElement.style.getPropertyValue("--ap-bg")).toBe("rgba(0, 0, 255, 0.55)")
         })
-        
+
         it("does nothing if root element is missing", async () => {
             mockContext.getRootElement = vi.fn().mockReturnValue(null)
             const plugin = createAutoThemePlugin()
             plugin.init(mockContext)
             await Promise.resolve()
-            
+
             expect(colorExtraction.extractPalette).not.toHaveBeenCalled()
         })
     })

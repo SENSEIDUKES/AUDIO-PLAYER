@@ -47,9 +47,7 @@ export function extractUrlFromCss(css: string): string | null {
  * unwrapped; a gradient (or any other CSS function) is rejected so a non-image
  * background never yields a malformed `MediaImage` the OS can't render.
  */
-export function resolveArtworkSrc(
-    value: string | null | undefined
-): string | undefined {
+export function resolveArtworkSrc(value: string | null | undefined): string | undefined {
     if (typeof value !== "string") return undefined
     const trimmed = value.trim()
     if (!trimmed) return undefined
@@ -89,8 +87,7 @@ export function useMediaSessionObserver(
     //    Crucially, we do NOT clear metadata to null on cleanup — doing so
     //    causes iOS to flicker/clear artwork during track transitions.
     useEffect(() => {
-        if (typeof navigator === "undefined" || !("mediaSession" in navigator))
-            return
+        if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return
 
         const ms = navigator.mediaSession
         ms.metadata = new MediaMetadata({
@@ -104,8 +101,7 @@ export function useMediaSessionObserver(
     // 2. Register action handlers once on mount. All handlers read from the
     //    `latest` ref so they never go stale without re-registering.
     useEffect(() => {
-        if (typeof navigator === "undefined" || !("mediaSession" in navigator))
-            return
+        if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return
 
         const ms = navigator.mediaSession
         const actions: MediaSessionAction[] = [
@@ -154,10 +150,7 @@ export function useMediaSessionObserver(
 
     // Keep playback state in sync with the OS.
     useEffect(() => {
-        if (typeof navigator === "undefined" || !("mediaSession" in navigator))
-            return
-        navigator.mediaSession.playbackState = engine.isPlaying
-            ? "playing"
-            : "paused"
+        if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return
+        navigator.mediaSession.playbackState = engine.isPlaying ? "playing" : "paused"
     }, [engine.isPlaying])
 }

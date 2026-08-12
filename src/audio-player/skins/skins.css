@@ -29,7 +29,6 @@
     min-width: 0;
 }
 
-
 /* ----------------------------- Art / hero sizing -----------------------------
    Reusable sizing contract for album / hero artwork. Square by default,
    cover-cropped and centered, and it behaves the same whether the art is a
@@ -73,7 +72,12 @@
     /* Surface visuals (fill, blur, border, shadow) come from `.ap-glass-surface`
        on this same element — see audio-player.css. */
     color: var(--ap-text);
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family:
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        sans-serif;
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -264,8 +268,15 @@
     border: 1px solid color-mix(in srgb, var(--ap-vault-accent, var(--ap-accent)) 24%, transparent);
     /* Solid classification rail down the leading edge — the primary scan cue. */
     border-left: 3px solid var(--ap-vault-accent, var(--ap-accent));
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    transition: background-color 0.2s ease, border-color 0.2s ease;
+    font-family:
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        sans-serif;
+    transition:
+        background-color 0.2s ease,
+        border-color 0.2s ease;
     /* Make the row a query container so its layout adapts to the row's own
        width (mobile, narrow sidebars), independent of the viewport. */
     container-type: inline-size;
@@ -280,7 +291,11 @@
 }
 .ap-vr--active {
     border-color: color-mix(in srgb, var(--ap-vault-accent, var(--ap-accent)) 55%, transparent);
-    background-color: color-mix(in srgb, var(--ap-vault-accent, var(--ap-accent)) 14%, var(--ap-bg));
+    background-color: color-mix(
+        in srgb,
+        var(--ap-vault-accent, var(--ap-accent)) 14%,
+        var(--ap-bg)
+    );
 }
 .ap-vr__num {
     min-width: 20px;
@@ -395,7 +410,12 @@
     backdrop-filter: blur(16px);
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     color: var(--ap-text);
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family:
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        sans-serif;
 }
 .ap-sb *,
 .ap-sb *::before,
@@ -488,7 +508,12 @@
        on the root element — bright/saturated --ap-bg colors stay legible
        through a frosted scrim instead of being painted on flat. */
     color: var(--ap-text);
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family:
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        sans-serif;
 }
 .ap-ms *,
 .ap-ms *::before,
@@ -541,7 +566,9 @@
     /* Soft dual halo (tight + diffuse) keeps the title crisp over very bright
        surface colors, independent of the chosen --ap-text value — readability
        comes from here, not from darkening the whole widget. */
-    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.32), 0 1px 5px rgba(0, 0, 0, 0.22);
+    text-shadow:
+        0 1px 1px rgba(0, 0, 0, 0.32),
+        0 1px 5px rgba(0, 0, 0, 0.22);
 }
 .ap-ms__artist {
     font-size: 12px;
@@ -549,7 +576,9 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.28), 0 1px 4px rgba(0, 0, 0, 0.2);
+    text-shadow:
+        0 1px 1px rgba(0, 0, 0, 0.28),
+        0 1px 4px rgba(0, 0, 0, 0.2);
 }
 .ap-ms__play {
     /* Anchor for the coarse-pointer hit-area pseudo-element. */
@@ -567,7 +596,12 @@
     overflow: hidden;
     background-color: var(--ap-bg);
     color: var(--ap-text);
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family:
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        sans-serif;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
 }
 .ap-sea *,
@@ -750,7 +784,12 @@
     backdrop-filter: blur(14px);
     border: 1px solid rgba(255, 255, 255, 0.08);
     color: var(--ap-text);
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family:
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        sans-serif;
 }
 .ap-nf *,
 .ap-nf *::before,
@@ -791,11 +830,20 @@
     animation: ap-nf-pulse 1.8s ease-in-out infinite;
 }
 @keyframes ap-nf-pulse {
-    0%, 100% { transform: scale(1); opacity: 0.55; }
-    50% { transform: scale(1.35); opacity: 1; }
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 0.55;
+    }
+    50% {
+        transform: scale(1.35);
+        opacity: 1;
+    }
 }
 @media (prefers-reduced-motion: reduce) {
-    .ap-nf--narrating .ap-nf__dot { animation: none; }
+    .ap-nf--narrating .ap-nf__dot {
+        animation: none;
+    }
 }
 .ap-nf__mood {
     font-size: 12px;

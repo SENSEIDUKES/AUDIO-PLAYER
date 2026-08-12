@@ -14,10 +14,7 @@ export interface ControllerPanelRendererProps {
  * workspace route to edit the lyric display's settings; edits flow straight back
  * to the live SEI Canvas visual through context.
  */
-export function ControllerPanelRenderer({
-    componentId,
-    lyrics,
-}: ControllerPanelRendererProps) {
+export function ControllerPanelRenderer({ componentId, lyrics }: ControllerPanelRendererProps) {
     const slots = useVisualSlots()
     const def = getVisualComponent(componentId)
 
@@ -25,9 +22,7 @@ export function ControllerPanelRenderer({
         return (
             <div className="sap-ctl__workspace-empty">
                 <p className="sap-ctl__workspace-lead">{def?.name ?? "Settings"}</p>
-                <p className="sap-ctl__workspace-sub">
-                    This visual has no configurable settings.
-                </p>
+                <p className="sap-ctl__workspace-sub">This visual has no configurable settings.</p>
             </div>
         )
     }

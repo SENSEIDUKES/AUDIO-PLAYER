@@ -1,11 +1,7 @@
 import { useCallback, useMemo } from "react"
 import { DotsIcon } from "../skins/icons"
 import type { MenuNode } from "../menu/menuData"
-import {
-    pruneDeadArcActions,
-    resolveArcActionState,
-    routeArcAction,
-} from "../menu/arcRouting"
+import { pruneDeadArcActions, resolveArcActionState, routeArcAction } from "../menu/arcRouting"
 import type { ArcAction, ArcCommandHost } from "../menu/arcRouting"
 import type { WorkspaceRoute } from "../components/workspace/workspaceRoutes"
 import { SEICanvasActionMenu } from "./SEICanvasActionMenu"
@@ -46,10 +42,7 @@ function toMenuNodes(actions: ArcAction[]): MenuNode[] {
         // through the single router below, keeping this decoupled from the
         // menu's reserved queue/canvas actions. An empty `children` array stays
         // `undefined` so the node renders as a leaf, not an empty submenu.
-        children:
-            a.children && a.children.length > 0
-                ? toMenuNodes(a.children)
-                : undefined,
+        children: a.children && a.children.length > 0 ? toMenuNodes(a.children) : undefined,
     }))
 }
 
@@ -90,10 +83,7 @@ export function ArcActionButton({
     )
     // No dead buttons: drop every leaf that can't reach a real destination on
     // this host (and every branch that ends up empty), then render the rest.
-    const liveActions = useMemo(
-        () => pruneDeadArcActions(actions, host),
-        [actions, host]
-    )
+    const liveActions = useMemo(() => pruneDeadArcActions(actions, host), [actions, host])
     const items = useMemo(() => toMenuNodes(liveActions), [liveActions])
     const leaves = useMemo(() => {
         const map = new Map<string, ArcAction>()

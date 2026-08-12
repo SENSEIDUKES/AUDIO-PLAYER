@@ -1,11 +1,4 @@
-import {
-    memo,
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-} from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { FixedSizeList } from "react-window"
 import type { ListChildComponentProps } from "react-window"
 import { AutoSizer } from "react-virtualized-auto-sizer"
@@ -27,15 +20,8 @@ const QueueRowWrapper = memo(function QueueRowWrapper({
     style,
     data,
 }: ListChildComponentProps<QueueItemData>) {
-    const {
-        visibleQueue,
-        upcomingStart,
-        currentIndex,
-        drag,
-        onPlayTrack,
-        onRemove,
-        isPlaying,
-    } = data
+    const { visibleQueue, upcomingStart, currentIndex, drag, onPlayTrack, onRemove, isPlaying } =
+        data
 
     const actualIndex = upcomingStart + index
     const track = visibleQueue[index]
@@ -163,7 +149,11 @@ function useQueueDrag(
             if (!s) return
             event.preventDefault()
             const el = event.currentTarget
-            try { el.releasePointerCapture(event.pointerId) } catch { /* ignore */ }
+            try {
+                el.releasePointerCapture(event.pointerId)
+            } catch {
+                /* ignore */
+            }
 
             const target = computeTarget(event.clientY, s.index)
             if (target !== s.index) {
@@ -177,8 +167,7 @@ function useQueueDrag(
 
     const getRowHandlers = useCallback(
         (index: number) => ({
-            onPointerDown: (e: React.PointerEvent<HTMLElement>) =>
-                handlePointerDown(index, e),
+            onPointerDown: (e: React.PointerEvent<HTMLElement>) => handlePointerDown(index, e),
             onPointerMove: handlePointerMove,
             onPointerUp: handlePointerUp,
         }),
@@ -209,14 +198,34 @@ const DragHandleIcon = () => (
 )
 
 const CloseIcon = () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+    >
         <line x1="18" y1="6" x2="6" y2="18" />
         <line x1="6" y1="6" x2="18" y2="18" />
     </svg>
 )
 
 const RemoveIcon = () => (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+    >
         <line x1="18" y1="6" x2="6" y2="18" />
         <line x1="6" y1="6" x2="18" y2="18" />
     </svg>
@@ -265,7 +274,12 @@ function QueueRow({
             role="listitem"
             tabIndex={-1}
             aria-label={`${track.title} by ${track.artist}${isActive ? " (now playing)" : ""}`}
-            style={{ ...style, ...(isDragging && dragOffset !== 0 ? { transform: `translateY(${dragOffset}px)` } : {}) }}
+            style={{
+                ...style,
+                ...(isDragging && dragOffset !== 0
+                    ? { transform: `translateY(${dragOffset}px)` }
+                    : {}),
+            }}
         >
             <span
                 className="ap-q-row__drag"
@@ -280,7 +294,11 @@ function QueueRow({
 
             <span className="ap-q-row__num">
                 {isActive && isPlaying ? (
-                    <span className="ap-eq" aria-hidden="true"><i /><i /><i /></span>
+                    <span className="ap-eq" aria-hidden="true">
+                        <i />
+                        <i />
+                        <i />
+                    </span>
                 ) : (
                     index + 1
                 )}
@@ -291,9 +309,7 @@ function QueueRow({
                 <span className="ap-q-row__artist">{track.artist}</span>
             </div>
 
-            {isActive && (
-                <span className="ap-q-row__badge">Now Playing</span>
-            )}
+            {isActive && <span className="ap-q-row__badge">Now Playing</span>}
 
             {/* Click to jump to this track (except the active one — it's already playing). */}
             {!isActive && (
@@ -303,7 +319,13 @@ function QueueRow({
                     onClick={onPlay}
                     aria-label={`Play ${track.title}`}
                 >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        aria-hidden="true"
+                    >
                         <path d="M8 5v14l12-7z" />
                     </svg>
                 </button>
@@ -351,20 +373,11 @@ export function QueueDrawer({
     const prevQueueRef = useRef(queue)
 
     const upcomingStart = currentIndex
-    const visibleQueue = useMemo(
-        () => queue.slice(upcomingStart),
-        [queue, upcomingStart]
-    )
+    const visibleQueue = useMemo(() => queue.slice(upcomingStart), [queue, upcomingStart])
 
     const drag = useQueueDrag(queue.length, onReorder, 56, upcomingStart)
-    const handlePlayTrack = useCallback(
-        (index: number) => onPlayTrack(index),
-        [onPlayTrack]
-    )
-    const handleRemove = useCallback(
-        (index: number) => onRemove(index),
-        [onRemove]
-    )
+    const handlePlayTrack = useCallback((index: number) => onPlayTrack(index), [onPlayTrack])
+    const handleRemove = useCallback((index: number) => onRemove(index), [onRemove])
     const itemData = useMemo<QueueItemData>(
         () => ({
             visibleQueue,
@@ -375,24 +388,13 @@ export function QueueDrawer({
             onRemove: handleRemove,
             isPlaying,
         }),
-        [
-            visibleQueue,
-            upcomingStart,
-            currentIndex,
-            drag,
-            handlePlayTrack,
-            handleRemove,
-            isPlaying,
-        ]
+        [visibleQueue, upcomingStart, currentIndex, drag, handlePlayTrack, handleRemove, isPlaying]
     )
-    const getItemKey = useCallback(
-        (index: number, data: QueueItemData) => {
-            const actualIndex = data.upcomingStart + index
-            const track = data.visibleQueue[index]
-            return actualIndex + ":" + trackKey(track)
-        },
-        []
-    )
+    const getItemKey = useCallback((index: number, data: QueueItemData) => {
+        const actualIndex = data.upcomingStart + index
+        const track = data.visibleQueue[index]
+        return actualIndex + ":" + trackKey(track)
+    }, [])
 
     // Lock body scroll when open.
     useEffect(() => {
@@ -410,7 +412,9 @@ export function QueueDrawer({
         const removed = prevQueueRef.current.length > queue.length
         if (removed) {
             const removedCount = prevQueueRef.current.length - queue.length
-            setAnnouncement(`${removedCount} track${removedCount > 1 ? "s" : ""} removed from queue`)
+            setAnnouncement(
+                `${removedCount} track${removedCount > 1 ? "s" : ""} removed from queue`
+            )
         }
         prevQueueRef.current = queue
     }, [queue])

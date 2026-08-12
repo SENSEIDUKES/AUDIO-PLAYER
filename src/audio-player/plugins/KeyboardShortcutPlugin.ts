@@ -1,7 +1,4 @@
-import type {
-    AudioPlayerPlugin,
-    PluginPlayerContext,
-} from "../core/plugins/PluginInterface"
+import type { AudioPlayerPlugin, PluginPlayerContext } from "../core/plugins/PluginInterface"
 import { KeyboardShortcutPluginConfigSchema, validateConfig } from "./configValidators"
 
 export interface KeyboardShortcutPluginConfig {
@@ -25,7 +22,11 @@ export class KeyboardShortcutPlugin implements AudioPlayerPlugin {
     private context: PluginPlayerContext | null = null
 
     constructor(config: KeyboardShortcutPluginConfig = {}) {
-        const valid = validateConfig(KeyboardShortcutPluginConfigSchema, config, "keyboard-shortcuts")
+        const valid = validateConfig(
+            KeyboardShortcutPluginConfigSchema,
+            config,
+            "keyboard-shortcuts"
+        )
         this.name = valid.name
         this.scope = valid.scope as "root" | "document"
         this.seekSeconds = valid.seekSeconds
@@ -52,7 +53,13 @@ export class KeyboardShortcutPlugin implements AudioPlayerPlugin {
 
     private handleKeyDown = (nativeEvent: Event) => {
         const event = nativeEvent as KeyboardEvent
-        if (!this.context || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) {
+        if (
+            !this.context ||
+            event.defaultPrevented ||
+            event.metaKey ||
+            event.ctrlKey ||
+            event.altKey
+        ) {
             return
         }
 

@@ -276,11 +276,7 @@ export function SEICanvasActionMenu({
                             aria-hidden="true"
                             data-entered={entered}
                         />
-                        <div
-                            className="sac__stage"
-                            role="menu"
-                            aria-label={ariaLabel}
-                        >
+                        <div className="sac__stage" role="menu" aria-label={ariaLabel}>
                             <div
                                 className="sac__arc"
                                 data-open={entered}
@@ -316,21 +312,13 @@ export function SEICanvasActionMenu({
                                             }
                                             onClick={() => handleNode(node)}
                                             aria-disabled={!interactive}
-                                            aria-haspopup={
-                                                node.children ? "menu" : undefined
-                                            }
+                                            aria-haspopup={node.children ? "menu" : undefined}
                                             tabIndex={interactive ? 0 : -1}
                                         >
                                             <span className="sac__node-icon">
-                                                {state === "locked" ? (
-                                                    <LockIcon />
-                                                ) : (
-                                                    <Icon />
-                                                )}
+                                                {state === "locked" ? <LockIcon /> : <Icon />}
                                             </span>
-                                            <span className="sac__node-label">
-                                                {node.label}
-                                            </span>
+                                            <span className="sac__node-label">{node.label}</span>
                                             {state === "coming-soon" && (
                                                 <span className="sac__badge">soon</span>
                                             )}

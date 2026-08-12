@@ -5,9 +5,7 @@ export function LibraryPlaylistsWorkspace() {
     return (
         <div className="sap-ctl__workspace-empty">
             <p className="sap-ctl__workspace-lead">Playlists coming soon</p>
-            <p className="sap-ctl__workspace-sub">
-                Browse, build and reorder playlists from here.
-            </p>
+            <p className="sap-ctl__workspace-sub">Browse, build and reorder playlists from here.</p>
         </div>
     )
 }

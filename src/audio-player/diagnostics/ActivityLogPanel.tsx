@@ -11,12 +11,7 @@ import { useCallback, useMemo, useRef, useState, useEffect } from "react"
 import type { ChangeEvent } from "react"
 import { useOptionalActivityLog } from "./useActivityLog"
 import { createActivityLogStore } from "./activityLogStore"
-import type {
-    ActivityArea,
-    ActivityEvent,
-    ActivityLogApi,
-    ActivityStatus,
-} from "./activityTypes"
+import type { ActivityArea, ActivityEvent, ActivityLogApi, ActivityStatus } from "./activityTypes"
 import { CheckIcon } from "../skins/icons"
 import "./activity-log.css"
 
@@ -54,12 +49,8 @@ const STATUS_CLASS: Record<ActivityStatus, string> = {
     success: "al-event--success",
 }
 
-const VALID_AREAS = new Set<ActivityArea>(
-    Object.keys(AREA_LABELS) as ActivityArea[]
-)
-const VALID_STATUSES = new Set<ActivityStatus>(
-    Object.keys(STATUS_CLASS) as ActivityStatus[]
-)
+const VALID_AREAS = new Set<ActivityArea>(Object.keys(AREA_LABELS) as ActivityArea[])
+const VALID_STATUSES = new Set<ActivityStatus>(Object.keys(STATUS_CLASS) as ActivityStatus[])
 
 type SafeActivityEvent = ActivityEvent & {
     area: ActivityArea
@@ -117,35 +108,29 @@ export function ActivityLogPanel() {
 
     // ---- Handlers ----
 
-    const handleStatusChange = useCallback(
-        (e: ChangeEvent<HTMLSelectElement>) => {
-            setFilters((f) => ({
-                ...f,
-                status: e.target.value as StatusFilter,
-            }))
-        },
-        []
-    )
+    const handleStatusChange = useCallback((e: ChangeEvent<HTMLSelectElement>) => {
+        setFilters((f) => ({
+            ...f,
+            status: e.target.value as StatusFilter,
+        }))
+    }, [])
 
-    const handleAreaChange = useCallback(
-        (e: ChangeEvent<HTMLSelectElement>) => {
-            setFilters((f) => ({
-                ...f,
-                area: e.target.value as AreaFilter,
-            }))
-        },
-        []
-    )
+    const handleAreaChange = useCallback((e: ChangeEvent<HTMLSelectElement>) => {
+        setFilters((f) => ({
+            ...f,
+            area: e.target.value as AreaFilter,
+        }))
+    }, [])
 
-    const handleSearchChange = useCallback(
-        (e: ChangeEvent<HTMLInputElement>) => {
-            setFilters((f) => ({ ...f, search: e.target.value }))
-        },
-        []
-    )
+    const handleSearchChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+        setFilters((f) => ({ ...f, search: e.target.value }))
+    }, [])
 
     const handleClear = useCallback(() => {
-        if (typeof window !== "undefined" && window.confirm("Are you sure you want to clear the activity log?")) {
+        if (
+            typeof window !== "undefined" &&
+            window.confirm("Are you sure you want to clear the activity log?")
+        ) {
             log.clear()
         }
     }, [log])
@@ -167,19 +152,11 @@ export function ActivityLogPanel() {
     }, [log])
 
     const handleExportJson = useCallback(() => {
-        downloadLog(
-            log.exportJson(),
-            `activity-log-${Date.now()}.json`,
-            "application/json"
-        )
+        downloadLog(log.exportJson(), `activity-log-${Date.now()}.json`, "application/json")
     }, [log])
 
     const handleExportText = useCallback(() => {
-        downloadLog(
-            log.exportText(),
-            `activity-log-${Date.now()}.txt`,
-            "text/plain"
-        )
+        downloadLog(log.exportText(), `activity-log-${Date.now()}.txt`, "text/plain")
     }, [log])
 
     return (
@@ -207,13 +184,11 @@ export function ActivityLogPanel() {
                         aria-label="Filter by area"
                     >
                         <option value="all">All areas</option>
-                        {(Object.keys(AREA_LABELS) as ActivityArea[]).map(
-                            (area) => (
-                                <option key={area} value={area}>
-                                    {AREA_LABELS[area]}
-                                </option>
-                            )
-                        )}
+                        {(Object.keys(AREA_LABELS) as ActivityArea[]).map((area) => (
+                            <option key={area} value={area}>
+                                {AREA_LABELS[area]}
+                            </option>
+                        ))}
                     </select>
 
                     <input
@@ -270,9 +245,7 @@ export function ActivityLogPanel() {
             {/* ── Badge ── */}
             <div className="al__badge">
                 {filtered.length} / {log.count} event{log.count !== 1 ? "s" : ""}
-                {filters.status !== "all" ||
-                filters.area !== "all" ||
-                filters.search.trim()
+                {filters.status !== "all" || filters.area !== "all" || filters.search.trim()
                     ? " (filtered)"
                     : ""}
             </div>
@@ -286,9 +259,7 @@ export function ActivityLogPanel() {
                             : "No events match the current filters."}
                     </div>
                 ) : (
-                    filtered.map((event) => (
-                        <ActivityEventRow key={event.id} event={event} />
-                    ))
+                    filtered.map((event) => <ActivityEventRow key={event.id} event={event} />)
                 )}
             </div>
         </div>
@@ -305,25 +276,16 @@ function ActivityEventRow({ event }: { event: SafeActivityEvent }) {
     const time = formatEventTime(event.timestamp)
     const statusClass = STATUS_CLASS[event.status]
 
-    const hasDetails =
-        event.details != null ||
-        event.error != null ||
-        event.message.length > 120
+    const hasDetails = event.details != null || event.error != null || event.message.length > 120
 
     return (
-        <div
-            className={`al-event ${statusClass}${expanded ? " al-event--expanded" : ""}`}
-        >
+        <div className={`al-event ${statusClass}${expanded ? " al-event--expanded" : ""}`}>
             <button
                 type="button"
                 className="al-event__summary"
                 onClick={() => setExpanded((v) => !v)}
                 aria-expanded={expanded}
-                aria-label={
-                    expanded
-                        ? "Collapse event details"
-                        : "Expand event details"
-                }
+                aria-label={expanded ? "Collapse event details" : "Expand event details"}
             >
                 <span className="al-event__time">{time}</span>
                 <span className={`al-event__status al-event__status--${event.status}`}>
@@ -359,16 +321,12 @@ function ActivityEventRow({ event }: { event: SafeActivityEvent }) {
                     {event.message.length > 120 && (
                         <div className="al-event__detail-row">
                             <span className="al-event__detail-label">Message</span>
-                            <code className="al-event__detail-val">
-                                {event.message}
-                            </code>
+                            <code className="al-event__detail-val">{event.message}</code>
                         </div>
                     )}
                     <div className="al-event__detail-row">
                         <span className="al-event__detail-label">ID</span>
-                        <code className="al-event__detail-val">
-                            #{event.id}
-                        </code>
+                        <code className="al-event__detail-val">#{event.id}</code>
                     </div>
                 </div>
             )}
@@ -383,9 +341,7 @@ function ActivityEventRow({ event }: { event: SafeActivityEvent }) {
 function getSafeEvents(events: readonly unknown[]): SafeActivityEvent[] {
     if (!Array.isArray(events)) return []
 
-    return events
-        .map(toSafeEvent)
-        .filter((event): event is SafeActivityEvent => event != null)
+    return events.map(toSafeEvent).filter((event): event is SafeActivityEvent => event != null)
 }
 
 function toSafeEvent(event: unknown): SafeActivityEvent | null {
@@ -400,14 +356,11 @@ function toSafeEvent(event: unknown): SafeActivityEvent | null {
         : "warn"
     const message = String(candidate.message ?? "Malformed activity event")
     const timestamp =
-        typeof candidate.timestamp === "number" &&
-        Number.isFinite(candidate.timestamp)
+        typeof candidate.timestamp === "number" && Number.isFinite(candidate.timestamp)
             ? candidate.timestamp
             : Date.now()
     const id =
-        typeof candidate.id === "number" && Number.isFinite(candidate.id)
-            ? candidate.id
-            : timestamp
+        typeof candidate.id === "number" && Number.isFinite(candidate.id) ? candidate.id : timestamp
 
     return {
         ...candidate,
@@ -422,13 +375,7 @@ function toSafeEvent(event: unknown): SafeActivityEvent | null {
 
 function formatEventTime(ts: number): string {
     const d = new Date(ts)
-    return (
-        pad2(d.getHours()) +
-        ":" +
-        pad2(d.getMinutes()) +
-        ":" +
-        pad2(d.getSeconds())
-    )
+    return pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds())
 }
 
 function pad2(n: number): string {

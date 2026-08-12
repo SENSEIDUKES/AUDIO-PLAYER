@@ -2,8 +2,7 @@ function getAudioContextCtor(): typeof AudioContext | undefined {
     if (typeof window === "undefined") return undefined
     return (
         window.AudioContext ??
-        (window as unknown as { webkitAudioContext?: typeof AudioContext })
-            .webkitAudioContext
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
     )
 }
 
@@ -213,10 +212,7 @@ export class AudioSpriteEngine {
         }
     }
 
-    play(
-        clipName: string,
-        options: AudioSpritePlayOptions = {}
-    ): AudioSpriteInstanceId | null {
+    play(clipName: string, options: AudioSpritePlayOptions = {}): AudioSpriteInstanceId | null {
         const manifest = this.manifest
         const buffer = this.buffer
         if (!manifest || !buffer) return null

@@ -21,12 +21,8 @@ describe("buildMediaSessionArtwork", () => {
 
 describe("extractUrlFromCss", () => {
     it("pulls the bare URL out of a url() wrapper", () => {
-        expect(extractUrlFromCss('url("https://cdn/a.jpg")')).toBe(
-            "https://cdn/a.jpg"
-        )
-        expect(extractUrlFromCss("url(https://cdn/b.png)")).toBe(
-            "https://cdn/b.png"
-        )
+        expect(extractUrlFromCss('url("https://cdn/a.jpg")')).toBe("https://cdn/a.jpg")
+        expect(extractUrlFromCss("url(https://cdn/b.png)")).toBe("https://cdn/b.png")
     })
 
     it("returns null when there is no url()", () => {
@@ -36,27 +32,19 @@ describe("extractUrlFromCss", () => {
 
 describe("resolveArtworkSrc", () => {
     it("passes a plain URL through unchanged", () => {
-        expect(resolveArtworkSrc("https://cdn/cover.jpg")).toBe(
-            "https://cdn/cover.jpg"
-        )
+        expect(resolveArtworkSrc("https://cdn/cover.jpg")).toBe("https://cdn/cover.jpg")
     })
 
     it("passes a plain URL through unchanged, even with parentheses", () => {
-        expect(resolveArtworkSrc("https://cdn/cover(1).jpg")).toBe(
-            "https://cdn/cover(1).jpg"
-        )
+        expect(resolveArtworkSrc("https://cdn/cover(1).jpg")).toBe("https://cdn/cover(1).jpg")
     })
 
     it("unwraps a CSS url() value to a usable image URL", () => {
-        expect(resolveArtworkSrc('url("https://cdn/cover.jpg")')).toBe(
-            "https://cdn/cover.jpg"
-        )
+        expect(resolveArtworkSrc('url("https://cdn/cover.jpg")')).toBe("https://cdn/cover.jpg")
     })
 
     it("rejects gradients and other CSS functions (not real images)", () => {
-        expect(
-            resolveArtworkSrc("linear-gradient(135deg,#FF7AC6,#7C5CFF)")
-        ).toBeUndefined()
+        expect(resolveArtworkSrc("linear-gradient(135deg,#FF7AC6,#7C5CFF)")).toBeUndefined()
         expect(resolveArtworkSrc("radial-gradient(#000,#fff)")).toBeUndefined()
     })
 

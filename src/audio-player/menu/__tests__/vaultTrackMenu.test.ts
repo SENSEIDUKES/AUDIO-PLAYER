@@ -16,12 +16,7 @@ function collectLeaves(actions: ArcAction[], out: ArcAction[] = []): ArcAction[]
 describe("buildVaultTrackArcActions", () => {
     it("matches the standardized Vault-face command wheel (Vault replaces Plugins)", () => {
         const tree = buildVaultTrackArcActions()
-        expect(tree.map((a) => a.label)).toEqual([
-            "Vault",
-            "Playback",
-            "Share",
-            "Agents",
-        ])
+        expect(tree.map((a) => a.label)).toEqual(["Vault", "Playback", "Share", "Agents"])
         const byLabel = Object.fromEntries(
             tree.map((a) => [a.label, a.children!.map((c) => c.label)])
         )
@@ -73,18 +68,15 @@ describe("buildVaultTrackArcActions", () => {
         const scout = (entitled?: boolean) =>
             collectLeaves(
                 buildVaultTrackArcActions(
-                    entitled === undefined
-                        ? undefined
-                        : { entitlements: { studioScout: entitled } }
+                    entitled === undefined ? undefined : { entitlements: { studioScout: entitled } }
                 )
             ).find((l) => l.id === "agent-scout")!
         expect(scout().workspaceRoute).toBe("agent:demo-scout")
         expect(scout(false).workspaceRoute).toBe("agent:demo-scout")
         expect(scout(true).workspaceRoute).toBe("agent:studio-scout")
         expect(
-            collectLeaves(buildVaultTrackArcActions()).find(
-                (l) => l.id === "agent-memoir"
-            )!.workspaceRoute
+            collectLeaves(buildVaultTrackArcActions()).find((l) => l.id === "agent-memoir")!
+                .workspaceRoute
         ).toBe("agent:memoir")
     })
 
@@ -107,12 +99,7 @@ describe("buildVaultTrackArcActions", () => {
             },
             openWorkspace: () => {},
         })
-        expect(pruned.map((a) => a.id)).toEqual([
-            "vault",
-            "playback",
-            "share",
-            "agents",
-        ])
+        expect(pruned.map((a) => a.id)).toEqual(["vault", "playback", "share", "agents"])
         expect(collectLeaves(pruned)).toHaveLength(12)
     })
 })
@@ -122,12 +109,7 @@ describe("buildStandardTrackArcActions", () => {
         const tree = buildStandardTrackArcActions({
             activePluginIds: ["lyrics"],
         })
-        expect(tree.map((a) => a.label)).toEqual([
-            "Plugins",
-            "Playback",
-            "Share",
-            "Agents",
-        ])
+        expect(tree.map((a) => a.label)).toEqual(["Plugins", "Playback", "Share", "Agents"])
     })
 
     it("shows only currently active plugins, bucketed under Audio / Visual / Analytics", () => {
@@ -149,18 +131,14 @@ describe("buildStandardTrackArcActions", () => {
         const tree = buildStandardTrackArcActions()
         const plugins = tree.find((a) => a.id === "plugins")!
         expect(plugins.children!.map((b) => b.label)).toEqual(["Visual"])
-        expect(plugins.children![0].children!.map((c) => c.label)).toEqual([
-            "Canvas",
-        ])
+        expect(plugins.children![0].children!.map((c) => c.label)).toEqual(["Canvas"])
     })
 
     it("shares the standardized Playback / Share / Agents arms with the Vault wheel", () => {
         const standard = buildStandardTrackArcActions()
         const vault = buildVaultTrackArcActions()
         for (const id of ["playback", "share", "agents"]) {
-            expect(standard.find((a) => a.id === id)).toEqual(
-                vault.find((a) => a.id === id)
-            )
+            expect(standard.find((a) => a.id === id)).toEqual(vault.find((a) => a.id === id))
         }
     })
 

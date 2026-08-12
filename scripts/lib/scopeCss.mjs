@@ -112,7 +112,7 @@ export function scopeCss(css, scopeClass, id) {
 
             // Regular selector at top level — scope it
             if (opens > 0 || trimmed.endsWith(",")) {
-                const scoped = scopeSelectors(trimmed, scopeClass, warnings)
+                const scoped = scopeSelectors(trimmed, scopeClass)
                 output.push(scoped)
                 depth += opens - closes
                 continue
@@ -120,7 +120,7 @@ export function scopeCss(css, scopeClass, id) {
 
             // Bare selector line without brace (multi-line selector)
             if (trimmed && !trimmed.startsWith("}")) {
-                const scoped = scopeSelectors(trimmed, scopeClass, warnings)
+                const scoped = scopeSelectors(trimmed, scopeClass)
                 output.push(scoped)
                 depth += opens - closes
                 continue
@@ -137,11 +137,11 @@ export function scopeCss(css, scopeClass, id) {
                     // closing @media
                     output.push(line)
                 } else if (opens > 0 || trimmed.endsWith(",")) {
-                    const scoped = scopeSelectors(trimmed, scopeClass, warnings)
+                    const scoped = scopeSelectors(trimmed, scopeClass)
                     output.push(scoped)
                 } else if (trimmed && !trimmed.startsWith("}")) {
                     // Multi-line selector continuation inside @media
-                    const scoped = scopeSelectors(trimmed, scopeClass, warnings)
+                    const scoped = scopeSelectors(trimmed, scopeClass)
                     output.push(scoped)
                 } else {
                     output.push(line)
@@ -191,17 +191,19 @@ export function scopeCss(css, scopeClass, id) {
  *
  * @param {string} selectorLine
  * @param {string} scopeClass
- * @param {string[]} warnings
  * @returns {string}
  */
-function scopeSelectors(selectorLine, scopeClass, warnings) {
+function scopeSelectors(selectorLine, scopeClass) {
     // Split on the opening brace — the part before `{` is selectors, after is the rest
     const braceIdx = selectorLine.indexOf("{")
     const selectorPart = braceIdx >= 0 ? selectorLine.slice(0, braceIdx) : selectorLine
     const rest = braceIdx >= 0 ? selectorLine.slice(braceIdx) : ""
 
-    const selectors = selectorPart.split(",").map((s) => s.trim()).filter(Boolean)
-    const scoped = selectors.map((sel) => scopeSingleSelector(sel, scopeClass, warnings))
+    const selectors = selectorPart
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    const scoped = selectors.map((sel) => scopeSingleSelector(sel, scopeClass))
 
     return scoped.join(",\n") + (rest ? " " + rest.trim() : "")
 }
@@ -211,10 +213,9 @@ function scopeSelectors(selectorLine, scopeClass, warnings) {
  *
  * @param {string} selector
  * @param {string} scopeClass
- * @param {string[]} warnings
  * @returns {string}
  */
-function scopeSingleSelector(selector, scopeClass, warnings) {
+function scopeSingleSelector(selector, scopeClass) {
     const s = selector.trim()
 
     // :root, html, body (and combined selectors like body.dark or body[data-theme]) → scope root
@@ -254,7 +255,10 @@ function rewriteAnimationReferences(line, renames) {
     for (const [original, namespaced] of renames) {
         // Match animation-name or animation shorthand references
         // Use word-boundary matching to avoid false positives
-        const re = new RegExp(`(animation(?:-name)?\\s*:[^;{}]*?)\\b${escapeRegex(original)}\\b`, "g")
+        const re = new RegExp(
+            `(animation(?:-name)?\\s*:[^;{}]*?)\\b${escapeRegex(original)}\\b`,
+            "g"
+        )
         result = result.replace(re, `$1${namespaced}`)
     }
     return result

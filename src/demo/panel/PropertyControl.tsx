@@ -1,20 +1,13 @@
 import { useEffect, useState } from "react"
 import type { CSSProperties } from "react"
-import type {
-    MediaSource,
-    PropertyDescriptor,
-    RepeatMode,
-} from "../../audio-player"
+import type { MediaSource, PropertyDescriptor, RepeatMode } from "../../audio-player"
 import { MediaPicker } from "./MediaPicker"
 import { getRecentColors, pushRecentColor, subscribeRecentColors } from "../recentColors"
 
 /* rgba/hex normalizer: <input type=color> only accepts 7-char hex, but the
    audio player uses hex AND rgba() strings. Fall back so the user still sees a
    swatch for values the picker can't render. */
-export function normalizeColor(
-    value: string | undefined,
-    fallback = "#000000"
-): string {
+export function normalizeColor(value: string | undefined, fallback = "#000000"): string {
     if (!value) return fallback
     const v = value.trim()
     if (/^#[0-9a-f]{6}$/i.test(v)) return v
@@ -189,9 +182,7 @@ export function PropertyControl({
                         id={fieldId}
                         className="framer-panel__select"
                         value={String(value ?? "")}
-                        onChange={(e) =>
-                            onSet(propPath, e.target.value as RepeatMode)
-                        }
+                        onChange={(e) => onSet(propPath, e.target.value as RepeatMode)}
                     >
                         {control.options.map((o) => (
                             <option key={o.value} value={o.value}>
@@ -228,9 +219,7 @@ export function PropertyControl({
                             id={`${fieldId}-w`}
                             className="framer-panel__select"
                             value={String(font.fontWeight ?? 500)}
-                            onChange={(e) =>
-                                setFont({ fontWeight: Number(e.target.value) })
-                            }
+                            onChange={(e) => setFont({ fontWeight: Number(e.target.value) })}
                         >
                             {FONT_WEIGHTS.map((w) => (
                                 <option key={w.value} value={w.value}>
@@ -247,9 +236,7 @@ export function PropertyControl({
                             id={`${fieldId}-ls`}
                             className="framer-panel__input"
                             value={font.letterSpacing ?? ""}
-                            onChange={(e) =>
-                                setFont({ letterSpacing: e.target.value })
-                            }
+                            onChange={(e) => setFont({ letterSpacing: e.target.value })}
                         />
                     </div>
                     <div className="framer-panel__row">

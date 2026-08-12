@@ -7,7 +7,12 @@
     position: fixed;
     inset: 0;
     z-index: 120;
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family:
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        sans-serif;
 }
 
 /* Dim + light blur, fades in. Mirrors the SAP Controller backdrop. */
@@ -92,8 +97,10 @@
     cursor: pointer;
     pointer-events: auto;
     touch-action: manipulation;
-    transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
-        opacity 0.2s ease-out, background-color 0.2s ease;
+    transition:
+        transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
+        opacity 0.2s ease-out,
+        background-color 0.2s ease;
 }
 .sac__arc[data-open="true"] .sac__center {
     transform: translate(-50%, -50%) scale(1);
@@ -151,7 +158,8 @@
     user-select: none;
     transform: translate(-50%, -50%) scale(0.4);
     opacity: 0;
-    transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
+    transition:
+        transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
         opacity 0.2s ease-out;
 }
 .sac__arc[data-open="true"] .sac__node {
@@ -192,8 +200,12 @@
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ap-text, #fff) 14%, transparent);
-    transition: background-color 0.2s ease, border-color 0.2s ease,
-        box-shadow 0.2s ease, color 0.2s ease, transform 0.2s ease;
+    transition:
+        background-color 0.2s ease,
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        color 0.2s ease,
+        transform 0.2s ease;
 }
 .sac__node-label {
     font-size: 11px;
@@ -227,7 +239,8 @@
     background-color: color-mix(in srgb, var(--ap-accent, #fff) 22%, transparent);
     border-color: var(--ap-accent, #fff);
     color: var(--ap-accent, #fff);
-    box-shadow: 0 0 0 1px var(--ap-accent, #fff),
+    box-shadow:
+        0 0 0 1px var(--ap-accent, #fff),
         0 0 18px color-mix(in srgb, var(--ap-accent, #fff) 45%, transparent);
 }
 .sac__node--inactive .sac__node-icon {

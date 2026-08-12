@@ -96,16 +96,11 @@ function VisualCanvasWorkspace({ lyrics }: { lyrics?: string }) {
         <>
             <VisualSlotPicker slot="seiCanvas" />
             {activeId ? (
-                <ControllerPanelRenderer
-                    componentId={activeId}
-                    lyrics={lyrics}
-                />
+                <ControllerPanelRenderer componentId={activeId} lyrics={lyrics} />
             ) : (
                 <div className="sap-ctl__workspace-empty">
                     <p className="sap-ctl__workspace-lead">No Visual</p>
-                    <p className="sap-ctl__workspace-sub">
-                        Select a visual above to configure it.
-                    </p>
+                    <p className="sap-ctl__workspace-sub">Select a visual above to configure it.</p>
                 </div>
             )}
         </>
@@ -135,12 +130,7 @@ function contentForRoute(
             // The lyric display is a seiCanvas visual that declares a settings
             // panel; the lyrics route surfaces that panel through the renderer so
             // edits flow straight back to the live canvas visual.
-            return (
-                <ControllerPanelRenderer
-                    componentId={LYRIC_DISPLAY_ID}
-                    lyrics={lyrics}
-                />
-            )
+            return <ControllerPanelRenderer componentId={LYRIC_DISPLAY_ID} lyrics={lyrics} />
         case "playback:automix":
             return <PlaybackAutomixWorkspace />
         case "playback:controls":
@@ -174,12 +164,7 @@ function contentForRoute(
     }
 }
 
-export function WorkspaceShell({
-    route,
-    onClose,
-    lyrics,
-    playback,
-}: WorkspaceShellProps) {
+export function WorkspaceShell({ route, onClose, lyrics, playback }: WorkspaceShellProps) {
     return (
         <>
             <header className="sap-ctl__header">

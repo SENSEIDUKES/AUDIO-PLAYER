@@ -81,7 +81,9 @@ export function HoldSkipButton({
         resetHold()
     }, [resetHold])
 
-    useEffect(() => { resetHold(); }, [resetHold, disabled, skipDisabled])
+    useEffect(() => {
+        resetHold()
+    }, [resetHold, disabled, skipDisabled])
 
     const handlePointerDown = (event: PointerEvent<HTMLButtonElement>) => {
         if (event.button !== 0) return
@@ -123,10 +125,13 @@ export function HoldSkipButton({
             onKeyDown={handleKeyDown}
             onKeyUp={handleKeyUp}
         >
-            <span className="ap-hold-skip__icon" aria-hidden="true">{children}</span>
+            <span className="ap-hold-skip__icon" aria-hidden="true">
+                {children}
+            </span>
             <span className="ap-hold-skip__progress" aria-hidden="true" />
             <span id={hintId} className="ap-sr-only">
-                Tap to {seekLabel.toLowerCase()}. Hold for about one second for {skipLabel.toLowerCase()}.
+                Tap to {seekLabel.toLowerCase()}. Hold for about one second for{" "}
+                {skipLabel.toLowerCase()}.
             </span>
         </button>
     )

@@ -117,8 +117,7 @@ export function SchemaPanel({
     })
     const [copied, setCopied] = useState(false)
 
-    const toggle = (id: string) =>
-        setOpen((o) => ({ ...o, [id]: !o[id] }))
+    const toggle = (id: string) => setOpen((o) => ({ ...o, [id]: !o[id] }))
 
     const setPath = (propPath: string, value: unknown) =>
         onChange(

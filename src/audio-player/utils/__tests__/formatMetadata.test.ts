@@ -52,14 +52,12 @@ describe("formatSecondaryLine", () => {
         expect(formatSecondaryLine({ artist: "Band" })).toBe("Band")
     })
     it("artist + featured", () => {
-        expect(
-            formatSecondaryLine({ artist: "Band", featuredArtists: ["Guest"] })
-        ).toBe("Band feat. Guest")
+        expect(formatSecondaryLine({ artist: "Band", featuredArtists: ["Guest"] })).toBe(
+            "Band feat. Guest"
+        )
     })
     it("artist + album with a middot separator", () => {
-        expect(formatSecondaryLine({ artist: "Band", albumTitle: "LP" })).toBe(
-            "Band · LP"
-        )
+        expect(formatSecondaryLine({ artist: "Band", albumTitle: "LP" })).toBe("Band · LP")
     })
     it("artist + featured + album", () => {
         expect(
@@ -71,9 +69,7 @@ describe("formatSecondaryLine", () => {
         ).toBe("Band feat. X & Y · LP")
     })
     it("uses subtitle as the trailing fallback only without album/featured", () => {
-        expect(formatSecondaryLine({ artist: "Band", subtitle: "Live" })).toBe(
-            "Band · Live"
-        )
+        expect(formatSecondaryLine({ artist: "Band", subtitle: "Live" })).toBe("Band · Live")
         // Featured present → subtitle is suppressed.
         expect(
             formatSecondaryLine({
@@ -83,9 +79,9 @@ describe("formatSecondaryLine", () => {
             })
         ).toBe("Band feat. G")
         // Album wins over subtitle.
-        expect(
-            formatSecondaryLine({ artist: "Band", albumTitle: "LP", subtitle: "Live" })
-        ).toBe("Band · LP")
+        expect(formatSecondaryLine({ artist: "Band", albumTitle: "LP", subtitle: "Live" })).toBe(
+            "Band · LP"
+        )
     })
     it("falls back to Unknown Artist", () => {
         expect(formatSecondaryLine({ albumTitle: "LP" })).toBe("Unknown Artist · LP")

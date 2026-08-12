@@ -21,8 +21,7 @@ export function usePluginSoundLayer(): PluginSoundLayer {
     return useMemo<PluginSoundLayer>(
         () => ({
             loadSpritePack: (manifest) => engineRef.current!.load(manifest),
-            playSprite: (clipName, options) =>
-                engineRef.current!.play(clipName, options),
+            playSprite: (clipName, options) => engineRef.current!.play(clipName, options),
             stopSprite: (id) => engineRef.current!.stop(id),
             fadeSprite: (id, toVolume, durationMs) =>
                 engineRef.current!.fade(id, toVolume, durationMs),

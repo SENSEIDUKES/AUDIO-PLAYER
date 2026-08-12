@@ -23,12 +23,12 @@ describe("AnalyticsPlugin", () => {
             getCurrentTrack: vi.fn().mockReturnValue({ id: "1", title: "Test" }),
             getSourceKey: vi.fn().mockReturnValue("local"),
         } as unknown as PluginPlayerContext
-        
+
         // Mock global objects
         vi.stubGlobal("fetch", vi.fn().mockResolvedValue({}))
         Object.defineProperty(navigator, "sendBeacon", {
             value: vi.fn().mockReturnValue(true),
-            writable: true
+            writable: true,
         })
     })
 
@@ -43,9 +43,9 @@ describe("AnalyticsPlugin", () => {
             const sendCallback = vi.fn()
             const plugin = createAnalyticsPlugin({ send: sendCallback })
             plugin.init(mockContext)
-            
+
             plugin.onTrackLoad?.(null)
-            
+
             expect(sendCallback).toHaveBeenCalledWith({
                 type: "track_load",
                 track: { id: "1", title: "Test" },
@@ -61,21 +61,27 @@ describe("AnalyticsPlugin", () => {
             const sendCallback = vi.fn()
             const plugin = createAnalyticsPlugin({ send: sendCallback })
             plugin.init(mockContext)
-            
+
             plugin.onPlay?.()
             expect(sendCallback).toHaveBeenLastCalledWith(expect.objectContaining({ type: "play" }))
-            
+
             plugin.onPause?.()
-            expect(sendCallback).toHaveBeenLastCalledWith(expect.objectContaining({ type: "pause" }))
-            
+            expect(sendCallback).toHaveBeenLastCalledWith(
+                expect.objectContaining({ type: "pause" })
+            )
+
             plugin.onStop?.()
             expect(sendCallback).toHaveBeenLastCalledWith(expect.objectContaining({ type: "stop" }))
-            
+
             plugin.onTrackEnded?.()
-            expect(sendCallback).toHaveBeenLastCalledWith(expect.objectContaining({ type: "track_ended" }))
-            
+            expect(sendCallback).toHaveBeenLastCalledWith(
+                expect.objectContaining({ type: "track_ended" })
+            )
+
             plugin.onSeek?.(25)
-            expect(sendCallback).toHaveBeenLastCalledWith(expect.objectContaining({ type: "seek", position: 25 }))
+            expect(sendCallback).toHaveBeenLastCalledWith(
+                expect.objectContaining({ type: "seek", position: 25 })
+            )
         })
     })
 
@@ -84,40 +90,48 @@ describe("AnalyticsPlugin", () => {
             const sendCallback = vi.fn()
             const plugin = createAnalyticsPlugin({ send: sendCallback })
             plugin.init(mockContext)
-            
+
             plugin.onTimeUpdate?.(5)
             expect(sendCallback).not.toHaveBeenCalled()
         })
 
         it("emits time_update based on intervals", () => {
             const sendCallback = vi.fn()
-            const plugin = createAnalyticsPlugin({ send: sendCallback, includeTimeUpdates: true, timeUpdateIntervalSeconds: 10 })
+            const plugin = createAnalyticsPlugin({
+                send: sendCallback,
+                includeTimeUpdates: true,
+                timeUpdateIntervalSeconds: 10,
+            })
             plugin.init(mockContext)
-            
+
             plugin.onTimeUpdate?.(0)
             expect(sendCallback).toHaveBeenCalledTimes(1) // bucket 0
-            
+
             plugin.onTimeUpdate?.(5)
             expect(sendCallback).toHaveBeenCalledTimes(1) // still bucket 0
-            
+
             plugin.onTimeUpdate?.(10)
             expect(sendCallback).toHaveBeenCalledTimes(2) // bucket 1
-            
+
             plugin.onTimeUpdate?.(15)
             expect(sendCallback).toHaveBeenCalledTimes(2) // still bucket 1
         })
-        
+
         it("resets time bucket on track load", () => {
             const sendCallback = vi.fn()
-            const plugin = createAnalyticsPlugin({ send: sendCallback, includeTimeUpdates: true, timeUpdateIntervalSeconds: 10 })
+            const plugin = createAnalyticsPlugin({
+                send: sendCallback,
+                includeTimeUpdates: true,
+                timeUpdateIntervalSeconds: 10,
+            })
             plugin.init(mockContext)
-            
+
             plugin.onTimeUpdate?.(0)
             expect(sendCallback).toHaveBeenCalledTimes(1) // bucket 0
-            
+
             plugin.onTrackLoad?.(null) // Resets bucket. Also emits track_load (+1)
             expect(sendCallback).toHaveBeenCalledTimes(2)
-            
+
             plugin.onTimeUpdate?.(0) // Should emit again because bucket was reset
             expect(sendCallback).toHaveBeenCalledTimes(3)
         })
@@ -136,58 +150,61 @@ describe("AnalyticsPlugin", () => {
             const plugin = createAnalyticsPlugin({ endpoint: "/api/events" })
             plugin.init(mockContext)
             plugin.onPlay?.()
-            
-            expect(navigator.sendBeacon).toHaveBeenCalledWith(
-                "/api/events",
-                expect.any(Blob)
-            )
+
+            expect(navigator.sendBeacon).toHaveBeenCalledWith("/api/events", expect.any(Blob))
             expect(fetch).not.toHaveBeenCalled()
         })
 
         it("falls back to fetch if sendBeacon returns false", () => {
             Object.defineProperty(navigator, "sendBeacon", {
                 value: vi.fn().mockReturnValue(false),
-                writable: true
+                writable: true,
             })
-            
+
             const plugin = createAnalyticsPlugin({ endpoint: "/api/events" })
             plugin.init(mockContext)
             plugin.onPlay?.()
-            
+
             expect(navigator.sendBeacon).toHaveBeenCalled()
-            expect(fetch).toHaveBeenCalledWith("/api/events", expect.objectContaining({
-                method: "POST",
-                keepalive: true
-            }))
+            expect(fetch).toHaveBeenCalledWith(
+                "/api/events",
+                expect.objectContaining({
+                    method: "POST",
+                    keepalive: true,
+                })
+            )
         })
 
         it("falls back to fetch if sendBeacon is missing", () => {
             Object.defineProperty(navigator, "sendBeacon", {
                 value: undefined,
-                writable: true
+                writable: true,
             })
-            
+
             const plugin = createAnalyticsPlugin({ endpoint: "/api/events" })
             plugin.init(mockContext)
             plugin.onPlay?.()
-            
-            expect(fetch).toHaveBeenCalledWith("/api/events", expect.objectContaining({
-                method: "POST",
-                keepalive: true
-            }))
+
+            expect(fetch).toHaveBeenCalledWith(
+                "/api/events",
+                expect.objectContaining({
+                    method: "POST",
+                    keepalive: true,
+                })
+            )
         })
-        
+
         it("silently catches fetch errors (offline mode, endpoint errors)", async () => {
             Object.defineProperty(navigator, "sendBeacon", {
                 value: undefined,
-                writable: true
+                writable: true,
             })
             vi.mocked(fetch).mockRejectedValueOnce(new Error("Network Error"))
-            
+
             const plugin = createAnalyticsPlugin({ endpoint: "/api/events" })
             plugin.init(mockContext)
             plugin.onPlay?.() // Should not throw
-            
+
             expect(fetch).toHaveBeenCalled()
         })
 
@@ -198,21 +215,21 @@ describe("AnalyticsPlugin", () => {
             plugin.onPlay?.()
             expect(sendCallback).not.toHaveBeenCalled()
         })
-        
+
         it("handles destroy gracefully", () => {
             const sendCallback = vi.fn()
             const plugin = createAnalyticsPlugin({ send: sendCallback })
             plugin.init(mockContext)
             plugin.destroy()
-            
+
             plugin.onPlay?.()
             expect(sendCallback).not.toHaveBeenCalled()
         })
-        
+
         it("handles missing window gracefully", () => {
             const plugin = createAnalyticsPlugin({ endpoint: "/api/events" })
             plugin.init(mockContext)
-            
+
             const originalWindow = (globalThis as any).window
             try {
                 // @ts-ignore

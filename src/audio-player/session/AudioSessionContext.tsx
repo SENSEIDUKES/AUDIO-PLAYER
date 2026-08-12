@@ -1,12 +1,4 @@
-import {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-} from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import type {
     AudioSessionProviderProps,
     AudioPlayerEngine,
@@ -19,10 +11,7 @@ import type {
     PreloadConfig,
     TerminalTrackErrorEvent,
 } from "../types"
-import type {
-    AudioPlayerPlugin,
-    PluginPlayerContext,
-} from "../core/plugins/PluginInterface"
+import type { AudioPlayerPlugin, PluginPlayerContext } from "../core/plugins/PluginInterface"
 import { useAudioPlayer } from "../useAudioPlayer"
 import { AutomixPlugin, createAutomixPlugin } from "../plugins/AutomixPlugin"
 import {
@@ -144,19 +133,14 @@ export function AudioSessionProvider({
         failedSourceKeysRef.current.clear()
     }, [])
 
-    const currentTrack = currentIndex >= 0 ? queue[currentIndex] ?? null : null
-    const currentTrackSources = useMemo(
-        () => getTrackSources(currentTrack),
-        [currentTrack]
-    )
+    const currentTrack = currentIndex >= 0 ? (queue[currentIndex] ?? null) : null
+    const currentTrackSources = useMemo(() => getTrackSources(currentTrack), [currentTrack])
     const src = currentTrackSources[0]?.url ?? ""
     // Identity key for the engine's reset lifecycle. Encodes the queue position
     // AND the track identity so switching between two tracks that share the same
     // audio URL still resets currentTime/duration/buffered/error state — `src`
     // alone wouldn't change in that case.
-    const sourceKey = currentTrack
-        ? queueSourceKey(currentIndex, currentTrack)
-        : "empty"
+    const sourceKey = currentTrack ? queueSourceKey(currentIndex, currentTrack) : "empty"
     const sourceKeyRef = useRef(sourceKey)
     sourceKeyRef.current = sourceKey
     const currentTrackRef = useRef(currentTrack)
@@ -164,37 +148,49 @@ export function AudioSessionProvider({
 
     // Pub/Sub system
     const subscribersRef = useRef(new Map<PlayerEventType, Set<(payload: any) => void>>())
-    const subscribe = useCallback(<T extends PlayerEventType>(eventType: T, handler: (payload: PlayerEventPayload[T]) => void) => {
-        let set = subscribersRef.current.get(eventType)
-        if (!set) {
-            set = new Set()
-            subscribersRef.current.set(eventType, set)
-        }
-        set.add(handler)
-        return () => {
-            set?.delete(handler)
-        }
-    }, [])
-
-    const emit = useCallback(<T extends PlayerEventType>(eventType: T, payload: PlayerEventPayload[T]) => {
-        const set = subscribersRef.current.get(eventType)
-        if (set) {
-            for (const handler of Array.from(set)) {
-                handler(payload)
+    const subscribe = useCallback(
+        <T extends PlayerEventType>(
+            eventType: T,
+            handler: (payload: PlayerEventPayload[T]) => void
+        ) => {
+            let set = subscribersRef.current.get(eventType)
+            if (!set) {
+                set = new Set()
+                subscribersRef.current.set(eventType, set)
             }
-        }
-    }, [])
+            set.add(handler)
+            return () => {
+                set?.delete(handler)
+            }
+        },
+        []
+    )
 
-    const handleFallbackSource = useCallback((event: FallbackSourceEvent) => {
-        onFallbackSource?.(event)
-        emit('fallback-source', event)
-    }, [onFallbackSource, emit])
+    const emit = useCallback(
+        <T extends PlayerEventType>(eventType: T, payload: PlayerEventPayload[T]) => {
+            const set = subscribersRef.current.get(eventType)
+            if (set) {
+                for (const handler of Array.from(set)) {
+                    handler(payload)
+                }
+            }
+        },
+        []
+    )
+
+    const handleFallbackSource = useCallback(
+        (event: FallbackSourceEvent) => {
+            onFallbackSource?.(event)
+            emit("fallback-source", event)
+        },
+        [onFallbackSource, emit]
+    )
 
     // Forward declaration: onEnded needs the latest queue navigation logic.
     const advanceRef = useRef<() => void>(() => {})
-    const settleTrackErrorRef = useRef<
-        (failedSourceKey: string, shouldSkip: boolean) => void
-    >(() => {})
+    const settleTrackErrorRef = useRef<(failedSourceKey: string, shouldSkip: boolean) => void>(
+        () => {}
+    )
 
     const handleTerminalError = useCallback(
         (event: TerminalTrackErrorEvent) => {
@@ -280,7 +276,7 @@ export function AudioSessionProvider({
     const prevIndexRef = useRef(currentIndex)
     useEffect(() => {
         if (currentIndex !== prevIndexRef.current) {
-            emit('track-change', { track: currentTrack, previousIndex: prevIndexRef.current })
+            emit("track-change", { track: currentTrack, previousIndex: prevIndexRef.current })
             prevIndexRef.current = currentIndex
         }
     }, [currentIndex, currentTrack, emit])
@@ -344,7 +340,7 @@ export function AudioSessionProvider({
 
         let next = stepIndex(currentIndex, 1)
         if (next === null) {
-            emit('queue-end', { reason: repeatMode === 'off' ? 'repeat-off' : 'normal' })
+            emit("queue-end", { reason: repeatMode === "off" ? "repeat-off" : "normal" })
             return
         }
         if (reason === "error") {
@@ -358,9 +354,7 @@ export function AudioSessionProvider({
                 const nextTrack = queue[next]
                 if (
                     nextTrack &&
-                    !failedSourceKeysRef.current.has(
-                        queueSourceKey(next, nextTrack)
-                    )
+                    !failedSourceKeysRef.current.has(queueSourceKey(next, nextTrack))
                 ) {
                     break
                 }
@@ -399,11 +393,10 @@ export function AudioSessionProvider({
     // Resolve the next track through the same order/repeat logic a natural
     // advance would use. Null disables transitions (repeat-one, end of queue
     // with repeat off, or a single-track wrap).
-    const pluginNextIndex =
-        repeatMode !== "one" ? stepIndex(currentIndex, 1) : null
+    const pluginNextIndex = repeatMode !== "one" ? stepIndex(currentIndex, 1) : null
     const pluginNextTrack =
         pluginNextIndex !== null && pluginNextIndex !== currentIndex
-            ? queue[pluginNextIndex] ?? null
+            ? (queue[pluginNextIndex] ?? null)
             : null
 
     // Automix runs through a single internal plugin created once (stable
@@ -477,8 +470,7 @@ export function AudioSessionProvider({
 
     const seekByWithPlugins = useCallback(
         (delta: number) => {
-            const base =
-                engine.audioRef.current?.currentTime ?? timeValueRef.current.currentTime
+            const base = engine.audioRef.current?.currentTime ?? timeValueRef.current.currentTime
             seekWithPlugins(base + delta)
         },
         [engine.audioRef, seekWithPlugins]
@@ -526,18 +518,18 @@ export function AudioSessionProvider({
     const preloadConfigProp = preloadConfig ?? DEFAULT_PRELOAD_CONFIG
     useEffect(() => {
         if (!engineIsPlaying || repeatMode === "one") return
-        
-        const strategy = preloadConfigProp.strategy || 'next'
-        if (strategy === 'none') return
 
-        if (preloadConfigProp.skipOnCellular && 'connection' in navigator) {
+        const strategy = preloadConfigProp.strategy || "next"
+        if (strategy === "none") return
+
+        if (preloadConfigProp.skipOnCellular && "connection" in navigator) {
             const conn = (navigator as any).connection
-            if (conn.effectiveType === 'cellular' || conn.type === 'cellular') return
+            if (conn.effectiveType === "cellular" || conn.type === "cellular") return
         }
 
-        if (strategy === 'next' && pluginNextTrack) {
+        if (strategy === "next" && pluginNextTrack) {
             enginePreload(pluginNextTrack)
-        } else if (strategy === 'aggressive') {
+        } else if (strategy === "aggressive") {
             const max = preloadConfigProp.maxConcurrent || 2
             let current = currentIndex
             for (let i = 0; i < max; i++) {
@@ -547,22 +539,32 @@ export function AudioSessionProvider({
                 current = nextIdx
             }
         }
-    }, [engineIsPlaying, enginePreload, pluginNextTrack, repeatMode, sourceKey, preloadConfigProp, currentIndex, queue, stepIndex])
+    }, [
+        engineIsPlaying,
+        enginePreload,
+        pluginNextTrack,
+        repeatMode,
+        sourceKey,
+        preloadConfigProp,
+        currentIndex,
+        queue,
+        stepIndex,
+    ])
 
     const previousPluginPlayingRef = useRef(engine.isPlaying)
     useEffect(() => {
         if (previousPluginPlayingRef.current === engine.isPlaying) return
         previousPluginPlayingRef.current = engine.isPlaying
         pluginManager.trigger(engine.isPlaying ? "onPlay" : "onPause")
-        
+
         if (engine.isPlaying) {
             // A new successful play attempt starts a fresh settlement window.
             // Keep the failed-track sweep intact until a natural end so an
             // all-bad repeat-all queue still terminates.
             settledSourceKeyRef.current = null
-            emit('play', { track: currentTrack!, currentTime: timeValueRef.current.currentTime })
+            emit("play", { track: currentTrack!, currentTime: timeValueRef.current.currentTime })
         } else {
-            emit('pause', { track: currentTrack, currentTime: timeValueRef.current.currentTime })
+            emit("pause", { track: currentTrack, currentTime: timeValueRef.current.currentTime })
         }
     }, [pluginManager, engine.isPlaying, currentTrack, emit])
 
@@ -574,9 +576,12 @@ export function AudioSessionProvider({
         if (!engine.hasAudio || queue.length === 0) pluginManager.trigger("onStop")
     }, [pluginManager, engine.hasAudio, queue.length])
 
-    useEffect(() => () => {
-        pluginManager.trigger("onStop")
-    }, [pluginManager])
+    useEffect(
+        () => () => {
+            pluginManager.trigger("onStop")
+        },
+        [pluginManager]
+    )
 
     // Start playback for any pending request after a track/source change. Keyed
     // on both `sourceKey` and `src`: a same-id active refresh can keep the
@@ -596,9 +601,8 @@ export function AudioSessionProvider({
     const setQueue = useCallback(
         (tracks: Track[], startIndex = 0, autoPlayNext = false) => {
             resetTrackFailureRecovery()
-            const idx = tracks.length > 0
-                ? Math.min(Math.max(startIndex, 0), tracks.length - 1)
-                : -1
+            const idx =
+                tracks.length > 0 ? Math.min(Math.max(startIndex, 0), tracks.length - 1) : -1
             // `order` recomputes from the new queue during the next render.
             // If already playing, the engine continues into the new source; only
             // arm a deferred play when starting from a paused session.
@@ -651,9 +655,7 @@ export function AudioSessionProvider({
                 // (re-signed CDN URL, updated title). Replace the stale entry
                 // with the fresh argument so we don't replay old data.
                 if (queue[existing] !== track) {
-                    setQueueState((q) =>
-                        q.map((t, i) => (i === existing ? track : t))
-                    )
+                    setQueueState((q) => q.map((t, i) => (i === existing ? track : t)))
                     if (existing === currentIndex) {
                         const nextSrc = getPrimaryTrackSource(track)
                         const sourceChanged = nextSrc !== src
@@ -681,15 +683,7 @@ export function AudioSessionProvider({
             setQueueState((q) => [...q, track])
             setCurrentIndex(nextIndex)
         },
-        [
-            queue,
-            goTo,
-            engineIsPlaying,
-            enginePlay,
-            currentIndex,
-            src,
-            resetTrackFailureRecovery,
-        ]
+        [queue, goTo, engineIsPlaying, enginePlay, currentIndex, src, resetTrackFailureRecovery]
     )
 
     const next = useCallback(() => {
@@ -822,14 +816,17 @@ export function AudioSessionProvider({
         const html5Stats = sharedHTML5AudioPool.getStats()
         return {
             ...stats,
-            preloadElementCount: html5Stats.preloadElementCount
+            preloadElementCount: html5Stats.preloadElementCount,
         }
     }, [])
 
-    const pruneAudioCache = useCallback((keepRecent = 0) => {
-        const keepKeys = queue.map((t, i) => queueSourceKey(i, t))
-        sharedAudioBufferCache.prune(keepKeys, keepRecent)
-    }, [queue])
+    const pruneAudioCache = useCallback(
+        (keepRecent = 0) => {
+            const keepKeys = queue.map((t, i) => queueSourceKey(i, t))
+            sharedAudioBufferCache.prune(keepKeys, keepRecent)
+        },
+        [queue]
+    )
 
     const setCacheLimit = useCallback((maxBuffers: number) => {
         sharedAudioBufferCache.setMaxSize(maxBuffers)
@@ -1001,9 +998,7 @@ export function AudioSessionProvider({
 export function useAudioSession(): SessionEngine {
     const ctx = useContext(AudioSessionContext)
     if (!ctx) {
-        throw new Error(
-            "useAudioSession must be used within an <AudioSessionProvider>"
-        )
+        throw new Error("useAudioSession must be used within an <AudioSessionProvider>")
     }
     return ctx
 }

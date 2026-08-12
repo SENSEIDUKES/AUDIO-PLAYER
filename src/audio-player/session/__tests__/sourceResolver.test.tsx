@@ -13,9 +13,7 @@ describe("AudioSessionContext sourceResolver", () => {
     it("forwards managed resolution and releases each queue track exactly once", async () => {
         vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {})
         vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {})
-        const play = vi
-            .spyOn(HTMLMediaElement.prototype, "play")
-            .mockResolvedValue()
+        const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue()
 
         const releases = new Map<string, ReturnType<typeof vi.fn>>()
         const resolver = vi.fn<TrackSourceResolver>(async (source) => {
@@ -38,7 +36,7 @@ describe("AudioSessionContext sourceResolver", () => {
                 <AudioSessionProvider
                     initialQueue={[
                         { title: "A", artist: "Narrator", audioFile: "a.mp3" },
-                        { title: "B", artist: "Narrator", audioFile: "b.mp3" }
+                        { title: "B", artist: "Narrator", audioFile: "b.mp3" },
                     ]}
                     sourceResolver={resolver}
                 >
@@ -69,18 +67,18 @@ describe("AudioSessionContext sourceResolver", () => {
         ) {
             this.dispatchEvent(new Event("pause"))
         })
-        const play = vi
-            .spyOn(HTMLMediaElement.prototype, "play")
-            .mockImplementation(function (this: HTMLMediaElement) {
-                this.dispatchEvent(new Event("play"))
-                return Promise.resolve()
-            })
+        const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(function (
+            this: HTMLMediaElement
+        ) {
+            this.dispatchEvent(new Event("play"))
+            return Promise.resolve()
+        })
         const releases = [vi.fn(), vi.fn()]
         const resolver = vi.fn<TrackSourceResolver>(async (source) => {
             const index = source.url.endsWith("a.mp3") ? 0 : 1
             return {
                 url: `blob:https://audio.test/session-${index}`,
-                release: releases[index]
+                release: releases[index],
             }
         })
         let session: SessionEngine | null = null
@@ -97,7 +95,7 @@ describe("AudioSessionContext sourceResolver", () => {
                 <AudioSessionProvider
                     initialQueue={[
                         { title: "A", artist: "Narrator", audioFile: "a.mp3" },
-                        { title: "B", artist: "Narrator", audioFile: "b.mp3" }
+                        { title: "B", artist: "Narrator", audioFile: "b.mp3" },
                     ]}
                     sourceResolver={resolver}
                 >

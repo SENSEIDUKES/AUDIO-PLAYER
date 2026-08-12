@@ -6,21 +6,20 @@
 
 export type VaultActionVariant = "tag" | "rename" | "radio"
 
-const VAULT_ACTION_COPY: Record<VaultActionVariant, { lead: string; sub: string }> =
-    {
-        tag: {
-            lead: "Tag",
-            sub: "File this track under a vault classification and add custom tags.",
-        },
-        rename: {
-            lead: "Rename",
-            sub: "Rename this track and manage its version label.",
-        },
-        radio: {
-            lead: "Radio",
-            sub: "Start a Vault Radio station seeded from this track.",
-        },
-    }
+const VAULT_ACTION_COPY: Record<VaultActionVariant, { lead: string; sub: string }> = {
+    tag: {
+        lead: "Tag",
+        sub: "File this track under a vault classification and add custom tags.",
+    },
+    rename: {
+        lead: "Rename",
+        sub: "Rename this track and manage its version label.",
+    },
+    radio: {
+        lead: "Radio",
+        sub: "Start a Vault Radio station seeded from this track.",
+    },
+}
 
 export function VaultActionWorkspace({ variant }: { variant: VaultActionVariant }) {
     const copy = VAULT_ACTION_COPY[variant]

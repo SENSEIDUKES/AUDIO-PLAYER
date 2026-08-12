@@ -1,7 +1,4 @@
-import type {
-    AudioPlayerPlugin,
-    PluginPlayerContext,
-} from "../core/plugins/PluginInterface"
+import type { AudioPlayerPlugin, PluginPlayerContext } from "../core/plugins/PluginInterface"
 import type { Track } from "../types"
 import { LyricsPluginConfigSchema, validateConfig } from "./configValidators"
 
@@ -93,8 +90,7 @@ export class LyricsPlugin implements AudioPlayerPlugin {
     }
 
     private writeTarget(text: string) {
-        const target =
-            typeof this.target === "function" ? this.target() : this.target ?? null
+        const target = typeof this.target === "function" ? this.target() : (this.target ?? null)
         if (target) target.textContent = text
     }
 }

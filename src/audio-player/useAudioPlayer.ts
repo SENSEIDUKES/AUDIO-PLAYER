@@ -57,10 +57,7 @@ function resolveEngineSources(
     const declaredSources = dedupeSources(sources ?? [])
     if (declaredSources.length > 0) return declaredSources
 
-    return dedupeSources([
-        { url: src },
-        ...(fallbackSources ?? []).map((url) => ({ url })),
-    ])
+    return dedupeSources([{ url: src }, ...(fallbackSources ?? []).map((url) => ({ url }))])
 }
 
 function sourceListSignature(sources: readonly TrackSource[]): string {
@@ -68,9 +65,7 @@ function sourceListSignature(sources: readonly TrackSource[]): string {
 }
 
 function sanitizeInitialCurrentTime(value: number | undefined): number | null {
-    return typeof value === "number" && Number.isFinite(value) && value > 0
-        ? value
-        : null
+    return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null
 }
 
 /**
@@ -92,9 +87,7 @@ function sanitizeInitialCurrentTime(value: number | undefined): number | null {
  *   no-op if it has changed, which removes the rapid-track-skip race.
  * - The backend is fixed at mount; remount (e.g. via `key`) to switch.
  */
-export function useAudioPlayer(
-    options: UseAudioPlayerOptions
-): AudioPlayerEngine {
+export function useAudioPlayer(options: UseAudioPlayerOptions): AudioPlayerEngine {
     const {
         src,
         fallbackSources,
@@ -114,26 +107,23 @@ export function useAudioPlayer(
         () => resolveEngineSources(src, sources, fallbackSources),
         [fallbackSources, sources, src]
     )
-    const sourcesSignature = useMemo(
-        () => sourceListSignature(resolvedSources),
-        [resolvedSources]
-    )
-    const [activeSourceState, setActiveSourceState] = useState<ActiveSourceState>(
-        () => ({ sourceKey, signature: sourcesSignature, index: 0 })
-    )
+    const sourcesSignature = useMemo(() => sourceListSignature(resolvedSources), [resolvedSources])
+    const [activeSourceState, setActiveSourceState] = useState<ActiveSourceState>(() => ({
+        sourceKey,
+        signature: sourcesSignature,
+        index: 0,
+    }))
     const sourceStateMatches =
         activeSourceState.sourceKey === sourceKey &&
         activeSourceState.signature === sourcesSignature
     const currentSourceIndex = sourceStateMatches
-        ? Math.max(
-              0,
-              Math.min(activeSourceState.index, resolvedSources.length - 1)
-          )
+        ? Math.max(0, Math.min(activeSourceState.index, resolvedSources.length - 1))
         : 0
     const currentSource = resolvedSources[currentSourceIndex] ?? null
     const hasSourceResolver = typeof sourceResolver === "function"
-    const [effectiveSourceState, setEffectiveSourceState] =
-        useState<EffectiveSourceState | null>(null)
+    const [effectiveSourceState, setEffectiveSourceState] = useState<EffectiveSourceState | null>(
+        null
+    )
     const effectiveSourceMatches =
         effectiveSourceState?.sourceKey === sourceKey &&
         effectiveSourceState.signature === sourcesSignature &&
@@ -142,7 +132,7 @@ export function useAudioPlayer(
         ? effectiveSourceMatches
             ? effectiveSourceState.url
             : ""
-        : currentSource?.url ?? ""
+        : (currentSource?.url ?? "")
 
     const audioRef = useRef<HTMLAudioElement>(null)
     const backendRef = useRef<AudioBackend | null>(null)
@@ -182,10 +172,7 @@ export function useAudioPlayer(
     const initialSeekRef = useRef({
         sourceKey,
         sourcesSignature,
-        time:
-            resolvedSources.length > 0
-                ? sanitizeInitialCurrentTime(initialCurrentTime)
-                : null,
+        time: resolvedSources.length > 0 ? sanitizeInitialCurrentTime(initialCurrentTime) : null,
     })
     const onEndedRef = useRef(onEnded)
     onEndedRef.current = onEnded
@@ -233,9 +220,7 @@ export function useAudioPlayer(
     const [buffered, setBuffered] = useState(0)
     const [bufferedRanges, setBufferedRanges] = useState<BufferedRange[]>([])
     const [volume, setVolumeState] = useState(1)
-    const [playbackRate, setPlaybackRateState] = useState(() =>
-        backendRef.current!.getRate()
-    )
+    const [playbackRate, setPlaybackRateState] = useState(() => backendRef.current!.getRate())
     const [isMuted, setIsMuted] = useState(false)
     const [isSeeking, setIsSeekingState] = useState(false)
     const [isBuffering, setIsBuffering] = useState(false)
@@ -290,15 +275,8 @@ export function useAudioPlayer(
     }, [])
 
     const reportTerminalError = useCallback(
-        (
-            message: string,
-            playbackRequested: boolean,
-            token = playbackTokenRef.current
-        ) => {
-            if (
-                token !== playbackTokenRef.current ||
-                lastTerminalErrorTokenRef.current === token
-            ) {
+        (message: string, playbackRequested: boolean, token = playbackTokenRef.current) => {
+            if (token !== playbackTokenRef.current || lastTerminalErrorTokenRef.current === token) {
                 return
             }
             lastTerminalErrorTokenRef.current = token
@@ -346,14 +324,9 @@ export function useAudioPlayer(
             const previousActiveSource = currentSrcRef.current
             const activeIndex = currentSourceIndexRef.current
             const failedIndex = failedUrl
-                ? sourceList.findIndex((source) =>
-                      sourceUrlsMatch(source.url, failedUrl)
-                  )
+                ? sourceList.findIndex((source) => sourceUrlsMatch(source.url, failedUrl))
                 : -1
-            const failedActiveSource = sourceUrlsMatch(
-                previousActiveSource,
-                failedUrl
-            )
+            const failedActiveSource = sourceUrlsMatch(previousActiveSource, failedUrl)
 
             // An error from a detached/replaced URL must not consume a source
             // candidate on the current logical track.
@@ -452,21 +425,13 @@ export function useAudioPlayer(
 
         void (async () => {
             try {
-                const rawResolution = await resolver(
-                    declaredSource,
-                    controller.signal
-                )
+                const rawResolution = await resolver(declaredSource, controller.signal)
                 const rawRelease =
-                    typeof rawResolution === "string"
-                        ? undefined
-                        : rawResolution?.release
+                    typeof rawResolution === "string" ? undefined : rawResolution?.release
                 const release = onceSourceRelease(rawRelease)
                 const resolution = normalizeSourceResolution(rawResolution)
 
-                if (
-                    generation !== resolutionGenerationRef.current ||
-                    controller.signal.aborted
-                ) {
+                if (generation !== resolutionGenerationRef.current || controller.signal.aborted) {
                     release?.()
                     return
                 }
@@ -489,10 +454,7 @@ export function useAudioPlayer(
                     url: resolution.url,
                 })
             } catch (error: unknown) {
-                if (
-                    generation !== resolutionGenerationRef.current ||
-                    controller.signal.aborted
-                ) {
+                if (generation !== resolutionGenerationRef.current || controller.signal.aborted) {
                     return
                 }
 
@@ -501,9 +463,7 @@ export function useAudioPlayer(
                     resolutionAbortRef.current = null
                 }
                 const errorName =
-                    error instanceof Error && error.name
-                        ? error.name
-                        : "source-resolution"
+                    error instanceof Error && error.name ? error.name : "source-resolution"
                 if (
                     tryFallbackSource(
                         declaredSource.url,
@@ -539,10 +499,7 @@ export function useAudioPlayer(
                 resolutionShouldPlayRef.current ||
                 isPlayingRef.current ||
                 playPromiseRef.current !== null
-            if (
-                sourceResolverRef.current ||
-                backend.getInfo().active === "webaudio"
-            ) {
+            if (sourceResolverRef.current || backend.getInfo().active === "webaudio") {
                 backend.pause()
                 backend.clearSource()
             }
@@ -828,14 +785,7 @@ export function useAudioPlayer(
         setIsBuffering(true)
         backend.load()
         play(true)
-    }, [
-        bumpToken,
-        clearPendingPlay,
-        clearBufferingTimer,
-        hasAudio,
-        hasSourceResolver,
-        play,
-    ])
+    }, [bumpToken, clearPendingPlay, clearBufferingTimer, hasAudio, hasSourceResolver, play])
 
     const loadAndPlay = useCallback(() => {
         const backend = backendRef.current!
@@ -1023,13 +973,11 @@ export function useAudioPlayer(
         }
         const handleEnded = () => {
             const mediaElement = backend.getMediaElement()
-            const endedSource =
-                mediaElement?.currentSrc || mediaElement?.getAttribute("src") || ""
+            const endedSource = mediaElement?.currentSrc || mediaElement?.getAttribute("src") || ""
             if (
                 isUnloadedRef.current ||
                 !currentSrcRef.current ||
-                (endedSource &&
-                    !sourceUrlsMatch(endedSource, currentSrcRef.current))
+                (endedSource && !sourceUrlsMatch(endedSource, currentSrcRef.current))
             ) {
                 return
             }
@@ -1203,10 +1151,8 @@ export function useAudioPlayer(
         if (!backend.isAttached()) return
 
         const resolutionKey = `${sourceKey}:${sourcesSignature}`
-        const isAwaitingResolution =
-            hasSourceResolver && hasAudio && !currentSrc
-        const didResetForResolution =
-            resolutionResetKeyRef.current === resolutionKey
+        const isAwaitingResolution = hasSourceResolver && hasAudio && !currentSrc
+        const didResetForResolution = resolutionResetKeyRef.current === resolutionKey
         const isFallbackSwitch = fallbackShouldPlayRef.current !== null
         const isFirstLoad = isFirstLoadRef.current
         const wasPlaying = isPlayingRef.current
@@ -1215,8 +1161,7 @@ export function useAudioPlayer(
             : isFirstLoad
               ? autoPlay
               : wasPlaying
-        const shouldPlay =
-            resolutionShouldPlayRef.current || shouldPlayWithoutResolution
+        const shouldPlay = resolutionShouldPlayRef.current || shouldPlayWithoutResolution
         if (isAwaitingResolution) {
             resolutionShouldPlayRef.current = shouldPlay
         } else {
@@ -1281,14 +1226,7 @@ export function useAudioPlayer(
         }
         if (shouldPlay) play(true)
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [
-        currentSrc,
-        currentSourceIndex,
-        hasAudio,
-        hasSourceResolver,
-        sourceKey,
-        sourcesSignature,
-    ])
+    }, [currentSrc, currentSourceIndex, hasAudio, hasSourceResolver, sourceKey, sourcesSignature])
 
     // Keep the backend's volume/loop in sync with state on mount + changes.
     useEffect(() => {
@@ -1310,10 +1248,7 @@ export function useAudioPlayer(
     }, [])
 
     const getBackendInfo = useCallback(() => backendRef.current!.getInfo(), [])
-    const getDecodedData = useCallback(
-        () => backendRef.current!.getDecodedData(),
-        []
-    )
+    const getDecodedData = useCallback(() => backendRef.current!.getDecodedData(), [])
 
     return {
         audioRef,

@@ -45,11 +45,9 @@ export function isMobileDevice(): boolean {
 
     // Feature-detection fallback: a touch-capable device whose primary pointer
     // is coarse (finger) — i.e. not a desktop with an attached touchscreen.
-    const hasTouch =
-        "ontouchstart" in window || navigator.maxTouchPoints > 0
+    const hasTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0
     const coarsePointer =
-        typeof window.matchMedia === "function" &&
-        window.matchMedia("(pointer: coarse)").matches
+        typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches
     return hasTouch && coarsePointer
 }
 

@@ -7,10 +7,10 @@ import { SurfacesDemo } from "./surfaces"
 import "./audio-player-lab.css"
 
 if (typeof window !== "undefined") {
-    (window as any).VITE_OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || "";
-    (window as any).VITE_PRESET_DEMO_SCOUT = import.meta.env.VITE_PRESET_DEMO_SCOUT || "";
-    (window as any).VITE_PRESET_STUDIO_SCOUT = import.meta.env.VITE_PRESET_STUDIO_SCOUT || "";
-    (window as any).VITE_PRESET_MEMOIR = import.meta.env.VITE_PRESET_MEMOIR || "";
+    ;(window as any).VITE_OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || ""
+    ;(window as any).VITE_PRESET_DEMO_SCOUT = import.meta.env.VITE_PRESET_DEMO_SCOUT || ""
+    ;(window as any).VITE_PRESET_STUDIO_SCOUT = import.meta.env.VITE_PRESET_STUDIO_SCOUT || ""
+    ;(window as any).VITE_PRESET_MEMOIR = import.meta.env.VITE_PRESET_MEMOIR || ""
 }
 
 /* SEIHouse Audio Player Lab — showcase, test, and customize player faces.
@@ -31,7 +31,9 @@ function TabNav({ tab, onTabChange }: { tab: DemoTab; onTabChange: (tab: DemoTab
         <nav className="demo-mode" aria-label="App sections">
             <div>
                 <p className="demo-mode__eyebrow">SEIHouse Audio Player Lab</p>
-                <strong className="demo-mode__title">Showcase, test, and customize player faces</strong>
+                <strong className="demo-mode__title">
+                    Showcase, test, and customize player faces
+                </strong>
             </div>
             <div className="demo-mode__actions" role="group" aria-label="Switch section">
                 {TABS.map((t) => (

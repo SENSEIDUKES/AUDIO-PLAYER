@@ -32,8 +32,7 @@ describe("isIOS", () => {
 
     it("detects iPadOS 13+ masquerading as MacIntel with touch", () => {
         stubNavigator({
-            userAgent:
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15",
+            userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15",
             platform: "MacIntel",
             maxTouchPoints: 5,
         })
@@ -42,8 +41,7 @@ describe("isIOS", () => {
 
     it("does not flag a real Mac (no touch)", () => {
         stubNavigator({
-            userAgent:
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15",
+            userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15",
             platform: "MacIntel",
             maxTouchPoints: 0,
         })
@@ -55,8 +53,7 @@ describe("isMobileDevice", () => {
     it("returns true for Android user agents", () => {
         stubWindow({})
         stubNavigator({
-            userAgent:
-                "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Mobile",
+            userAgent: "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Mobile",
             platform: "Linux armv8l",
             maxTouchPoints: 5,
         })
@@ -81,8 +78,7 @@ describe("isMobileDevice", () => {
             matchMedia: (q: string) => ({ matches: !q.includes("coarse") }),
         })
         stubNavigator({
-            userAgent:
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120",
+            userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120",
             platform: "Win32",
             maxTouchPoints: 0,
         })
@@ -100,8 +96,7 @@ describe("defaultShowVolume", () => {
     it("hides the slider by default on mobile", () => {
         stubWindow({})
         stubNavigator({
-            userAgent:
-                "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)",
+            userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)",
             platform: "iPhone",
             maxTouchPoints: 5,
         })
@@ -113,8 +108,7 @@ describe("defaultShowVolume", () => {
             matchMedia: (q: string) => ({ matches: !q.includes("coarse") }),
         })
         stubNavigator({
-            userAgent:
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120",
+            userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120",
             platform: "Win32",
             maxTouchPoints: 0,
         })

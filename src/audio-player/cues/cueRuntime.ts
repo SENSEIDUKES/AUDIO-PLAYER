@@ -39,9 +39,11 @@ export class CueRuntime {
         // Preload assets if available. Currently we just load the 'default' pack
         // if multiple packs are provided, or the first one we find.
         if (manifest.assets?.spritePacks && this.context.sounds) {
-            const packToLoad = manifest.assets.spritePacks["default"] || Object.values(manifest.assets.spritePacks)[0]
+            const packToLoad =
+                manifest.assets.spritePacks["default"] ||
+                Object.values(manifest.assets.spritePacks)[0]
             if (packToLoad) {
-                this.context.sounds.loadSpritePack(packToLoad).catch(e => {
+                this.context.sounds.loadSpritePack(packToLoad).catch((e) => {
                     console.warn("SAP Cues: Failed to load sprite pack", e)
                 })
             }
@@ -96,7 +98,7 @@ export class CueRuntime {
                 }
             }
         }
-        
+
         this.lastTime = currentTime
     }
 
@@ -165,8 +167,12 @@ export class CueRuntime {
                             const ids = this.activeSprites.get(key)
                             if (ids) {
                                 for (const id of ids) {
-                                    this.context.sounds.fadeSprite(id, action.volume, action.durationMs)
-                                } 
+                                    this.context.sounds.fadeSprite(
+                                        id,
+                                        action.volume,
+                                        action.durationMs
+                                    )
+                                }
                             }
                         }
                         break

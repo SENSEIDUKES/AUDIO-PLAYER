@@ -40,10 +40,7 @@ export function getDisplayArtist(
 }
 
 /** Append a version qualifier in parentheses, e.g. `Title (Radio Edit)`. */
-export function formatVersionedTitle(
-    title: string,
-    versionLabel?: string
-): string {
+export function formatVersionedTitle(title: string, versionLabel?: string): string {
     const version = versionLabel?.trim()
     return version ? `${title} (${version})` : title
 }

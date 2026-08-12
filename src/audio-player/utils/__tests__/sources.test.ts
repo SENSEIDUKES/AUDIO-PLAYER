@@ -12,12 +12,8 @@ import {
 
 describe("source utilities", () => {
     it("normalizes relative URLs to the same absolute form browsers report", () => {
-        expect(normalizeSourceUrl(" /audio/main.mp3 ")).toBe(
-            "http://localhost/audio/main.mp3"
-        )
-        expect(sourceUrlsMatch("/audio/main.mp3", "http://localhost/audio/main.mp3")).toBe(
-            true
-        )
+        expect(normalizeSourceUrl(" /audio/main.mp3 ")).toBe("http://localhost/audio/main.mp3")
+        expect(sourceUrlsMatch("/audio/main.mp3", "http://localhost/audio/main.mp3")).toBe(true)
     })
 
     it("resolves audioFile plus fallbackSources and dedupes normalized URLs", () => {
@@ -25,10 +21,7 @@ describe("source utilities", () => {
             title: "Main",
             artist: "SEIHouse",
             audioFile: "/audio/main.mp3",
-            fallbackSources: [
-                "http://localhost/audio/main.mp3",
-                "/audio/backup.mp3",
-            ],
+            fallbackSources: ["http://localhost/audio/main.mp3", "/audio/backup.mp3"],
         }
 
         expect(getTrackSources(track)).toEqual([

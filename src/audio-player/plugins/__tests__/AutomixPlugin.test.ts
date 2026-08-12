@@ -34,25 +34,27 @@ class MockAudio {
     muted: boolean = false
     readyState: number = 0
     listeners: Record<string, Function[]> = {}
-    
+
     addEventListener(event: string, callback: Function) {
         if (!this.listeners[event]) this.listeners[event] = []
         this.listeners[event].push(callback)
     }
-    
+
     removeEventListener(event: string, callback: Function) {
         if (!this.listeners[event]) return
-        this.listeners[event] = this.listeners[event].filter(cb => cb !== callback)
+        this.listeners[event] = this.listeners[event].filter((cb) => cb !== callback)
     }
-    
-    play() { return Promise.resolve() }
+
+    play() {
+        return Promise.resolve()
+    }
     pause() {}
     load() {}
     removeAttribute() {}
-    
+
     // Test helper to trigger events
     _trigger(event: string) {
-        this.listeners[event]?.forEach(cb => cb())
+        this.listeners[event]?.forEach((cb) => cb())
     }
 }
 
@@ -125,11 +127,11 @@ describe("AutomixPlugin", () => {
         beforeEach(() => {
             vi.useFakeTimers()
             vi.spyOn(performance, "now").mockReturnValue(1000)
-            
+
             vi.stubGlobal("Audio", MockAudio)
             mockMainAudio = new MockAudio()
             mockMainAudio.readyState = 4
-            
+
             mockEngine = {
                 isPlaying: true,
                 isSeeking: false,
@@ -159,18 +161,18 @@ describe("AutomixPlugin", () => {
         it("triggers analysis on track load", () => {
             const plugin = createAutomixPlugin({ enabled: true })
             plugin.init(mockContext)
-            
+
             plugin.onTrackLoad?.({ id: "loaded", url: "url" } as any)
             expect(trackAnalysis.ensureProTrackAnalysis).toHaveBeenCalled()
         })
-        
+
         it("cancels fade on backward seek", () => {
             const plugin = createAutomixPlugin()
             plugin.init(mockContext)
-            
+
             mockEngine.currentTime = 175
             plugin.onTimeUpdate?.(175)
-            
+
             const deck = (plugin as any).deck
             if (deck) {
                 deck.readyState = 4
@@ -178,7 +180,7 @@ describe("AutomixPlugin", () => {
                 mockEngine.currentTime = 176
                 plugin.onTimeUpdate?.(176)
                 expect((plugin as any).phase).toBe("fading")
-                
+
                 mockEngine.currentTime = 170
                 plugin.onSeek?.(170)
                 expect((plugin as any).phase).toBe("idle")
@@ -188,11 +190,11 @@ describe("AutomixPlugin", () => {
         it("starts preloading when approaching end", () => {
             const plugin = createAutomixPlugin()
             plugin.init(mockContext)
-            
+
             mockEngine.currentTime = 100
             plugin.onTimeUpdate?.(100)
             expect((plugin as any).phase).toBe("idle")
-            
+
             mockEngine.currentTime = 166
             plugin.onTimeUpdate?.(166)
             expect((plugin as any).phase).toBe("preloading")
@@ -203,7 +205,7 @@ describe("AutomixPlugin", () => {
             mockEngine.duration = 20
             const plugin = createAutomixPlugin()
             plugin.init(mockContext)
-            
+
             mockEngine.currentTime = 18
             plugin.onTimeUpdate?.(18)
             expect((plugin as any).phase).toBe("idle")
@@ -213,24 +215,24 @@ describe("AutomixPlugin", () => {
             const onTransitionChange = vi.fn()
             const plugin = createAutomixPlugin({ onTransitionChange })
             plugin.init(mockContext)
-            
+
             mockEngine.currentTime = 166
             plugin.onTimeUpdate?.(166)
-            
+
             const deck = (plugin as any).deck
             deck.readyState = 4
-            
+
             mockEngine.currentTime = 176
             plugin.onTimeUpdate?.(176)
-            
+
             expect((plugin as any).phase).toBe("fading")
             expect(onTransitionChange).toHaveBeenCalledWith(true)
-            
+
             await Promise.resolve() // let deck.play() resolve and trigger runRamp
-            
+
             vi.spyOn(performance, "now").mockReturnValue(1000 + 6000)
             vi.advanceTimersByTime(6000)
-            
+
             expect((plugin as any).phase).toBe("handoff")
             expect(mockContext.requestAdvance).toHaveBeenCalled()
         })
@@ -238,7 +240,7 @@ describe("AutomixPlugin", () => {
         it("suppresses advance if in handoff", () => {
             const plugin = createAutomixPlugin()
             plugin.init(mockContext)
-            
+
             ;(plugin as any).phase = "handoff"
             expect(plugin.handleTrackEnded()).toBe(true)
         })
@@ -246,52 +248,52 @@ describe("AutomixPlugin", () => {
         it("finalizes early if track ends mid-fade", () => {
             const plugin = createAutomixPlugin()
             plugin.init(mockContext)
-            
+
             ;(plugin as any).phase = "fading"
             expect(plugin.handleTrackEnded()).toBe(false)
             expect((plugin as any).phase).toBe("handoff")
         })
-        
+
         it("aborts preloading if next track changes", () => {
             const plugin = createAutomixPlugin()
             plugin.init(mockContext)
-            
+
             mockEngine.currentTime = 166
             plugin.onTimeUpdate?.(166)
             expect((plugin as any).phase).toBe("preloading")
-            
+
             // Change next track
             mockContext.getNextTrack = vi.fn().mockReturnValue({ id: "another_next" })
             plugin.onTimeUpdate?.(166)
-            
+
             expect((plugin as any).phase).toBe("idle")
             expect((plugin as any).deck).toBeNull()
         })
-        
+
         it("aborts handoff and restores volume if flip times out", async () => {
             const plugin = createAutomixPlugin()
             plugin.init(mockContext)
-            
+
             mockEngine.currentTime = 166
             plugin.onTimeUpdate?.(166)
             const deck = (plugin as any).deck
             deck.readyState = 4
             mockEngine.currentTime = 176
             plugin.onTimeUpdate?.(176)
-            
+
             await Promise.resolve() // let deck.play() resolve and trigger runRamp
-            
+
             vi.spyOn(performance, "now").mockReturnValue(1000 + 6000)
             vi.advanceTimersByTime(6000)
-            
+
             expect((plugin as any).phase).toBe("handoff")
-            
+
             // Simulating track load on handoff (source key MUST change)
             mockContext.getSourceKey = vi.fn().mockReturnValue("new_source_key")
             plugin.onTrackLoad?.({ id: "next", url: "url2" } as any)
-            
+
             vi.advanceTimersByTime(7000) // HANDOFF_TIMEOUT_MS is 6000
-            
+
             expect((plugin as any).phase).toBe("idle")
             expect((plugin as any).transitioning).toBe(false)
         })
@@ -299,27 +301,27 @@ describe("AutomixPlugin", () => {
         it("successfully completes handoff when main starts playing", async () => {
             const plugin = createAutomixPlugin()
             plugin.init(mockContext)
-            
+
             mockEngine.currentTime = 166
             plugin.onTimeUpdate?.(166)
             const deck = (plugin as any).deck
             deck.readyState = 4
             mockEngine.currentTime = 176
             plugin.onTimeUpdate?.(176)
-            
+
             await Promise.resolve()
-            
+
             vi.spyOn(performance, "now").mockReturnValue(1000 + 6000)
             vi.advanceTimersByTime(6000)
-            
+
             expect((plugin as any).phase).toBe("handoff")
-            
+
             mockContext.getSourceKey = vi.fn().mockReturnValue("new_source_key")
             plugin.onTrackLoad?.({ id: "next", url: "url2" } as any)
-            
+
             // Trigger playing on main
             mockMainAudio._trigger("playing")
-            
+
             expect((plugin as any).phase).toBe("idle")
             expect((plugin as any).transitioning).toBe(false)
             expect(mockMainAudio.volume).toBe(1)

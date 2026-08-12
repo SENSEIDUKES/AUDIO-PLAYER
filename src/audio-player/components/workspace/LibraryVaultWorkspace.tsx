@@ -8,9 +8,7 @@ export function LibraryVaultWorkspace() {
     return (
         <div className="sap-ctl__workspace-empty">
             <p className="sap-ctl__workspace-lead">Add to Vault</p>
-            <p className="sap-ctl__workspace-sub">
-                File this track under a vault classification.
-            </p>
+            <p className="sap-ctl__workspace-sub">File this track under a vault classification.</p>
             {categories.length > 0 && (
                 <ul className="sap-ctl__workspace-list" aria-label="Vault classifications">
                     {categories.map(([id, meta]) => (

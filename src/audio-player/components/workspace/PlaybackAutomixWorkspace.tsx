@@ -6,8 +6,7 @@ export function PlaybackAutomixWorkspace() {
         <div className="sap-ctl__workspace-empty">
             <p className="sap-ctl__workspace-lead">Automix settings coming soon</p>
             <p className="sap-ctl__workspace-sub">
-                Crossfade length, beat snapping and transition tuning will live
-                here.
+                Crossfade length, beat snapping and transition tuning will live here.
             </p>
         </div>
     )

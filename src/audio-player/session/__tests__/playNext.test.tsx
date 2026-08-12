@@ -44,12 +44,7 @@ describe("AudioSessionContext — playNext", () => {
             await React.act(async () => {
                 get().playNext(NEW_TRACK)
             })
-            expect(get().queue.map((t) => t.title)).toEqual([
-                "One",
-                "Inserted",
-                "Two",
-                "Three",
-            ])
+            expect(get().queue.map((t) => t.title)).toEqual(["One", "Inserted", "Two", "Three"])
             // The active track is unchanged; the insert is what plays next.
             expect(get().currentIndex).toBe(0)
             expect(get().currentTrack?.title).toBe("One")
@@ -70,12 +65,7 @@ describe("AudioSessionContext — playNext", () => {
             await React.act(async () => {
                 get().enqueue(NEW_TRACK)
             })
-            expect(get().queue.map((t) => t.title)).toEqual([
-                "One",
-                "Two",
-                "Three",
-                "Inserted",
-            ])
+            expect(get().queue.map((t) => t.title)).toEqual(["One", "Two", "Three", "Inserted"])
         })
     })
 })

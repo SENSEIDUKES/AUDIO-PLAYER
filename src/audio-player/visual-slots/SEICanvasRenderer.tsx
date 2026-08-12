@@ -70,12 +70,7 @@ function ActiveSEICanvas({
     })
     const { Component } = definition
 
-    return (
-        <Component
-            settings={settings}
-            playback={{ currentTime, duration, lyrics }}
-        />
-    )
+    return <Component settings={settings} playback={{ currentTime, duration, lyrics }} />
 }
 
 export default SEICanvasRenderer

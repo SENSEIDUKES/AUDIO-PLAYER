@@ -84,7 +84,9 @@
     white-space: nowrap;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    transition: background 0.12s ease, border-color 0.12s ease;
+    transition:
+        background 0.12s ease,
+        border-color 0.12s ease;
 }
 
 .al__btn:hover {

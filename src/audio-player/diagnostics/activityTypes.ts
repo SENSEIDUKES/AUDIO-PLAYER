@@ -11,13 +11,7 @@
 
 /** The subsystem that generated the event. */
 export type ActivityArea =
-    | "plugin"
-    | "player"
-    | "canvas"
-    | "agent"
-    | "playback"
-    | "session"
-    | "system"
+    "plugin" | "player" | "canvas" | "agent" | "playback" | "session" | "system"
 
 /** Severity/status of the event. */
 export type ActivityStatus = "info" | "warn" | "error" | "success"

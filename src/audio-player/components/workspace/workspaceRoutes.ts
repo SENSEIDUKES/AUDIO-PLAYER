@@ -75,9 +75,7 @@ export function isWorkspaceRoute(value: string): value is WorkspaceRoute {
  * not a known route, so callers can fall back to `"options"` (or ignore an
  * unrecognized node) rather than render an empty shell.
  */
-export function parseWorkspaceRoute(
-    value: string | null | undefined
-): ParsedWorkspaceRoute | null {
+export function parseWorkspaceRoute(value: string | null | undefined): ParsedWorkspaceRoute | null {
     if (!value || !isWorkspaceRoute(value)) return null
     if (value === "options") {
         return { route: value, category: "options", target: null }

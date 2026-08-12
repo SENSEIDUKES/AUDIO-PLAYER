@@ -1,6 +1,5 @@
 /* Scoped under .sap-visual-sample-skin by import-skin CLI. */
 
-
 .sap-visual-sample-skin {
     --sample-fg: #ffffff;
     --sample-bg: #1a1a2e;
@@ -36,12 +35,16 @@
 }
 
 @keyframes sap-sample-skin-spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 @media (max-width: 480px) {
-.sap-visual-sample-skin .title {
+    .sap-visual-sample-skin .title {
         font-size: 16px;
     }
 }

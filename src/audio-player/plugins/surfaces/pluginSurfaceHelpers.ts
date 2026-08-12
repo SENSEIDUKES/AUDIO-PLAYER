@@ -23,16 +23,12 @@ export function isHeadlessPlugin(definition: PluginSurfaceDefinition): boolean {
 }
 
 /** The declarative settings route, when the plugin has an enabled settings surface. */
-export function getPluginSettingsRoute(
-    definition: PluginSurfaceDefinition,
-): string | undefined {
+export function getPluginSettingsRoute(definition: PluginSurfaceDefinition): string | undefined {
     return hasSettingsSurface(definition) ? definition.settings?.route : undefined
 }
 
 /** The SEI Canvas surface id, when the plugin has an enabled canvas surface. */
-export function getPluginCanvasSurfaceId(
-    definition: PluginSurfaceDefinition,
-): string | undefined {
+export function getPluginCanvasSurfaceId(definition: PluginSurfaceDefinition): string | undefined {
     return hasCanvasSurface(definition) ? definition.canvas?.surfaceId : undefined
 }
 
@@ -41,7 +37,7 @@ export function getPluginCanvasSurfaceId(
  * Stable and non-mutating — the input array is left untouched.
  */
 export function sortPluginSurfaceDefinitions(
-    definitions: readonly PluginSurfaceDefinition[],
+    definitions: readonly PluginSurfaceDefinition[]
 ): PluginSurfaceDefinition[] {
     return [...definitions].sort((a, b) => {
         const orderA = a.menu?.order ?? Number.MAX_SAFE_INTEGER

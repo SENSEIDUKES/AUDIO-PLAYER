@@ -7,10 +7,7 @@ import type {
     AudioBackendInfo,
     AudioBackendKind,
 } from "./AudioBackend"
-import {
-    DEFAULT_PLAYBACK_RATE,
-    sanitizePlaybackRate,
-} from "./AudioBackend"
+import { DEFAULT_PLAYBACK_RATE, sanitizePlaybackRate } from "./AudioBackend"
 import { sharedHTML5AudioPool } from "./audioCaches"
 
 export const HTML5_CAPABILITIES = {
@@ -37,10 +34,7 @@ export class HTML5AudioBackend implements AudioBackend {
     private info: AudioBackendInfo
     private rate = DEFAULT_PLAYBACK_RATE
 
-    constructor(
-        audioRef: RefObject<HTMLAudioElement | null>,
-        info?: AudioBackendInfo
-    ) {
+    constructor(audioRef: RefObject<HTMLAudioElement | null>, info?: AudioBackendInfo) {
         this.audioRef = audioRef
         this.info = info ?? {
             requested: "html5",
@@ -61,10 +55,7 @@ export class HTML5AudioBackend implements AudioBackend {
             audio.defaultPlaybackRate = this.rate
             audio.playbackRate = this.rate
         } catch (error) {
-            console.warn(
-                "[HTML5AudioBackend] Failed to apply playbackRate:",
-                error
-            )
+            console.warn("[HTML5AudioBackend] Failed to apply playbackRate:", error)
         }
     }
 
@@ -358,7 +349,6 @@ export class HTML5AudioBackend implements AudioBackend {
     setLiteMode(_enabled: boolean): void {
         // No-op: already in "lite mode" by not supporting spatial at all
     }
-
 
     private warnUnsupportedFeature(
         methodName: string,

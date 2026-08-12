@@ -67,9 +67,8 @@ export function TextMarquee({
                 reducedMotion,
                 minWidth,
             })
-            const activeChanged = active !== (distanceRef.current > 0)
-            const previousOverflow =
-                contentWidthRef.current - containerWidthRef.current
+            const activeChanged = active !== distanceRef.current > 0
+            const previousOverflow = contentWidthRef.current - containerWidthRef.current
 
             // Keep the last significant measurement so repeated observer
             // callbacks and one-pixel resize jitter do not enqueue state work.

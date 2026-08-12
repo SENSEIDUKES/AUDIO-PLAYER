@@ -4,9 +4,7 @@ import { WorkspaceShell } from "../WorkspaceShell"
 import type { WorkspaceRoute } from "../workspaceRoutes"
 
 function render(route: WorkspaceRoute, lyrics?: string): string {
-    return renderToStaticMarkup(
-        <WorkspaceShell route={route} onClose={() => {}} lyrics={lyrics} />
-    )
+    return renderToStaticMarkup(<WorkspaceShell route={route} onClose={() => {}} lyrics={lyrics} />)
 }
 
 describe("WorkspaceShell", () => {

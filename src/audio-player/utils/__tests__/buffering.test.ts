@@ -112,21 +112,12 @@ describe("createBufferingDebounce", () => {
         // bare references on the scheduler object. Simulate that strictness.
         const realSetTimeout = setTimeout
         const realClearTimeout = clearTimeout
-        const strictSetTimeout = function (
-            this: unknown,
-            cb: () => void,
-            ms?: number
-        ) {
-            if (this !== undefined && this !== globalThis)
-                throw new TypeError("Illegal invocation")
+        const strictSetTimeout = function (this: unknown, cb: () => void, ms?: number) {
+            if (this !== undefined && this !== globalThis) throw new TypeError("Illegal invocation")
             return realSetTimeout(cb, ms)
         }
-        const strictClearTimeout = function (
-            this: unknown,
-            handle: ReturnType<typeof setTimeout>
-        ) {
-            if (this !== undefined && this !== globalThis)
-                throw new TypeError("Illegal invocation")
+        const strictClearTimeout = function (this: unknown, handle: ReturnType<typeof setTimeout>) {
+            if (this !== undefined && this !== globalThis) throw new TypeError("Illegal invocation")
             return realClearTimeout(handle)
         }
         vi.stubGlobal("setTimeout", strictSetTimeout)

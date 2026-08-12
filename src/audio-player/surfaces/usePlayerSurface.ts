@@ -1,14 +1,7 @@
 import { useCallback, useMemo, useReducer } from "react"
-import {
-    faceSupportsContextualActions,
-    faceSupportsSEICanvas,
-} from "./faceCapabilities"
+import { faceSupportsContextualActions, faceSupportsSEICanvas } from "./faceCapabilities"
 import type { PlayerFace } from "./faceCapabilities"
-import {
-    INITIAL_SURFACE_STATE,
-    deriveHeroCollapsed,
-    surfaceReducer,
-} from "./surfaceReducer"
+import { INITIAL_SURFACE_STATE, deriveHeroCollapsed, surfaceReducer } from "./surfaceReducer"
 import type { PlayerSurfaceMode, SurfaceAction, SurfaceState } from "./surfaceReducer"
 
 export interface UsePlayerSurfaceResult {

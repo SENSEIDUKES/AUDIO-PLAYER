@@ -17,15 +17,15 @@ import "./sample-skin.css"
 // ─── Settings ────────────────────────────────────────────────────────────────
 
 type SampleSkinSettings = {
-    primaryColor?: string;
-    label?: string;
+    primaryColor?: string
+    label?: string
 }
 
 /** Default settings for this skin. Edit to match your component's API. */
 export const sampleSkinDefaultSettings: SampleSkinSettings = {
     primaryColor: "#7cc4ff",
-    label: "Hello Skin"
-};
+    label: "Hello Skin",
+}
 
 // ─── Component ───────────────────────────────────────────────────────────────
 

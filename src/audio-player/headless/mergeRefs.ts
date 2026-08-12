@@ -8,9 +8,7 @@ import type { MutableRefObject, Ref, RefCallback } from "react"
  *
  * Nullish refs are skipped.
  */
-export function mergeRefs<T>(
-    ...refs: Array<Ref<T> | null | undefined>
-): RefCallback<T> {
+export function mergeRefs<T>(...refs: Array<Ref<T> | null | undefined>): RefCallback<T> {
     return (node: T | null) => {
         for (const ref of refs) {
             if (!ref) continue

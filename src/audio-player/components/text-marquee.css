@@ -26,8 +26,7 @@
     overflow: visible;
     text-overflow: clip;
     will-change: transform;
-    animation: ap-marquee-shift var(--ap-marquee-duration, 10s) ease-in-out
-        infinite alternate;
+    animation: ap-marquee-shift var(--ap-marquee-duration, 10s) ease-in-out infinite alternate;
 }
 
 @keyframes ap-marquee-shift {

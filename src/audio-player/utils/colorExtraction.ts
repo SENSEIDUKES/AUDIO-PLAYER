@@ -166,9 +166,7 @@ function pickDistinct(base: Rgb, ranked: Rgb[]): Rgb | null {
     const threshold = 60
     for (const color of ranked) {
         const dist = Math.sqrt(
-            (color[0] - base[0]) ** 2 +
-                (color[1] - base[1]) ** 2 +
-                (color[2] - base[2]) ** 2
+            (color[0] - base[0]) ** 2 + (color[1] - base[1]) ** 2 + (color[2] - base[2]) ** 2
         )
         if (dist > threshold) return color
     }

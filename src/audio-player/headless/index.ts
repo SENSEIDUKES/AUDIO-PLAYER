@@ -1,7 +1,4 @@
-export {
-    composeEventHandlers,
-    isSAPDefaultPrevented,
-} from "./composeEventHandlers"
+export { composeEventHandlers, isSAPDefaultPrevented } from "./composeEventHandlers"
 export { mergeRefs } from "./mergeRefs"
 export { useSAPPropGetters, isSessionEngine } from "./useSAPPropGetters"
 export {

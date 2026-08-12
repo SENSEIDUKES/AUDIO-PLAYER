@@ -30,13 +30,22 @@
     background-color: var(--ap-bg);
     -webkit-backdrop-filter: blur(var(--ap-blur));
     backdrop-filter: blur(var(--ap-blur));
-    box-shadow: inset 0 0.5px 0.5px rgba(255, 255, 255, 0.1),
+    box-shadow:
+        inset 0 0.5px 0.5px rgba(255, 255, 255, 0.1),
         0 1px 4px rgba(0, 0, 0, 0.08),
-        0 0 calc(60px * var(--ap-glow-intensity, 1))
-            calc(-10px * var(--ap-glow-intensity, 1)) var(--ap-glow);
-    transition: box-shadow 0.4s ease, background-color 0.4s ease, color 0.4s ease;
+        0 0 calc(60px * var(--ap-glow-intensity, 1)) calc(-10px * var(--ap-glow-intensity, 1))
+            var(--ap-glow);
+    transition:
+        box-shadow 0.4s ease,
+        background-color 0.4s ease,
+        color 0.4s ease;
     color: var(--ap-text);
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family:
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        sans-serif;
     /* Lets the player adapt to the width of whatever surface embeds it
        (cards, sidebars, phone frames), not just the viewport. */
     container: ap-player / inline-size;
@@ -202,7 +211,11 @@
     height: 36px;
     border-radius: 50%;
     border: 1px solid color-mix(in srgb, var(--ap-accent) 50%, transparent);
-    background-color: color-mix(in srgb, var(--ap-accent) calc(18% + var(--ap-btn-opacity-delta, 0%)), var(--ap-bg));
+    background-color: color-mix(
+        in srgb,
+        var(--ap-accent) calc(18% + var(--ap-btn-opacity-delta, 0%)),
+        var(--ap-bg)
+    );
     color: var(--ap-accent);
     display: flex;
     align-items: center;
@@ -216,11 +229,18 @@
     -webkit-backdrop-filter: blur(10px) saturate(140%);
     backdrop-filter: blur(10px) saturate(140%);
     padding: 0;
-    transition: transform 0.12s var(--ap-spring), box-shadow 0.18s var(--ap-spring), background-color 0.18s var(--ap-spring),
+    transition:
+        transform 0.12s var(--ap-spring),
+        box-shadow 0.18s var(--ap-spring),
+        background-color 0.18s var(--ap-spring),
         border-color 0.18s var(--ap-spring);
 }
 .ap-menu__btn:hover:not(:disabled) {
-    background-color: color-mix(in srgb, var(--ap-accent) calc(28% + var(--ap-btn-opacity-delta, 0%)), var(--ap-bg));
+    background-color: color-mix(
+        in srgb,
+        var(--ap-accent) calc(28% + var(--ap-btn-opacity-delta, 0%)),
+        var(--ap-bg)
+    );
     border-color: color-mix(in srgb, var(--ap-accent) 70%, transparent);
     box-shadow:
         inset 0 1px 0.5px rgba(255, 255, 255, 0.38),
@@ -408,8 +428,11 @@
     cursor: pointer;
     flex-shrink: 0;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-    transition: transform 0.12s var(--ap-spring), box-shadow 0.18s var(--ap-spring),
-        background-color 0.18s var(--ap-spring), border-color 0.18s var(--ap-spring);
+    transition:
+        transform 0.12s var(--ap-spring),
+        box-shadow 0.18s var(--ap-spring),
+        background-color 0.18s var(--ap-spring),
+        border-color 0.18s var(--ap-spring);
 }
 .ap-btn svg {
     animation: ap-pop-in 0.35s var(--ap-spring);
@@ -426,7 +449,11 @@
     width: 40px;
     height: 40px;
     border: 1.5px solid color-mix(in srgb, var(--ap-accent) 50%, transparent);
-    background-color: color-mix(in srgb, var(--ap-accent) calc(18% + var(--ap-btn-opacity-delta, 0%)), transparent);
+    background-color: color-mix(
+        in srgb,
+        var(--ap-accent) calc(18% + var(--ap-btn-opacity-delta, 0%)),
+        transparent
+    );
     color: var(--ap-accent);
     /* Top highlight + bottom inner shadow = a bevel; the hairline outer ring
        separates the control from a same-color surface; the soft drop lifts it. */
@@ -440,7 +467,11 @@
     backdrop-filter: blur(10px) saturate(140%);
 }
 .ap-btn--ghost:hover:not(:disabled) {
-    background-color: color-mix(in srgb, var(--ap-accent) calc(28% + var(--ap-btn-opacity-delta, 0%)), transparent);
+    background-color: color-mix(
+        in srgb,
+        var(--ap-accent) calc(28% + var(--ap-btn-opacity-delta, 0%)),
+        transparent
+    );
     border-color: color-mix(in srgb, var(--ap-accent) 72%, transparent);
     box-shadow:
         inset 0 1px 0.5px rgba(255, 255, 255, 0.42),
@@ -449,7 +480,11 @@
         0 5px 13px -3px rgba(0, 0, 0, 0.3);
 }
 .ap-btn--ghost:active:not(:disabled) {
-    background-color: color-mix(in srgb, var(--ap-accent) calc(22% + var(--ap-btn-opacity-delta, 0%)), transparent);
+    background-color: color-mix(
+        in srgb,
+        var(--ap-accent) calc(22% + var(--ap-btn-opacity-delta, 0%)),
+        transparent
+    );
     box-shadow:
         inset 0 2px 4px rgba(0, 0, 0, 0.28),
         0 1px 2px rgba(0, 0, 0, 0.12);
@@ -469,8 +504,17 @@
        reads through a frosted tint rather than a solid fill, and an accent
        glow (below) does the work of marking it as the primary control. */
     border: 1px solid color-mix(in srgb, var(--ap-accent) 60%, transparent);
-    background-color: color-mix(in srgb, var(--ap-accent) calc(24% + var(--ap-btn-opacity-delta, 0%)), transparent);
-    background-image: linear-gradient(165deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.04) 52%, transparent 74%);
+    background-color: color-mix(
+        in srgb,
+        var(--ap-accent) calc(24% + var(--ap-btn-opacity-delta, 0%)),
+        transparent
+    );
+    background-image: linear-gradient(
+        165deg,
+        rgba(255, 255, 255, 0.32),
+        rgba(255, 255, 255, 0.04) 52%,
+        transparent 74%
+    );
     /* Accent icon (not --ap-play-icon): a dark icon can't be read on a
        translucent body, and this matches the accent icons of the other
        transport buttons. */
@@ -481,24 +525,35 @@
         inset 0 1px 0.5px rgba(255, 255, 255, 0.4),
         inset 0 -2px 4px rgba(0, 0, 0, 0.12),
         0 0 0 1px color-mix(in srgb, var(--ap-accent) 28%, transparent),
-        0 0 calc(12px * var(--ap-glow-intensity, 1)) -2px color-mix(in srgb, var(--ap-accent) 40%, transparent),
+        0 0 calc(12px * var(--ap-glow-intensity, 1)) -2px
+            color-mix(in srgb, var(--ap-accent) 40%, transparent),
         0 6px 16px -6px rgba(0, 0, 0, 0.4);
 }
 .ap-btn--play:hover:not(:disabled) {
-    background-color: color-mix(in srgb, var(--ap-accent) calc(32% + var(--ap-btn-opacity-delta, 0%)), transparent);
+    background-color: color-mix(
+        in srgb,
+        var(--ap-accent) calc(32% + var(--ap-btn-opacity-delta, 0%)),
+        transparent
+    );
     border-color: color-mix(in srgb, var(--ap-accent) 78%, transparent);
     box-shadow:
         inset 0 1px 0.5px rgba(255, 255, 255, 0.48),
         inset 0 -2px 4px rgba(0, 0, 0, 0.12),
         0 0 0 1px color-mix(in srgb, var(--ap-accent) 36%, transparent),
-        0 0 calc(20px * var(--ap-glow-intensity, 1)) -1px color-mix(in srgb, var(--ap-accent) 50%, transparent),
+        0 0 calc(20px * var(--ap-glow-intensity, 1)) -1px
+            color-mix(in srgb, var(--ap-accent) 50%, transparent),
         0 9px 22px -6px rgba(0, 0, 0, 0.45);
 }
 .ap-btn--play:active:not(:disabled) {
-    background-color: color-mix(in srgb, var(--ap-accent) calc(28% + var(--ap-btn-opacity-delta, 0%)), transparent);
+    background-color: color-mix(
+        in srgb,
+        var(--ap-accent) calc(28% + var(--ap-btn-opacity-delta, 0%)),
+        transparent
+    );
     box-shadow:
         inset 0 2px 5px rgba(0, 0, 0, 0.22),
-        0 0 calc(10px * var(--ap-glow-intensity, 1)) -2px color-mix(in srgb, var(--ap-accent) 30%, transparent),
+        0 0 calc(10px * var(--ap-glow-intensity, 1)) -2px
+            color-mix(in srgb, var(--ap-accent) 30%, transparent),
         0 2px 6px -2px rgba(0, 0, 0, 0.3);
 }
 .ap-btn--play-active {
@@ -512,7 +567,8 @@
             inset 0 1px 0.5px rgba(255, 255, 255, 0.4),
             inset 0 -2px 4px rgba(0, 0, 0, 0.12),
             0 0 0 1px color-mix(in srgb, var(--ap-accent) 28%, transparent),
-            0 0 calc(12px * var(--ap-glow-intensity, 1)) -2px color-mix(in srgb, var(--ap-accent) 40%, transparent),
+            0 0 calc(12px * var(--ap-glow-intensity, 1)) -2px
+                color-mix(in srgb, var(--ap-accent) 40%, transparent),
             0 6px 16px -6px rgba(0, 0, 0, 0.4);
     }
     50% {
@@ -520,7 +576,8 @@
             inset 0 1px 0.5px rgba(255, 255, 255, 0.4),
             inset 0 -2px 4px rgba(0, 0, 0, 0.12),
             0 0 0 1px color-mix(in srgb, var(--ap-accent) 32%, transparent),
-            0 0 calc(22px * var(--ap-glow-intensity, 1)) -1px color-mix(in srgb, var(--ap-accent) 55%, transparent),
+            0 0 calc(22px * var(--ap-glow-intensity, 1)) -1px
+                color-mix(in srgb, var(--ap-accent) 55%, transparent),
             0 6px 16px -6px rgba(0, 0, 0, 0.4);
     }
 }
@@ -540,7 +597,11 @@
     width: 32px;
     height: 32px;
     border: 1px solid color-mix(in srgb, var(--ap-text, #fff) 18%, transparent);
-    background-color: color-mix(in srgb, var(--ap-text, #fff) calc(10% + var(--ap-btn-opacity-delta, 0%)), transparent);
+    background-color: color-mix(
+        in srgb,
+        var(--ap-text, #fff) calc(10% + var(--ap-btn-opacity-delta, 0%)),
+        transparent
+    );
     color: var(--ap-accent);
     cursor: pointer;
     border-radius: 9px;
@@ -552,14 +613,21 @@
         0 1px 4px rgba(0, 0, 0, 0.16);
     -webkit-backdrop-filter: blur(8px) saturate(130%);
     backdrop-filter: blur(8px) saturate(130%);
-    transition: transform 0.12s var(--ap-spring), box-shadow 0.18s var(--ap-spring), background-color 0.18s var(--ap-spring),
+    transition:
+        transform 0.12s var(--ap-spring),
+        box-shadow 0.18s var(--ap-spring),
+        background-color 0.18s var(--ap-spring),
         border-color 0.18s var(--ap-spring);
 }
 .ap-icon-btn svg {
     animation: ap-pop-in 0.35s var(--ap-spring);
 }
 .ap-icon-btn:hover:not(:disabled) {
-    background-color: color-mix(in srgb, var(--ap-text, #fff) calc(18% + var(--ap-btn-opacity-delta, 0%)), transparent);
+    background-color: color-mix(
+        in srgb,
+        var(--ap-text, #fff) calc(18% + var(--ap-btn-opacity-delta, 0%)),
+        transparent
+    );
     border-color: color-mix(in srgb, var(--ap-text, #fff) 26%, transparent);
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.24),
@@ -628,7 +696,8 @@
     font-weight: 600;
     cursor: pointer;
     text-decoration: none;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15),
+    box-shadow:
+        0 1px 4px rgba(0, 0, 0, 0.15),
         inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 .ap-wide-btn--ghost {
@@ -776,12 +845,14 @@
 @keyframes ap-pulse {
     0%,
     100% {
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15),
+        box-shadow:
+            0 1px 4px rgba(0, 0, 0, 0.15),
             inset 0 1px 0 rgba(255, 255, 255, 0.2),
             0 0 0 0 transparent;
     }
     50% {
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15),
+        box-shadow:
+            0 1px 4px rgba(0, 0, 0, 0.15),
             inset 0 1px 0 rgba(255, 255, 255, 0.2),
             0 0 16px 4px var(--ap-accent);
     }
@@ -1127,7 +1198,12 @@
     display: flex;
     flex-direction: column;
     color: var(--ap-text, #ffffff);
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family:
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        sans-serif;
 }
 
 .ap-q-header {
@@ -1192,7 +1268,9 @@
     user-select: none;
     -webkit-user-select: none;
     cursor: default;
-    transition: background-color 0.15s ease, transform 0.05s ease;
+    transition:
+        background-color 0.15s ease,
+        transform 0.05s ease;
     touch-action: none;
     position: relative;
     z-index: 1;
@@ -1207,14 +1285,14 @@
 }
 
 .ap-q-row--active:hover {
-    background-color: rgba(255, 255, 255, 0.10);
+    background-color: rgba(255, 255, 255, 0.1);
 }
 
 .ap-q-row--dragging {
     z-index: 10;
     opacity: 0.9;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    background-color: rgba(255, 255, 255, 0.10);
+    background-color: rgba(255, 255, 255, 0.1);
 }
 
 .ap-q-row__drag {
@@ -1331,7 +1409,9 @@
     border-radius: 50%;
     flex-shrink: 0;
     opacity: 0.2;
-    transition: opacity 0.15s ease, color 0.15s ease;
+    transition:
+        opacity 0.15s ease,
+        color 0.15s ease;
 }
 
 .ap-q-row:hover .ap-q-row__remove {
@@ -1418,8 +1498,12 @@
     opacity: 0.85;
 }
 @keyframes ap-hold-skip-progress {
-    from { background: conic-gradient(var(--ap-accent) 0deg, transparent 0deg); }
-    to { background: conic-gradient(var(--ap-accent) 360deg, transparent 360deg); }
+    from {
+        background: conic-gradient(var(--ap-accent) 0deg, transparent 0deg);
+    }
+    to {
+        background: conic-gradient(var(--ap-accent) 360deg, transparent 360deg);
+    }
 }
 @media (prefers-reduced-motion: reduce) {
     .ap-hold-skip--holding:not(:disabled) .ap-hold-skip__progress {

@@ -61,9 +61,7 @@ function resolveColor(
             const variableName = match[1].trim()
             let resolved = cache.get(variableName)
             if (resolved === undefined && !cache.has(variableName)) {
-                resolved = getComputedStyle(el)
-                    .getPropertyValue(variableName)
-                    .trim()
+                resolved = getComputedStyle(el).getPropertyValue(variableName).trim()
                 cache.set(variableName, resolved)
             }
             if (resolved) return resolved
@@ -135,23 +133,14 @@ function getRelevantInlineVariableNames(
 }
 
 /** Build a layout-free fingerprint of relevant ancestor theme inputs. */
-function getThemeSignature(
-    wrapper: HTMLElement,
-    colorVariableNames: readonly string[]
-): string {
+function getThemeSignature(wrapper: HTMLElement, colorVariableNames: readonly string[]): string {
     const elements = getElementAncestors(wrapper)
-    const inlineVariableNames = getRelevantInlineVariableNames(
-        elements,
-        colorVariableNames
-    )
+    const inlineVariableNames = getRelevantInlineVariableNames(elements, colorVariableNames)
     const parts: string[] = []
     for (const [depth, currentElement] of elements.entries()) {
         const themeClasses = getThemeClassSignature(currentElement)
         const inlineVariables = inlineVariableNames
-            .map(
-                (name) =>
-                    `${name}:${currentElement.style.getPropertyValue(name).trim()}`
-            )
+            .map((name) => `${name}:${currentElement.style.getPropertyValue(name).trim()}`)
             .join(";")
         parts.push(`${depth}|${themeClasses}|${inlineVariables}`)
     }
@@ -241,11 +230,7 @@ export function WaveformProgress({
         const wrapper = wrapperRef.current
         if (!wrapper || typeof MutationObserver === "undefined") return
 
-        const colorVariableNames = getColorVariableNames(
-            waveColor,
-            progressColor,
-            cursorColor
-        )
+        const colorVariableNames = getColorVariableNames(waveColor, progressColor, cursorColor)
         let themeSignature = getThemeSignature(wrapper, colorVariableNames)
         const observer = new MutationObserver(() => {
             const nextSignature = getThemeSignature(wrapper, colorVariableNames)
@@ -488,11 +473,8 @@ export function WaveformProgress({
 
     const showWave = status === "ready" && !disabled && duration > 0
     const ariaValueNow =
-        Number.isFinite(currentTime) && currentTime > 0
-            ? Math.round(currentTime * 10) / 10
-            : 0
-    const clampPct = (v: number) =>
-        Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : 0
+        Number.isFinite(currentTime) && currentTime > 0 ? Math.round(currentTime * 10) / 10 : 0
+    const clampPct = (v: number) => (Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : 0)
     const bufferedPct = clampPct(duration > 0 ? (buffered / duration) * 100 : 0)
 
     return (
@@ -519,10 +501,7 @@ export function WaveformProgress({
                 style={{ visibility: showWave ? "visible" : "hidden" }}
             >
                 <div ref={containerRef} className="ap-waveform__canvas" />
-                <div
-                    className="ap-waveform__buffered"
-                    style={{ width: `${bufferedPct}%` }}
-                />
+                <div className="ap-waveform__buffered" style={{ width: `${bufferedPct}%` }} />
             </div>
             {!showWave && (
                 <div className="ap-waveform__fallback">

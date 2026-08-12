@@ -38,12 +38,7 @@ import {
  * - `coming-soon` — placeholder for a future capability; "soon" badge, not interactive
  */
 export type MenuItemState =
-    | "active"
-    | "available"
-    | "inactive"
-    | "disabled"
-    | "locked"
-    | "coming-soon"
+    "active" | "available" | "inactive" | "disabled" | "locked" | "coming-soon"
 
 /** Known leaf actions the host resolves to real callbacks. Open string union so
  *  the tree can carry future action ids without a type change. */
@@ -212,14 +207,14 @@ export function buildMenuTree({
             actionId: "activate-canvas",
         })
     }
-    const pluginChildren: MenuNode[] = (
-        ["audio", "visual", "analytics"] as const
-    ).flatMap((bucket) => {
-        const children = buckets[bucket]
-        if (children.length === 0) return []
-        const meta = PLUGIN_BUCKET_META[bucket]
-        return [{ id: meta.id, label: meta.label, icon: meta.icon, children }]
-    })
+    const pluginChildren: MenuNode[] = (["audio", "visual", "analytics"] as const).flatMap(
+        (bucket) => {
+            const children = buckets[bucket]
+            if (children.length === 0) return []
+            const meta = PLUGIN_BUCKET_META[bucket]
+            return [{ id: meta.id, label: meta.label, icon: meta.icon, children }]
+        }
+    )
     if (pluginChildren.length > 0) {
         tree.push({
             id: "plugins",

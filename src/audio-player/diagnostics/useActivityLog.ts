@@ -22,9 +22,7 @@ export function useOptionalActivityLog(): ActivityLogApi | null {
 export function useActivityLog(): ActivityLogApi {
     const ctx = useOptionalActivityLog()
     if (!ctx) {
-        throw new Error(
-            "useActivityLog must be used within an <ActivityLogProvider>"
-        )
+        throw new Error("useActivityLog must be used within an <ActivityLogProvider>")
     }
     return ctx
 }

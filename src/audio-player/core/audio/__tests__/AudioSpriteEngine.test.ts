@@ -186,9 +186,7 @@ describe("AudioSpriteEngine", () => {
         })) as unknown as typeof fetch
 
         const engine = new AudioSpriteEngine()
-        await expect(
-            engine.load({ src: "/sprites/missing.mp3", clips: {} })
-        ).rejects.toThrow()
+        await expect(engine.load({ src: "/sprites/missing.mp3", clips: {} })).rejects.toThrow()
         // ready() consumes a never-rejecting view, so no unhandled rejection.
         await expect(engine.ready()).resolves.toBeUndefined()
     })

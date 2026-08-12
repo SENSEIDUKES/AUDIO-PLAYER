@@ -81,13 +81,22 @@ describe("sortPluginSurfaceDefinitions", () => {
 
     it("tie-breaks equal orders by pluginId", () => {
         const tie: PluginSurfaceDefinition[] = [
-            { pluginId: "zeta", label: "Z", category: "utility", kind: "headless", menu: { order: 1 } },
-            { pluginId: "alpha", label: "A", category: "utility", kind: "headless", menu: { order: 1 } },
+            {
+                pluginId: "zeta",
+                label: "Z",
+                category: "utility",
+                kind: "headless",
+                menu: { order: 1 },
+            },
+            {
+                pluginId: "alpha",
+                label: "A",
+                category: "utility",
+                kind: "headless",
+                menu: { order: 1 },
+            },
         ]
-        expect(sortPluginSurfaceDefinitions(tie).map((d) => d.pluginId)).toEqual([
-            "alpha",
-            "zeta",
-        ])
+        expect(sortPluginSurfaceDefinitions(tie).map((d) => d.pluginId)).toEqual(["alpha", "zeta"])
     })
 })
 

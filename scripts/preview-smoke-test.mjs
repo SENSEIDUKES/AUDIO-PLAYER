@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process"
 import { setTimeout as delay } from "node:timers/promises"
+import { fileURLToPath } from "node:url"
 
 const host = process.env.PREVIEW_HOST ?? "127.0.0.1"
 const port = Number(process.env.PREVIEW_PORT ?? 4173)
@@ -7,19 +8,20 @@ const origin = `http://${host}:${port}`
 const timeoutMs = Number(process.env.PREVIEW_TIMEOUT_MS ?? 15_000)
 
 async function stop(child) {
-    if (child.exitCode !== null || child.killed) return
+    if (child.exitCode !== null) return
+
+    const waitForClose = (timeout) =>
+        Promise.race([
+            new Promise((resolve) => child.once("close", () => resolve(true))),
+            delay(timeout).then(() => false),
+        ])
 
     if (process.platform === "win32") {
-        // The preview runs under a shell wrapper (see spawn below), so kill
-        // the whole process tree or vite keeps the port bound for later runs.
-        spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"]).on(
-            "error",
-            () => {}
-        )
-        await Promise.race([
-            new Promise((resolve) => child.once("close", resolve)),
-            delay(2_000),
-        ])
+        child.kill("SIGTERM")
+        if (!(await waitForClose(1_000)) && child.exitCode === null) {
+            child.kill("SIGKILL")
+            await waitForClose(1_000)
+        }
         return
     }
 
@@ -30,18 +32,14 @@ async function stop(child) {
         child.kill("SIGTERM")
     }
 
-    await Promise.race([
-        new Promise((resolve) => child.once("close", resolve)),
-        delay(1_000).then(() => {
-            if (child.exitCode === null && !child.killed) {
-                try {
-                    process.kill(killTarget, "SIGKILL")
-                } catch {
-                    child.kill("SIGKILL")
-                }
-            }
-        }),
-    ])
+    if (!(await waitForClose(1_000)) && child.exitCode === null) {
+        try {
+            process.kill(killTarget, "SIGKILL")
+        } catch {
+            child.kill("SIGKILL")
+        }
+        await waitForClose(1_000)
+    }
 }
 
 async function waitForPreview(child) {
@@ -75,27 +73,15 @@ function collectAssets(html) {
         .filter((asset) => asset.startsWith("/assets/"))
 }
 
-const previewArgs = [
-    "vite",
-    "preview",
-    "--host",
-    host,
-    "--port",
-    String(port),
-    "--strictPort",
-]
-// Node >= 20.12 refuses to spawn .cmd shims directly (EINVAL), so Windows goes
-// through the shell with a pre-joined command string.
-const preview =
-    process.platform === "win32"
-        ? spawn(["npx", ...previewArgs].join(" "), {
-              shell: true,
-              stdio: ["ignore", "pipe", "pipe"],
-          })
-        : spawn("npx", previewArgs, {
-              detached: true,
-              stdio: ["ignore", "pipe", "pipe"],
-          })
+const viteCli = fileURLToPath(new URL("../node_modules/vite/bin/vite.js", import.meta.url))
+const preview = spawn(
+    process.execPath,
+    [viteCli, "preview", "--host", host, "--port", String(port), "--strictPort"],
+    {
+        detached: process.platform !== "win32",
+        stdio: ["ignore", "pipe", "pipe"],
+    }
+)
 
 let logs = ""
 preview.stdout.on("data", (chunk) => {

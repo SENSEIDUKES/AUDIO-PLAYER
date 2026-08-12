@@ -47,7 +47,9 @@ export class PluginManager {
     constructor(context: PluginPlayerContext, options: PluginManagerOptions = {}) {
         this.context = context
         this.defaultOptions = {
-            errorHandler: options.errorHandler ?? new DefaultPluginErrorHandler(options.maxFailuresBeforeDisable),
+            errorHandler:
+                options.errorHandler ??
+                new DefaultPluginErrorHandler(options.maxFailuresBeforeDisable),
             maxFailuresBeforeDisable: options.maxFailuresBeforeDisable ?? 3,
         }
         this.errorBoundaryFactory = new PluginErrorBoundaryFactory(this.defaultOptions.errorHandler)
@@ -82,28 +84,20 @@ export class PluginManager {
 
         let cleanup: (() => void) | undefined
         try {
-            const result = errorBoundary.executeSync(
-                "init",
-                () => plugin.init(this.context),
-                {
-                    recoverable: false,
-                    severity: "error",
-                    context: { pluginName: plugin.name }
-                }
-            )
+            const result = errorBoundary.executeSync("init", () => plugin.init(this.context), {
+                recoverable: false,
+                severity: "error",
+                context: { pluginName: plugin.name },
+            })
             if (typeof result === "function") cleanup = result
             this.plugins.set(plugin.name, { plugin, cleanup, errorBoundary })
         } catch (error) {
             try {
-                errorBoundary.executeSync(
-                    "destroy",
-                    () => plugin.destroy(),
-                    {
-                        recoverable: false,
-                        severity: "error",
-                        context: { pluginName: plugin.name }
-                    }
-                )
+                errorBoundary.executeSync("destroy", () => plugin.destroy(), {
+                    recoverable: false,
+                    severity: "error",
+                    context: { pluginName: plugin.name },
+                })
             } catch {}
         }
     }
@@ -154,7 +148,7 @@ export class PluginManager {
             lastHookCalled: null,
             lastHookTime: null,
             errorCount: errorBoundary.getFailureCount(),
-            memoryUsage: this.debugger.getMemoryUsage()
+            memoryUsage: this.debugger.getMemoryUsage(),
         }))
     }
 
@@ -184,28 +178,28 @@ export class PluginManager {
         return false
     }
 
-    trigger<K extends PluginHookName>(
-        hook: K,
-        ...args: PluginHookArgs[K]
-    ): unknown[] {
+    trigger<K extends PluginHookName>(hook: K, ...args: PluginHookArgs[K]): unknown[] {
         const results: unknown[] = []
         for (const { plugin, errorBoundary } of this.plugins.values()) {
             const hookFn = plugin[hook]
             if (typeof hookFn !== "function") continue
-            
+
             // Use error boundary to execute the hook with structured error handling
             try {
                 const result = errorBoundary.executeSync(
                     `hook:${hook}`,
-                    () => this.debugger.measure(plugin.name, hook, () => (hookFn as HookCallable<K>).call(plugin, ...args)),
+                    () =>
+                        this.debugger.measure(plugin.name, hook, () =>
+                            (hookFn as HookCallable<K>).call(plugin, ...args)
+                        ),
                     {
                         recoverable: true,
                         severity: "warning",
                         fallback: undefined,
-                        context: { hook, pluginName: plugin.name }
+                        context: { hook, pluginName: plugin.name },
                     }
                 )
-                
+
                 if (result !== undefined) {
                     results.push(result)
                 }
@@ -217,23 +211,25 @@ export class PluginManager {
         return results
     }
 
-    triggerUntilHandled<K extends PluginHookName>(
-        hook: K,
-        ...args: PluginHookArgs[K]
-    ): boolean {
+    triggerUntilHandled<K extends PluginHookName>(hook: K, ...args: PluginHookArgs[K]): boolean {
         for (const { plugin, errorBoundary } of this.plugins.values()) {
             const hookFn = plugin[hook]
             if (typeof hookFn !== "function") continue
-            
+
             try {
                 const handled = errorBoundary.executeSync(
                     `hook:${hook}`,
-                    () => this.debugger.measure(plugin.name, hook, () => (hookFn as HookCallable<K>).call(plugin, ...args) === true),
+                    () =>
+                        this.debugger.measure(
+                            plugin.name,
+                            hook,
+                            () => (hookFn as HookCallable<K>).call(plugin, ...args) === true
+                        ),
                     {
                         recoverable: true,
                         severity: "warning",
                         fallback: false,
-                        context: { hook, pluginName: plugin.name }
+                        context: { hook, pluginName: plugin.name },
                     }
                 )
                 if (handled) return true
@@ -253,41 +249,43 @@ export class PluginManager {
         severity: ErrorSeverity = "error",
         context?: Record<string, unknown>
     ): void {
-        const pluginName: string = (context?.pluginName as string) ?? scope.split(":")[1] ?? "unknown"
-        
+        const pluginName: string =
+            (context?.pluginName as string) ?? scope.split(":")[1] ?? "unknown"
+
         // Don't double-wrap PluginErrors
-        const pluginError = isPluginError(error) 
-            ? error 
+        const pluginError = isPluginError(error)
+            ? error
             : PluginError.fromError(pluginName, scope, error, severity !== "error")
 
         // Use the plugin's error boundary if available, otherwise use default handler
         const boundary = this.plugins.get(pluginName)?.errorBoundary
-        const handler: PluginErrorHandler = boundary 
-            ? this.getBoundaryHandler(boundary) 
+        const handler: PluginErrorHandler = boundary
+            ? this.getBoundaryHandler(boundary)
             : this.defaultOptions.errorHandler
 
         // Execute error handling asynchronously to not block
         const info: PluginErrorInfo = {
             error: pluginError,
             severity,
-            context
+            context,
         }
-        
+
         // Handler can be sync or async - wrap in Promise.resolve to normalize
         Promise.resolve(handler.onError(info))
-            .then(result => {
+            .then((result) => {
                 // Handle recovery actions at the manager level
                 if (result.action === "disable_plugin" && boundary) {
                     boundary.disable()
                     const failureCount = boundary.getFailureCount()
-                    Promise.resolve(handler.onPluginDisabled(pluginName, failureCount))
-                        .catch(() => {})
+                    Promise.resolve(handler.onPluginDisabled(pluginName, failureCount)).catch(
+                        () => {}
+                    )
                 }
             })
             .catch(() => {
                 // Handler threw - just log if possible
-                if (severity === 'error') {
-                    console.error('[PluginManager] Error handler threw:', pluginError.message)
+                if (severity === "error") {
+                    console.error("[PluginManager] Error handler threw:", pluginError.message)
                 }
             })
     }

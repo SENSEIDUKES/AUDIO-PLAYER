@@ -8,10 +8,7 @@ import { usePlayerSurface } from "../surfaces/usePlayerSurface"
 import { PlayerSurfaceButtons } from "../surfaces/PlayerSurfaceButtons"
 import { QueueSurface } from "../surfaces/QueueSurface"
 import { ExplicitBadge } from "../components/TrackMetadata"
-import {
-    formatSecondaryLine,
-    formatVersionedTitle,
-} from "../utils/formatMetadata"
+import { formatSecondaryLine, formatVersionedTitle } from "../utils/formatMetadata"
 import "./skins.css"
 
 export interface MiniSidebarPlayerProps extends AudioPlayerTheme {

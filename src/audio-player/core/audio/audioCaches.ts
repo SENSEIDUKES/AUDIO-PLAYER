@@ -9,10 +9,7 @@ export class LRUAudioCache {
     ) {}
 
     private getBufferBytes(buffer: AudioBuffer): number {
-        const bytes =
-            buffer.length *
-            buffer.numberOfChannels *
-            Float32Array.BYTES_PER_ELEMENT
+        const bytes = buffer.length * buffer.numberOfChannels * Float32Array.BYTES_PER_ELEMENT
         return Number.isFinite(bytes) && bytes > 0 ? bytes : 0
     }
 
@@ -20,10 +17,7 @@ export class LRUAudioCache {
         const buffer = this.cache.get(url)
         if (!buffer) return false
 
-        this.decodedBufferBytes = Math.max(
-            0,
-            this.decodedBufferBytes - this.getBufferBytes(buffer)
-        )
+        this.decodedBufferBytes = Math.max(0, this.decodedBufferBytes - this.getBufferBytes(buffer))
         return this.cache.delete(url)
     }
 
@@ -31,7 +25,7 @@ export class LRUAudioCache {
         return {
             decodedBufferCount: this.cache.size,
             decodedBufferBytes: this.decodedBufferBytes,
-            lruOrder: [...this.cache.keys()]
+            lruOrder: [...this.cache.keys()],
         }
     }
 
@@ -61,8 +55,7 @@ export class LRUAudioCache {
     private enforceSize() {
         while (
             this.cache.size > 0 &&
-            (this.cache.size > this.maxSize ||
-                this.decodedBufferBytes > this.maxDecodedBufferBytes)
+            (this.cache.size > this.maxSize || this.decodedBufferBytes > this.maxDecodedBufferBytes)
         ) {
             const oldestKey = this.cache.keys().next().value as string
             // A single oversized buffer is evicted too, keeping the byte cap strict.
@@ -143,10 +136,7 @@ export class PersistentAudioCache {
             })
             await cache.put(url, response)
         } catch (error) {
-            console.warn(
-                "Persistent cache full or unavailable, skipping disk write.",
-                error
-            )
+            console.warn("Persistent cache full or unavailable, skipping disk write.", error)
         }
     }
 }
@@ -162,9 +152,7 @@ export class HTML5AudioPool {
     }
 
     acquire(): HTMLAudioElement {
-        let audio = this.pool.find(
-            (candidate) => candidate.paused && !candidate.ended
-        )
+        let audio = this.pool.find((candidate) => candidate.paused && !candidate.ended)
         if (!audio && this.pool.length < this.maxSize) {
             audio = new Audio()
             audio.preload = "auto"

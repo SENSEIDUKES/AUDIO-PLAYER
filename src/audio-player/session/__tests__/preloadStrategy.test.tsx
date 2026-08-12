@@ -19,7 +19,7 @@ describe("AudioSessionContext - Preload Strategy", () => {
 
         await React.act(async () => {
             root.render(
-                <AudioSessionProvider preloadConfig={{ strategy: 'aggressive', maxConcurrent: 3 }}>
+                <AudioSessionProvider preloadConfig={{ strategy: "aggressive", maxConcurrent: 3 }}>
                     <TestComponent />
                 </AudioSessionProvider>
             )

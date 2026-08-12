@@ -13,10 +13,7 @@ import type { WorkspaceRoute } from "../components/workspace/workspaceRoutes"
  * cannot be resolved against the host's wiring is pruned before render.
  */
 export type ArcActionTarget =
-    | "immediate-action"
-    | "sei-canvas"
-    | "sap-controller"
-    | "locked-entitlement"
+    "immediate-action" | "sei-canvas" | "sap-controller" | "locked-entitlement"
 
 /**
  * Known immediate command ids the hosts resolve to real callbacks. Open string
@@ -91,10 +88,7 @@ export function resolveArcActionState(action: ArcAction): MenuItemState {
 
 /** Resolve the immediate handler for a leaf, if any. Explicit `action`
  *  commands win over the legacy `onSelect`. */
-function immediateHandler(
-    action: ArcAction,
-    host: ArcCommandHost
-): (() => void) | undefined {
+function immediateHandler(action: ArcAction, host: ArcCommandHost): (() => void) | undefined {
     if (action.action) {
         const command = host.commands?.[action.action]
         if (command) return command
@@ -132,10 +126,7 @@ export function isArcActionLive(action: ArcAction, host: ArcCommandHost): boolea
  * left empty by that. What survives is exactly the set of buttons that work —
  * the arc never renders a "coming soon" or mystery no-op node.
  */
-export function pruneDeadArcActions(
-    actions: ArcAction[],
-    host: ArcCommandHost
-): ArcAction[] {
+export function pruneDeadArcActions(actions: ArcAction[], host: ArcCommandHost): ArcAction[] {
     const pruned: ArcAction[] = []
     // Public library entry point: a null/undefined tree from an untyped (plain
     // JS) caller prunes to nothing instead of throwing.

@@ -51,11 +51,7 @@ export function ScrubberCanvasHost({
             data-progress={Math.round(progress * 100)}
         >
             {children ?? (
-                <FallbackScrubber
-                    currentTime={currentTime}
-                    duration={duration}
-                    onSeek={onSeek}
-                />
+                <FallbackScrubber currentTime={currentTime} duration={duration} onSeek={onSeek} />
             )}
         </div>
     )

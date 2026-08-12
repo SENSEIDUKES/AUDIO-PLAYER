@@ -2,8 +2,7 @@ import type { AudioPlayerProps, Track } from "../audio-player"
 
 /* ----------------------------- OG Framer defaults ----------------------------- */
 export const OG_DEFAULTS: AudioPlayerProps = {
-    audioFile:
-        "https://framerusercontent.com/assets/8w3IUatLX9a5JVJ6XPCVuHi94.mp3",
+    audioFile: "https://framerusercontent.com/assets/8w3IUatLX9a5JVJ6XPCVuHi94.mp3",
     backgroundColor: "rgba(255, 255, 255, 0)",
     accentColor: "#FFFFFF",
     textColor: "#FFFFFF",
@@ -36,19 +35,37 @@ export const OG_DEFAULTS: AudioPlayerProps = {
     showTracklist: false,
 }
 
-export const SAMPLE =
-    "https://framerusercontent.com/assets/8w3IUatLX9a5JVJ6XPCVuHi94.mp3"
+export const SAMPLE = "https://framerusercontent.com/assets/8w3IUatLX9a5JVJ6XPCVuHi94.mp3"
 export const BROKEN = "https://example.com/this-track-does-not-exist.mp3"
-export const OG_BG =
-    "https://framerusercontent.com/images/GfGkADagM4KEibNcIiRUWlfrR0.jpg"
+export const OG_BG = "https://framerusercontent.com/images/GfGkADagM4KEibNcIiRUWlfrR0.jpg"
 
 // All three share the same SAMPLE URL to validate the sourceKey fix:
 // switching between First Light → Midnight Run → Aurora must reset
 // currentTime, duration, and buffered even though the src is unchanged.
 export const playlist: Track[] = [
-    { id: "track-1", title: "First Light", artist: "SEIHouse", audioFile: SAMPLE, lyrics: "Verse one\nVerse two\nChorus line", purchaseUrl: "https://example.com/buy/first-light" },
-    { id: "track-2", title: "Midnight Run", artist: "SEIHouse", audioFile: SAMPLE, lyrics: "Late night city glow\nNeon on the wall", purchaseUrl: "https://example.com/buy/midnight-run" },
-    { id: "track-3", title: "Signal Lost", artist: "SEIHouse", audioFile: BROKEN, lyrics: "(unreachable)" },
+    {
+        id: "track-1",
+        title: "First Light",
+        artist: "SEIHouse",
+        audioFile: SAMPLE,
+        lyrics: "Verse one\nVerse two\nChorus line",
+        purchaseUrl: "https://example.com/buy/first-light",
+    },
+    {
+        id: "track-2",
+        title: "Midnight Run",
+        artist: "SEIHouse",
+        audioFile: SAMPLE,
+        lyrics: "Late night city glow\nNeon on the wall",
+        purchaseUrl: "https://example.com/buy/midnight-run",
+    },
+    {
+        id: "track-3",
+        title: "Signal Lost",
+        artist: "SEIHouse",
+        audioFile: BROKEN,
+        lyrics: "(unreachable)",
+    },
     { id: "track-4", title: "Aurora", artist: "SEIHouse", audioFile: SAMPLE },
 ]
 
@@ -90,12 +107,42 @@ export const NO_LUCK_COVER =
     "https://images.seihouse.org/COVER%20ART/SENSEI%20-%20COVER%20ART/NO%20LUCK%20-%20COVER.JPG"
 
 export const noLuckTracks: Track[] = [
-    { id: "sea-nl-0101", title: "Angel Numbers", artist: "SENSEI", audioFile: "https://audio.seihouse.org/SEA-NL/SEA-NL-0101.wav" },
-    { id: "sea-nl-0102", title: "Forces", artist: "SENSEI", audioFile: "https://audio.seihouse.org/SEA-NL/SEA-NL-0102.wav" },
-    { id: "sea-nl-0103", title: "Heartbreak Hotel", artist: "SENSEI", audioFile: "https://audio.seihouse.org/SEA-NL/SEA-NL-0103.wav" },
-    { id: "sea-nl-0104", title: "Tell Me", artist: "SENSEI", audioFile: "https://audio.seihouse.org/SEA-NL/SEA-NL-0104.wav" },
-    { id: "sea-nl-0105", title: "I Am", artist: "SENSEI", audioFile: "https://audio.seihouse.org/SEA-NL/SEA-NL-0105.wav" },
-    { id: "sea-nl-0106", title: "Message", artist: "SENSEI", audioFile: "https://audio.seihouse.org/SEA-NL/SEA-NL-0106.wav" },
+    {
+        id: "sea-nl-0101",
+        title: "Angel Numbers",
+        artist: "SENSEI",
+        audioFile: "https://audio.seihouse.org/SEA-NL/SEA-NL-0101.wav",
+    },
+    {
+        id: "sea-nl-0102",
+        title: "Forces",
+        artist: "SENSEI",
+        audioFile: "https://audio.seihouse.org/SEA-NL/SEA-NL-0102.wav",
+    },
+    {
+        id: "sea-nl-0103",
+        title: "Heartbreak Hotel",
+        artist: "SENSEI",
+        audioFile: "https://audio.seihouse.org/SEA-NL/SEA-NL-0103.wav",
+    },
+    {
+        id: "sea-nl-0104",
+        title: "Tell Me",
+        artist: "SENSEI",
+        audioFile: "https://audio.seihouse.org/SEA-NL/SEA-NL-0104.wav",
+    },
+    {
+        id: "sea-nl-0105",
+        title: "I Am",
+        artist: "SENSEI",
+        audioFile: "https://audio.seihouse.org/SEA-NL/SEA-NL-0105.wav",
+    },
+    {
+        id: "sea-nl-0106",
+        title: "Message",
+        artist: "SENSEI",
+        audioFile: "https://audio.seihouse.org/SEA-NL/SEA-NL-0106.wav",
+    },
 ]
 
 // Skin `art` props take a CSS background-image value, not a bare URL.

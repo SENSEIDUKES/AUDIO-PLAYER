@@ -1,7 +1,5 @@
 import { EssentiaWASM } from "essentia.js/dist/essentia-wasm.es.js"
-import Essentia, {
-    type RhythmExtractor2013Result,
-} from "essentia.js/dist/essentia.js-core.es.js"
+import Essentia, { type RhythmExtractor2013Result } from "essentia.js/dist/essentia.js-core.es.js"
 import type { RhythmRequest, RhythmResponse } from "./rhythmProtocol"
 
 /**

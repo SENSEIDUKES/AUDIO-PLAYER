@@ -9,19 +9,10 @@
  */
 
 /** Where a plugin renders its UI. */
-export type PluginSurfaceKind =
-    | "headless"
-    | "settings"
-    | "canvas"
-    | "dual"
+export type PluginSurfaceKind = "headless" | "settings" | "canvas" | "dual"
 
 /** Broad classification of a plugin, used for grouping and future routing. */
-export type PluginSurfaceCategory =
-    | "visual"
-    | "agent"
-    | "playback"
-    | "analytics"
-    | "utility"
+export type PluginSurfaceCategory = "visual" | "agent" | "playback" | "analytics" | "utility"
 
 /**
  * Intended menu branch for a plugin. Declarative for now — future phases map
@@ -29,12 +20,7 @@ export type PluginSurfaceCategory =
  * plugins; no agent plugin is implemented in this phase.
  */
 export type PluginMenuBranch =
-    | "plugin:visual"
-    | "plugin:playback"
-    | "plugin:analytics"
-    | "agent"
-    | "playback"
-    | "library"
+    "plugin:visual" | "plugin:playback" | "plugin:analytics" | "agent" | "playback" | "library"
 
 /** Settings surface: the plugin exposes options in the SAPController experience. */
 export interface PluginSettingsSurface {

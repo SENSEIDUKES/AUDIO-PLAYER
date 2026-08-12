@@ -12,10 +12,7 @@ const DEFAULT_BUCKETS = 1024
  * sample per bucket across up to two channels. wavesurfer renders a single
  * channel as a symmetric waveform, and `normalize: true` handles scaling.
  */
-export function extractPeaks(
-    buffer: AudioBuffer,
-    buckets: number = DEFAULT_BUCKETS
-): number[][] {
+export function extractPeaks(buffer: AudioBuffer, buckets: number = DEFAULT_BUCKETS): number[][] {
     const length = buffer.length
     if (length === 0 || buckets <= 0) return [[]]
     const bucketCount = Math.min(buckets, length)

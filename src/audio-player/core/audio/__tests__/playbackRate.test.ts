@@ -1,11 +1,7 @@
 /** @vitest-environment jsdom */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { RefObject } from "react"
-import {
-    DEFAULT_PLAYBACK_RATE,
-    MAX_PLAYBACK_RATE,
-    MIN_PLAYBACK_RATE,
-} from "../AudioBackend"
+import { DEFAULT_PLAYBACK_RATE, MAX_PLAYBACK_RATE, MIN_PLAYBACK_RATE } from "../AudioBackend"
 import { HTML5AudioBackend } from "../HTML5AudioBackend"
 import { WebAudioBackend, WEBAUDIO_CAPABILITIES } from "../WebAudioBackend"
 import { sharedAudioBufferCache } from "../audioCaches"
@@ -221,11 +217,7 @@ describe("playback rate backends", () => {
         await backend.play()
 
         expect(backend.getRate()).toBe(1.75)
-        expect(sources.map((source) => source.playbackRate.value)).toEqual([
-            1.75,
-            1.75,
-            1.75,
-        ])
+        expect(sources.map((source) => source.playbackRate.value)).toEqual([1.75, 1.75, 1.75])
 
         backend.setRate(Number.POSITIVE_INFINITY)
         expect(backend.getRate()).toBe(DEFAULT_PLAYBACK_RATE)

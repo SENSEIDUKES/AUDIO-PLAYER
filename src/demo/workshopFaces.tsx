@@ -37,12 +37,12 @@ export type WorkshopFaceId =
 
 /** Control groups the panel can render; a face opts into the ones that apply. */
 export type WorkshopControlGroup =
-    | "theme"       // the 6 AudioPlayerTheme colors (every face)
-    | "background"  // backgroundImage src / blurSize / darkenAmount
-    | "typography"  // titleFont / artistFont
-    | "behavior"    // autoPlay / shuffle / repeatMode
-    | "display"     // showTracklist / showVolume / showWaveform
-    | "art"         // cover art / gradient for skins with an `art` prop
+    | "theme" // the 6 AudioPlayerTheme colors (every face)
+    | "background" // backgroundImage src / blurSize / darkenAmount
+    | "typography" // titleFont / artistFont
+    | "behavior" // autoPlay / shuffle / repeatMode
+    | "display" // showTracklist / showVolume / showWaveform
+    | "art" // cover art / gradient for skins with an `art` prop
 
 /* Flat, JSON-serializable settings superset shared by every face. Each face
    reads only the slices it supports, so switching faces keeps your edits. */
@@ -154,13 +154,7 @@ function workshopShareCommands(track: Track): ArcCommandHost["commands"] {
 /* The workshop's Vault preview: rows carry the standardized command wheel with
    the Vault face's dedicated Vault arm (Vault / Playback / Share / Agents) and
    route workspace leaves into one shared SAP Controller instance owned here. */
-function WorkshopVaultRows({
-    tracks,
-    theme,
-}: {
-    tracks: Track[]
-    theme: AudioPlayerTheme
-}) {
+function WorkshopVaultRows({ tracks, theme }: { tracks: Track[]; theme: AudioPlayerTheme }) {
     const s = useAudioSession()
     const [route, setRoute] = useState<WorkspaceRoute | null>(null)
     // No Studio Scout entitlement in the workshop — Agents › Scout routes to
@@ -176,8 +170,7 @@ function WorkshopVaultRows({
                 // color system is visible in the workshop preview.
                 const tagged: Track = {
                     ...t,
-                    vaultCategory:
-                        WORKSHOP_VAULT_CATEGORIES[i % WORKSHOP_VAULT_CATEGORIES.length],
+                    vaultCategory: WORKSHOP_VAULT_CATEGORIES[i % WORKSHOP_VAULT_CATEGORIES.length],
                 }
                 return (
                     <VaultRowPlayer
@@ -307,8 +300,7 @@ export const WORKSHOP_FACES: readonly WorkshopFaceDefinition[] = [
     {
         id: "sea-card",
         label: "SeaCardPlayer",
-        description:
-            "Embeddable SEA marketplace cards with overlaid play buttons.",
+        description: "Embeddable SEA marketplace cards with overlaid play buttons.",
         playerFace: "seaCard",
         sessionBased: true,
         controls: ["theme", "art"],
