@@ -29,7 +29,7 @@ const requiredApiSections = [
     "Workspaces and Agent Scout contracts",
     "Diagnostics",
 ]
-const allowedPublishedReadmeRelativeLinks = new Set(["./LICENSE"])
+const allowedPublishedReadmeRelativeLinks = new Set(["./LICENSE", "LICENSE"])
 
 function fail(message) {
     throw new Error(`Documentation check failed: ${message}`)
@@ -65,16 +65,20 @@ async function findMarkdownFiles(directory) {
 
 function localMarkdownTargets(markdown) {
     const links = markdown.matchAll(/!?\[[^\]]*\]\(([^)]+)\)/g)
-    return Array.from(links, (match) => match[1].trim())
-        .map((target) => target.replace(/^<|>$/g, "").split(/[?#]/, 1)[0])
-        .filter(
-            (target) =>
-                target.length > 0 &&
-                !target.startsWith("#") &&
-                !target.startsWith("http:") &&
-                !target.startsWith("https:") &&
-                !target.startsWith("mailto:")
-        )
+    return Array.from(links, (match) => {
+        const rawTarget = match[1].trim()
+        const target = rawTarget.startsWith("<")
+            ? rawTarget.slice(1, rawTarget.indexOf(">"))
+            : rawTarget.split(/\s+/, 1)[0]
+
+        return target.split(/[?#]/, 1)[0]
+    }).filter(
+        (target) =>
+            target.length > 0 &&
+            !target.startsWith("#") &&
+            !target.startsWith("//") &&
+            !/^[a-z][a-z\d+.-]*:/i.test(target)
+    )
 }
 
 const packageJson = JSON.parse(await readFile(packagePath, "utf8"))
@@ -133,7 +137,9 @@ const markdownFiles = await findMarkdownFiles(projectRoot)
 for (const markdownPath of markdownFiles) {
     const content = await readFile(markdownPath, "utf8")
     for (const target of localMarkdownTargets(content)) {
-        const resolved = path.resolve(path.dirname(markdownPath), target)
+        const resolved = target.startsWith("/")
+            ? path.join(projectRoot, target)
+            : path.resolve(path.dirname(markdownPath), target)
         if (!(await pathExists(resolved))) {
             fail(`${path.relative(projectRoot, markdownPath)} links to missing ${target}`)
         }
