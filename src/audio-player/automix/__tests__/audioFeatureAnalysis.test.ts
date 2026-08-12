@@ -51,6 +51,27 @@ describe("extractAudioFeatures", () => {
         expect(features?.peakDbfs).toBe(0)
     })
 
+    it("reports the source channel count while measuring only the first two channels", () => {
+        const left = Float32Array.from({ length: 100 }, (_, index) =>
+            index % 2 === 0 ? 0.25 : -0.25
+        )
+        const right = Float32Array.from(left)
+        const ignoredSurroundChannel = new Float32Array(100).fill(1)
+
+        const features = extractAudioFeatures(
+            fakeBuffer([left, right, ignoredSurroundChannel], 1_000),
+            {
+                trimStartMs: 0,
+                trimEndMs: 0,
+            }
+        )
+
+        expect(features?.channelCount).toBe(3)
+        expect(features?.peakDbfs).toBeCloseTo(-12.04, 2)
+        expect(features?.clippingSampleRatio).toBe(0)
+        expect(features?.stereoCorrelation).toBeCloseTo(1, 3)
+    })
+
     it("excludes measured trim regions from its PCM statistics", () => {
         const samples = new Float32Array(2_000)
         samples.fill(1, 0, 500)

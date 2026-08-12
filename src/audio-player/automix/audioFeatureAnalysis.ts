@@ -57,10 +57,8 @@ export function extractAudioFeatures(
     const analyzedChannels = Math.min(buffer.numberOfChannels, 2)
     if (analyzedChannels === 0 || buffer.length === 0 || buffer.sampleRate <= 0) return null
 
-    const channels: Float32Array[] = []
-    for (let channel = 0; channel < analyzedChannels; channel++) {
-        channels.push(buffer.getChannelData(channel))
-    }
+    const leftChannel = buffer.getChannelData(0)
+    const rightChannel = analyzedChannels === 2 ? buffer.getChannelData(1) : null
 
     const start = Math.min(
         buffer.length,
@@ -99,36 +97,48 @@ export function extractAudioFeatures(
     for (let windowIndex = 0; windowIndex < windowCount; windowIndex++) {
         const windowStart = start + windowIndex * windowSize
         const windowEnd = Math.min(end, windowStart + windowSize)
-        let windowSquares = 0
-        let windowSamples = 0
-        const channelWindowSquares = new Float64Array(channels.length)
+        const samplesPerChannel = windowEnd - windowStart
+        let leftWindowSquares = 0
+        let rightWindowSquares = 0
 
-        for (let sampleIndex = windowStart; sampleIndex < windowEnd; sampleIndex++) {
-            for (let channelIndex = 0; channelIndex < channels.length; channelIndex++) {
-                const channel = channels[channelIndex]
-                const sample = channel[sampleIndex]
-                const absolute = Math.abs(sample)
-                const square = sample * sample
-                peak = Math.max(peak, absolute)
-                if (absolute >= 0.999) clippedSamples++
-                windowSquares += square
-                totalSquares += square
-                channelWindowSquares[channelIndex] += square
-                windowSamples++
-                totalSamples++
-            }
+        if (rightChannel) {
+            for (let sampleIndex = windowStart; sampleIndex < windowEnd; sampleIndex++) {
+                const left = leftChannel[sampleIndex]
+                const right = rightChannel[sampleIndex]
+                const leftAbsolute = Math.abs(left)
+                const rightAbsolute = Math.abs(right)
+                const leftSquare = left * left
+                const rightSquare = right * right
 
-            if (channels.length === 2) {
-                const left = channels[0][sampleIndex]
-                const right = channels[1][sampleIndex]
+                peak = Math.max(peak, leftAbsolute, rightAbsolute)
+                if (leftAbsolute >= 0.999) clippedSamples++
+                if (rightAbsolute >= 0.999) clippedSamples++
+                leftWindowSquares += leftSquare
+                rightWindowSquares += rightSquare
+                totalSquares += leftSquare + rightSquare
                 leftSum += left
                 rightSum += right
-                leftSquares += left * left
-                rightSquares += right * right
+                leftSquares += leftSquare
+                rightSquares += rightSquare
                 crossProducts += left * right
-                stereoSamples++
+            }
+            stereoSamples += samplesPerChannel
+        } else {
+            for (let sampleIndex = windowStart; sampleIndex < windowEnd; sampleIndex++) {
+                const sample = leftChannel[sampleIndex]
+                const absolute = Math.abs(sample)
+                const square = sample * sample
+
+                peak = Math.max(peak, absolute)
+                if (absolute >= 0.999) clippedSamples++
+                leftWindowSquares += square
+                totalSquares += square
             }
         }
+
+        const windowSquares = leftWindowSquares + rightWindowSquares
+        const windowSamples = samplesPerChannel * analyzedChannels
+        totalSamples += windowSamples
 
         const windowRms = windowSamples > 0 ? Math.sqrt(windowSquares / windowSamples) : 0
         const windowLevel = toDbfs(windowRms)
@@ -137,12 +147,8 @@ export function extractAudioFeatures(
 
         // Preserve Automix Pro's established energy semantics: mean 50ms RMS
         // of the louder channel, excluding a final partial window.
-        if (windowEnd - windowStart === windowSize) {
-            let loudestChannelRms = 0
-            for (const squares of channelWindowSquares) {
-                loudestChannelRms = Math.max(loudestChannelRms, Math.sqrt(squares / windowSize))
-            }
-            energyTotal += loudestChannelRms
+        if (samplesPerChannel === windowSize) {
+            energyTotal += Math.sqrt(Math.max(leftWindowSquares, rightWindowSquares) / windowSize)
             energyWindows++
         }
 
