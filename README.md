@@ -267,9 +267,10 @@ Open the printed Vite preview URL to inspect the production build. The preview s
 - `npm run typecheck` — run TypeScript without emitting files.
 - `npm run build` — type-check and build the production demo into `dist/`.
 - `npm run build:lib` — build the package version for installing into other apps.
+- `npm run test:package` — pack and install the library in a clean consumer, then verify its CommonJS entry and Automix worker asset.
 - `npm run preview` — serve the built `dist/` output with Vite preview.
 - `npm run preview:smoke` — start Vite preview on `127.0.0.1:4173`, fetch the demo page, and verify referenced built assets return HTTP 200.
-- `npm test` — run type-checking, production build, and the preview smoke test.
+- `npm test` — run type-checking, unit and installed-package tests, the production build, and the preview smoke test.
 
 ---
 

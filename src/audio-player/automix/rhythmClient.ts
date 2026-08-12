@@ -1,4 +1,5 @@
 import type { RhythmRequest, RhythmResponse } from "./rhythmProtocol"
+import rhythmWorkerUrl from "./rhythmWorker.ts?worker&url"
 
 /**
  * Main-thread client for the essentia rhythm worker.
@@ -79,7 +80,7 @@ function ensureWorker(): Promise<boolean> {
     ready = new Promise<boolean>((resolve) => {
         let instance: Worker
         try {
-            instance = new Worker(new URL("./rhythmWorker.ts", import.meta.url), {
+            instance = new Worker(rhythmWorkerUrl, {
                 type: "module",
             })
         } catch {
