@@ -9,7 +9,12 @@
     display: flex;
     align-items: flex-end;
     justify-content: center;
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family:
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        sans-serif;
 }
 .sap-ctl__backdrop {
     position: absolute;
@@ -228,7 +233,10 @@
 }
 
 .sap-ctl__lyric-line {
-    transition: opacity 0.3s var(--ap-spring), transform 0.3s var(--ap-spring), font-weight 0.3s var(--ap-spring);
+    transition:
+        opacity 0.3s var(--ap-spring),
+        transform 0.3s var(--ap-spring),
+        font-weight 0.3s var(--ap-spring);
     opacity: 0.4;
     transform: scale(0.98);
     transform-origin: left center;
@@ -351,7 +359,7 @@
 
 .sap-ctl__agent-track-title {
     font-weight: 600;
-    color: var(--ap-accent, #7C5CFF);
+    color: var(--ap-accent, #7c5cff);
 }
 
 .sap-ctl__agent-track-artist {
@@ -372,7 +380,7 @@
 .sap-ctl__agent-intro-icon {
     width: 48px;
     height: 48px;
-    color: var(--ap-accent, #7C5CFF);
+    color: var(--ap-accent, #7c5cff);
     opacity: 0.8;
 }
 
@@ -404,7 +412,7 @@
 
 .sap-ctl__agent-msg--user {
     align-self: flex-end;
-    background: var(--ap-accent, #7C5CFF);
+    background: var(--ap-accent, #7c5cff);
     color: var(--ap-play-icon, #0b0b12);
     border-bottom-right-radius: 2px;
 }
@@ -434,7 +442,7 @@
     font-size: 14px;
     font-weight: 700;
     margin: 12px 0 6px 0;
-    color: var(--ap-accent, #7C5CFF);
+    color: var(--ap-accent, #7c5cff);
 }
 
 .sap-ctl__agent-msg-content ul,
@@ -472,14 +480,14 @@
 
 .sap-ctl__agent-input:focus {
     outline: none;
-    border-color: var(--ap-accent, #7C5CFF);
+    border-color: var(--ap-accent, #7c5cff);
 }
 
 .sap-ctl__agent-send-btn {
     align-self: flex-end;
     height: 36px;
     padding: 0 16px;
-    background: var(--ap-accent, #7C5CFF);
+    background: var(--ap-accent, #7c5cff);
     color: var(--ap-play-icon, #0b0b12);
     border: none;
     border-radius: 8px;
@@ -503,7 +511,7 @@
 
 .sap-ctl__agent-btn-primary {
     padding: 10px 20px;
-    background: var(--ap-accent, #7C5CFF);
+    background: var(--ap-accent, #7c5cff);
     color: var(--ap-play-icon, #0b0b12);
     border: none;
     border-radius: 8px;
@@ -535,7 +543,7 @@
 .sap-ctl__agent-loading-bar {
     width: 2px;
     height: 8px;
-    background-color: var(--ap-accent, #7C5CFF);
+    background-color: var(--ap-accent, #7c5cff);
     animation: sap-wave 1s ease-in-out infinite;
 }
 
@@ -550,7 +558,8 @@
 }
 
 @keyframes sap-wave {
-    0%, 100% {
+    0%,
+    100% {
         transform: scaleY(1);
     }
     50% {

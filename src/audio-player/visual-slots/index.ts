@@ -20,14 +20,8 @@ export {
     getVisualComponentIterator,
 } from "./visualRegistry"
 
-export {
-    VisualSlotsProvider,
-    useVisualSlots,
-} from "./VisualSlotsContext"
-export type {
-    VisualSlotsContextValue,
-    VisualSlotsProviderProps,
-} from "./VisualSlotsContext"
+export { VisualSlotsProvider, useVisualSlots } from "./VisualSlotsContext"
+export type { VisualSlotsContextValue, VisualSlotsProviderProps } from "./VisualSlotsContext"
 
 export { SEICanvasRenderer } from "./SEICanvasRenderer"
 export type { SEICanvasRendererProps } from "./SEICanvasRenderer"

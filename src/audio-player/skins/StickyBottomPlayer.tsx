@@ -10,22 +10,12 @@ import { HoldSkipButton } from "../components/HoldSkipButton"
 import { useShareTrack } from "../components/useShareTrack"
 import { ExplicitBadge } from "../components/TrackMetadata"
 import { AudioTimeText } from "../components/AudioTimeText"
-import {
-    formatSecondaryLine,
-    formatVersionedTitle,
-} from "../utils/formatMetadata"
+import { formatSecondaryLine, formatVersionedTitle } from "../utils/formatMetadata"
 import { defaultShowVolume } from "../utils/device"
 import { ScrubberCanvasHost } from "../surfaces/ScrubberCanvasHost"
 import { getScrubberDensity } from "../surfaces/faceCapabilities"
 import { buildThemeVars } from "./themeVars"
-import {
-    DotsIcon,
-    NextIcon,
-    PauseIcon,
-    PlayIcon,
-    PrevIcon,
-    SpinnerIcon,
-} from "./icons"
+import { DotsIcon, NextIcon, PauseIcon, PlayIcon, PrevIcon, SpinnerIcon } from "./icons"
 import "./skins.css"
 
 export interface StickyBottomPlayerProps extends AudioPlayerTheme {
@@ -69,10 +59,11 @@ export function StickyBottomPlayer({
     const handleOpenQueue = useCallback(() => setQueueDrawerOpen(true), [])
     const handleCloseQueue = useCallback(() => setQueueDrawerOpen(false), [])
 
-    const { share, copied: shareCopied, nativeShare } = useShareTrack(
-        s.currentTrack?.title ?? "",
-        s.currentTrack?.artist ?? ""
-    )
+    const {
+        share,
+        copied: shareCopied,
+        nativeShare,
+    } = useShareTrack(s.currentTrack?.title ?? "", s.currentTrack?.artist ?? "")
     const handleShareClick = useCallback(() => {
         if (nativeShare) setControllerOpen(false)
         share()
@@ -134,21 +125,12 @@ export function StickyBottomPlayer({
                 <div className="ap-sb__meta">
                     <span
                         className="ap-sb__title"
-                        title={formatVersionedTitle(
-                            currentTrack.title,
-                            currentTrack.versionLabel
-                        )}
+                        title={formatVersionedTitle(currentTrack.title, currentTrack.versionLabel)}
                     >
-                        {formatVersionedTitle(
-                            currentTrack.title,
-                            currentTrack.versionLabel
-                        )}
+                        {formatVersionedTitle(currentTrack.title, currentTrack.versionLabel)}
                         {currentTrack.explicit && <ExplicitBadge />}
                     </span>
-                    <span
-                        className="ap-sb__artist"
-                        title={formatSecondaryLine(currentTrack)}
-                    >
+                    <span className="ap-sb__artist" title={formatSecondaryLine(currentTrack)}>
                         {formatSecondaryLine(currentTrack)}
                     </span>
                 </div>
@@ -172,9 +154,17 @@ export function StickyBottomPlayer({
                             className={`ap-btn ap-btn--play ap-sb__play ap-tap${isPlaying ? " ap-btn--play-active" : ""}`}
                             onClick={s.toggle}
                             disabled={!s.hasAudio}
-                            aria-label={showPlaySpinner ? "Buffering audio" : isPlaying ? "Pause" : "Play"}
+                            aria-label={
+                                showPlaySpinner ? "Buffering audio" : isPlaying ? "Pause" : "Play"
+                            }
                         >
-                            {showPlaySpinner ? <SpinnerIcon /> : isPlaying ? <PauseIcon /> : <PlayIcon />}
+                            {showPlaySpinner ? (
+                                <SpinnerIcon />
+                            ) : isPlaying ? (
+                                <PauseIcon />
+                            ) : (
+                                <PlayIcon />
+                            )}
                         </button>
                         <HoldSkipButton
                             direction="next"

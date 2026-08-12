@@ -23,9 +23,7 @@ describe("WaveformPlugin", () => {
     })
 
     it("honors a custom name", () => {
-        expect(createWaveformPlugin({ name: "registry-waveform" }).name).toBe(
-            "registry-waveform"
-        )
+        expect(createWaveformPlugin({ name: "registry-waveform" }).name).toBe("registry-waveform")
     })
 
     it("never throws into the host and does no playback work", () => {

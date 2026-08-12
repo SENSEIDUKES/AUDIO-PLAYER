@@ -74,22 +74,22 @@ describe("SleepTimerPlugin", () => {
             const select = root.querySelector("select")
             expect(select).not.toBeNull()
             expect(select?.value).toBe("off")
-            
+
             // change select
             select!.value = "30m"
             select!.dispatchEvent(new Event("change"))
-            
+
             expect(plugin.getActiveTimer().preset).toBe("30m")
-            
+
             plugin.destroy()
             expect(root.querySelector("select")).toBeNull()
         })
-        
+
         it("handles early expire appropriately", () => {
             vi.useFakeTimers()
             const plugin = new SleepTimerPlugin()
             plugin.init(createPluginContext())
-            
+
             // mock Date.now manually
             let now = 1000
             const originalNow = Date.now

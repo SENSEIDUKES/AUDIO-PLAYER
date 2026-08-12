@@ -30,9 +30,7 @@ export function VisualSlotPicker({ slot = "seiCanvas" }: VisualSlotPickerProps) 
                         key={def.id}
                         type="button"
                         className={`sap-visual-switcher__btn${
-                            activeId === def.id
-                                ? " sap-visual-switcher__btn--active"
-                                : ""
+                            activeId === def.id ? " sap-visual-switcher__btn--active" : ""
                         }`}
                         onClick={() => setActive(slot, def.id)}
                         aria-pressed={activeId === def.id}
@@ -44,9 +42,7 @@ export function VisualSlotPicker({ slot = "seiCanvas" }: VisualSlotPickerProps) 
                     key="__none__"
                     type="button"
                     className={`sap-visual-switcher__btn${
-                        activeId === null
-                            ? " sap-visual-switcher__btn--active"
-                            : ""
+                        activeId === null ? " sap-visual-switcher__btn--active" : ""
                     }`}
                     onClick={() => setActive(slot, null)}
                     aria-pressed={activeId === null}

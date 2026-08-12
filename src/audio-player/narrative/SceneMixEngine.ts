@@ -94,12 +94,7 @@ export interface SceneCrossfadeOptions {
 }
 
 export type SceneMixTransitionState =
-    | "idle"
-    | "loading"
-    | "autoplay-blocked"
-    | "playing"
-    | "stopped"
-    | "failed"
+    "idle" | "loading" | "autoplay-blocked" | "playing" | "stopped" | "failed"
 
 export type SceneMixFailureReason = "playback-failed" | "media-error"
 
@@ -346,14 +341,14 @@ export class SceneMixEngine {
         el.addEventListener(
             "loadedmetadata",
             () => this.handleCandidateMetadata(transition, deck),
-            { signal: abort.signal },
+            { signal: abort.signal }
         )
         el.addEventListener(
             "error",
             () => {
                 this.handleDeckFailure(deck, transition)
             },
-            { signal: abort.signal },
+            { signal: abort.signal }
         )
 
         if (
@@ -422,7 +417,7 @@ export class SceneMixEngine {
     private handleCandidateAnalysis(
         transition: PendingTransition,
         deck: Deck,
-        trims: TrackTrims | null,
+        trims: TrackTrims | null
     ): void {
         if (!this.isCurrentCandidate(transition, deck)) return
         deck.trimStartMs = this.sanitizeAnalysisTrimStart(trims?.trimStartMs)
@@ -461,7 +456,7 @@ export class SceneMixEngine {
 
         Promise.resolve(playPromise).then(
             () => this.commitTransition(transition, deck),
-            (error: unknown) => this.handlePlaybackFailure(transition, deck, error),
+            (error: unknown) => this.handlePlaybackFailure(transition, deck, error)
         )
     }
 
@@ -516,7 +511,7 @@ export class SceneMixEngine {
     private failTransition(
         transition: PendingTransition,
         reason: SceneMixFailureReason,
-        error: unknown,
+        error: unknown
     ): void {
         if (this.pendingTransition !== transition) return
         const requestedTrackKey = transition.request.key
@@ -525,7 +520,7 @@ export class SceneMixEngine {
             "failed",
             requestedTrackKey,
             this.active?.key ?? null,
-            this.normalizeFailure(reason, error),
+            this.normalizeFailure(reason, error)
         )
     }
 
@@ -576,7 +571,7 @@ export class SceneMixEngine {
             this.publishStatus(
                 pendingState,
                 this.pendingTransition.request.key,
-                this.active?.key ?? null,
+                this.active?.key ?? null
             )
         }
     }
@@ -589,7 +584,7 @@ export class SceneMixEngine {
         transition: PendingTransition,
         deck: Deck,
         reason: SceneMixFailureReason,
-        error: unknown,
+        error: unknown
     ): void {
         if (!this.isCurrentCandidate(transition, deck)) return
 
@@ -651,7 +646,7 @@ export class SceneMixEngine {
 
     private normalizeFallbackError(
         reason: SceneMixFailureReason,
-        error: unknown,
+        error: unknown
     ): FallbackSourceEvent["error"] {
         try {
             if (reason === "media-error" && error && typeof error === "object") {
@@ -687,10 +682,7 @@ export class SceneMixEngine {
         }
     }
 
-    private normalizeFailure(
-        reason: SceneMixFailureReason,
-        error: unknown
-    ): SceneMixFailure {
+    private normalizeFailure(reason: SceneMixFailureReason, error: unknown): SceneMixFailure {
         const fallback =
             reason === "media-error"
                 ? "Scene audio failed to load or decode."
@@ -701,9 +693,7 @@ export class SceneMixEngine {
                 message = error.trim()
             } else if (error && typeof error === "object") {
                 const candidate =
-                    "message" in error
-                        ? (error as { message?: unknown }).message
-                        : undefined
+                    "message" in error ? (error as { message?: unknown }).message : undefined
                 if (typeof candidate === "string" && candidate.trim()) {
                     message = candidate.trim()
                 } else if ("code" in error) {
@@ -896,8 +886,6 @@ export class SceneMixEngine {
     }
 }
 
-export function createSceneMixEngine(
-    options: SceneMixEngineOptions = {}
-): SceneMixEngine {
+export function createSceneMixEngine(options: SceneMixEngineOptions = {}): SceneMixEngine {
     return new SceneMixEngine(options)
 }

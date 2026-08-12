@@ -22,7 +22,9 @@ for (const [relativePath, maxBytes] of Object.entries(bundleLimits)) {
 
         if (size > maxBytes) {
             hasFailure = true
-            console.error(`Bundle size exceeded: ${relativePath} is ${sizeKiB} KiB (limit: ${maxKiB} KiB).`)
+            console.error(
+                `Bundle size exceeded: ${relativePath} is ${sizeKiB} KiB (limit: ${maxKiB} KiB).`
+            )
         } else {
             console.log(`Bundle size OK: ${relativePath} is ${sizeKiB} KiB (limit: ${maxKiB} KiB).`)
         }

@@ -57,9 +57,7 @@ export function clearCustomCategories(): void {
  * Useful for building a category picker.
  */
 export function getAllVaultCategories(): Array<[string, VaultCategoryMeta]> {
-    const merged = new Map<string, VaultCategoryMeta>(
-        Object.entries(VAULT_CATEGORY_META)
-    )
+    const merged = new Map<string, VaultCategoryMeta>(Object.entries(VAULT_CATEGORY_META))
     for (const [id, meta] of CUSTOM_CATEGORIES) merged.set(id, meta)
     return Array.from(merged.entries())
 }
@@ -70,9 +68,7 @@ export function getAllVaultCategories(): Array<[string, VaultCategoryMeta]> {
  * custom registrations win. Unknown values return `null`, keeping the contract
  * honest against unexpected external data.
  */
-export function getVaultCategoryMeta(
-    category: string | undefined
-): VaultCategoryMeta | null {
+export function getVaultCategoryMeta(category: string | undefined): VaultCategoryMeta | null {
     if (!category) return null
     // `hasOwnProperty` guards against inherited prototype keys: now that the
     // field accepts any string, a value like "toString"/"constructor" would

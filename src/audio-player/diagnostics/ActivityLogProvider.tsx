@@ -29,15 +29,10 @@ export interface ActivityLogProviderProps {
     config?: Partial<ActivityLogConfig>
 }
 
-export function ActivityLogProvider({
-    children,
-    config,
-}: ActivityLogProviderProps) {
+export function ActivityLogProvider({ children, config }: ActivityLogProviderProps) {
     // Store lives in a ref so it survives re-renders without recreating the
     // buffer. Created once on mount.
-    const storeRef = useRef<ReturnType<typeof createActivityLogStore> | null>(
-        null
-    )
+    const storeRef = useRef<ReturnType<typeof createActivityLogStore> | null>(null)
     if (storeRef.current === null) {
         storeRef.current = createActivityLogStore(config)
     }
@@ -46,9 +41,5 @@ export function ActivityLogProvider({
     // need to memoize it once. We create it from the ref which is stable.
     const api = useMemo(() => storeRef.current!, [])
 
-    return (
-        <ActivityLogContext.Provider value={api}>
-            {children}
-        </ActivityLogContext.Provider>
-    )
+    return <ActivityLogContext.Provider value={api}>{children}</ActivityLogContext.Provider>
 }

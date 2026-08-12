@@ -77,21 +77,18 @@ describe("sessionSerializer", () => {
         ["infinite", Number.POSITIVE_INFINITY, 0],
         ["fractional", 1.5, 0],
         ["non-numeric", "1", 0],
-    ])(
-        "sanitizes a %s restored currentIndex",
-        (_label, currentIndex, expectedIndex) => {
-            const deserialized = deserializeSession({
-                queue: [mockTrack, { ...mockTrack, title: "Second Track" }],
-                currentIndex,
-                currentTime: 0,
-                shuffle: false,
-                repeatMode: "off",
-                timestamp: Date.now(),
-            })
+    ])("sanitizes a %s restored currentIndex", (_label, currentIndex, expectedIndex) => {
+        const deserialized = deserializeSession({
+            queue: [mockTrack, { ...mockTrack, title: "Second Track" }],
+            currentIndex,
+            currentTime: 0,
+            shuffle: false,
+            repeatMode: "off",
+            timestamp: Date.now(),
+        })
 
-            expect(deserialized?.currentIndex).toBe(expectedIndex)
-        }
-    )
+        expect(deserialized?.currentIndex).toBe(expectedIndex)
+    })
 
     it("normalizes an empty queue without discarding it", () => {
         const deserialized = deserializeSession({
@@ -145,7 +142,7 @@ describe("sessionSerializer", () => {
 
         const transformer = (url: string) => url + "?token=123"
         const deserialized = deserializeSession(data, { urlTransformer: transformer })
-        
+
         expect(deserialized?.queue[0]?.audioFile).toBe("https://example.com/test.mp3?token=123")
     })
 

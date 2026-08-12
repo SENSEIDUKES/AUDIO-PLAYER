@@ -133,23 +133,16 @@ function detectFormat(inputPath, forced) {
         const files = fs.readdirSync(inputPath)
         if (files.some((f) => f.endsWith(".html"))) return "split"
         // Directory with .tsx/.jsx but no .html → treat as react (format #2)
-        const reactFile = files.find(
-            (f) => f.endsWith(".tsx") || f.endsWith(".jsx")
-        )
+        const reactFile = files.find((f) => f.endsWith(".tsx") || f.endsWith(".jsx"))
         if (reactFile) {
-            const content = fs.readFileSync(
-                path.join(inputPath, reactFile),
-                "utf-8"
-            )
+            const content = fs.readFileSync(path.join(inputPath, reactFile), "utf-8")
             const hasTailwind =
                 /class(?:Name)?=["'][^"']*\b(?:flex|grid|p-|m-|text-|bg-|rounded|shadow|border)\b/i.test(
                     content
                 )
             return hasTailwind ? "tailwind" : "react"
         }
-        fatal(
-            "Directory input detected but no .html, .tsx, or .jsx file found."
-        )
+        fatal("Directory input detected but no .html, .tsx, or .jsx file found.")
     }
 
     // Single file — detect react vs tailwind
@@ -160,7 +153,10 @@ function detectFormat(inputPath, forced) {
         }
         const content = fs.readFileSync(inputPath, "utf-8")
         // Heuristic: look for Tailwind utility classes in className strings
-        const hasTailwind = /class(?:Name)?=["'][^"']*\b(?:flex|grid|p-|m-|text-|bg-|rounded|shadow|border)\b/i.test(content)
+        const hasTailwind =
+            /class(?:Name)?=["'][^"']*\b(?:flex|grid|p-|m-|text-|bg-|rounded|shadow|border)\b/i.test(
+                content
+            )
         return hasTailwind ? "tailwind" : "react"
     }
 
@@ -178,9 +174,7 @@ function resolveInputFile(inputPath, format) {
 
     // Directory + react/tailwind: find the .tsx/.jsx entry
     const files = fs.readdirSync(inputPath)
-    const reactFile = files.find(
-        (f) => f.endsWith(".tsx") || f.endsWith(".jsx")
-    )
+    const reactFile = files.find((f) => f.endsWith(".tsx") || f.endsWith(".jsx"))
     if (!reactFile) fatal("No .tsx/.jsx file found in directory for react format.")
     return path.join(inputPath, reactFile)
 }
@@ -400,9 +394,7 @@ function main() {
     const outDir = path.join(IMPORTED_DIR, id)
     if (fs.existsSync(outDir)) {
         if (!force) {
-            fatal(
-                `Output directory already exists: ${outDir}\n   Use --force to overwrite.`
-            )
+            fatal(`Output directory already exists: ${outDir}\n   Use --force to overwrite.`)
         }
         console.log(`   ⚠️  Overwriting existing skin folder.`)
         fs.rmSync(outDir, { recursive: true, force: true })
@@ -436,15 +428,9 @@ function main() {
         fs.writeFileSync(path.join(outDir, `${pascal}.tsx`), adapter, "utf-8")
 
         if (format === "tailwind") {
-            console.log(
-                `\n   ⚠️  Tailwind utilities detected in this component.`
-            )
-            console.log(
-                `      Utilities won't render unless Tailwind is configured.`
-            )
-            console.log(
-                `      Recommend: re-export from Workshop-Light as format #2.\n`
-            )
+            console.log(`\n   ⚠️  Tailwind utilities detected in this component.`)
+            console.log(`      Utilities won't render unless Tailwind is configured.`)
+            console.log(`      Recommend: re-export from Workshop-Light as format #2.\n`)
         }
     } else if (format === "split") {
         // Read all files from the directory
@@ -462,10 +448,7 @@ function main() {
 
         // behavior.js — copy verbatim
         if (jsFile) {
-            fs.copyFileSync(
-                path.join(flags.in, jsFile),
-                path.join(outDir, "behavior.js")
-            )
+            fs.copyFileSync(path.join(flags.in, jsFile), path.join(outDir, "behavior.js"))
         } else {
             // Write an empty behavior stub
             fs.writeFileSync(

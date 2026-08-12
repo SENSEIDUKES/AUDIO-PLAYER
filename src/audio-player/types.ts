@@ -15,14 +15,7 @@ import type { CueManifest } from "./cues/cueTypes"
  * playback. The category → color/label map lives in `skins/vaultCategories.ts`.
  */
 export type VaultCategory =
-    | "demo"
-    | "beat"
-    | "mix"
-    | "master"
-    | "memo"
-    | "arcNote"
-    | "toFinish"
-    | "archived"
+    "demo" | "beat" | "mix" | "master" | "memo" | "arcNote" | "toFinish" | "archived"
 
 /** A concrete audio URL plus an optional MIME type hint. */
 export interface TrackSource {
@@ -526,35 +519,30 @@ export interface SpatialAudioState {
 
 export interface PreloadConfig {
     /** Preload strategy. 'aggressive' preloads next 3 tracks. Default: 'next' */
-    strategy: 'none' | 'next' | 'aggressive'
+    strategy: "none" | "next" | "aggressive"
     /** Max concurrent preloads. Default: 2 */
     maxConcurrent?: number
     /** Skip preload on cellular networks. Default: false */
     skipOnCellular?: boolean
 }
 
-export type PlayerEventType = 
-    | 'track-change'
-    | 'play'
-    | 'pause'
-    | 'queue-end'
-    | 'error'
-    | 'fallback-source'
+export type PlayerEventType =
+    "track-change" | "play" | "pause" | "queue-end" | "error" | "fallback-source"
 
 export interface PlayerEventPayload {
-    'track-change': { track: Track | null, previousIndex: number }
-    'play': { track: Track, currentTime: number }
-    'pause': { track: Track | null, currentTime: number }
-    'queue-end': { reason: 'normal' | 'repeat-off' }
-    'error': { error: string, track: Track | null }
-    'fallback-source': FallbackSourceEvent
+    "track-change": { track: Track | null; previousIndex: number }
+    play: { track: Track; currentTime: number }
+    pause: { track: Track | null; currentTime: number }
+    "queue-end": { reason: "normal" | "repeat-off" }
+    error: { error: string; track: Track | null }
+    "fallback-source": FallbackSourceEvent
 }
 
 export interface CacheStats {
     decodedBufferCount: number
     decodedBufferBytes: number
     preloadElementCount: number
-    lruOrder: string[]  // sourceKeys
+    lruOrder: string[] // sourceKeys
 }
 
 /**
@@ -615,7 +603,7 @@ export interface SessionEngine extends AudioPlayerEngine {
     cycleRepeat: () => void
     /** Toggle Automix Lite crossfade transitions. */
     toggleAutomix: () => void
-    
+
     /** Subscribe to player events. Returns unsubscribe function. */
     subscribe: <T extends PlayerEventType>(
         eventType: T,
@@ -624,10 +612,10 @@ export interface SessionEngine extends AudioPlayerEngine {
 
     /** Get cache statistics */
     getCacheStats: () => CacheStats
-    
+
     /** Clear decoded buffers not in current queue */
     pruneAudioCache: (keepRecent?: number) => void
-    
+
     /** Set max decoded buffer count (default: 4) */
     setCacheLimit: (maxBuffers: number) => void
 }

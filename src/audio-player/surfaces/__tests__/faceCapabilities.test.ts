@@ -94,9 +94,7 @@ describe("PLAYER_FACE_CAPABILITIES", () => {
 
     it("declares supportsContextualActions for every face", () => {
         for (const face of ALL_FACES) {
-            expect(
-                typeof PLAYER_FACE_CAPABILITIES[face].supportsContextualActions
-            ).toBe("boolean")
+            expect(typeof PLAYER_FACE_CAPABILITIES[face].supportsContextualActions).toBe("boolean")
         }
     })
 
@@ -111,9 +109,7 @@ describe("PLAYER_FACE_CAPABILITIES", () => {
 
     it("declares supportsWaveform for every face", () => {
         for (const face of ALL_FACES) {
-            expect(typeof PLAYER_FACE_CAPABILITIES[face].supportsWaveform).toBe(
-                "boolean"
-            )
+            expect(typeof PLAYER_FACE_CAPABILITIES[face].supportsWaveform).toBe("boolean")
         }
     })
 

@@ -1,8 +1,5 @@
 import type { PlayerFace } from "../surfaces/faceCapabilities"
-import type {
-    PropertyDescriptor,
-    PropertyGroup,
-} from "./propertyTypes"
+import type { PropertyDescriptor, PropertyGroup } from "./propertyTypes"
 
 /**
  * The shared property model. Every editable property is declared here exactly
@@ -148,7 +145,8 @@ export const PROPERTY_REGISTRY: readonly PropertyDescriptor[] = [
     {
         id: "buttonOpacity",
         label: "Button Fill",
-        description: "Translucency of button fills — lower is more see-through, higher is more solid.",
+        description:
+            "Translucency of button fills — lower is more see-through, higher is more solid.",
         group: "appearance",
         control: { kind: "range", min: -20, max: 40, step: 1, unit: "%" },
         propPath: "theme.buttonOpacity",
@@ -306,15 +304,11 @@ export function setByPropPath<T extends Record<string, unknown>>(
 }
 
 /** Read a value at a dotted `propPath`. */
-export function getByPropPath(
-    target: Record<string, unknown>,
-    propPath: string
-): unknown {
+export function getByPropPath(target: Record<string, unknown>, propPath: string): unknown {
     return propPath
         .split(".")
         .reduce<unknown>(
-            (acc, key) =>
-                acc == null ? undefined : (acc as Record<string, unknown>)[key],
+            (acc, key) => (acc == null ? undefined : (acc as Record<string, unknown>)[key]),
             target
         )
 }

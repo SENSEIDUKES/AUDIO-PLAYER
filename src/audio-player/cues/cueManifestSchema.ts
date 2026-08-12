@@ -93,30 +93,39 @@ const cueActionSchema = z.discriminatedUnion("command", [
 function generateSecureId(): string {
     if (typeof crypto !== "undefined") {
         if (typeof crypto.randomUUID === "function") {
-            return crypto.randomUUID();
+            return crypto.randomUUID()
         }
         if (typeof crypto.getRandomValues === "function") {
-            const buffer = new Uint8Array(4);
-            crypto.getRandomValues(buffer);
-            return Array.from(buffer).map(b => b.toString(16).padStart(2, '0')).join('');
+            const buffer = new Uint8Array(4)
+            crypto.getRandomValues(buffer)
+            return Array.from(buffer)
+                .map((b) => b.toString(16).padStart(2, "0"))
+                .join("")
         }
     }
-    return Math.random().toString(36).slice(2, 9);
+    return Math.random().toString(36).slice(2, 9)
 }
 
 const cueEventSchema = z.object({
-    id: z.string().optional().transform(val => val || "cue-" + generateSecureId()),
+    id: z
+        .string()
+        .optional()
+        .transform((val) => val || "cue-" + generateSecureId()),
     trigger: cueTriggerSchema,
-    actions: z.array(
-        z.any().transform((val) => {
-            const parsed = cueActionSchema.safeParse(val)
-            if (!parsed.success) {
-                console.warn("SAP Cues: Ignoring invalid action:", parsed.error)
-                return null
-            }
-            return parsed.data
-        })
-    ).transform(actions => actions.filter((a): a is z.infer<typeof cueActionSchema> => a !== null)),
+    actions: z
+        .array(
+            z.any().transform((val) => {
+                const parsed = cueActionSchema.safeParse(val)
+                if (!parsed.success) {
+                    console.warn("SAP Cues: Ignoring invalid action:", parsed.error)
+                    return null
+                }
+                return parsed.data
+            })
+        )
+        .transform((actions) =>
+            actions.filter((a): a is z.infer<typeof cueActionSchema> => a !== null)
+        ),
     replayable: z.boolean().optional(),
     fireOnSeek: z.boolean().optional(),
 })
@@ -137,19 +146,23 @@ const cueManifestSchema = z.object({
     version: z.literal("sap-cues/1"),
     id: z.string().optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
-    assets: z.object({
-        spritePacks: z.record(z.string(), audioSpriteManifestSchema).optional(),
-    }).optional(),
-    cues: z.array(
-        z.any().transform((val, _ctx) => {
-            const parsed = cueEventSchema.safeParse(val)
-            if (!parsed.success) {
-                console.warn("SAP Cues: Ignoring invalid cue:", parsed.error)
-                return null
-            }
-            return parsed.data
+    assets: z
+        .object({
+            spritePacks: z.record(z.string(), audioSpriteManifestSchema).optional(),
         })
-    ).transform(cues => cues.filter(c => c !== null)),
+        .optional(),
+    cues: z
+        .array(
+            z.any().transform((val, _ctx) => {
+                const parsed = cueEventSchema.safeParse(val)
+                if (!parsed.success) {
+                    console.warn("SAP Cues: Ignoring invalid cue:", parsed.error)
+                    return null
+                }
+                return parsed.data
+            })
+        )
+        .transform((cues) => cues.filter((c) => c !== null)),
 })
 
 export function validateCueManifest(json: unknown): CueManifest | null {

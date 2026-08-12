@@ -68,7 +68,11 @@ export function bpmCompatibility(a?: number, b?: number, tolerancePct = 8): numb
  * Return the beat nearest `targetMs`, or `targetMs` itself when no beat is
  * within `maxDriftMs`.
  */
-export function snapToBeat(targetMs: number, beatsMs: readonly number[], maxDriftMs: number): number {
+export function snapToBeat(
+    targetMs: number,
+    beatsMs: readonly number[],
+    maxDriftMs: number
+): number {
     let best = targetMs
     let bestDrift = Infinity
     for (const beat of beatsMs) {
@@ -182,10 +186,7 @@ export function planTransition(
     // Never plan a blend longer than the outgoing track can actually carry,
     // or short tracks would end mid-fade with an abrupt cutoff.
     const availableMs = trimmedEndAMs - trimsA.trimStartMs
-    const maxFadeMs = Math.max(
-        FADE_MIN_MS,
-        Math.min(FADE_MAX_MS, availableMs - FADE_END_SAFETY_MS)
-    )
+    const maxFadeMs = Math.max(FADE_MIN_MS, Math.min(FADE_MAX_MS, availableMs - FADE_END_SAFETY_MS))
     fadeMs = Math.min(maxFadeMs, Math.max(FADE_MIN_MS, fadeMs))
 
     const pointsA = computeTransitionPoints(outgoing, trimsA, durationAMs, fadeMs)

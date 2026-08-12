@@ -1,7 +1,4 @@
-import type {
-    AudioPlayerPlugin,
-    PluginPlayerContext,
-} from "../core/plugins/PluginInterface"
+import type { AudioPlayerPlugin, PluginPlayerContext } from "../core/plugins/PluginInterface"
 import type { Track } from "../types"
 import {
     contrastText,
@@ -24,13 +21,7 @@ export interface AutoThemePluginConfig extends ExtractPaletteOptions {
 }
 
 /** CSS custom properties this plugin writes onto the player root. */
-const MANAGED_VARS = [
-    "--ap-accent",
-    "--ap-progress",
-    "--ap-bg",
-    "--ap-text",
-    "--ap-glow",
-] as const
+const MANAGED_VARS = ["--ap-accent", "--ap-progress", "--ap-bg", "--ap-text", "--ap-glow"] as const
 
 /**
  * Auto Theme: derive the player's palette from the current album art.
@@ -113,9 +104,7 @@ export class AutoThemePlugin implements AudioPlayerPlugin {
     /** Read the artwork URL from the rendered backdrop, else Media Session. */
     private resolveArtworkSrc(root: HTMLElement): string | null {
         const bg = root.querySelector<HTMLElement>(".ap-bg-image")
-        const fromBackdrop = bg
-            ? parseCssUrl(bg.style.backgroundImage)
-            : null
+        const fromBackdrop = bg ? parseCssUrl(bg.style.backgroundImage) : null
         if (fromBackdrop) return fromBackdrop
 
         if (typeof navigator !== "undefined" && navigator.mediaSession) {

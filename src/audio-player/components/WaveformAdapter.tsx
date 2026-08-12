@@ -1,9 +1,6 @@
 import { ProgressBar } from "./ProgressBar"
 import { WaveformProgress } from "./WaveformProgress"
-import {
-    faceSupportsWaveform,
-    getScrubberHeight,
-} from "../surfaces/faceCapabilities"
+import { faceSupportsWaveform, getScrubberHeight } from "../surfaces/faceCapabilities"
 import type { PlayerFace, ScrubberDensity } from "../surfaces/faceCapabilities"
 
 export interface WaveformAdapterProps {

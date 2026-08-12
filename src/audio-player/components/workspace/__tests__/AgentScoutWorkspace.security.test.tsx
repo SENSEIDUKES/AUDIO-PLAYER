@@ -13,9 +13,15 @@ const mockSessionStorage = (() => {
     let store: Record<string, string> = {}
     return {
         getItem: (key: string) => store[key] || null,
-        setItem: (key: string, value: string) => { store[key] = value },
-        removeItem: (key: string) => { delete store[key] },
-        clear: () => { store = {} }
+        setItem: (key: string, value: string) => {
+            store[key] = value
+        },
+        removeItem: (key: string) => {
+            delete store[key]
+        },
+        clear: () => {
+            store = {}
+        },
     }
 })()
 
@@ -31,11 +37,14 @@ describe("AgentScoutWorkspace Security", () => {
 
         ;(useAudioSession as any).mockReturnValue({
             currentTrack: { id: "1", title: "Test Track", artist: "Test Artist" },
-            queue: []
+            queue: [],
         })
 
         const storageKey = "sap-agent-chat:demo-scout:1"
-        sessionStorage.setItem(storageKey, JSON.stringify([{ role: "assistant", content: maliciousContent }]))
+        sessionStorage.setItem(
+            storageKey,
+            JSON.stringify([{ role: "assistant", content: maliciousContent }])
+        )
 
         render(<AgentScoutWorkspace variant="demo-scout" />)
 
@@ -52,15 +61,20 @@ describe("AgentScoutWorkspace Security", () => {
 
         ;(useAudioSession as any).mockReturnValue({
             currentTrack: { id: "1", title: "Test Track", artist: "Test Artist" },
-            queue: []
+            queue: [],
         })
 
         const storageKey = "sap-agent-chat:demo-scout:1"
-        sessionStorage.setItem(storageKey, JSON.stringify([{ role: "assistant", content: content }]))
+        sessionStorage.setItem(
+            storageKey,
+            JSON.stringify([{ role: "assistant", content: content }])
+        )
 
         render(<AgentScoutWorkspace variant="demo-scout" />)
 
         const p = screen.getByText(/Normal/)
-        expect(p.innerHTML).toContain("Normal <strong>bold </strong>still bold<strong></strong> normal")
+        expect(p.innerHTML).toContain(
+            "Normal <strong>bold </strong>still bold<strong></strong> normal"
+        )
     })
 })

@@ -2,11 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import React from "react"
 import { createRoot } from "react-dom/client"
-import {
-    AudioSessionProvider,
-    useAudioSession,
-    useAudioTime,
-} from "../AudioSessionContext"
+import { AudioSessionProvider, useAudioSession, useAudioTime } from "../AudioSessionContext"
 import type { SessionEngine } from "../../types"
 import { AudioTimeText } from "../../components/AudioTimeText"
 
@@ -99,13 +95,7 @@ describe("AudioSessionContext timeline isolation", () => {
         const root = createRoot(container)
 
         await React.act(async () => {
-            root.render(
-                <AudioTimeText
-                    value="currentTime"
-                    fallback={0}
-                    placeholder="–:––"
-                />
-            )
+            root.render(<AudioTimeText value="currentTime" fallback={0} placeholder="–:––" />)
         })
 
         expect(container.textContent).toBe("0:00")

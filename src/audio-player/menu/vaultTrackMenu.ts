@@ -1,10 +1,4 @@
-import {
-    QueueIcon,
-    RadioIcon,
-    RenameIcon,
-    TagIcon,
-    VaultIcon,
-} from "../skins/icons"
+import { QueueIcon, RadioIcon, RenameIcon, TagIcon, VaultIcon } from "../skins/icons"
 import type { ArcAction } from "./arcRouting"
 import type { ArcMenuEntitlements } from "./menuData"
 import {

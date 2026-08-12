@@ -1,7 +1,4 @@
-import type {
-    AudioPlayerPlugin,
-    PluginPlayerContext,
-} from "../core/plugins/PluginInterface"
+import type { AudioPlayerPlugin, PluginPlayerContext } from "../core/plugins/PluginInterface"
 import type { Track, TrackTrims } from "../types"
 import { ensureTrackAnalysis, getTrackTrims } from "../automix/silenceAnalysis"
 import { ensureProTrackAnalysis, getTrackAnalysis } from "../automix/trackAnalysis"
@@ -86,7 +83,8 @@ export class AutomixPlugin implements AudioPlayerPlugin {
         this.name = valid.name
         this.enabled = valid.enabled
         this.confidenceMin = valid.confidenceMin
-        this.onTransitionChange = valid.onTransitionChange as AutomixPluginConfig["onTransitionChange"]
+        this.onTransitionChange =
+            valid.onTransitionChange as AutomixPluginConfig["onTransitionChange"]
     }
 
     get isTransitioning() {
@@ -375,10 +373,7 @@ export class AutomixPlugin implements AudioPlayerPlugin {
                 this.cancel()
                 return
             }
-            const t = Math.min(
-                1,
-                (performance.now() - this.fadeT0) / this.activeFadeMs
-            )
+            const t = Math.min(1, (performance.now() - this.fadeT0) / this.activeFadeMs)
             const vol = context.getEngine().volume
             const mainTarget = Math.cos((t * Math.PI) / 2) * vol
             const deckTarget = Math.sin((t * Math.PI) / 2) * vol

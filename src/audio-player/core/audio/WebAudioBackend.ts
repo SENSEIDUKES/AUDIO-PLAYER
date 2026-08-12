@@ -6,10 +6,7 @@ import type {
     AudioBackendInfo,
     AudioBackendKind,
 } from "./AudioBackend"
-import {
-    DEFAULT_PLAYBACK_RATE,
-    sanitizePlaybackRate,
-} from "./AudioBackend"
+import { DEFAULT_PLAYBACK_RATE, sanitizePlaybackRate } from "./AudioBackend"
 import { sharedAudioBufferCache, sharedAudioStorageCache } from "./audioCaches"
 
 export const WEBAUDIO_CAPABILITIES = {
@@ -21,14 +18,7 @@ export const WEBAUDIO_CAPABILITIES = {
     progressiveBuffered: false,
 } as const
 
-type WebAudioState =
-    | "idle"
-    | "loading"
-    | "ready"
-    | "playing"
-    | "paused"
-    | "ended"
-    | "error"
+type WebAudioState = "idle" | "loading" | "ready" | "playing" | "paused" | "ended" | "error"
 
 /** Default spatial audio values matching Howler.js conventions. */
 const DEFAULT_SPATIAL = {
@@ -56,8 +46,7 @@ function getAudioContextCtor(): typeof AudioContext | undefined {
     if (typeof window === "undefined") return undefined
     return (
         window.AudioContext ??
-        (window as unknown as { webkitAudioContext?: typeof AudioContext })
-            .webkitAudioContext
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
     )
 }
 
@@ -317,12 +306,7 @@ export class WebAudioBackend implements AudioBackend {
         if (gen !== this.generation || signal?.aborted) return null
         if (diskHit) return this.decodeArrayBuffer(diskHit, url, gen, reportErrors)
 
-        const networkData = await this.fetchNetworkArrayBuffer(
-            url,
-            gen,
-            reportErrors,
-            signal
-        )
+        const networkData = await this.fetchNetworkArrayBuffer(url, gen, reportErrors, signal)
         if (!networkData || gen !== this.generation || signal?.aborted) return null
         const buffer = await this.decodeArrayBuffer(networkData, url, gen, reportErrors)
         if (buffer) void sharedAudioStorageCache.putArrayBuffer(url, networkData)
@@ -415,10 +399,7 @@ export class WebAudioBackend implements AudioBackend {
         // resume() can resolve while the context stays suspended (no gesture);
         // treat that as autoplay-blocked so the hook's affordance shows.
         if (!resumed || ctx.state !== "running") {
-            throw namedError(
-                "NotAllowedError",
-                "AudioContext requires a user gesture to start."
-            )
+            throw namedError("NotAllowedError", "AudioContext requires a user gesture to start.")
         }
         if (gen !== this.generation) {
             throw namedError("AbortError", "Source changed during play().")
@@ -431,10 +412,7 @@ export class WebAudioBackend implements AudioBackend {
                 throw namedError("AbortError", "Source changed during play().")
             }
             if (!this.buffer) {
-                throw namedError(
-                    "NotSupportedError",
-                    "Audio failed to load or decode."
-                )
+                throw namedError("NotSupportedError", "Audio failed to load or decode.")
             }
         }
 
@@ -442,8 +420,7 @@ export class WebAudioBackend implements AudioBackend {
 
         // Like the html5 element, playing an ended track restarts it.
         const duration = this.buffer.duration
-        const startAt =
-            this.state === "ended" || this.offset >= duration ? 0 : this.offset
+        const startAt = this.state === "ended" || this.offset >= duration ? 0 : this.offset
         this.startSource(startAt)
         this.emit("play")
         this.emit("playing")

@@ -1,8 +1,4 @@
-import {
-    AudioSessionProvider,
-    FullCardPlayer,
-    MiniSidebarPlayer,
-} from "../audio-player"
+import { AudioSessionProvider, FullCardPlayer, MiniSidebarPlayer } from "../audio-player"
 import { noLuckTracks, NO_LUCK_ART, SEA_THEME } from "./data"
 
 /* Surfaces — Phase 1 UI infrastructure demo.
@@ -19,10 +15,9 @@ export function SurfacesDemo() {
                     SEICanvas &amp; ScrubberCanvas surfaces
                 </h1>
                 <p className="surfaces-demo__lede">
-                    Placeholder infrastructure only. Use the two surface buttons
-                    under the controls: the left opens the SEICanvas (the hero
-                    collapses), the right opens the in-region “Up Next” queue.
-                    One surface is open at a time. Compact faces never show the
+                    Placeholder infrastructure only. Use the two surface buttons under the controls:
+                    the left opens the SEICanvas (the hero collapses), the right opens the in-region
+                    “Up Next” queue. One surface is open at a time. Compact faces never show the
                     canvas button.
                 </p>
             </header>
@@ -32,9 +27,8 @@ export function SurfacesDemo() {
                     <section className="surfaces-demo__face">
                         <h2>Expanded — FullCardPlayer</h2>
                         <p className="surfaces-demo__note">
-                            Supports SEICanvas + hero collapse. Tap the canvas
-                            button to open the placeholder canvas; tap the queue
-                            button for the in-region “Up Next”.
+                            Supports SEICanvas + hero collapse. Tap the canvas button to open the
+                            placeholder canvas; tap the queue button for the in-region “Up Next”.
                         </p>
                         <FullCardPlayer {...SEA_THEME} />
                     </section>
@@ -42,9 +36,8 @@ export function SurfacesDemo() {
                     <section className="surfaces-demo__face">
                         <h2>Compact — MiniSidebarPlayer</h2>
                         <p className="surfaces-demo__note">
-                            No SEICanvas (no canvas button). Shows a compact
-                            ScrubberCanvas and the queue surface behind the
-                            right button.
+                            No SEICanvas (no canvas button). Shows a compact ScrubberCanvas and the
+                            queue surface behind the right button.
                         </p>
                         <MiniSidebarPlayer art={NO_LUCK_ART} {...SEA_THEME} />
                     </section>

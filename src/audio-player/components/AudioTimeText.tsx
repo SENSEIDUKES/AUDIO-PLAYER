@@ -10,11 +10,7 @@ export interface AudioTimeTextProps {
 }
 
 /** A narrow time-context subscriber for visible playback clocks. */
-export function AudioTimeText({
-    value,
-    fallback = 0,
-    placeholder,
-}: AudioTimeTextProps) {
+export function AudioTimeText({ value, fallback = 0, placeholder }: AudioTimeTextProps) {
     const time = useAudioTime({
         currentTime: value === "currentTime" ? fallback : 0,
         duration: value === "duration" ? fallback : 0,
@@ -22,8 +18,7 @@ export function AudioTimeText({
     })
     const seconds = time[value]
     const isInvalidPlaceholderValue =
-        !Number.isFinite(seconds) ||
-        (value === "currentTime" ? seconds < 0 : seconds <= 0)
+        !Number.isFinite(seconds) || (value === "currentTime" ? seconds < 0 : seconds <= 0)
     if (placeholder !== undefined && isInvalidPlaceholderValue) {
         return <>{placeholder}</>
     }

@@ -1,27 +1,15 @@
 import { spawnSync } from "node:child_process"
-import {
-    access,
-    mkdir,
-    mkdtemp,
-    readFile,
-    rm,
-    writeFile,
-} from "node:fs/promises"
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { createRequire } from "node:module"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
-const projectRoot = path.resolve(
-    path.dirname(fileURLToPath(import.meta.url)),
-    ".."
-)
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const npmCli = process.env.npm_execpath
 
 if (!npmCli) {
-    throw new Error(
-        "Package smoke test must be run through npm so npm_execpath is available"
-    )
+    throw new Error("Package smoke test must be run through npm so npm_execpath is available")
 }
 
 function runNpm(args, cwd) {
@@ -40,13 +28,8 @@ function runNpm(args, cwd) {
     }
 
     if (result.status !== 0) {
-        const output = [result.stdout, result.stderr]
-            .filter(Boolean)
-            .join("\n")
-            .trim()
-        throw new Error(
-            `npm ${args.join(" ")} failed${output ? `:\n${output}` : ""}`
-        )
+        const output = [result.stdout, result.stderr].filter(Boolean).join("\n").trim()
+        throw new Error(`npm ${args.join(" ")} failed${output ? `:\n${output}` : ""}`)
     }
 
     return result.stdout
@@ -131,9 +114,7 @@ async function exerciseAutomixWorker(moduleExports, label, packageRoot) {
 
     const workerUrl = new URL(workerUrls[0])
     if (workerUrl.protocol !== "file:") {
-        throw new Error(
-            `${label} worker URL was not package-relative: ${workerUrl.href}`
-        )
+        throw new Error(`${label} worker URL was not package-relative: ${workerUrl.href}`)
     }
 
     const workerPath = fileURLToPath(workerUrl)
@@ -143,16 +124,12 @@ async function exerciseAutomixWorker(moduleExports, label, packageRoot) {
         !relativeWorkerPath.startsWith(`assets${path.sep}`) ||
         relativeWorkerPath.startsWith(`..${path.sep}`)
     ) {
-        throw new Error(
-            `${label} worker escaped the installed package: ${workerPath}`
-        )
+        throw new Error(`${label} worker escaped the installed package: ${workerPath}`)
     }
     await access(workerPath)
 }
 
-const temporaryRoot = await mkdtemp(
-    path.join(tmpdir(), "seihouse-audio-player-package-")
-)
+const temporaryRoot = await mkdtemp(path.join(tmpdir(), "seihouse-audio-player-package-"))
 
 try {
     const packDir = path.join(temporaryRoot, "pack")
@@ -184,26 +161,17 @@ try {
     )
     runNpm(["install", "--ignore-scripts", "--package-lock=false"], consumerDir)
 
-    const packageRoot = path.join(
-        consumerDir,
-        "node_modules",
-        "@seihouse",
-        "audio-player"
-    )
+    const packageRoot = path.join(consumerDir, "node_modules", "@seihouse", "audio-player")
     const installedPackage = JSON.parse(
         await readFile(path.join(packageRoot, "package.json"), "utf8")
     )
     if (installedPackage.name !== "@seihouse/audio-player") {
-        throw new Error(
-            "Packed artifact did not install as @seihouse/audio-player"
-        )
+        throw new Error("Packed artifact did not install as @seihouse/audio-player")
     }
 
     // No DOM globals exist here: loading the advertised CommonJS export must
     // remain safe for Node and SSR tooling.
-    const requireFromConsumer = createRequire(
-        path.join(consumerDir, "smoke.cjs")
-    )
+    const requireFromConsumer = createRequire(path.join(consumerDir, "smoke.cjs"))
     const commonJsExports = requireFromConsumer("@seihouse/audio-player")
     if (typeof commonJsExports.AudioPlayer !== "function") {
         throw new Error("CommonJS package export did not load the audio player")
@@ -211,19 +179,12 @@ try {
     await exerciseAutomixWorker(commonJsExports, "CommonJS", packageRoot)
 
     const esmFixturePath = path.join(consumerDir, "smoke.mjs")
-    await writeFile(
-        esmFixturePath,
-        'export * from "@seihouse/audio-player"\n'
-    )
-    const esmExports = await import(
-        `${pathToFileURL(esmFixturePath).href}?package-smoke`
-    )
+    await writeFile(esmFixturePath, 'export * from "@seihouse/audio-player"\n')
+    const esmExports = await import(`${pathToFileURL(esmFixturePath).href}?package-smoke`)
     await exerciseAutomixWorker(esmExports, "ESM", packageRoot)
 
     console.log("Installed package smoke test passed.")
-    console.log(
-        "Verified Node CommonJS loading and package-relative Automix workers."
-    )
+    console.log("Verified Node CommonJS loading and package-relative Automix workers.")
 } finally {
     await rm(temporaryRoot, { recursive: true, force: true })
 }

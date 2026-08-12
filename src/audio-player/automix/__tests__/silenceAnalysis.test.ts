@@ -78,7 +78,7 @@ describe("silence analysis source selection", () => {
         await expect(first).resolves.toEqual({ trimStartMs: 0, trimEndMs: 0 })
         expect(decodeMocks.fetchAndDecodeTrack).toHaveBeenCalledTimes(1)
         expect(decodeMocks.fetchAndDecodeTrack).toHaveBeenCalledWith(
-            "http://localhost/analysis/source-a.mp3",
+            "http://localhost/analysis/source-a.mp3"
         )
     })
 
@@ -97,16 +97,14 @@ describe("silence analysis source selection", () => {
         })
         expect(decodeMocks.fetchAndDecodeTrack).toHaveBeenCalledTimes(1)
         expect(decodeMocks.fetchAndDecodeTrack).toHaveBeenCalledWith(
-            "http://localhost/analysis/automix-primary.mp3",
+            "http://localhost/analysis/automix-primary.mp3"
         )
     })
 
     it("resolves analysis failures to natural-start fallback", async () => {
         decodeMocks.fetchAndDecodeTrack.mockRejectedValueOnce(new Error("decode failed"))
 
-        await expect(
-            ensureSourceAnalysis("/analysis/source-failure.mp3"),
-        ).resolves.toBeNull()
+        await expect(ensureSourceAnalysis("/analysis/source-failure.mp3")).resolves.toBeNull()
     })
 
     it("does not enter the decode pipeline when SceneMix analysis is off", async () => {
@@ -132,7 +130,7 @@ describe("silence analysis source selection", () => {
                 artist: "t",
                 audioFile: "/analysis/scene-precomputed.mp3",
             },
-            { trimStartMs: 1250 },
+            { trimStartMs: 1250 }
         )
 
         expect(decodeMocks.fetchAndDecodeTrack).not.toHaveBeenCalled()

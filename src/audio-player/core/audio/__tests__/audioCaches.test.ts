@@ -94,10 +94,10 @@ describe("LRUAudioCache", () => {
         const cache = new LRUAudioCache(3)
         const dummyBuffer1 = { length: 44100, numberOfChannels: 2 } as AudioBuffer
         const dummyBuffer2 = { length: 88200, numberOfChannels: 2 } as AudioBuffer
-        
+
         cache.set("a", dummyBuffer1)
         cache.set("b", dummyBuffer2)
-        
+
         const stats = cache.getStats()
         expect(stats.decodedBufferCount).toBe(2)
         expect(stats.lruOrder).toEqual(["a", "b"])
@@ -108,13 +108,13 @@ describe("LRUAudioCache", () => {
     it("should update lruOrder on get", () => {
         const cache = new LRUAudioCache(3)
         const dummyBuffer = { length: 1, numberOfChannels: 1 } as AudioBuffer
-        
+
         cache.set("a", dummyBuffer)
         cache.set("b", dummyBuffer)
         cache.set("c", dummyBuffer)
-        
+
         expect(cache.getStats().lruOrder).toEqual(["a", "b", "c"])
-        
+
         cache.get("a")
         expect(cache.getStats().lruOrder).toEqual(["b", "c", "a"])
     })
@@ -122,11 +122,11 @@ describe("LRUAudioCache", () => {
     it("should setMaxSize and enforce immediately", () => {
         const cache = new LRUAudioCache(3)
         const dummyBuffer = { length: 1, numberOfChannels: 1 } as AudioBuffer
-        
+
         cache.set("a", dummyBuffer)
         cache.set("b", dummyBuffer)
         cache.set("c", dummyBuffer)
-        
+
         cache.setMaxSize(1)
         expect(cache.getStats().decodedBufferCount).toBe(1)
         expect(cache.getStats().lruOrder).toEqual(["c"])
@@ -135,15 +135,15 @@ describe("LRUAudioCache", () => {
     it("should prune unused buffers but keep requested recent count", () => {
         const cache = new LRUAudioCache(5)
         const dummyBuffer = { length: 1, numberOfChannels: 1 } as AudioBuffer
-        
+
         cache.set("a", dummyBuffer)
         cache.set("b", dummyBuffer) // old, should be evicted
         cache.set("c", dummyBuffer) // active queue (kept)
         cache.set("d", dummyBuffer) // recent 2
         cache.set("e", dummyBuffer) // recent 1
-        
+
         cache.prune(["c"], 2)
-        
+
         const stats = cache.getStats()
         expect(stats.lruOrder).toEqual(["c", "d", "e"])
     })
@@ -248,16 +248,12 @@ describe("AudioStorageCache", () => {
 
         const cache = new AudioStorageCache()
 
-        await expect(
-            cache.putArrayBuffer("song.wav", new ArrayBuffer(4))
-        ).resolves.toBeUndefined()
+        await expect(cache.putArrayBuffer("song.wav", new ArrayBuffer(4))).resolves.toBeUndefined()
         expect(warn).toHaveBeenCalled()
     })
 
     it("writes the source ArrayBuffer without explicitly cloning it", async () => {
-        const put = vi.fn(
-            async (_url: RequestInfo | URL, _response: Response) => undefined
-        )
+        const put = vi.fn(async (_url: RequestInfo | URL, _response: Response) => undefined)
         const open = vi.fn(async () => ({ put }))
         Object.defineProperty(globalThis, "caches", {
             configurable: true,
@@ -272,9 +268,7 @@ describe("AudioStorageCache", () => {
         expect(slice).not.toHaveBeenCalled()
         const [, response] = put.mock.calls[0]
         expect(response.headers.get("Content-Length")).toBe("4")
-        expect(new Uint8Array(await response.arrayBuffer())).toEqual(
-            new Uint8Array([1, 2, 3, 4])
-        )
+        expect(new Uint8Array(await response.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3, 4]))
     })
 })
 
@@ -304,7 +298,6 @@ describe("HTML5AudioPool", () => {
         expect(audio.pause).toHaveBeenCalled()
         expect(audio.removeAttribute).toHaveBeenCalledWith("src")
         expect(audio.load).toHaveBeenCalled()
-
     })
 
     it("should track stats correctly", () => {
@@ -315,10 +308,10 @@ describe("HTML5AudioPool", () => {
         })
         const pool = new HTML5AudioPool(3)
         expect(pool.getStats().preloadElementCount).toBe(0)
-        
+
         pool.acquire()
         expect(pool.getStats().preloadElementCount).toBe(1)
-        
+
         pool.acquire()
         expect(pool.getStats().preloadElementCount).toBe(2)
     })
@@ -345,9 +338,7 @@ class FakeWebAudioNode {
     disconnect = vi.fn()
 }
 
-function installWebAudioContext(
-    decodeAudioData: (data: ArrayBuffer) => Promise<AudioBuffer>
-) {
+function installWebAudioContext(decodeAudioData: (data: ArrayBuffer) => Promise<AudioBuffer>) {
     const context = {
         state: "running" as AudioContextState,
         destination: {},
@@ -390,9 +381,7 @@ describe("WebAudioBackend cache integration", () => {
     it("fetches with CORS mode and only writes persistent cache after decode succeeds", async () => {
         const decoded = fakeBuffer("decoded")
         installWebAudioContext(async () => decoded)
-        const put = vi
-            .spyOn(sharedAudioStorageCache, "putArrayBuffer")
-            .mockResolvedValue()
+        const put = vi.spyOn(sharedAudioStorageCache, "putArrayBuffer").mockResolvedValue()
         const data = new ArrayBuffer(8)
         globalThis.fetch = vi.fn(async () => ({
             ok: true,
@@ -409,9 +398,7 @@ describe("WebAudioBackend cache integration", () => {
             expect.objectContaining({ mode: "cors" })
         )
         expect(put).toHaveBeenCalledWith("https://cdn.example.test/song.mp3", data)
-        expect(
-            sharedAudioBufferCache.get("https://cdn.example.test/song.mp3")
-        ).toBe(decoded)
+        expect(sharedAudioBufferCache.get("https://cdn.example.test/song.mp3")).toBe(decoded)
         backend.destroy()
     })
 
@@ -429,9 +416,7 @@ describe("WebAudioBackend cache integration", () => {
 
         expect(fetch).not.toHaveBeenCalled()
         expect(context.decodeAudioData).toHaveBeenCalledWith(data)
-        expect(
-            sharedAudioBufferCache.get("https://cdn.example.test/persisted.mp3")
-        ).toBe(decoded)
+        expect(sharedAudioBufferCache.get("https://cdn.example.test/persisted.mp3")).toBe(decoded)
         backend.destroy()
     })
 
@@ -447,14 +432,14 @@ describe("WebAudioBackend cache integration", () => {
 
         const backend = createWebAudioBackend()
         backend.preload("https://cdn.example.test/next.mp3")
-        const pending = (backend as unknown as {
-            preloadPromises: Map<string, Promise<AudioBuffer | null>>
-        }).preloadPromises.get("https://cdn.example.test/next.mp3")
+        const pending = (
+            backend as unknown as {
+                preloadPromises: Map<string, Promise<AudioBuffer | null>>
+            }
+        ).preloadPromises.get("https://cdn.example.test/next.mp3")
         await pending
 
-        expect(
-            sharedAudioBufferCache.get("https://cdn.example.test/next.mp3")
-        ).toBe(decoded)
+        expect(sharedAudioBufferCache.get("https://cdn.example.test/next.mp3")).toBe(decoded)
         backend.destroy()
     })
 
@@ -462,9 +447,7 @@ describe("WebAudioBackend cache integration", () => {
         installWebAudioContext(async () => {
             throw new Error("corrupt")
         })
-        const put = vi
-            .spyOn(sharedAudioStorageCache, "putArrayBuffer")
-            .mockResolvedValue()
+        const put = vi.spyOn(sharedAudioStorageCache, "putArrayBuffer").mockResolvedValue()
         globalThis.fetch = vi.fn(async () => ({
             ok: true,
             arrayBuffer: async () => new ArrayBuffer(8),
@@ -478,9 +461,7 @@ describe("WebAudioBackend cache integration", () => {
         await (backend as unknown as { loadPromise: Promise<void> }).loadPromise
 
         expect(put).not.toHaveBeenCalled()
-        expect(
-            sharedAudioBufferCache.get("https://cdn.example.test/corrupt.mp3")
-        ).toBeNull()
+        expect(sharedAudioBufferCache.get("https://cdn.example.test/corrupt.mp3")).toBeNull()
         expect(backend.getError()).toBe("decode")
         expect(onError).toHaveBeenCalled()
         backend.destroy()

@@ -18,8 +18,7 @@ function webAudioUnsupportedReason(): string | null {
     }
     const AudioContextCtor =
         window.AudioContext ??
-        (window as unknown as { webkitAudioContext?: typeof AudioContext })
-            .webkitAudioContext
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
     if (!AudioContextCtor) {
         return "AudioContext is not available"
     }

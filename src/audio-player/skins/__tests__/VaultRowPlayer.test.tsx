@@ -57,9 +57,7 @@ describe("VaultRowPlayer — Arc actions", () => {
         // Without onOpenWorkspace every sap-controller leaf dies, and the two
         // immediate Share leaves (Link, Favorite) have no wired commands — the
         // arc renders no dead buttons, so the trigger disappears entirely.
-        const html = render(
-            <VaultRowPlayer track={TRACK} actions={buildVaultTrackArcActions()} />
-        )
+        const html = render(<VaultRowPlayer track={TRACK} actions={buildVaultTrackArcActions()} />)
         expect(html).not.toContain("ap-vr__action")
     })
 
@@ -86,9 +84,7 @@ describe("VaultRowPlayer — Arc actions", () => {
 
 describe("VaultRowPlayer — classification color", () => {
     it("renders a labeled category chip (not a bare dot) for a known category", () => {
-        const html = render(
-            <VaultRowPlayer track={{ ...TRACK, vaultCategory: "beat" }} />
-        )
+        const html = render(<VaultRowPlayer track={{ ...TRACK, vaultCategory: "beat" }} />)
         expect(html).toContain("ap-vr__chip")
         expect(html).toContain("Beat")
         // The old empty dot element is removed.
@@ -96,9 +92,7 @@ describe("VaultRowPlayer — classification color", () => {
     })
 
     it("sets the classification accent CSS variable on the row", () => {
-        const html = render(
-            <VaultRowPlayer track={{ ...TRACK, vaultCategory: "beat" }} />
-        )
+        const html = render(<VaultRowPlayer track={{ ...TRACK, vaultCategory: "beat" }} />)
         // #22D3A6 is the built-in "beat" color.
         expect(html.toLowerCase()).toContain("--ap-vault-accent:#22d3a6")
     })
@@ -109,9 +103,7 @@ describe("VaultRowPlayer — classification color", () => {
     })
 
     it("renders both chip placements (lead for desktop, inline for mobile) so the title keeps its line", () => {
-        const html = render(
-            <VaultRowPlayer track={{ ...TRACK, vaultCategory: "beat" }} />
-        )
+        const html = render(<VaultRowPlayer track={{ ...TRACK, vaultCategory: "beat" }} />)
         // Leading pill (wide rows) + inline chip on the artist line (narrow rows);
         // a container query shows exactly one at a time.
         expect(html).toContain("ap-vr__chip--lead")

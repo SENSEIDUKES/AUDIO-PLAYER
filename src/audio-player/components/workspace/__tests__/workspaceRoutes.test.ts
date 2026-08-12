@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest"
-import {
-    WORKSPACE_ROUTES,
-    isWorkspaceRoute,
-    parseWorkspaceRoute,
-} from "../workspaceRoutes"
+import { WORKSPACE_ROUTES, isWorkspaceRoute, parseWorkspaceRoute } from "../workspaceRoutes"
 
 describe("isWorkspaceRoute", () => {
     it("accepts every known route", () => {

@@ -33,25 +33,20 @@ describe("WaveformProgress resolved color cache", () => {
         }
         getComputedStyleMock = vi.fn((element: HTMLElement) => ({
             getPropertyValue: (name: string) => {
-                const themeRoot = element.closest<HTMLElement>(
-                    '[data-testid="theme-root"]'
-                )
-                const inlineValue = themeRoot?.style
-                    .getPropertyValue(name)
-                    .trim()
-                const reference = inlineValue?.match(
-                    /var\(\s*(--[^,)\s]+)/
-                )?.[1]
+                const themeRoot = element.closest<HTMLElement>('[data-testid="theme-root"]')
+                const inlineValue = themeRoot?.style.getPropertyValue(name).trim()
+                const reference = inlineValue?.match(/var\(\s*(--[^,)\s]+)/)?.[1]
                 if (reference) {
-                    return (
-                        themeRoot?.style.getPropertyValue(reference).trim() ?? ""
-                    )
+                    return themeRoot?.style.getPropertyValue(reference).trim() ?? ""
                 }
                 return colors[name] ?? inlineValue ?? ""
             },
         }))
         vi.stubGlobal("getComputedStyle", getComputedStyleMock)
-        vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1))
+        vi.stubGlobal(
+            "requestAnimationFrame",
+            vi.fn(() => 1)
+        )
         vi.stubGlobal("cancelAnimationFrame", vi.fn())
         vi.clearAllMocks()
     })
@@ -107,10 +102,7 @@ describe("WaveformProgress resolved color cache", () => {
                     } as CSSProperties
                 }
             >
-                <WaveformProgress
-                    {...props}
-                    sourceKey="cached-colors-next-source"
-                />
+                <WaveformProgress {...props} sourceKey="cached-colors-next-source" />
             </div>
         )
         await waitFor(() => expect(waveSurfer.create).toHaveBeenCalledTimes(2))
@@ -127,11 +119,7 @@ describe("WaveformProgress resolved color cache", () => {
                     } as CSSProperties
                 }
             >
-                <WaveformProgress
-                    {...props}
-                    sourceKey="cached-colors-next-source"
-                    isSeeking
-                />
+                <WaveformProgress {...props} sourceKey="cached-colors-next-source" isSeeking />
             </div>
         )
         await act(async () => {
@@ -146,9 +134,7 @@ describe("WaveformProgress resolved color cache", () => {
             await Promise.resolve()
         })
         expect(getComputedStyleMock).toHaveBeenCalledTimes(3)
-        expect(waveSurfer.instance.setOptions).toHaveBeenCalledTimes(
-            setOptionsCallCount
-        )
+        expect(waveSurfer.instance.setOptions).toHaveBeenCalledTimes(setOptionsCallCount)
 
         await act(async () => {
             themeRoot.classList.add("highlighted")

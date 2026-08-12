@@ -10,10 +10,7 @@ import { ScrubberCanvasHost } from "../surfaces/ScrubberCanvasHost"
 import { SEICanvasHost } from "../surfaces/SEICanvasHost"
 import { PlayerHero } from "../surfaces/PlayerHero"
 import { ExplicitBadge } from "../components/TrackMetadata"
-import {
-    formatSecondaryLine,
-    formatVersionedTitle,
-} from "../utils/formatMetadata"
+import { formatSecondaryLine, formatVersionedTitle } from "../utils/formatMetadata"
 import { getScrubberDensity, faceSupportsAction } from "../surfaces/faceCapabilities"
 import { ArcActionButton } from "../surfaces/ArcActionButton"
 import type { ArcAction, ArcCommandHost } from "../surfaces/ArcActionButton"
@@ -133,14 +130,10 @@ export function SeaCardPlayer({
             <div
                 className="ap-sea__art"
                 style={
-                    cardArt.cssBackground
-                        ? { backgroundImage: cardArt.cssBackground }
-                        : undefined
+                    cardArt.cssBackground ? { backgroundImage: cardArt.cssBackground } : undefined
                 }
             >
-                {cardArt.media && (
-                    <BackgroundMedia media={cardArt.media} className="ap-sea__bg" />
-                )}
+                {cardArt.media && <BackgroundMedia media={cardArt.media} className="ap-sea__bg" />}
                 <button
                     type="button"
                     className="ap-btn ap-btn--play ap-sea__play ap-tap"
@@ -153,7 +146,13 @@ export function SeaCardPlayer({
                               : `Play ${track.title}`
                     }
                 >
-                    {isBufferingThis ? <SpinnerIcon /> : isPlayingThis ? <PauseIcon /> : <PlayIcon />}
+                    {isBufferingThis ? (
+                        <SpinnerIcon />
+                    ) : isPlayingThis ? (
+                        <PauseIcon />
+                    ) : (
+                        <PlayIcon />
+                    )}
                 </button>
                 {tag && <span className="ap-sea__tag">{tag}</span>}
                 {/* Overlay trigger (Phase 4): only on the active card, since the
@@ -289,11 +288,7 @@ export function SeaCardPlayer({
                             // The overlay is user-initiated, so the fetch+decode
                             // fallback (html5 only) is acceptable when a track has
                             // no precomputed peaks; webaudio supplies decoded PCM.
-                            url={
-                                s.getBackendInfo().active === "html5"
-                                    ? s.currentSrc
-                                    : undefined
-                            }
+                            url={s.getBackendInfo().active === "html5" ? s.currentSrc : undefined}
                             sourceKey={trackKey(track)}
                         />
                     </div>

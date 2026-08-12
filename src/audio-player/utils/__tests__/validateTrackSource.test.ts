@@ -8,7 +8,7 @@ describe("validateTrackSource", () => {
     beforeEach(() => {
         globalFetchMock = vi.fn()
         vi.stubGlobal("fetch", globalFetchMock)
-        
+
         vi.spyOn(checkCodecModule, "checkCodecSupport").mockImplementation((mime) => {
             return mime === "audio/mpeg" || mime === "audio/mp4"
         })

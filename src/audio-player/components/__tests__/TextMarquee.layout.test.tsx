@@ -52,18 +52,16 @@ describe("TextMarquee layout measurements", () => {
             "cancelAnimationFrame",
             vi.fn((id: number) => animationFrames.delete(id))
         )
-        vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(
-            function (this: HTMLElement) {
-                return this.classList.contains("ap-marquee") ? containerWidth : 0
-            }
-        )
-        vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockImplementation(
-            function (this: HTMLElement) {
-                return this.classList.contains("ap-marquee__inner")
-                    ? contentWidth
-                    : 0
-            }
-        )
+        vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(function (
+            this: HTMLElement
+        ) {
+            return this.classList.contains("ap-marquee") ? containerWidth : 0
+        })
+        vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockImplementation(function (
+            this: HTMLElement
+        ) {
+            return this.classList.contains("ap-marquee__inner") ? contentWidth : 0
+        })
     })
 
     afterEach(() => {
@@ -77,21 +75,15 @@ describe("TextMarquee layout measurements", () => {
 
         const marquee = view.container.querySelector<HTMLElement>(".ap-marquee")!
         expect(marquee.dataset.scroll).toBe("true")
-        expect(marquee.style.getPropertyValue("--ap-marquee-distance")).toBe(
-            "108px"
-        )
+        expect(marquee.style.getPropertyValue("--ap-marquee-distance")).toBe("108px")
 
         contentWidth = 401
         notifyResize()
-        expect(marquee.style.getPropertyValue("--ap-marquee-distance")).toBe(
-            "108px"
-        )
+        expect(marquee.style.getPropertyValue("--ap-marquee-distance")).toBe("108px")
 
         contentWidth = 402
         notifyResize()
-        expect(marquee.style.getPropertyValue("--ap-marquee-distance")).toBe(
-            "110px"
-        )
+        expect(marquee.style.getPropertyValue("--ap-marquee-distance")).toBe("110px")
     })
 
     it("re-evaluates the min-width gate when overflow stays unchanged", () => {
@@ -107,8 +99,6 @@ describe("TextMarquee layout measurements", () => {
         contentWidth = 301
         notifyResize()
         expect(marquee.dataset.scroll).toBe("true")
-        expect(marquee.style.getPropertyValue("--ap-marquee-distance")).toBe(
-            "108px"
-        )
+        expect(marquee.style.getPropertyValue("--ap-marquee-distance")).toBe("108px")
     })
 })

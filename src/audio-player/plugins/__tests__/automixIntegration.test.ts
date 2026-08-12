@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest"
-import {
-    AUTOMIX_PLUGIN_NAME,
-    hasAutomixPlugin,
-    withInternalAutomix,
-} from "../automixIntegration"
+import { AUTOMIX_PLUGIN_NAME, hasAutomixPlugin, withInternalAutomix } from "../automixIntegration"
 import { createAutomixPlugin } from "../AutomixPlugin"
 import type { AudioPlayerPlugin } from "../../core/plugins/PluginInterface"
 
@@ -29,21 +25,14 @@ describe("withInternalAutomix", () => {
         expect(result).toBe(external)
         expect(result).not.toContain(internalAutomix)
         // Exactly one automix controller in the resolved list.
-        expect(
-            result.filter((p) => p.name === AUTOMIX_PLUGIN_NAME)
-        ).toHaveLength(1)
+        expect(result.filter((p) => p.name === AUTOMIX_PLUGIN_NAME)).toHaveLength(1)
     })
 
     it("never produces more than one automix controller", () => {
-        const withExternal = withInternalAutomix(
-            [fakePlugin(AUTOMIX_PLUGIN_NAME)],
-            internalAutomix
-        )
+        const withExternal = withInternalAutomix([fakePlugin(AUTOMIX_PLUGIN_NAME)], internalAutomix)
         const withoutExternal = withInternalAutomix([], internalAutomix)
         for (const list of [withExternal, withoutExternal]) {
-            expect(
-                list.filter((p) => p.name === AUTOMIX_PLUGIN_NAME)
-            ).toHaveLength(1)
+            expect(list.filter((p) => p.name === AUTOMIX_PLUGIN_NAME)).toHaveLength(1)
         }
     })
 })

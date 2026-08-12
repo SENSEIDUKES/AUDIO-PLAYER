@@ -120,15 +120,11 @@ describe("QueueDrawer virtualization memoization", () => {
         const secondCall = listCalls[listCalls.length - 1]!
         expect(secondCall.itemData).toBe(firstCall.itemData)
         expect(secondCall.itemKey).toBe(firstCall.itemKey)
-        expect(secondCall.itemData.onPlayTrack).toBe(
-            firstCall.itemData.onPlayTrack
-        )
+        expect(secondCall.itemData.onPlayTrack).toBe(firstCall.itemData.onPlayTrack)
         expect(secondCall.itemData.onRemove).toBe(firstCall.itemData.onRemove)
 
         fireEvent.click(view.getByRole("button", { name: "Play Track 2" }))
-        fireEvent.click(
-            view.getByRole("button", { name: "Remove Track 2 from queue" })
-        )
+        fireEvent.click(view.getByRole("button", { name: "Remove Track 2 from queue" }))
 
         expect(onPlayTrack).toHaveBeenCalledWith(1)
         expect(onRemove).toHaveBeenCalledWith(1)

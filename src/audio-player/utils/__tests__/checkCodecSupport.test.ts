@@ -28,7 +28,7 @@ describe("checkCodecSupport", () => {
 
     it("returns true when canPlayType returns 'probably'", () => {
         const mockAudio = {
-            canPlayType: () => "probably"
+            canPlayType: () => "probably",
         } as unknown as HTMLAudioElement
         vi.spyOn(document, "createElement").mockReturnValue(mockAudio)
         expect(checkCodecSupport("audio/mpeg")).toBe(true)
@@ -36,7 +36,7 @@ describe("checkCodecSupport", () => {
 
     it("returns true when canPlayType returns 'maybe'", () => {
         const mockAudio = {
-            canPlayType: () => "maybe"
+            canPlayType: () => "maybe",
         } as unknown as HTMLAudioElement
         vi.spyOn(document, "createElement").mockReturnValue(mockAudio)
         expect(checkCodecSupport("audio/mpeg")).toBe(true)
@@ -44,7 +44,7 @@ describe("checkCodecSupport", () => {
 
     it("returns false when canPlayType returns '' (empty string)", () => {
         const mockAudio = {
-            canPlayType: () => ""
+            canPlayType: () => "",
         } as unknown as HTMLAudioElement
         vi.spyOn(document, "createElement").mockReturnValue(mockAudio)
         expect(checkCodecSupport("audio/mpeg")).toBe(false)
@@ -52,7 +52,7 @@ describe("checkCodecSupport", () => {
 
     it("returns false when canPlayType returns an unknown string", () => {
         const mockAudio = {
-            canPlayType: () => "unlikely"
+            canPlayType: () => "unlikely",
         } as unknown as HTMLAudioElement
         vi.spyOn(document, "createElement").mockReturnValue(mockAudio)
         expect(checkCodecSupport("audio/mpeg")).toBe(false)
@@ -61,7 +61,7 @@ describe("checkCodecSupport", () => {
     it("passes the correct mimeType to canPlayType", () => {
         const canPlayTypeMock = vi.fn().mockReturnValue("probably")
         const mockAudio = {
-            canPlayType: canPlayTypeMock
+            canPlayType: canPlayTypeMock,
         } as unknown as HTMLAudioElement
         vi.spyOn(document, "createElement").mockReturnValue(mockAudio)
         checkCodecSupport("audio/ogg")

@@ -52,39 +52,39 @@ const safeSessionStorage = {
         try {
             sessionStorage.removeItem(key)
         } catch {}
-    }
+    },
 }
 
-const KEY_NAME = "VITE_OPENROUTER_API_KEY";
+const KEY_NAME = "VITE_OPENROUTER_API_KEY"
 
 const getApiKey = (): string => {
     return (
         (typeof window !== "undefined" && (window as any)[KEY_NAME]) ||
         (typeof globalThis !== "undefined" && (globalThis as any).process?.env?.[KEY_NAME]) ||
         ""
-    );
-};
+    )
+}
 
 const PRESET_KEYS = {
     "demo-scout": "VITE_PRESET_DEMO_SCOUT",
     "studio-scout": "VITE_PRESET_STUDIO_SCOUT",
-    "memoir": "VITE_PRESET_MEMOIR",
-};
+    memoir: "VITE_PRESET_MEMOIR",
+}
 
 const getPresetValue = (v: AgentScoutVariant): string => {
-    const key = PRESET_KEYS[v];
+    const key = PRESET_KEYS[v]
     const fallback =
         v === "demo-scout"
             ? "@preset/sea-demo-scout-dev"
             : v === "studio-scout"
-            ? "@preset/sea-studio-scout-dev"
-            : "@preset/sea-demo-memoir-dev";
+              ? "@preset/sea-studio-scout-dev"
+              : "@preset/sea-demo-memoir-dev"
     return (
         (typeof window !== "undefined" && (window as any)[key]) ||
         (typeof globalThis !== "undefined" && (globalThis as any).process?.env?.[key]) ||
         fallback
-    );
-};
+    )
+}
 
 const getSystemPrompt = (variant: AgentScoutVariant, track: Track | null, queue: Track[]) => {
     const trackDetails = track
@@ -242,7 +242,9 @@ export function AgentScoutWorkspace({ variant }: { variant: AgentScoutVariant })
 
         const apiKey = getApiKey()
         if (!apiKey) {
-            setError("OpenRouter API key is missing. Please configure VITE_OPENROUTER_API_KEY in your .env.local file.")
+            setError(
+                "OpenRouter API key is missing. Please configure VITE_OPENROUTER_API_KEY in your .env.local file."
+            )
             return
         }
 
@@ -265,23 +267,22 @@ export function AgentScoutWorkspace({ variant }: { variant: AgentScoutVariant })
                 method: "POST",
                 signal: abortController.signal,
                 headers: {
-                    "Authorization": `Bearer ${apiKey}`,
+                    Authorization: `Bearer ${apiKey}`,
                     "Content-Type": "application/json",
                     "HTTP-Referer": "https://sap.seaportal.world",
                     "X-Title": "SEIHouse Audio Player",
                 },
                 body: JSON.stringify({
                     model: presetModel,
-                    messages: [
-                        { role: "system", content: systemPrompt },
-                        ...newMessages,
-                    ],
+                    messages: [{ role: "system", content: systemPrompt }, ...newMessages],
                 }),
             })
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}))
-                throw new Error(errorData?.error?.message || `HTTP ${response.status} from OpenRouter`)
+                throw new Error(
+                    errorData?.error?.message || `HTTP ${response.status} from OpenRouter`
+                )
             }
 
             const data = await response.json()
@@ -291,7 +292,10 @@ export function AgentScoutWorkspace({ variant }: { variant: AgentScoutVariant })
                 throw new Error("No response content received from agent.")
             }
 
-            const updatedMessages = [...newMessages, { role: "assistant" as const, content: assistantContent }]
+            const updatedMessages = [
+                ...newMessages,
+                { role: "assistant" as const, content: assistantContent },
+            ]
             setMessages(updatedMessages)
             safeSessionStorage.setItem(storageKey, JSON.stringify(updatedMessages))
         } catch (err: any) {
@@ -308,13 +312,16 @@ export function AgentScoutWorkspace({ variant }: { variant: AgentScoutVariant })
             variant === "demo-scout"
                 ? "Please scan this demo and tell me if it's worth finishing."
                 : variant === "studio-scout"
-                ? "Please perform a studio session mix analysis on this track."
-                : "Please write the historical memoir of this track's evolution."
+                  ? "Please perform a studio session mix analysis on this track."
+                  : "Please write the historical memoir of this track's evolution."
         void handleSendMessage(initialPrompt)
     }
 
     const clearChat = () => {
-        if (typeof window !== "undefined" && window.confirm("Are you sure you want to reset the chat?")) {
+        if (
+            typeof window !== "undefined" &&
+            window.confirm("Are you sure you want to reset the chat?")
+        ) {
             setMessages([])
             safeSessionStorage.removeItem(storageKey)
             setError(null)
@@ -366,8 +373,16 @@ export function AgentScoutWorkspace({ variant }: { variant: AgentScoutVariant })
                         {loading ? "Initializing..." : copy.actionLabel}
                     </button>
                     {!getApiKey() && (
-                        <p style={{ color: "#ef4444", fontSize: "12px", marginTop: "12px", opacity: 0.8 }}>
-                            API Key missing. Please set VITE_OPENROUTER_API_KEY in your .env.local file.
+                        <p
+                            style={{
+                                color: "#ef4444",
+                                fontSize: "12px",
+                                marginTop: "12px",
+                                opacity: 0.8,
+                            }}
+                        >
+                            API Key missing. Please set VITE_OPENROUTER_API_KEY in your .env.local
+                            file.
                         </p>
                     )}
                 </div>
@@ -421,7 +436,11 @@ export function AgentScoutWorkspace({ variant }: { variant: AgentScoutVariant })
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={(e) => {
-                                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                                if (
+                                    e.key === "Enter" &&
+                                    !e.shiftKey &&
+                                    !e.nativeEvent.isComposing
+                                ) {
                                     e.preventDefault()
                                     void handleSendMessage(input)
                                 }
@@ -448,4 +467,3 @@ export function AgentScoutWorkspace({ variant }: { variant: AgentScoutVariant })
 }
 
 export default AgentScoutWorkspace
-

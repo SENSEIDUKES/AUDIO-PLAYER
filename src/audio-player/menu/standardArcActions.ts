@@ -127,13 +127,9 @@ export function buildShareArcBranch(): ArcAction {
  * its paid Studio tier when entitled, else the free Demo tier. Memoir is
  * assistance and info (a narrated history of the track's vault versions).
  */
-export function buildAgentsArcBranch(
-    entitlements?: ArcMenuEntitlements
-): ArcAction {
+export function buildAgentsArcBranch(entitlements?: ArcMenuEntitlements): ArcAction {
     const scoutRoute: WorkspaceRoute =
-        entitlements?.studioScout === true
-            ? "agent:studio-scout"
-            : "agent:demo-scout"
+        entitlements?.studioScout === true ? "agent:studio-scout" : "agent:demo-scout"
     return {
         id: "agents",
         label: "Agents",
@@ -171,9 +167,7 @@ const PLUGIN_BUCKET_META = {
  * `"sei-canvas"`); like everything else it prunes away on hosts that don't
  * wire the canvas. Returns `null` when no bucket has any live leaf.
  */
-export function buildPluginsArcBranch(
-    activePluginIds: readonly string[] = []
-): ArcAction | null {
+export function buildPluginsArcBranch(activePluginIds: readonly string[] = []): ArcAction | null {
     const buckets: Record<"audio" | "visual" | "analytics", ArcAction[]> = {
         audio: [],
         visual: [],
@@ -199,9 +193,7 @@ export function buildPluginsArcBranch(
         icon: CanvasIcon,
         target: "sei-canvas",
     })
-    const children: ArcAction[] = (
-        ["audio", "visual", "analytics"] as const
-    ).flatMap((bucket) => {
+    const children: ArcAction[] = (["audio", "visual", "analytics"] as const).flatMap((bucket) => {
         if (buckets[bucket].length === 0) return []
         const meta = PLUGIN_BUCKET_META[bucket]
         return [

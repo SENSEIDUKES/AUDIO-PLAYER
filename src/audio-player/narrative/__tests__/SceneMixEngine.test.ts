@@ -14,11 +14,7 @@ vi.mock("../../automix/silenceAnalysis", () => ({
 
 type VolumeWriteBehavior = "normal" | "ignore" | "throw"
 type PlayBehavior =
-    | "resolve"
-    | "not-allowed"
-    | "reject"
-    | "throw"
-    | ((audio: FakeAudio) => Promise<void>)
+    "resolve" | "not-allowed" | "reject" | "throw" | ((audio: FakeAudio) => Promise<void>)
 
 /**
  * Minimal Audio stand-in: enough surface for SceneMixEngine's deck lifecycle,
@@ -83,11 +79,9 @@ class FakeAudio {
         if (signal?.aborted) return
         if (!this.listeners.has(type)) this.listeners.set(type, new Set())
         this.listeners.get(type)!.add(cb)
-        signal?.addEventListener(
-            "abort",
-            () => this.listeners.get(type)?.delete(cb),
-            { once: true }
-        )
+        signal?.addEventListener("abort", () => this.listeners.get(type)?.delete(cb), {
+            once: true,
+        })
     }
 
     removeEventListener(type: string, cb: EventListener): void {
@@ -138,9 +132,24 @@ class FakeAudio {
     }
 }
 
-const TRACK: Track = { id: "SCENE_1", title: "Scene 1", artist: "t", audioFile: "https://cdn.example/score.mp3" }
-const TRACK_2: Track = { id: "SCENE_2", title: "Scene 2", artist: "t", audioFile: "https://cdn.example/score-2.mp3" }
-const TRACK_3: Track = { id: "SCENE_3", title: "Scene 3", artist: "t", audioFile: "https://cdn.example/score-3.mp3" }
+const TRACK: Track = {
+    id: "SCENE_1",
+    title: "Scene 1",
+    artist: "t",
+    audioFile: "https://cdn.example/score.mp3",
+}
+const TRACK_2: Track = {
+    id: "SCENE_2",
+    title: "Scene 2",
+    artist: "t",
+    audioFile: "https://cdn.example/score-2.mp3",
+}
+const TRACK_3: Track = {
+    id: "SCENE_3",
+    title: "Scene 3",
+    artist: "t",
+    audioFile: "https://cdn.example/score-3.mp3",
+}
 const FALLBACK_TRACK: Track = {
     id: "SCENE_FALLBACK",
     title: "Fallback scene",
@@ -220,10 +229,7 @@ describe("SceneMixEngine", () => {
         expect(Object.isFrozen(snapshots[0])).toBe(true)
 
         mix.crossfadeTo(TRACK)
-        expect(snapshots.map((snapshot) => snapshot.state)).toEqual([
-            "idle",
-            "loading",
-        ])
+        expect(snapshots.map((snapshot) => snapshot.state)).toEqual(["idle", "loading"])
         expect(snapshots[1]).toMatchObject({
             requestedTrackKey: "id:SCENE_1",
             audibleTrackKey: null,
@@ -232,11 +238,7 @@ describe("SceneMixEngine", () => {
 
         pendingPlay.resolve()
         await flushMicrotasks()
-        expect(snapshots.map((snapshot) => snapshot.state)).toEqual([
-            "idle",
-            "loading",
-            "playing",
-        ])
+        expect(snapshots.map((snapshot) => snapshot.state)).toEqual(["idle", "loading", "playing"])
         expect(snapshots[2]).toMatchObject({
             requestedTrackKey: "id:SCENE_1",
             audibleTrackKey: "id:SCENE_1",
@@ -256,11 +258,7 @@ describe("SceneMixEngine", () => {
         })
 
         expect(() => mix.crossfadeTo(TRACK)).not.toThrow()
-        expect(snapshots.map((snapshot) => snapshot.state)).toEqual([
-            "idle",
-            "loading",
-            "failed",
-        ])
+        expect(snapshots.map((snapshot) => snapshot.state)).toEqual(["idle", "loading", "failed"])
         expect(snapshots[2]).toMatchObject({
             requestedTrackKey: "id:SCENE_1",
             audibleTrackKey: null,
@@ -320,10 +318,7 @@ describe("SceneMixEngine", () => {
         mix.stop(0)
         mix.dispose()
 
-        expect(snapshots.map((snapshot) => snapshot.state)).toEqual([
-            "playing",
-            "stopped",
-        ])
+        expect(snapshots.map((snapshot) => snapshot.state)).toEqual(["playing", "stopped"])
         expect(stoppedSnapshot).toMatchObject({
             requestedTrackKey: null,
             audibleTrackKey: null,
@@ -564,9 +559,7 @@ describe("SceneMixEngine", () => {
             audibleTrackKey: "id:SCENE_1",
             failure: null,
         })
-        expect(snapshots.some((snapshot) => snapshot.state === "failed")).toBe(
-            false
-        )
+        expect(snapshots.some((snapshot) => snapshot.state === "failed")).toBe(false)
 
         delayedC.resolve()
         await flushMicrotasks()
@@ -617,10 +610,7 @@ describe("SceneMixEngine", () => {
         expect(pending.pauseCalls).toBeGreaterThan(0)
         expect(pending.playCalls).toBe(1)
         expect(mix.getCurrentTrackKey()).toBeNull()
-        expect(snapshots.map((snapshot) => snapshot.state)).toEqual([
-            "autoplay-blocked",
-            "stopped",
-        ])
+        expect(snapshots.map((snapshot) => snapshot.state)).toEqual(["autoplay-blocked", "stopped"])
         expect(mix.getStatusSnapshot()).toMatchObject({
             state: "stopped",
             requestedTrackKey: null,
@@ -721,11 +711,7 @@ describe("SceneMixEngine", () => {
             "",
             "http://localhost:3000/chain/working.mp3",
         ])
-        expect(fallbackEvents.map((event) => event.error)).toEqual([
-            "network",
-            "decode",
-            "decode",
-        ])
+        expect(fallbackEvents.map((event) => event.error)).toEqual(["network", "decode", "decode"])
         expect(mix.getCurrentTrackKey()).toBe("id:FAILURE_CHAIN")
 
         const settledSnapshot = mix.getStatusSnapshot()
@@ -755,9 +741,7 @@ describe("SceneMixEngine", () => {
         expect(mix.getStatusSnapshot().state).toBe("autoplay-blocked")
 
         FakeAudio.playBehavior = (audio) =>
-            audio === primary
-                ? Promise.reject(new Error("retry failed"))
-                : Promise.resolve()
+            audio === primary ? Promise.reject(new Error("retry failed")) : Promise.resolve()
         document.dispatchEvent(new Event("pointerdown"))
         await flushMicrotasks()
 
@@ -853,9 +837,7 @@ describe("SceneMixEngine", () => {
         const fallbackPlay = deferred()
         const fallbackEvents: FallbackSourceEvent[] = []
         FakeAudio.playBehavior = (audio) =>
-            audio.src.endsWith("/scene/primary.webm")
-                ? primaryPlay.promise
-                : fallbackPlay.promise
+            audio.src.endsWith("/scene/primary.webm") ? primaryPlay.promise : fallbackPlay.promise
         const mix = createSceneMixEngine({
             onFallbackSource: (event) => fallbackEvents.push(event),
         })
@@ -948,7 +930,7 @@ describe("SceneMixEngine", () => {
         await flushMicrotasks()
 
         expect(analysisMocks.ensureSourceAnalysis).toHaveBeenCalledWith(
-            "https://cdn.example/score.mp3",
+            "https://cdn.example/score.mp3"
         )
         expect(deck.currentTime).toBe(1.5)
         pendingPlay.resolve()
@@ -1005,14 +987,10 @@ describe("SceneMixEngine", () => {
         const primaryPlay = deferred()
         const fallbackPlay = deferred()
         analysisMocks.ensureSourceAnalysis.mockImplementation((url: string) =>
-            url.endsWith("/scene/primary.webm")
-                ? primaryAnalysis.promise
-                : fallbackAnalysis.promise,
+            url.endsWith("/scene/primary.webm") ? primaryAnalysis.promise : fallbackAnalysis.promise
         )
         FakeAudio.playBehavior = (audio) =>
-            audio.src.endsWith("/scene/primary.webm")
-                ? primaryPlay.promise
-                : fallbackPlay.promise
+            audio.src.endsWith("/scene/primary.webm") ? primaryPlay.promise : fallbackPlay.promise
         const mix = createSceneMixEngine()
 
         mix.crossfadeTo(FALLBACK_TRACK)
@@ -1053,7 +1031,7 @@ describe("SceneMixEngine", () => {
         const stalePlay = deferred()
         const currentPlay = deferred()
         analysisMocks.ensureSourceAnalysis.mockImplementation((url: string) =>
-            url.endsWith("score-2.mp3") ? staleAnalysis.promise : currentAnalysis.promise,
+            url.endsWith("score-2.mp3") ? staleAnalysis.promise : currentAnalysis.promise
         )
         FakeAudio.playBehavior = (audio) =>
             audio.src.endsWith("score-2.mp3") ? stalePlay.promise : currentPlay.promise

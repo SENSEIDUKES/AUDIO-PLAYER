@@ -16,13 +16,9 @@ export const AUTOMIX_PLUGIN_NAME = "automix"
  * `"registry-automix"`. The canonical-name check is a defensive fallback for
  * automix-equivalent plugins that aren't `AutomixPlugin` instances.
  */
-export function hasAutomixPlugin(
-    plugins: readonly AudioPlayerPlugin[]
-): boolean {
+export function hasAutomixPlugin(plugins: readonly AudioPlayerPlugin[]): boolean {
     return plugins.some(
-        (plugin) =>
-            plugin instanceof AutomixPlugin ||
-            plugin.name === AUTOMIX_PLUGIN_NAME
+        (plugin) => plugin instanceof AutomixPlugin || plugin.name === AUTOMIX_PLUGIN_NAME
     )
 }
 
@@ -39,7 +35,5 @@ export function withInternalAutomix(
     externalPlugins: readonly AudioPlayerPlugin[],
     internal: AudioPlayerPlugin
 ): readonly AudioPlayerPlugin[] {
-    return hasAutomixPlugin(externalPlugins)
-        ? externalPlugins
-        : [...externalPlugins, internal]
+    return hasAutomixPlugin(externalPlugins) ? externalPlugins : [...externalPlugins, internal]
 }

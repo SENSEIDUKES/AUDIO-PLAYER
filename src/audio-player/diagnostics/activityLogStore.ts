@@ -20,9 +20,7 @@ import { DEFAULT_ACTIVITY_LOG_CONFIG } from "./activityTypes"
 
 /** Create a standalone activity log store. Callers can create multiple stores
  *  (e.g. one for a session, one for a plugin) or share a single global one. */
-export function createActivityLogStore(
-    config?: Partial<ActivityLogConfig>
-): ActivityLogApi {
+export function createActivityLogStore(config?: Partial<ActivityLogConfig>): ActivityLogApi {
     const { maxEntries } = { ...DEFAULT_ACTIVITY_LOG_CONFIG, ...config }
     const buffer: ActivityEvent[] = []
     let nextId = 1
@@ -71,10 +69,7 @@ export function createActivityLogStore(
     /** Export as plain text — one line per event, newest first. */
     function exportText(): string {
         try {
-            return [...buffer]
-                .reverse()
-                .map(formatLine)
-                .join("\n")
+            return [...buffer].reverse().map(formatLine).join("\n")
         } catch {
             return ""
         }
@@ -126,18 +121,11 @@ const VALID_AREAS = new Set<ActivityArea>([
     "system",
 ])
 
-const VALID_STATUSES = new Set<ActivityStatus>([
-    "info",
-    "warn",
-    "error",
-    "success",
-])
+const VALID_STATUSES = new Set<ActivityStatus>(["info", "warn", "error", "success"])
 
 function normalizeEntry(entry: ActivityLogEntry): ActivityLogEntry {
     const candidate =
-        entry != null && typeof entry === "object"
-            ? (entry as Partial<ActivityLogEntry>)
-            : {}
+        entry != null && typeof entry === "object" ? (entry as Partial<ActivityLogEntry>) : {}
     return {
         area: VALID_AREAS.has(candidate.area as ActivityArea)
             ? (candidate.area as ActivityArea)

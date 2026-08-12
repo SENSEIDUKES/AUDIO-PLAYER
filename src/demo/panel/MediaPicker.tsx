@@ -39,10 +39,7 @@ export function MediaPicker({
     return (
         <div className="ws-media">
             <div className="ws-media__top">
-                <div
-                    className="ws-media__thumb"
-                    data-empty={hasAsset ? "false" : "true"}
-                >
+                <div className="ws-media__thumb" data-empty={hasAsset ? "false" : "true"}>
                     {hasAsset && kind === "video" ? (
                         <video
                             className="ws-media__thumb-el"
@@ -67,9 +64,7 @@ export function MediaPicker({
                 </div>
                 <div className="ws-media__meta">
                     <div className="ws-media__label">{label}</div>
-                    {description && (
-                        <div className="ws-media__desc">{description}</div>
-                    )}
+                    {description && <div className="ws-media__desc">{description}</div>}
                     <div className="ws-media__kind" role="group" aria-label={`${label} type`}>
                         <button
                             type="button"
@@ -119,18 +114,14 @@ export function MediaPicker({
                 <button
                     type="button"
                     className="framer-panel__preset"
-                    onClick={() =>
-                        onChange({ kind: "image", src: IMAGE_PRESET })
-                    }
+                    onClick={() => onChange({ kind: "image", src: IMAGE_PRESET })}
                 >
                     Sample image
                 </button>
                 <button
                     type="button"
                     className="framer-panel__preset"
-                    onClick={() =>
-                        onChange({ kind: "video", src: VIDEO_PRESET })
-                    }
+                    onClick={() => onChange({ kind: "video", src: VIDEO_PRESET })}
                 >
                     Sample video
                 </button>

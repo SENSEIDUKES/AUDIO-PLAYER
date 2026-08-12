@@ -15,9 +15,9 @@ export function slugify(name) {
     return name
         .trim()
         .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, "")   // strip non-alnum (except space/dash)
-        .replace(/[\s-]+/g, "-")          // collapse whitespace/dashes
-        .replace(/^-+|-+$/g, "")          // trim leading/trailing dashes
+        .replace(/[^a-z0-9\s-]/g, "") // strip non-alnum (except space/dash)
+        .replace(/[\s-]+/g, "-") // collapse whitespace/dashes
+        .replace(/^-+|-+$/g, "") // trim leading/trailing dashes
 }
 
 /**

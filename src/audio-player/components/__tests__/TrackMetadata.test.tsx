@@ -29,9 +29,7 @@ describe("TrackMetadata", () => {
     }
 
     it("renders the full hierarchy with version, badge, featured and album", () => {
-        const html = render(
-            <TrackMetadata track={full} variant="hero" showTertiary />
-        )
+        const html = render(<TrackMetadata track={full} variant="hero" showTertiary />)
         expect(html).toContain("Midnight (Extended Mix)")
         expect(html).toContain("ap-explicit-badge")
         expect(html).toContain("Aurora")
@@ -43,9 +41,7 @@ describe("TrackMetadata", () => {
     })
 
     it("renders minimal metadata without optional pieces", () => {
-        const html = render(
-            <TrackMetadata track={{ title: "Solo", artist: "Nobody" }} />
-        )
+        const html = render(<TrackMetadata track={{ title: "Solo", artist: "Nobody" }} />)
         expect(html).toContain("Solo")
         expect(html).toContain("Nobody")
         expect(html).not.toContain("ap-explicit-badge")
@@ -70,9 +66,7 @@ describe("TrackMetadata", () => {
     })
 
     it("wraps the title in a marquee when enabled", () => {
-        const html = render(
-            <TrackMetadata track={{ title: "Long", artist: "A" }} enableMarquee />
-        )
+        const html = render(<TrackMetadata track={{ title: "Long", artist: "A" }} enableMarquee />)
         expect(html).toContain("ap-marquee")
     })
 })

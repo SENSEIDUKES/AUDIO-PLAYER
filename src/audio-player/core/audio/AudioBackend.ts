@@ -43,11 +43,7 @@ export type AudioBackendEvent =
  * so both backends can drive the same user-facing error messages.
  */
 export type AudioBackendErrorCode =
-    | "aborted"
-    | "network"
-    | "decode"
-    | "src-not-supported"
-    | "unknown"
+    "aborted" | "network" | "decode" | "src-not-supported" | "unknown"
 
 /** What a backend can and cannot do, for consumers picking a backend. */
 export interface AudioBackendCapabilities {

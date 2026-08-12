@@ -47,20 +47,14 @@ function isValidRepeatMode(mode: any): mode is RepeatMode {
 
 function sanitizeCurrentIndex(value: unknown, queueLength: number): number {
     if (queueLength === 0) return -1
-    if (
-        typeof value !== "number" ||
-        !Number.isFinite(value) ||
-        !Number.isInteger(value)
-    ) {
+    if (typeof value !== "number" || !Number.isFinite(value) || !Number.isInteger(value)) {
         return 0
     }
     return Math.min(Math.max(value, 0), queueLength - 1)
 }
 
 function sanitizeCurrentTime(value: unknown): number {
-    return typeof value === "number" && Number.isFinite(value) && value >= 0
-        ? value
-        : 0
+    return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0
 }
 
 function sanitizeTimestamp(value: unknown): number {
@@ -81,10 +75,7 @@ export function deserializeSession(
     const session = data as Partial<SerializedSession>
     const timestamp = sanitizeTimestamp(session.timestamp)
 
-    if (
-        options?.maxAgeMs !== undefined &&
-        Date.now() - timestamp > options.maxAgeMs
-    ) {
+    if (options?.maxAgeMs !== undefined && Date.now() - timestamp > options.maxAgeMs) {
         return null
     }
 
@@ -95,7 +86,7 @@ export function deserializeSession(
     for (const item of session.queue) {
         if (isValidTrack(item)) {
             const track = { ...item }
-            
+
             if (options?.urlTransformer) {
                 if (track.audioFile) {
                     track.audioFile = options.urlTransformer(track.audioFile)

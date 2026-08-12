@@ -121,9 +121,7 @@ export function useNarrativeAudio(
     // Tracks the manifest src currently loaded so we only reload on change.
     const loadedSrcRef = useRef<string | null>(null)
 
-    const [ambienceVolume, setAmbienceVolumeState] = useState(
-        clamp01(ambienceVolumeProp)
-    )
+    const [ambienceVolume, setAmbienceVolumeState] = useState(clamp01(ambienceVolumeProp))
 
     // Keep local ambience level in sync when the host drives it via props, so it
     // behaves like the narration volume passthrough below (host wins on change).
@@ -139,11 +137,8 @@ export function useNarrativeAudio(
     // Effective levels factor in the global intensity dial.
     const targetAmbience = clamp01(ambienceVolume * clamp01(intensity))
     const isNarrating =
-        narrationState === "playing" ||
-        (narrationState === undefined && session.isPlaying)
-    const duckedAmbience = clamp01(
-        targetAmbience * (1 - clamp01(duckAmount) * clamp01(intensity))
-    )
+        narrationState === "playing" || (narrationState === undefined && session.isPlaying)
+    const duckedAmbience = clamp01(targetAmbience * (1 - clamp01(duckAmount) * clamp01(intensity)))
     const liveAmbienceTarget = isNarrating ? duckedAmbience : targetAmbience
 
     // ---- Ambience manifest load + profile crossfade ----------------------
@@ -264,8 +259,7 @@ export function useNarrativeAudio(
         [session]
     )
 
-    const hasAmbience =
-        Boolean(ambienceManifest?.src?.trim()) && Boolean(ambientProfile)
+    const hasAmbience = Boolean(ambienceManifest?.src?.trim()) && Boolean(ambientProfile)
     const indicatorState: SoundscapeIndicatorState = isNarrating
         ? "narrating"
         : hasAmbience

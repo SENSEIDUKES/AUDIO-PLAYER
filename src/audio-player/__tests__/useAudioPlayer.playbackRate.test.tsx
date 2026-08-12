@@ -12,7 +12,10 @@ describe("useAudioPlayer playback rate", () => {
     })
 
     it("exposes a sanitized rate and preserves it through playback, seek, fallback, and track changes", async () => {
-        vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1))
+        vi.stubGlobal(
+            "requestAnimationFrame",
+            vi.fn(() => 1)
+        )
         vi.stubGlobal("cancelAnimationFrame", vi.fn())
         vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {})
         vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(function (
@@ -99,12 +102,7 @@ describe("useAudioPlayer playback rate", () => {
         expect(audio.playbackRate).toBe(1.75)
 
         await React.act(async () => {
-            root.render(
-                <Harness
-                    sourceKey="track-b"
-                    sources={[{ url: "track-b.mp3" }]}
-                />
-            )
+            root.render(<Harness sourceKey="track-b" sources={[{ url: "track-b.mp3" }]} />)
         })
         expect(engine!.currentSrc).toBe("track-b.mp3")
         expect(engine!.playbackRate).toBe(1.75)

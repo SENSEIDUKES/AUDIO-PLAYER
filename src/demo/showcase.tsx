@@ -201,23 +201,19 @@ function FaceCard({
 /* Top-of-page explainer: the two families and what each is for. */
 function FamilyExplainer() {
     return (
-        <section
-            className="showcase-families-section"
-            aria-labelledby="showcase-families-title"
-        >
+        <section className="showcase-families-section" aria-labelledby="showcase-families-title">
             <header className="showcase-gallery-head">
                 <h2 id="showcase-families-title">Two player families</h2>
                 <p>
-                    Every SEIHouse player face belongs to one of two families.
-                    Same shared engine — different jobs.
+                    Every SEIHouse player face belongs to one of two families. Same shared engine —
+                    different jobs.
                 </p>
             </header>
             <div className="showcase-families">
                 <article className="showcase-family showcase-family--primary">
                     <span className="showcase-family__badge">PrimaryPlayer</span>
                     <p className="showcase-family__role">
-                        Full release experiences — rich artwork, metadata,
-                        SEICanvas, and waveform.
+                        Full release experiences — rich artwork, metadata, SEICanvas, and waveform.
                     </p>
                     <ul className="showcase-family__list">
                         <li>
@@ -233,8 +229,8 @@ function FamilyExplainer() {
                 <article className="showcase-family showcase-family--compact">
                     <span className="showcase-family__badge">CompactPlayer</span>
                     <p className="showcase-family__role">
-                        Utility playback surfaces — minimal and fast, synced to
-                        the StickyBottom master transport.
+                        Utility playback surfaces — minimal and fast, synced to the StickyBottom
+                        master transport.
                     </p>
                     <ul className="showcase-family__list">
                         <li>MiniSidebar</li>
@@ -261,22 +257,28 @@ export function Showcase() {
         <main className="product-preview" aria-labelledby="showcase-title">
             <section className="product-preview__hero">
                 <div className="product-preview__copy">
-                    <div className="product-preview__pill">Featured release · Portable AudioPlayer</div>
+                    <div className="product-preview__pill">
+                        Featured release · Portable AudioPlayer
+                    </div>
                     <h1 id="showcase-title" className="product-preview__title">
                         One playback layer, two player families.
                     </h1>
                     <p className="product-preview__lede">
-                        The same SEIHouse player engine powers the Vault, SEA
-                        cards, album worlds, artist pages, and Vault Radio.
-                        This page shows both families working cleanly — the
-                        portable full player below, then the PrimaryPlayer and
-                        CompactPlayer galleries all playing{" "}
-                        <strong>No Luck</strong> by SENSEI.
+                        The same SEIHouse player engine powers the Vault, SEA cards, album worlds,
+                        artist pages, and Vault Radio. This page shows both families working cleanly
+                        — the portable full player below, then the PrimaryPlayer and CompactPlayer
+                        galleries all playing <strong>No Luck</strong> by SENSEI.
                     </p>
                     <div className="product-preview__metrics" aria-label="Release highlights">
-                        <span><strong>6</strong> tracks</span>
-                        <span><strong>2025</strong> release</span>
-                        <span><strong>SENSEI</strong> · No Luck</span>
+                        <span>
+                            <strong>6</strong> tracks
+                        </span>
+                        <span>
+                            <strong>2025</strong> release
+                        </span>
+                        <span>
+                            <strong>SENSEI</strong> · No Luck
+                        </span>
                     </div>
                 </div>
 
@@ -320,10 +322,9 @@ export function Showcase() {
                     <header className="showcase-gallery-head">
                         <h2 id="showcase-primary-title">PrimaryPlayer family</h2>
                         <p>
-                            Rich, full release surfaces. They carry artwork,
-                            metadata, the SEICanvas, and the interactive waveform
-                            scrubber. The portable full player is the release
-                            player in the hero above.
+                            Rich, full release surfaces. They carry artwork, metadata, the
+                            SEICanvas, and the interactive waveform scrubber. The portable full
+                            player is the release player in the hero above.
                         </p>
                     </header>
                     <div className="showcase-gallery">
@@ -352,10 +353,9 @@ export function Showcase() {
                     <header className="showcase-gallery-head">
                         <h2 id="showcase-compact-title">CompactPlayer family</h2>
                         <p>
-                            Small utility surfaces. They stay minimal — no
-                            per-face scrubbers. StickyBottom is the shared
-                            compact master transport that owns the scrubber for
-                            the whole family.
+                            Small utility surfaces. They stay minimal — no per-face scrubbers.
+                            StickyBottom is the shared compact master transport that owns the
+                            scrubber for the whole family.
                         </p>
                     </header>
                     <div className="showcase-gallery">
@@ -390,17 +390,26 @@ export function Showcase() {
                 <article>
                     <span>01</span>
                     <h2>Two families, one engine</h2>
-                    <p>PrimaryPlayer carries the full release experience; CompactPlayer stays minimal. Both are the production components that ship to SEIHouse surfaces.</p>
+                    <p>
+                        PrimaryPlayer carries the full release experience; CompactPlayer stays
+                        minimal. Both are the production components that ship to SEIHouse surfaces.
+                    </p>
                 </article>
                 <article>
                     <span>02</span>
                     <h2>One shared session</h2>
-                    <p>Both galleries run on a single AudioSessionProvider, so the SEA cards, mini sidebar, Vault rows, and the StickyBottom master all mirror one queue.</p>
+                    <p>
+                        Both galleries run on a single AudioSessionProvider, so the SEA cards, mini
+                        sidebar, Vault rows, and the StickyBottom master all mirror one queue.
+                    </p>
                 </article>
                 <article>
                     <span>03</span>
                     <h2>Test &amp; customize</h2>
-                    <p>Switch to Lab for QA, broken states, backends, and plugin coverage — or to Workshop to restyle a face and save presets.</p>
+                    <p>
+                        Switch to Lab for QA, broken states, backends, and plugin coverage — or to
+                        Workshop to restyle a face and save presets.
+                    </p>
                 </article>
             </section>
         </main>

@@ -63,9 +63,7 @@ describe("per-face applicability", () => {
         for (const face of MAJOR_FACES) {
             const ids = getPropertiesForFace(face).map((d) => d.id)
             // at least one media property (background or art)
-            expect(
-                ids.includes("backgroundMedia") || ids.includes("artMedia")
-            ).toBe(true)
+            expect(ids.includes("backgroundMedia") || ids.includes("artMedia")).toBe(true)
             // typography
             expect(ids).toContain("titleFont")
             expect(ids).toContain("artistFont")
@@ -94,9 +92,7 @@ describe("grouping", () => {
     it("partitions a face's properties across the four sections", () => {
         const face: PlayerFace = "portable"
         const all = getPropertiesForFace(face)
-        const grouped = PROPERTY_GROUPS.flatMap((g) =>
-            getPropertiesForGroup(face, g)
-        )
+        const grouped = PROPERTY_GROUPS.flatMap((g) => getPropertiesForGroup(face, g))
         expect(grouped.length).toBe(all.length)
     })
 })

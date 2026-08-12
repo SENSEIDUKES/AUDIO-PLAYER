@@ -4,10 +4,7 @@ import type { AudioPlayerTheme } from "../types"
 import type { AudioSpriteManifest } from "../core/audio/AudioSpriteEngine"
 import { useAudioSession } from "../session/AudioSessionContext"
 import { VolumeControl } from "../components/VolumeControl"
-import {
-    useNarrativeAudio,
-    type NarrationState,
-} from "../narrative/useNarrativeAudio"
+import { useNarrativeAudio, type NarrationState } from "../narrative/useNarrativeAudio"
 import { buildThemeVars } from "./themeVars"
 import { PauseIcon, PlayIcon, SpinnerIcon, DotsIcon } from "./icons"
 import "./skins.css"
@@ -136,13 +133,7 @@ export function NarrativeFace({
                           : "Play narration"
                 }
             >
-                {showSpinner ? (
-                    <SpinnerIcon />
-                ) : narrative.isPlaying ? (
-                    <PauseIcon />
-                ) : (
-                    <PlayIcon />
-                )}
+                {showSpinner ? <SpinnerIcon /> : narrative.isPlaying ? <PauseIcon /> : <PlayIcon />}
             </button>
 
             {/* Narration level + mute (the reused VolumeControl bundles both). */}

@@ -1,18 +1,9 @@
-import type {
-    AudioPlayerPlugin,
-    PluginPlayerContext,
-} from "../core/plugins/PluginInterface"
+import type { AudioPlayerPlugin, PluginPlayerContext } from "../core/plugins/PluginInterface"
 import type { Track } from "../types"
 import { AnalyticsPluginConfigSchema, validateConfig } from "./configValidators"
 
 export type AnalyticsEventType =
-    | "track_load"
-    | "play"
-    | "pause"
-    | "stop"
-    | "seek"
-    | "time_update"
-    | "track_ended"
+    "track_load" | "play" | "pause" | "stop" | "seek" | "time_update" | "track_ended"
 
 export interface AnalyticsEventPayload {
     type: AnalyticsEventType

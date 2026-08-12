@@ -4,10 +4,7 @@ import type { AudioPlayerTheme, Track } from "../types"
 import { useAudioSession } from "../session/AudioSessionContext"
 import { ExplicitBadge } from "../components/TrackMetadata"
 import { AudioTimeText } from "../components/AudioTimeText"
-import {
-    formatSecondaryLine,
-    formatVersionedTitle,
-} from "../utils/formatMetadata"
+import { formatSecondaryLine, formatVersionedTitle } from "../utils/formatMetadata"
 import { trackKey } from "../utils/trackKey"
 import { faceSupportsAction } from "../surfaces/faceCapabilities"
 import { ArcActionButton } from "../surfaces/ArcActionButton"
@@ -113,9 +110,7 @@ export function VaultRowPlayer({
             className={`ap-vr${isActive ? " ap-vr--active" : ""}${className ? ` ${className}` : ""}`}
             style={{
                 ...buildThemeVars(theme),
-                ...(category
-                    ? ({ "--ap-vault-accent": category.color } as CSSProperties)
-                    : {}),
+                ...(category ? ({ "--ap-vault-accent": category.color } as CSSProperties) : {}),
                 ...style,
             }}
             data-vault-category={track.vaultCategory}
@@ -149,18 +144,11 @@ export function VaultRowPlayer({
                     {formatVersionedTitle(track.title, track.versionLabel)}
                     {track.explicit && <ExplicitBadge />}
                 </span>
-                <span
-                    className="ap-vr__artist"
-                    title={formatSecondaryLine(track)}
-                >
+                <span className="ap-vr__artist" title={formatSecondaryLine(track)}>
                     {category && (
-                        <span className="ap-vr__chip ap-vr__chip--inline">
-                            {category.label}
-                        </span>
+                        <span className="ap-vr__chip ap-vr__chip--inline">{category.label}</span>
                     )}
-                    <span className="ap-vr__artist-text">
-                        {formatSecondaryLine(track)}
-                    </span>
+                    <span className="ap-vr__artist-text">{formatSecondaryLine(track)}</span>
                 </span>
             </div>
             {isActive && (
@@ -170,7 +158,9 @@ export function VaultRowPlayer({
             )}
             {isPlayingThis && (
                 <span className="ap-eq" aria-hidden="true">
-                    <i /><i /><i />
+                    <i />
+                    <i />
+                    <i />
                 </span>
             )}
             {showAction && (

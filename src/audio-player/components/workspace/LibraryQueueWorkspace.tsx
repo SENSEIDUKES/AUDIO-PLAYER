@@ -6,8 +6,7 @@ export function LibraryQueueWorkspace() {
         <div className="sap-ctl__workspace-empty">
             <p className="sap-ctl__workspace-lead">Up Next</p>
             <p className="sap-ctl__workspace-sub">
-                An in-workspace view of the play queue is on the way. Use the
-                queue drawer for now.
+                An in-workspace view of the play queue is on the way. Use the queue drawer for now.
             </p>
         </div>
     )

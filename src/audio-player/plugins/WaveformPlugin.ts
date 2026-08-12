@@ -1,7 +1,4 @@
-import type {
-    AudioPlayerPlugin,
-    PluginPlayerContext,
-} from "../core/plugins/PluginInterface"
+import type { AudioPlayerPlugin, PluginPlayerContext } from "../core/plugins/PluginInterface"
 import type { Track } from "../types"
 import { computePeaksFromUrl } from "../core/waveform/peaks"
 import { getPrimaryTrackSource } from "../utils/sources"
@@ -66,8 +63,6 @@ export class WaveformPlugin implements AudioPlayerPlugin {
 }
 
 /** Factory mirroring the other registry plugins (fresh instance per install). */
-export function createWaveformPlugin(
-    config: WaveformPluginConfig = {}
-): AudioPlayerPlugin {
+export function createWaveformPlugin(config: WaveformPluginConfig = {}): AudioPlayerPlugin {
     return new WaveformPlugin(config)
 }

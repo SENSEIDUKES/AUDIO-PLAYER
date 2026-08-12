@@ -1,35 +1,13 @@
-import {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-} from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import type { ReactNode } from "react"
 import type { AudioPlayerPlugin } from "../../core/plugins/PluginInterface"
-import {
-    createAnalyticsPlugin,
-} from "../AnalyticsPlugin"
-import {
-    createKeyboardShortcutPlugin,
-} from "../KeyboardShortcutPlugin"
-import {
-    createLyricsPlugin,
-} from "../LyricsPlugin"
-import {
-    createSleepTimerPlugin,
-} from "../SleepTimerPlugin"
-import {
-    createAutomixPlugin,
-} from "../AutomixPlugin"
-import {
-    createAutoThemePlugin,
-} from "../AutoThemePlugin"
-import {
-    createWaveformPlugin,
-} from "../WaveformPlugin"
+import { createAnalyticsPlugin } from "../AnalyticsPlugin"
+import { createKeyboardShortcutPlugin } from "../KeyboardShortcutPlugin"
+import { createLyricsPlugin } from "../LyricsPlugin"
+import { createSleepTimerPlugin } from "../SleepTimerPlugin"
+import { createAutomixPlugin } from "../AutomixPlugin"
+import { createAutoThemePlugin } from "../AutoThemePlugin"
+import { createWaveformPlugin } from "../WaveformPlugin"
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -86,8 +64,8 @@ const availablePlugins: PluginRegistryEntry[] = [
         id: "keyboard-shortcuts",
         label: "Keyboard Shortcuts",
         description:
-            "Space/J/K/L/N/P keyboard controls scoped to the player root. "
-            + "Conflicts with the player's built-in key handler are suppressed.",
+            "Space/J/K/L/N/P keyboard controls scoped to the player root. " +
+            "Conflicts with the player's built-in key handler are suppressed.",
         factory: () =>
             createKeyboardShortcutPlugin({
                 name: "registry-keyboard-shortcuts",
@@ -108,12 +86,14 @@ const availablePlugins: PluginRegistryEntry[] = [
                 includeTimeUpdates: false,
                 send: (event) => {
                     if (typeof console !== "undefined") {
-                        console.table([{
-                            type: event.type,
-                            track: event.track?.title ?? "(none)",
-                            position: event.position.toFixed(1),
-                            duration: event.duration.toFixed(1),
-                        }])
+                        console.table([
+                            {
+                                type: event.type,
+                                track: event.track?.title ?? "(none)",
+                                position: event.position.toFixed(1),
+                                duration: event.duration.toFixed(1),
+                            },
+                        ])
                     }
                 },
             }),
@@ -146,8 +126,7 @@ const availablePlugins: PluginRegistryEntry[] = [
         description:
             "Adds a sleep-timer dropdown to the player root. " +
             "Supports 15/30/45/60-minute counts and end-of-track.",
-        factory: () =>
-            createSleepTimerPlugin({ name: "registry-sleep-timer" }),
+        factory: () => createSleepTimerPlugin({ name: "registry-sleep-timer" }),
         defaultActive: false,
         category: "ui",
     },
@@ -158,8 +137,7 @@ const availablePlugins: PluginRegistryEntry[] = [
             "Beat/BPM-aware crossfades between playlist tracks, with automatic " +
             "light-mode fallback (silence-based trims) when analysis is " +
             "unavailable or low-confidence. No setup required.",
-        factory: () =>
-            createAutomixPlugin({ name: "registry-automix" }),
+        factory: () => createAutomixPlugin({ name: "registry-automix" }),
         defaultActive: false,
         category: "playback",
     },
@@ -169,8 +147,7 @@ const availablePlugins: PluginRegistryEntry[] = [
         description:
             "Derives the player's accent, progress gradient, background tint, " +
             "text contrast, and ambient glow from the album artwork.",
-        factory: () =>
-            createAutoThemePlugin({ name: "registry-auto-theme" }),
+        factory: () => createAutoThemePlugin({ name: "registry-auto-theme" }),
         defaultActive: false,
         category: "ui",
     },
@@ -181,8 +158,7 @@ const availablePlugins: PluginRegistryEntry[] = [
             "Replaces the progress bar with an interactive wavesurfer waveform " +
             "on players that support it. Adds a Show Waveform toggle in the " +
             "player's options.",
-        factory: () =>
-            createWaveformPlugin({ name: "registry-waveform" }),
+        factory: () => createWaveformPlugin({ name: "registry-waveform" }),
         defaultActive: false,
         category: "ui",
     },
@@ -200,9 +176,7 @@ const SAMPLE_LYRICS = [
 /*  Context + Provider                                                 */
 /* ------------------------------------------------------------------ */
 
-const PluginRegistryContext = createContext<PluginRegistrySnapshot | null>(
-    null
-)
+const PluginRegistryContext = createContext<PluginRegistrySnapshot | null>(null)
 
 export interface PluginRegistryProviderProps {
     children: ReactNode
@@ -217,9 +191,7 @@ export interface PluginRegistryProviderProps {
  * The provider only materialises instances for **active** plugins, so an
  * installed-but-inactive plugin does not consume slots in the player.
  */
-export function PluginRegistryProvider({
-    children,
-}: PluginRegistryProviderProps) {
+export function PluginRegistryProvider({ children }: PluginRegistryProviderProps) {
     const [installed, setInstalled] = useState<InstalledPluginRecord[]>(() =>
         availablePlugins
             .filter((e) => e.defaultActive)
@@ -236,10 +208,7 @@ export function PluginRegistryProvider({
         setInstalled((prev) => {
             if (prev.some((r) => r.entry.id === id)) return prev
             revRef.current++
-            return [
-                ...prev,
-                { entry, active: entry.defaultActive },
-            ]
+            return [...prev, { entry, active: entry.defaultActive }]
         })
     }, [])
 
@@ -255,40 +224,28 @@ export function PluginRegistryProvider({
     const activate = useCallback((id: string) => {
         revRef.current++
         setInstalled((prev) =>
-            prev.map((r) =>
-                r.entry.id === id && !r.active
-                    ? { ...r, active: true }
-                    : r
-            )
+            prev.map((r) => (r.entry.id === id && !r.active ? { ...r, active: true } : r))
         )
     }, [])
 
     const deactivate = useCallback((id: string) => {
         revRef.current++
         setInstalled((prev) =>
-            prev.map((r) =>
-                r.entry.id === id && r.active
-                    ? { ...r, active: false }
-                    : r
-            )
+            prev.map((r) => (r.entry.id === id && r.active ? { ...r, active: false } : r))
         )
     }, [])
 
     const toggleActive = useCallback((id: string) => {
         revRef.current++
         setInstalled((prev) =>
-            prev.map((r) =>
-                r.entry.id === id ? { ...r, active: !r.active } : r
-            )
+            prev.map((r) => (r.entry.id === id ? { ...r, active: !r.active } : r))
         )
     }, [])
 
     // Materialise active plugin instances, keyed by a revision counter so
     // React sees fresh references after an active→inactive→active toggle.
     const activeInstances = useMemo<readonly AudioPlayerPlugin[]>(() => {
-        return installed
-            .filter((r) => r.active)
-            .map((r) => r.entry.factory())
+        return installed.filter((r) => r.active).map((r) => r.entry.factory())
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [installed, revRef.current])
 
@@ -304,21 +261,11 @@ export function PluginRegistryProvider({
             toggleActive,
             activeInstances,
         }),
-        [
-            installed,
-            install,
-            uninstall,
-            activate,
-            deactivate,
-            toggleActive,
-            activeInstances,
-        ]
+        [installed, install, uninstall, activate, deactivate, toggleActive, activeInstances]
     )
 
     return (
-        <PluginRegistryContext.Provider value={snapshot}>
-            {children}
-        </PluginRegistryContext.Provider>
+        <PluginRegistryContext.Provider value={snapshot}>{children}</PluginRegistryContext.Provider>
     )
 }
 
@@ -334,9 +281,7 @@ export function PluginRegistryProvider({
 export function usePluginRegistry(): PluginRegistrySnapshot {
     const ctx = useContext(PluginRegistryContext)
     if (ctx === null) {
-        throw new Error(
-            "usePluginRegistry must be used within a <PluginRegistryProvider>"
-        )
+        throw new Error("usePluginRegistry must be used within a <PluginRegistryProvider>")
     }
     return ctx
 }
@@ -356,19 +301,14 @@ export function useActivePluginInstances(): readonly AudioPlayerPlugin[] {
     // Store instances in a ref so we can detect actual array-content changes
     // vs. the memoised-array-identity changing on every toggle.
     const prev = useRef<readonly AudioPlayerPlugin[]>(activeInstances)
-    const [stable, setStable] = useState<readonly AudioPlayerPlugin[]>(
-        activeInstances
-    )
+    const [stable, setStable] = useState<readonly AudioPlayerPlugin[]>(activeInstances)
 
     useEffect(() => {
         // Simple shallow identity: if the length differs or any element
         // reference differs, emit the new array.
         const a = prev.current
         const b = activeInstances
-        if (
-            a.length !== b.length ||
-            a.some((plugin, i) => plugin !== b[i])
-        ) {
+        if (a.length !== b.length || a.some((plugin, i) => plugin !== b[i])) {
             prev.current = b
             setStable(b)
         }

@@ -145,27 +145,25 @@ export const DEFAULT_PLUGIN_SURFACES: readonly PluginSurfaceDefinition[] = [
 ]
 
 /** Look up a single plugin's surface definition by its plugin id. */
-export function getPluginSurfaceDefinition(
-    pluginId: string,
-): PluginSurfaceDefinition | undefined {
+export function getPluginSurfaceDefinition(pluginId: string): PluginSurfaceDefinition | undefined {
     return DEFAULT_PLUGIN_SURFACES.find((def) => def.pluginId === pluginId)
 }
 
 /** All surface definitions in a given category, sorted by menu order. */
 export function getPluginSurfaceDefinitionsByCategory(
-    category: PluginSurfaceCategory,
+    category: PluginSurfaceCategory
 ): PluginSurfaceDefinition[] {
     return sortPluginSurfaceDefinitions(
-        DEFAULT_PLUGIN_SURFACES.filter((def) => def.category === category),
+        DEFAULT_PLUGIN_SURFACES.filter((def) => def.category === category)
     )
 }
 
 /** All surface definitions whose menu placement targets a given branch, sorted. */
 export function getPluginSurfaceDefinitionsForMenuBranch(
-    branch: PluginMenuBranch,
+    branch: PluginMenuBranch
 ): PluginSurfaceDefinition[] {
     return sortPluginSurfaceDefinitions(
-        DEFAULT_PLUGIN_SURFACES.filter((def) => def.menu?.branch === branch),
+        DEFAULT_PLUGIN_SURFACES.filter((def) => def.menu?.branch === branch)
     )
 }
 
@@ -175,9 +173,7 @@ export function getPluginSurfaceDefinitionsForMenuBranch(
  * through unchanged, so hosts can supply either form.
  */
 export function normalizePluginId(nameOrId: string): string {
-    return nameOrId.startsWith("registry-")
-        ? nameOrId.slice("registry-".length)
-        : nameOrId
+    return nameOrId.startsWith("registry-") ? nameOrId.slice("registry-".length) : nameOrId
 }
 
 /**
@@ -192,9 +188,7 @@ export type ArcPluginBucket = "audio" | "visual" | "analytics"
  * are audio-affecting, so they fold into Audio. Agent-category plugins return
  * `null` — agents live under the arc's dedicated Agents branch, never Plugins.
  */
-export function getArcPluginBucket(
-    definition: PluginSurfaceDefinition,
-): ArcPluginBucket | null {
+export function getArcPluginBucket(definition: PluginSurfaceDefinition): ArcPluginBucket | null {
     switch (definition.category) {
         case "visual":
             return "visual"
@@ -216,10 +210,10 @@ export function getArcPluginBucket(
  * the full catalog.
  */
 export function getActivePluginSurfaceDefinitions(
-    activePluginIds: readonly string[],
+    activePluginIds: readonly string[]
 ): PluginSurfaceDefinition[] {
     const ids = new Set(activePluginIds.map(normalizePluginId))
     return sortPluginSurfaceDefinitions(
-        DEFAULT_PLUGIN_SURFACES.filter((def) => ids.has(def.pluginId)),
+        DEFAULT_PLUGIN_SURFACES.filter((def) => ids.has(def.pluginId))
     )
 }

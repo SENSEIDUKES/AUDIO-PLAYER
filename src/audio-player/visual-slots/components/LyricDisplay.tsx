@@ -24,8 +24,7 @@ export interface LyricSettings {
 export const LYRIC_DISPLAY_ID = "lyric-display"
 
 export const lyricDefaultSettings: LyricSettings = {
-    fontFamily:
-        "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
     fontWeight: 600,
     fontSize: 18,
     lineHeight: 1.6,
@@ -63,10 +62,7 @@ function toLines(lyrics: string | undefined | null): string[] {
  * line is estimated from playback progress so the highlight still moves with the
  * track — a real, settings-driven visual rather than a placeholder.
  */
-export function LyricDisplay({
-    settings,
-    playback,
-}: VisualComponentProps<LyricSettings>) {
+export function LyricDisplay({ settings, playback }: VisualComponentProps<LyricSettings>) {
     const currentTime = playback?.currentTime ?? 0
     const duration = playback?.duration ?? 0
     const lines = useMemo(() => toLines(playback?.lyrics), [playback?.lyrics])
@@ -92,9 +88,7 @@ export function LyricDisplay({
         return (
             <div className="sap-visual-lyric sap-visual-lyric--empty">
                 <p className="sap-visual-lyric__empty-title">No lyrics</p>
-                <p className="sap-visual-lyric__empty-hint">
-                    This track has no lyrics to display.
-                </p>
+                <p className="sap-visual-lyric__empty-hint">This track has no lyrics to display.</p>
             </div>
         )
     }
@@ -214,8 +208,7 @@ export function LyricSettingsPanel({
                     value={settings.animationMode}
                     onChange={(e) =>
                         onChange({
-                            animationMode: e.target
-                                .value as LyricSettings["animationMode"],
+                            animationMode: e.target.value as LyricSettings["animationMode"],
                         })
                     }
                 >

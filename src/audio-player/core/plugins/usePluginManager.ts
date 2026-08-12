@@ -9,13 +9,13 @@ export function usePluginManager(
     options?: PluginManagerOptions
 ): PluginManager {
     const managerRef = useRef<PluginManager | null>(null)
-    
+
     // Memoize options to prevent recreation on every render
-    const memoizedOptions = useMemo(() => options, [
-        options?.errorHandler,
-        options?.maxFailuresBeforeDisable
-    ])
-    
+    const memoizedOptions = useMemo(
+        () => options,
+        [options?.errorHandler, options?.maxFailuresBeforeDisable]
+    )
+
     if (managerRef.current === null) {
         managerRef.current = new PluginManager(context, memoizedOptions)
     } else {
@@ -61,10 +61,7 @@ export function usePluginManager(
 }
 
 /** Whether two plugin arrays contain exactly the same multiset of plugin names. */
-function sameNameSet(
-    a: readonly AudioPlayerPlugin[],
-    b: readonly AudioPlayerPlugin[]
-): boolean {
+function sameNameSet(a: readonly AudioPlayerPlugin[], b: readonly AudioPlayerPlugin[]): boolean {
     if (a.length !== b.length) return false
     // Sort and compare so duplicate names are handled correctly, e.g.
     // ["a","b"] vs ["a","a"] must differ.

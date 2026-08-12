@@ -196,10 +196,7 @@ export const PLAYER_FACE_CAPABILITIES: Record<PlayerFace, PlayerFaceCapability> 
     Object.fromEntries(
         Object.entries(FACE_DEFINITIONS).map(([face, def]) => {
             const { family, ...overrides } = def
-            return [
-                face,
-                { family, ...FAMILY_DEFAULTS[family], ...overrides },
-            ]
+            return [face, { family, ...FAMILY_DEFAULTS[family], ...overrides }]
         })
     ) as Record<PlayerFace, PlayerFaceCapability>
 
@@ -257,8 +254,6 @@ export function getScrubberDensity(face: PlayerFace): ScrubberDensity {
     return getFaceCapability(face).scrubberDensity ?? "standard"
 }
 
-export function getPreferredCanvasPlacement(
-    face: PlayerFace
-): "main" | "overlay" | "none" {
+export function getPreferredCanvasPlacement(face: PlayerFace): "main" | "overlay" | "none" {
     return getFaceCapability(face).preferredCanvasPlacement ?? "none"
 }

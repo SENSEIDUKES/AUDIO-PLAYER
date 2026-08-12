@@ -54,12 +54,7 @@ describe("buildMenuTree", () => {
             canRouteWorkspaces: true,
             canShareLink: true,
         })
-        expect(tree.map((n) => n.label)).toEqual([
-            "Plugins",
-            "Playback",
-            "Share",
-            "Agents",
-        ])
+        expect(tree.map((n) => n.label)).toEqual(["Plugins", "Playback", "Share", "Agents"])
     })
 
     it("exposes Up Next and Canvas as leaf actions in the expected places", () => {
@@ -115,12 +110,8 @@ describe("buildMenuTree", () => {
         expect(byLabel["Audio"]).toEqual(["Automix"])
         expect(byLabel["Visual"]).toEqual(["Lyrics", "Canvas"])
         expect(byLabel["Analytics"]).toEqual(["Analytics"])
-        expect(findNode(tree, "plugin-lyrics")?.workspaceRoute).toBe(
-            "plugin-settings:lyrics"
-        )
-        expect(findNode(tree, "plugin-automix")?.workspaceRoute).toBe(
-            "playback:automix"
-        )
+        expect(findNode(tree, "plugin-lyrics")?.workspaceRoute).toBe("plugin-settings:lyrics")
+        expect(findNode(tree, "plugin-automix")?.workspaceRoute).toBe("playback:automix")
         // An inactive plugin never surfaces.
         expect(findNode(tree, "plugin-waveform")).toBeUndefined()
     })
@@ -131,13 +122,7 @@ describe("buildMenuTree", () => {
             isCanvasActive: false,
             activePluginIds: ["lyrics"],
         })
-        for (const id of [
-            "plugin-lyrics",
-            "controls",
-            "debug",
-            "share-add-to",
-            "agents",
-        ]) {
+        for (const id of ["plugin-lyrics", "controls", "debug", "share-add-to", "agents"]) {
             expect(findNode(unrouted, id)).toBeUndefined()
         }
         const routed = buildMenuTree({
@@ -146,18 +131,10 @@ describe("buildMenuTree", () => {
             canRouteWorkspaces: true,
             activePluginIds: ["lyrics"],
         })
-        expect(findNode(routed, "plugin-lyrics")?.workspaceRoute).toBe(
-            "plugin-settings:lyrics"
-        )
-        expect(findNode(routed, "controls")?.workspaceRoute).toBe(
-            "playback:controls"
-        )
-        expect(findNode(routed, "debug")?.workspaceRoute).toBe(
-            "diagnostics:activity-log"
-        )
-        expect(findNode(routed, "share-add-to")?.workspaceRoute).toBe(
-            "library:vault"
-        )
+        expect(findNode(routed, "plugin-lyrics")?.workspaceRoute).toBe("plugin-settings:lyrics")
+        expect(findNode(routed, "controls")?.workspaceRoute).toBe("playback:controls")
+        expect(findNode(routed, "debug")?.workspaceRoute).toBe("diagnostics:activity-log")
+        expect(findNode(routed, "share-add-to")?.workspaceRoute).toBe("library:vault")
         expect(isNodeInteractive(findNode(routed, "agents")!)).toBe(true)
     })
 
@@ -170,9 +147,7 @@ describe("buildMenuTree", () => {
             ...base,
             entitlements: { studioScout: true },
         })
-        expect(findNode(studio, "agent-scout")?.workspaceRoute).toBe(
-            "agent:studio-scout"
-        )
+        expect(findNode(studio, "agent-scout")?.workspaceRoute).toBe("agent:studio-scout")
     })
 
     it("adds Share leaves only when the host wires them (Link / Favorite)", () => {

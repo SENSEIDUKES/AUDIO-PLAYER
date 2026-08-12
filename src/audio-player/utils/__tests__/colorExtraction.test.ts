@@ -22,9 +22,7 @@ describe("relativeLuminance", () => {
     })
 
     it("ranks green brighter than blue", () => {
-        expect(relativeLuminance([0, 255, 0])).toBeGreaterThan(
-            relativeLuminance([0, 0, 255])
-        )
+        expect(relativeLuminance([0, 255, 0])).toBeGreaterThan(relativeLuminance([0, 0, 255]))
     })
 })
 
@@ -82,16 +80,32 @@ describe("quantizePixels", () => {
     })
 
     it("flags dark dominant colors via isDark", () => {
-        const dark = quantizePixels(pixels([[20, 20, 60], [20, 20, 60]]))!
-        const light = quantizePixels(pixels([[250, 210, 90], [250, 210, 90]]))!
+        const dark = quantizePixels(
+            pixels([
+                [20, 20, 60],
+                [20, 20, 60],
+            ])
+        )!
+        const light = quantizePixels(
+            pixels([
+                [250, 210, 90],
+                [250, 210, 90],
+            ])
+        )!
         expect(dark.isDark).toBe(true)
         expect(light.isDark).toBe(false)
     })
 
     it("skips near-transparent pixels", () => {
         const data = [
-            200, 30, 30, 10, // transparent red, ignored
-            30, 60, 200, 255, // opaque blue
+            200,
+            30,
+            30,
+            10, // transparent red, ignored
+            30,
+            60,
+            200,
+            255, // opaque blue
         ]
         const palette = quantizePixels(data)!
         expect(palette.primary[2]).toBeGreaterThan(150) // blue won

@@ -57,16 +57,13 @@ export function ProgressBar({
     const captureTargetRef = useRef<HTMLElement | null>(null)
     const [dragTime, setDragTime] = useState<number | null>(null)
 
-    const ratioFromEvent = useCallback(
-        (clientX: number) => {
-            const el = trackRef.current
-            if (!el) return 0
-            const rect = el.getBoundingClientRect()
-            if (rect.width <= 0) return 0
-            return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
-        },
-        []
-    )
+    const ratioFromEvent = useCallback((clientX: number) => {
+        const el = trackRef.current
+        if (!el) return 0
+        const rect = el.getBoundingClientRect()
+        if (rect.width <= 0) return 0
+        return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
+    }, [])
 
     const releaseCapture = useCallback(() => {
         const target = captureTargetRef.current
@@ -113,10 +110,7 @@ export function ProgressBar({
             // Only react to the pointer that started the drag. Without this
             // guard, simply moving any pointer over the track would yank the
             // thumb around.
-            if (
-                captureIdRef.current === null ||
-                event.pointerId !== captureIdRef.current
-            ) {
+            if (captureIdRef.current === null || event.pointerId !== captureIdRef.current) {
                 return
             }
             // Visual-only update while dragging — audio gets the final position
@@ -199,8 +193,7 @@ export function ProgressBar({
     // currentTime/buffered value cannot push the fill or thumb off the track.
     const rawProgressPct = duration > 0 ? (displayTime / duration) * 100 : 0
     const rawBufferedPct = duration > 0 ? (buffered / duration) * 100 : 0
-    const clampPct = (v: number) =>
-        Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : 0
+    const clampPct = (v: number) => (Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : 0)
     const progressPct = clampPct(rawProgressPct)
     const bufferedPct = clampPct(rawBufferedPct)
 
@@ -208,9 +201,7 @@ export function ProgressBar({
     // smooth movement during scrubbing instead of the coarse second-by-second
     // jumps caused by Math.floor.
     const ariaValueNow =
-        Number.isFinite(displayTime) && displayTime > 0
-            ? Math.round(displayTime * 10) / 10
-            : 0
+        Number.isFinite(displayTime) && displayTime > 0 ? Math.round(displayTime * 10) / 10 : 0
 
     return (
         <div
@@ -218,9 +209,7 @@ export function ProgressBar({
             className={`ap-progress${isSeeking ? " ap-progress--seeking" : ""}`}
             role="slider"
             tabIndex={disabled ? -1 : 0}
-            aria-label={
-                disabled ? "Seek unavailable. Audio file missing" : "Seek"
-            }
+            aria-label={disabled ? "Seek unavailable. Audio file missing" : "Seek"}
             aria-valuemin={0}
             aria-valuemax={Math.floor(duration)}
             aria-valuenow={ariaValueNow}
@@ -233,18 +222,9 @@ export function ProgressBar({
             onKeyDown={handleKeyDown}
         >
             <div className="ap-progress__track" />
-            <div
-                className="ap-progress__buffered"
-                style={{ width: `${bufferedPct}%` }}
-            />
-            <div
-                className="ap-progress__fill"
-                style={{ width: `${progressPct}%` }}
-            />
-            <div
-                className="ap-progress__thumb"
-                style={{ left: `${progressPct}%` }}
-            />
+            <div className="ap-progress__buffered" style={{ width: `${bufferedPct}%` }} />
+            <div className="ap-progress__fill" style={{ width: `${progressPct}%` }} />
+            <div className="ap-progress__thumb" style={{ left: `${progressPct}%` }} />
         </div>
     )
 }

@@ -1,7 +1,4 @@
-import type {
-    AudioPlayerPlugin,
-    PluginPlayerContext,
-} from "../core/plugins/PluginInterface"
+import type { AudioPlayerPlugin, PluginPlayerContext } from "../core/plugins/PluginInterface"
 import type { Track } from "../types"
 import { SleepTimerPluginConfigSchema, validateConfig } from "./configValidators"
 
@@ -57,7 +54,7 @@ export class SleepTimerPlugin implements AudioPlayerPlugin {
         this.label = valid.label
         this.renderUi = valid.renderUi
         this.target = valid.target as HTMLElement | (() => HTMLElement | null) | null
-        this.now = (valid.now as (() => number)) ?? (() => Date.now())
+        this.now = (valid.now as () => number) ?? (() => Date.now())
     }
 
     init(playerInstance: PluginPlayerContext) {
@@ -89,9 +86,7 @@ export class SleepTimerPlugin implements AudioPlayerPlugin {
 
     getActiveTimer(): SleepTimerState {
         const remainingMs =
-            this.deadlineMs === null
-                ? null
-                : Math.max(0, this.deadlineMs - this.now())
+            this.deadlineMs === null ? null : Math.max(0, this.deadlineMs - this.now())
         return {
             preset: this.preset,
             deadlineMs: this.deadlineMs,

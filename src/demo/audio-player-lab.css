@@ -15,8 +15,8 @@
     --lab-text: #f4f4f7;
     --lab-text-dim: rgba(244, 244, 247, 0.65);
     --lab-text-faint: rgba(244, 244, 247, 0.4);
-    --lab-accent: #7C5CFF;
-    --lab-success: #22D3A6;
+    --lab-accent: #7c5cff;
+    --lab-success: #22d3a6;
     --lab-danger: #ff5a55;
     --lab-radius: 14px;
     --lab-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
@@ -30,10 +30,16 @@ body {
     margin: 0;
     background:
         radial-gradient(1200px 600px at 10% -10%, rgba(124, 92, 255, 0.12), transparent 60%),
-        radial-gradient(900px 500px at 100% 10%, rgba(34, 211, 166, 0.10), transparent 60%),
+        radial-gradient(900px 500px at 100% 10%, rgba(34, 211, 166, 0.1), transparent 60%),
         var(--lab-bg);
     color: var(--lab-text);
-    font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family:
+        "Inter",
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        sans-serif;
     -webkit-font-smoothing: antialiased;
     min-height: 100vh;
 }
@@ -443,7 +449,9 @@ body {
     border-radius: 50%;
     border: 1px solid var(--lab-border);
     cursor: pointer;
-    transition: transform 0.1s ease, border-color 0.15s ease;
+    transition:
+        transform 0.1s ease,
+        border-color 0.15s ease;
 }
 .framer-panel__swatch:hover {
     border-color: var(--lab-border-strong);
@@ -591,7 +599,7 @@ body {
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #7C5CFF, #22D3A6);
+    background: linear-gradient(135deg, #7c5cff, #22d3a6);
 }
 .lab-feed__meta-author {
     color: var(--lab-text);
@@ -653,20 +661,20 @@ body {
    sizing from .ap-art survives; the shorthand would reset it. */
 .lab-card__art {
     aspect-ratio: 1 / 1;
-    background-image: linear-gradient(135deg, #FF7AC6, #7C5CFF);
+    background-image: linear-gradient(135deg, #ff7ac6, #7c5cff);
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
     position: relative;
 }
 .lab-card__art--b {
-    background-image: linear-gradient(135deg, #22D3A6, #0EA5E9);
+    background-image: linear-gradient(135deg, #22d3a6, #0ea5e9);
 }
 .lab-card__art--c {
-    background-image: linear-gradient(135deg, #F59E0B, #EF4444);
+    background-image: linear-gradient(135deg, #f59e0b, #ef4444);
 }
 .lab-card__art--d {
-    background-image: linear-gradient(135deg, #A855F7, #EC4899);
+    background-image: linear-gradient(135deg, #a855f7, #ec4899);
 }
 .lab-card__body {
     padding: 16px;
@@ -780,11 +788,15 @@ body {
     width: 44px;
     height: 44px;
     border-radius: 8px;
-    background: linear-gradient(135deg, #7C5CFF, #22D3A6);
+    background: linear-gradient(135deg, #7c5cff, #22d3a6);
     flex-shrink: 0;
 }
-.lab-app__row-thumb--b { background: linear-gradient(135deg, #F59E0B, #EF4444); }
-.lab-app__row-thumb--c { background: linear-gradient(135deg, #22D3A6, #0EA5E9); }
+.lab-app__row-thumb--b {
+    background: linear-gradient(135deg, #f59e0b, #ef4444);
+}
+.lab-app__row-thumb--c {
+    background: linear-gradient(135deg, #22d3a6, #0ea5e9);
+}
 .lab-app__row-meta {
     flex: 1;
     min-width: 0;
@@ -854,7 +866,7 @@ body {
 .lab-phone__art {
     aspect-ratio: 1 / 1;
     border-radius: 12px;
-    background-image: linear-gradient(135deg, #7C5CFF, #22D3A6);
+    background-image: linear-gradient(135deg, #7c5cff, #22d3a6);
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
@@ -911,9 +923,15 @@ body {
     border-radius: 50%;
     background: var(--lab-accent);
 }
-.lab-state__title--ok::before { background: var(--lab-success); }
-.lab-state__title--warn::before { background: #F59E0B; }
-.lab-state__title--err::before { background: var(--lab-danger); }
+.lab-state__title--ok::before {
+    background: var(--lab-success);
+}
+.lab-state__title--warn::before {
+    background: #f59e0b;
+}
+.lab-state__title--err::before {
+    background: var(--lab-danger);
+}
 .lab-state__desc {
     font-size: 12px;
     color: var(--lab-text-dim);
@@ -1409,7 +1427,10 @@ body {
     font-size: 12px;
     font-weight: 700;
     cursor: pointer;
-    transition: color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+    transition:
+        color 0.18s ease,
+        background 0.18s ease,
+        box-shadow 0.18s ease;
 }
 .demo-mode__button:hover {
     color: var(--lab-text);
@@ -1440,8 +1461,7 @@ body {
     background:
         linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
         radial-gradient(900px 520px at 82% 20%, rgba(34, 211, 166, 0.2), transparent 62%),
-        radial-gradient(760px 520px at 20% 85%, rgba(124, 92, 255, 0.22), transparent 58%),
-        #09090f;
+        radial-gradient(760px 520px at 20% 85%, rgba(124, 92, 255, 0.22), transparent 58%), #09090f;
     box-shadow: var(--lab-shadow);
 }
 .product-preview__hero::before {
@@ -1450,7 +1470,12 @@ body {
     inset: 1px;
     pointer-events: none;
     border-radius: 31px;
-    background: linear-gradient(140deg, rgba(255, 255, 255, 0.18), transparent 34%, rgba(34, 211, 166, 0.14));
+    background: linear-gradient(
+        140deg,
+        rgba(255, 255, 255, 0.18),
+        transparent 34%,
+        rgba(34, 211, 166, 0.14)
+    );
     mask: linear-gradient(#000, transparent 42%);
 }
 .product-preview__copy,
@@ -1543,10 +1568,22 @@ body {
     height: min(34vw, 420px);
     border-radius: 50%;
     background:
-        radial-gradient(circle at center, #050507 0 11%, #22d3a6 11% 14%, #050507 14% 18%, transparent 18%),
-        repeating-radial-gradient(circle at center, rgba(255, 255, 255, 0.18) 0 1px, rgba(255, 255, 255, 0.02) 1px 8px),
+        radial-gradient(
+            circle at center,
+            #050507 0 11%,
+            #22d3a6 11% 14%,
+            #050507 14% 18%,
+            transparent 18%
+        ),
+        repeating-radial-gradient(
+            circle at center,
+            rgba(255, 255, 255, 0.18) 0 1px,
+            rgba(255, 255, 255, 0.02) 1px 8px
+        ),
         #08080b;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 28px 100px rgba(0, 0, 0, 0.5);
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+        0 28px 100px rgba(0, 0, 0, 0.5);
 }
 .product-preview__player-card {
     position: relative;
@@ -1762,7 +1799,7 @@ body {
     gap: 10px;
 }
 .showcase-family--compact {
-    border-top-color: #22D3A6;
+    border-top-color: #22d3a6;
 }
 .showcase-family__badge {
     align-self: flex-start;
@@ -1997,7 +2034,12 @@ body {
     margin: 0 auto;
     padding: 32px 20px 80px;
     color: #fff;
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family:
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        sans-serif;
 }
 .surfaces-demo__eyebrow {
     margin: 0 0 4px;
