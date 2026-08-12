@@ -92,7 +92,7 @@ const info = engine.getBackendInfo()
 ```
 
 `AudioBackendInfo`, `AudioBackendKind`, and `AudioBackendCapabilities` are
-exported from `src/audio-player`.
+exported from `@seihouse/audio-player`.
 
 ---
 

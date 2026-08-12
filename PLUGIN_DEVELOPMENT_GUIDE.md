@@ -11,8 +11,8 @@ The plugin system is intentionally additive:
 - Plugin failures are isolated by `PluginManager` and logged as warnings.
 - Existing skins and compact layouts do not need to know which plugins are
   registered.
-- Existing `useAutomix` imports still work, but direct hook usage now emits a
-  deprecation warning. New integrations should prefer `AutomixPlugin`.
+- Automix is supplied through the built-in `automix` switch or
+  `createAutomixPlugin()`; there is no public `useAutomix` hook.
 
 ---
 
@@ -27,7 +27,7 @@ import {
   createLyricsPlugin,
   createSleepTimerPlugin,
   createAutomixPlugin,
-} from "./src/audio-player"
+} from "@seihouse/audio-player"
 ```
 
 Both standalone and shared-session entry points accept plugins:
@@ -65,7 +65,7 @@ All plugins implement `AudioPlayerPlugin` from
 import type {
   AudioPlayerPlugin,
   PluginPlayerContext,
-} from "./src/audio-player"
+} from "@seihouse/audio-player"
 
 export class ExamplePlugin implements AudioPlayerPlugin {
   name = "example"
@@ -230,8 +230,8 @@ remains deck A/source-of-truth, while the plugin owns a detached deck B around
 the transition window. It returns `true` from `onTrackEnded` during handoff to
 prevent double-advancing.
 
-> Compatibility: the existing `useAutomix` hook remains exported for older code,
-> but direct hook usage is deprecated.
+> Use `createAutomixPlugin()` for custom Automix configuration. The simpler
+> `automix` prop enables the player's built-in controller.
 
 ---
 
@@ -269,7 +269,7 @@ Host applications can inject a custom `PluginErrorHandler` to intercept these er
 ## Minimal plugin template
 
 ```ts
-import type { AudioPlayerPlugin, PluginPlayerContext } from "./src/audio-player"
+import type { AudioPlayerPlugin, PluginPlayerContext } from "@seihouse/audio-player"
 
 export function createMyPlugin(): AudioPlayerPlugin {
   let player: PluginPlayerContext | null = null

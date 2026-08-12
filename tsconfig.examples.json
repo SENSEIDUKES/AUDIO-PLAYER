@@ -1,0 +1,12 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "rootDir": ".",
+        "baseUrl": ".",
+        "paths": {
+            "@seihouse/audio-player": ["src/audio-player/index.ts"],
+            "@seihouse/audio-player/styles.css": ["src/audio-player/audio-player.css"]
+        }
+    },
+    "include": ["USAGE_EXAMPLE.tsx", "src/vite-env.d.ts"]
+}

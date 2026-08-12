@@ -1,5 +1,10 @@
 # WAVESURFER INTEGRATION PLAN - COPY-PASTE CHUNKS
 
+> **Historical planning record.** These chunks were written before the current
+> public plugin, waveform, and backend contracts. Do not copy their paths or
+> imports into a consumer. Use [`docs/public-api.md`](./docs/public-api.md) and
+> the current focused guides instead.
+
 ---
 
 ## PHASE 1: WAVEFORM DATA DECOUPLING
@@ -104,8 +109,8 @@ Formalize existing modular patterns into standardized plugin interface. Extract 
    - Memory usage tracking
    - Enabled via `window.AUDIO_PLAYER_DEBUG = "1"`
 
-6. **Migrate useAutomix to Plugin** (`src/audio-player/plugins/AutomixPlugin.ts`)
-   - Convert existing `useAutomix` logic into AutomixPlugin class
+6. **Migrate legacy Automix logic to Plugin** (`src/audio-player/plugins/AutomixPlugin.ts`)
+   - Convert the former standalone Automix hook into AutomixPlugin class
    - Maintain exact same behavior (two-deck crossfade)
    - Returns `true` from `onTrackEnded` during handoff to prevent double-advancing
 
@@ -133,7 +138,7 @@ Formalize existing modular patterns into standardized plugin interface. Extract 
 - [x] `src/audio-player/core/plugins/PluginDebugger.ts` — performance monitoring
 - [x] `src/audio-player/core/plugins/usePluginManager.ts` — React bridge hook
 - [x] `src/audio-player/plugins/configValidators.ts` — Zod schemas for all built-in plugins
-- [x] `src/audio-player/plugins/AutomixPlugin.ts` — migrated from useAutomix
+- [x] `src/audio-player/plugins/AutomixPlugin.ts` — contains the migrated legacy Automix behavior
 - [x] `src/audio-player/plugins/KeyboardShortcutPlugin.ts` — keyboard controls plugin
 - [x] `src/audio-player/plugins/AnalyticsPlugin.ts` — event tracking plugin
 - [x] `src/audio-player/plugins/LyricsPlugin.ts` — lyric sync plugin
@@ -142,7 +147,8 @@ Formalize existing modular patterns into standardized plugin interface. Extract 
 - [x] `src/audio-player/plugins/WaveformPlugin.ts` — waveform marker plugin
 - [x] `src/audio-player/plugins/ErrorBoundaryExample.ts` — usage examples
 - [x] Updated `src/audio-player/index.ts` to export plugin system + error boundary API
-- [x] Backward compatibility: existing `useAutomix` import still works (deprecated warning)
+- [x] Current status: `AutomixPlugin` is the supported public integration; the
+  standalone legacy hook is retired
 - [x] Plugin test suites: AnalyticsPlugin, AutoThemePlugin, AutomixPlugin, KeyboardShortcutPlugin, LyricsPlugin, SleepTimerPlugin, PluginErrorBoundary
 - [x] Docs: `PLUGIN_DEVELOPMENT_GUIDE.md`
 

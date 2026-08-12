@@ -1,258 +1,138 @@
-# 📦 Publishing Your Audio Player as an npm Package
+# Distribution and publishing
 
-This guide shows you how to publish your audio player as a package that other repositories can install and use, while keeping the master repo updatable.
+This document describes the current distribution contract for
+`@seihouse/audio-player`. It supersedes the original package-setup notes.
 
-## ✅ What's Already Configured
+## Current status
 
-Your repository is now configured with:
+- The package name is `@seihouse/audio-player`.
+- The canonical source repository is
+  `https://github.com/SENSEIDUKES/AUDIO-PLAYER.git`.
+- The package is not currently published to the public npm registry.
+- The package is proprietary (`UNLICENSED`), so a registry release requires
+  explicit release-owner approval.
+- Consumers may import the package root and
+  `@seihouse/audio-player/styles.css`. No source-directory deep import is a
+  supported package contract.
 
-1. **Scoped package name**: `@seihouse/audio-player`
-2. **Library build script**: `npm run build:lib`
-3. **Proper exports**: ESM (`dist/index.js`), CJS (`dist/index.cjs`), and TypeScript types (`dist/index.d.ts`)
-4. **CSS export**: Available via `@seihouse/audio-player/styles.css`
-5. **Pre-publish hook**: Automatically runs typecheck and build before publishing
+## Install from GitHub
 
----
+For an internal consumer that should follow the current main branch:
 
-## 🚀 Option 1: Publish to npm (Recommended for Production)
+```bash
+npm install github:SENSEIDUKES/AUDIO-PLAYER#main
+```
 
-### Step 1: Update Package Metadata
-
-Edit `package.json` to set your actual repository URL and optionally change the license:
+For a reproducible consumer, pin a reviewed commit SHA instead of a moving
+branch:
 
 ```json
 {
-  "name": "@seihouse/audio-player",
-  "version": "1.0.0",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/YOUR_ORG/audio-player.git"
-  },
-  "license": "MIT"
+  "dependencies": {
+    "@seihouse/audio-player": "github:SENSEIDUKES/AUDIO-PLAYER#<commit-sha>"
+  }
 }
 ```
 
-### Step 2: Login to npm
+Then run `npm install`. Do not reference a release tag until the tag has been
+created and pushed in this repository.
+
+When npm installs a Git dependency, this package's `prepare` lifecycle runs
+`npm run build:lib`. `prepublishOnly` does **not** run for a Git installation;
+it runs as part of `npm publish`.
+
+## Local development with `npm link`
+
+Use a link when iterating on a consumer and this repository at the same time:
 
 ```bash
-npm login
-```
-
-If using a scoped package (`@seihouse/`), you may need to create an organization on npmjs.com first, or publish publicly with:
-
-```bash
-npm publish --access public
-```
-
-### Step 3: Build and Publish
-
-```bash
-# Run the library build
-npm run build:lib
-
-# Publish to npm
-npm publish --access public
-```
-
-### Step 4: Install in Other Repos
-
-In any other repository:
-
-```bash
-npm install @seihouse/audio-player
-```
-
-Or with yarn:
-```bash
-yarn add @seihouse/audio-player
-```
-
-Or with pnpm:
-```bash
-pnpm add @seihouse/audio-player
-```
-
----
-
-## 🔄 Option 2: Use Git Repository Directly (Great for Development)
-
-This allows other repos to track specific commits/branches/tags directly from GitHub.
-
-### In Your Consumer Repository
-
-Install directly from GitHub:
-
-```bash
-# Latest main branch
-npm install git+https://github.com/SEIHouse/audio-player.git
-
-# Specific branch
-npm install git+https://github.com/SEIHouse/audio-player.git#develop
-
-# Specific tag
-npm install git+https://github.com/SEIHouse/audio-player.git#v1.0.0
-
-# Specific commit
-npm install git+https://github.com/SEIHouse/audio-player.git#abc123def
-```
-
-**Note:** When installing from Git, npm will automatically run `npm run build:lib` (via the `prepublishOnly` script) during installation.
-
----
-
-## 🔗 Option 3: Local Development with npm link
-
-For testing changes across multiple local repositories without publishing:
-
-### In the Audio Player Repo
-
-```bash
-cd /path/to/audio-player
+# In this repository
 npm run build:lib
 npm link
-```
 
-### In Each Consumer Repo
-
-```bash
-cd /path/to/consumer-repo
+# In the consumer repository
 npm link @seihouse/audio-player
 ```
 
-Now changes in the audio player repo are immediately reflected in consumer repos (after running `npm run build:lib`).
+Re-run `npm run build:lib` after changes to refresh the linked distribution.
+Use `npm unlink @seihouse/audio-player` in the consumer when the local test is
+finished, then reinstall its declared dependency.
 
----
+## Import contract
 
-## 📝 Usage in Consumer Applications
+```tsx
+import { AudioPlayer, type Track } from "@seihouse/audio-player"
+import "@seihouse/audio-player/styles.css"
 
-### Basic Import (TypeScript/ESM)
+const tracks: Track[] = [
+  {
+    id: "intro",
+    title: "Intro",
+    artist: "Artist",
+    audioFile: "/audio/intro.mp3",
+  },
+]
 
-```typescript
-import { AudioPlayer, useAudioPlayer } from '@seihouse/audio-player'
-import '@seihouse/audio-player/styles.css'
-
-function App() {
+export function App() {
   return <AudioPlayer tracks={tracks} />
 }
 ```
 
-### CommonJS Import
+For the full public surface and the correct entry point for sessions, skins,
+plugins, cues, narrative engines, diagnostics, and workspaces, see
+[`docs/public-api.md`](./docs/public-api.md).
 
-```javascript
-const { AudioPlayer } = require('@seihouse/audio-player')
-require('@seihouse/audio-player/styles.css')
-```
+## Release-owner checklist
 
-### Using Individual Components
+Only a release owner should perform a registry release. Before publishing:
 
-```typescript
-import { 
-  AudioPlayer,
-  FullCardPlayer,
-  VaultRowPlayer,
-  StickyBottomPlayer,
-  MiniSidebarPlayer,
-  SeaCardPlayer,
-  PluginManager,
-  useAudioPlayer,
-  useAutomix
-} from '@seihouse/audio-player'
-```
+1. Confirm the package name, repository metadata, license, and intended npm
+   access are approved for the release.
+2. Start from a clean, reviewed commit.
+3. Install dependencies reproducibly and validate the distributable artifact:
 
----
-
-## 🔄 Keeping the Master Repo Updatable
-
-### Best Practices
-
-1. **Use Semantic Versioning**: Tag releases with `v1.0.0`, `v1.1.0`, etc.
    ```bash
-   git tag v1.0.0
-   git push origin v1.0.0
+   npm ci
+   npm run prepublishOnly
+   npm pack --dry-run
    ```
 
-2. **Consumer repos can pin versions**:
-   ```json
-   {
-     "dependencies": {
-       "@seihouse/audio-player": "^1.0.0"
-     }
-   }
+   `prepublishOnly` runs type checking, documentation/example validation, and
+   the installed-package smoke test. The smoke test builds the library, creates
+   a tarball, installs it into a clean consumer, and checks both CommonJS and
+   ESM loading.
+
+4. Set the approved semantic version, commit/tag it according to the release
+   process, and push the commit and tag.
+5. Publish only after the preceding checks and authorization are complete:
+
+   ```bash
+   npm publish --access public
    ```
 
-3. **Update workflow**:
-   - Make changes in master repo
-   - Run tests: `npm test`
-   - Bump version: `npm version patch` (or `minor`/`major`)
-   - Push tag: `git push && git push --tags`
-   - Publish: `npm publish`
-   - Consumer repos run: `npm update @seihouse/audio-player`
+The final command intentionally has no automation wrapper: publishing changes
+external package state and must remain an explicit release-owner action.
 
-### For Git-based installs (Option 2)
+## What ships
 
-Consumer repos can update to latest main:
+The `files` field restricts the package payload to:
+
+- `dist/` — ESM, CommonJS, declarations, CSS, and code-split assets
+- `README.md`
+- `LICENSE`
+
+Run `npm pack --dry-run` to inspect the exact artifact for the current build.
+Do not assume a fixed asset list or bundle size; code-split worker names and
+their hashes are build outputs.
+
+## Updating a Git consumer
+
+For a branch-tracking consumer, reinstall after the upstream ref changes:
+
 ```bash
-npm update @seihouse/audio-player
-# or reinstall
-npm install git+https://github.com/SEIHouse/audio-player.git
+npm install
 ```
 
----
-
-## 🛠️ Build Commands Reference
-
-| Command | Description |
-|---------|-------------|
-| `npm run build:lib` | Builds the library for distribution |
-| `npm run typecheck` | Runs TypeScript type checking |
-| `npm run test` | Runs full test suite |
-| `npm run prepublishOnly` | Auto-runs before `npm publish` |
-
----
-
-## 📦 Published Files
-
-The following files are included in the published package:
-
-```
-dist/
-├── index.js          # ESM bundle
-├── index.cjs         # CommonJS bundle
-├── index.d.ts        # TypeScript definitions
-├── styles.css        # All player styles
-└── assets/           # Worker files and lazy-loaded chunks
-```
-
-Files excluded: demo code, tests, docs, scripts, and development configs.
-
----
-
-## ⚠️ Important Notes
-
-1. **Peer Dependencies**: React and React-DOM are peer dependencies. Consumer apps must have these installed.
-
-2. **Optional Dependencies**: `essentia.js` and `wavesurfer.js` are bundled but loaded lazily only when Automix Pro or waveforms are used.
-
-3. **CSS Import**: Don't forget to import the CSS file in your app's entry point:
-   ```typescript
-   import '@seihouse/audio-player/styles.css'
-   ```
-
-4. **Browser Support**: The package targets modern browsers with ES2020 support.
-
----
-
-## 🎯 Quick Start Checklist
-
-- [ ] Update `package.json` with correct repository URL
-- [ ] Set appropriate license in `package.json`
-- [ ] Run `npm run build:lib` to verify build works
-- [ ] Test locally with `npm link` if needed
-- [ ] Choose publish method (npm vs Git)
-- [ ] Publish/tag release
-- [ ] Install in consumer repos
-- [ ] Document usage in consumer repo READMEs
-
----
-
-**Need help?** Check the main README.md for player usage examples and API documentation.
+For a pinned consumer, update the commit SHA in `package.json`, review the
+public API and release changes, then run `npm install`. `npm update
+@seihouse/audio-player` is not the source of truth for Git-pinned dependencies.

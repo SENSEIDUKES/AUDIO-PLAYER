@@ -13,8 +13,8 @@ does both.
 > external plugins use — there is only ever one Automix controller. If you also
 > pass your own Automix plugin via `plugins`, that external plugin wins and the
 > internal one is omitted automatically, so the two can never both run and
-> double-advance the queue. (The legacy `useAutomix` hook still exists but is
-> deprecated and no longer mounted internally.)
+> double-advance the queue. The former standalone `useAutomix` hook is not part
+> of the current public package surface.
 >
 > **Memoize the `plugins` array.** Pass a stable reference (e.g.
 > `useMemo(() => [createAutomixPlugin()], [])`). An inline array
@@ -77,9 +77,14 @@ metadata steers timing only — it does not time-stretch or beatmatch.
 ## Controls
 
 ```tsx
-import { createAutomixPlugin } from "seihouse-audio-player"
+import { useMemo } from "react"
+import { AudioPlayer, createAutomixPlugin } from "@seihouse/audio-player"
 
-<AudioPlayer tracks={tracks} plugins={[createAutomixPlugin()]} />
+function PlaylistPlayer() {
+  const plugins = useMemo(() => [createAutomixPlugin()], [])
+
+  return <AudioPlayer tracks={tracks} plugins={plugins} />
+}
 ```
 
 `createAutomixPlugin(config)` accepts:
@@ -105,7 +110,6 @@ plugin and shows each track's live analysis readout.
 | Pure transition math (unit-tested) | `src/audio-player/automix/transitionPlanner.ts` |
 | IndexedDB analysis cache | `src/audio-player/automix/analysisStore.ts` |
 | Built-in `automix` prop/menu → internal plugin wiring | `AudioPlayer.tsx`, `session/AudioSessionContext.tsx`, `plugins/automixIntegration.ts` |
-| Deprecated standalone light-mode hook (no longer mounted) | `src/audio-player/automix/useAutomix.ts` |
 
 The `AutomixPlugin` always attempts rich analysis (`usePro()` is on except where
 fades are impossible); per-pair confidence in `planTransition` decides whether a
@@ -162,8 +166,9 @@ the plan.
   aligned for the duration of the blend.
 - `downbeats` stays unfilled — essentia.js has no downbeat tracker in its
   standard algorithm set.
-- The built-in `automix` prop / `useAutomix` hook remains light-mode only; rich
-  transitions apply through `AutomixPlugin`.
+- The built-in `automix` prop uses the same internal `AutomixPlugin` as the
+  explicit plugin path. An explicitly supplied `AutomixPlugin` takes precedence
+  and can set `confidenceMin` or observe transition state.
 - Analysis requires CORS-readable audio and the HTML5 backend.
 - Bundler note: the worker is created with `new Worker(new URL(...))`, the idiom
   Vite and webpack 5 understand. Where unsupported, worker construction fails and

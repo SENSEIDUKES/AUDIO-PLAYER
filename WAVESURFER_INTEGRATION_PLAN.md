@@ -1,5 +1,11 @@
 # Wavesurfer.js Integration Plan for SEIHouse Audio Player
 
+> **Historical planning record.** This document predates the current public
+> plugin, waveform, and backend contracts. Its proposed paths and snippets are
+> not supported consumer API. Use [`docs/public-api.md`](./docs/public-api.md),
+> [`docs/automix.md`](./docs/automix.md), and the current source tree for new
+> work.
+
 ## Executive Summary
 
 This document outlines a strategic approach to incorporate **three key concepts from wavesurfer.js** into the SEIHouse audio player architecture while **preserving all existing customizations**:
@@ -32,7 +38,8 @@ This document outlines a strategic approach to incorporate **three key concepts 
 
 **Current State:**
 - You already have a modular structure: `automix/`, `components/`, `skins/`, `utils/`
-- `useAutomix` is already extracted as an optional feature
+- `AutomixPlugin` is the current optional transition feature; the older
+  standalone hook is retired
 - Theme vars and icons are separated
 
 **Enhancement Opportunity:**
