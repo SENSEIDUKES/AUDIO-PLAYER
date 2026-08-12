@@ -27,7 +27,7 @@
     "build": "tsc && vite build",
     "build:lib": "vite build --config vite.lib.config.ts && node scripts/check-bundle-size.mjs",
     "prepare": "npm run build:lib",
-    "prepublishOnly": "npm run typecheck && npm run build:lib",
+    "prepublishOnly": "npm run typecheck && npm run test:package",
     "preview": "vite preview --host 0.0.0.0",
     "preview:smoke": "node scripts/preview-smoke-test.mjs",
     "typecheck": "tsc --noEmit",
@@ -35,7 +35,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test:unit": "vitest run",
-    "test": "npm run typecheck && npm run test:unit && npm run build && npm run preview:smoke",
+    "test:package": "npm run build:lib && node scripts/package-smoke-test.mjs",
+    "test": "npm run typecheck && npm run test:unit && npm run test:package && npm run build && npm run preview:smoke",
     "skin:import": "node scripts/import-skin.mjs"
   },
   "peerDependencies": {

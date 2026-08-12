@@ -4,6 +4,7 @@ import dts from "vite-plugin-dts"
 
 // Library build configuration for publishing as npm package
 export default defineConfig({
+    base: "./",
     plugins: [
         react(),
         dts({
@@ -26,6 +27,7 @@ export default defineConfig({
         lib: {
             entry: "src/audio-player/index.ts",
             name: "SEIHouseAudioPlayer",
+            formats: ["es", "cjs"],
             fileName: (format) => `index.${format === "es" ? "js" : "cjs"}`,
             cssFileName: "styles",
         },
