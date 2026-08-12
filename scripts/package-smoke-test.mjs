@@ -35,6 +35,10 @@ function runNpm(args, cwd) {
         },
     })
 
+    if (result.error) {
+        throw result.error
+    }
+
     if (result.status !== 0) {
         const output = [result.stdout, result.stderr]
             .filter(Boolean)
