@@ -133,6 +133,15 @@ export { PluginSettingsWorkspace } from "./components/workspace/PluginSettingsWo
 export type { PluginSettingsWorkspaceProps } from "./components/workspace/PluginSettingsWorkspace"
 export { PlaybackAutomixWorkspace } from "./components/workspace/PlaybackAutomixWorkspace"
 export { AgentQueueDirectorWorkspace } from "./components/workspace/AgentQueueDirectorWorkspace"
+export type {
+    AgentScoutVariant,
+    AgentScoutMessage,
+    AgentScoutTrackContext,
+    AgentScoutQueueItem,
+    AgentScoutAudioEvidence,
+    AgentScoutRequest,
+    AgentScoutResponse,
+} from "./components/workspace/agentScoutContract"
 export { VisualLyricsWorkspace } from "./components/workspace/VisualLyricsWorkspace"
 export type { VisualLyricsWorkspaceProps } from "./components/workspace/VisualLyricsWorkspace"
 

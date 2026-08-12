@@ -49,6 +49,12 @@ describe("ensureProTrackAnalysis", () => {
         expect(analysis?.transitionInMs).toBe(500)
         expect(analysis?.transitionOutMs).toBeDefined()
         expect(analysis?.energy).toBeGreaterThan(0)
+        expect(analysis?.durationMs).toBe(120_000)
+        expect(analysis?.sampleRateHz).toBe(44_100)
+        expect(analysis?.channelCount).toBe(1)
+        expect(analysis?.peakDbfs).toBeCloseTo(-20, 1)
+        expect(analysis?.rmsDbfs).toBeCloseTo(-20, 1)
+        expect(analysis?.waveformRmsDbfs).toHaveLength(32)
     })
 
     it("analyzes head and tail segments of a long track at the right offsets", async () => {

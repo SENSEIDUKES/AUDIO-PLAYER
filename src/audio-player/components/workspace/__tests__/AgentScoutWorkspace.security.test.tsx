@@ -1,11 +1,16 @@
 /** @vitest-environment jsdom */
-import { render, screen } from "@testing-library/react"
-import { describe, expect, it, vi, beforeAll } from "vitest"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import AgentScoutWorkspace from "../AgentScoutWorkspace"
 import { useAudioSession } from "../../../session/AudioSessionContext"
+import { ensureProTrackAnalysis } from "../../../automix/trackAnalysis"
 
 vi.mock("../../../session/AudioSessionContext", () => ({
     useAudioSession: vi.fn(),
+}))
+
+vi.mock("../../../automix/trackAnalysis", () => ({
+    ensureProTrackAnalysis: vi.fn(),
 }))
 
 // Mock sessionStorage
@@ -27,15 +32,28 @@ const mockSessionStorage = (() => {
 
 Object.defineProperty(window, "sessionStorage", { value: mockSessionStorage })
 
+function mockAudioSession(value: Partial<ReturnType<typeof useAudioSession>>) {
+    vi.mocked(useAudioSession).mockReturnValue(value as ReturnType<typeof useAudioSession>)
+}
+
 describe("AgentScoutWorkspace Security", () => {
     beforeAll(() => {
         window.HTMLElement.prototype.scrollIntoView = vi.fn()
     })
 
+    beforeEach(() => {
+        mockSessionStorage.clear()
+        vi.mocked(ensureProTrackAnalysis).mockReset()
+    })
+
+    afterEach(() => {
+        vi.unstubAllGlobals()
+    })
+
     it("should escape HTML tags and not render them as elements", () => {
         const maliciousContent = "Hello <img src=x onerror=alert(1)> **bold**"
 
-        ;(useAudioSession as any).mockReturnValue({
+        mockAudioSession({
             currentTrack: { id: "1", title: "Test Track", artist: "Test Artist" },
             queue: [],
         })
@@ -59,7 +77,7 @@ describe("AgentScoutWorkspace Security", () => {
     it("should handle nested bold correctly and safely", () => {
         const content = "Normal **bold **still bold**** normal"
 
-        ;(useAudioSession as any).mockReturnValue({
+        mockAudioSession({
             currentTrack: { id: "1", title: "Test Track", artist: "Test Artist" },
             queue: [],
         })
@@ -76,5 +94,92 @@ describe("AgentScoutWorkspace Security", () => {
         expect(p.innerHTML).toContain(
             "Normal <strong>bold </strong>still bold<strong></strong> normal"
         )
+    })
+
+    it("measures the resolved audio source and sends evidence only to the same-origin API", async () => {
+        mockAudioSession({
+            currentTrack: {
+                id: "1",
+                title: "Test Track",
+                artist: "Test Artist",
+                audioFile: "https://cdn.example/original.mp3",
+                lyrics: "Test lyrics",
+            },
+            currentSrc: "https://cdn.example/resolved.mp3",
+            queue: [],
+        })
+        vi.mocked(ensureProTrackAnalysis).mockResolvedValue({
+            durationMs: 120_000,
+            sampleRateHz: 44_100,
+            channelCount: 2,
+            peakDbfs: -1,
+            rmsDbfs: -14,
+            crestFactorDb: 13,
+            rmsRangeDb: 8,
+            clippingSampleRatio: 0,
+            silenceRatio: 0.02,
+            stereoCorrelation: 0.5,
+            waveformRmsDbfs: Array(32).fill(-18),
+            energy: 0.6,
+            bpm: 120,
+            beats: [500, 1_000],
+            confidence: 0.9,
+            trimStartMs: 200,
+            trimEndMs: 500,
+        })
+        const fetchMock = vi.fn<typeof fetch>(async () =>
+            Response.json({ content: "Evidence-based review" })
+        )
+        vi.stubGlobal("fetch", fetchMock)
+
+        render(<AgentScoutWorkspace variant="demo-scout" />)
+        fireEvent.click(screen.getByRole("button", { name: "Analyze Demo Audio" }))
+
+        await screen.findByText("Evidence-based review")
+        expect(ensureProTrackAnalysis).toHaveBeenCalledWith({
+            title: "Test Track",
+            artist: "Test Artist",
+            audioFile: "https://cdn.example/resolved.mp3",
+        })
+        expect(fetchMock).toHaveBeenCalledTimes(1)
+        const [url, init] = fetchMock.mock.calls[0]
+        expect(url).toBe("/api/agent-scout")
+        expect(new Headers(init?.headers).has("Authorization")).toBe(false)
+        const body = JSON.parse(String(init?.body))
+        expect(body.audio).toMatchObject({
+            peakDbfs: -1,
+            rmsDbfs: -14,
+            bpm: 120,
+            beatCount: 2,
+        })
+        expect(String(init?.body)).not.toContain("https://cdn.example/resolved.mp3")
+    })
+
+    it("stops instead of requesting speculative text feedback when decoding fails", async () => {
+        mockAudioSession({
+            currentTrack: {
+                id: "1",
+                title: "Blocked Track",
+                artist: "Test Artist",
+                audioFile: "https://cdn.example/blocked.mp3",
+            },
+            currentSrc: "https://cdn.example/blocked.mp3",
+            queue: [],
+        })
+        vi.mocked(ensureProTrackAnalysis).mockResolvedValue(null)
+        const fetchMock = vi.fn()
+        vi.stubGlobal("fetch", fetchMock)
+
+        render(<AgentScoutWorkspace variant="demo-scout" />)
+        fireEvent.click(screen.getByRole("button", { name: "Analyze Demo Audio" }))
+
+        await waitFor(() =>
+            expect(screen.getByRole("alert").textContent).toMatch(/couldn't decode/i)
+        )
+        expect(fetchMock).not.toHaveBeenCalled()
+        expect(
+            (screen.getByRole("button", { name: "Analyze Demo Audio" }) as HTMLButtonElement)
+                .disabled
+        ).toBe(false)
     })
 })

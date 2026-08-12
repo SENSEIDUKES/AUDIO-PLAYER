@@ -169,6 +169,18 @@ try {
         throw new Error("Packed artifact did not install as @seihouse/audio-player")
     }
 
+    const forbiddenBrowserMarkers = [
+        "VITE_OPENROUTER_API_KEY",
+        "https://openrouter.ai/api/v1/chat/completions",
+    ]
+    for (const bundleName of ["index.js", "index.cjs"]) {
+        const bundle = await readFile(path.join(packageRoot, "dist", bundleName), "utf8")
+        const exposedMarker = forbiddenBrowserMarkers.find((marker) => bundle.includes(marker))
+        if (exposedMarker) {
+            throw new Error(`${bundleName} exposes Agent Scout provider access: ${exposedMarker}`)
+        }
+    }
+
     // No DOM globals exist here: loading the advertised CommonJS export must
     // remain safe for Node and SSR tooling.
     const requireFromConsumer = createRequire(path.join(consumerDir, "smoke.cjs"))
@@ -184,7 +196,9 @@ try {
     await exerciseAutomixWorker(esmExports, "ESM", packageRoot)
 
     console.log("Installed package smoke test passed.")
-    console.log("Verified Node CommonJS loading and package-relative Automix workers.")
+    console.log(
+        "Verified Node CommonJS loading, package-relative Automix workers, and no browser OpenRouter access."
+    )
 } finally {
     await rm(temporaryRoot, { recursive: true, force: true })
 }

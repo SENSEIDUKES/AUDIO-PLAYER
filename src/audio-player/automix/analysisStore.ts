@@ -13,7 +13,7 @@ import type { TrackAnalysis } from "../types"
 const DB_NAME = "sap-automix"
 const STORE_NAME = "analysis"
 /** Bump to invalidate stored results when the analysis pipeline changes. */
-export const ANALYSIS_VERSION = 1
+export const ANALYSIS_VERSION = 2
 
 let dbPromise: Promise<IDBDatabase | null> | null = null
 

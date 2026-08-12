@@ -325,6 +325,28 @@ export interface TrackAnalysis {
     downbeats?: number[]
     /** Mean loudness of the trimmed region mapped to 0..1. */
     energy?: number
+    /** Decoded source duration in milliseconds. */
+    durationMs?: number
+    /** Decoded source sample rate. */
+    sampleRateHz?: number
+    /** Number of channels in the decoded source. */
+    channelCount?: number
+    /** Highest decoded sample level in dBFS (sample peak, not true peak). */
+    peakDbfs?: number
+    /** RMS level across the trimmed decoded audio in dBFS (not LUFS). */
+    rmsDbfs?: number
+    /** Difference between sample peak and overall RMS level. */
+    crestFactorDb?: number
+    /** 95th-to-10th percentile range of non-silent 50ms RMS windows. */
+    rmsRangeDb?: number
+    /** Fraction of analyzed samples whose absolute amplitude is at least 0.999. */
+    clippingSampleRatio?: number
+    /** Fraction of analyzed 50ms windows below the -40 dBFS silence threshold. */
+    silenceRatio?: number
+    /** Pearson correlation of the first two channels, or null for mono/constant audio. */
+    stereoCorrelation?: number | null
+    /** Compact 32-bin RMS waveform envelope in dBFS. */
+    waveformRmsDbfs?: number[]
     /** Silence trims, same semantics as `TrackTrims`. */
     trimStartMs?: number
     trimEndMs?: number
