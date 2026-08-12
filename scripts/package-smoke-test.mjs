@@ -210,8 +210,13 @@ try {
     }
     await exerciseAutomixWorker(commonJsExports, "CommonJS", packageRoot)
 
+    const esmFixturePath = path.join(consumerDir, "smoke.mjs")
+    await writeFile(
+        esmFixturePath,
+        'export * from "@seihouse/audio-player"\n'
+    )
     const esmExports = await import(
-        `${pathToFileURL(path.join(packageRoot, "dist", "index.js")).href}?package-smoke`
+        `${pathToFileURL(esmFixturePath).href}?package-smoke`
     )
     await exerciseAutomixWorker(esmExports, "ESM", packageRoot)
 
