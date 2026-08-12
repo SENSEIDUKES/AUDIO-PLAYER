@@ -1,6 +1,6 @@
 import type { Track, TrackTrims } from "../types"
 import { trackKey } from "../utils/trackKey"
-import { getPrimaryTrackSource } from "../utils/sources"
+import { getPrimaryTrackSource, normalizeSourceUrl } from "../utils/sources"
 import { fetchAndDecodeTrack } from "./decodeTrack"
 
 /**
@@ -33,6 +33,8 @@ const NO_TRIMS: TrackTrims = { trimStartMs: 0, trimEndMs: 0 }
 const pending = new Map<string, Promise<TrackTrims | null>>()
 /** Settled results for synchronous reads from the playback hot path. */
 const settled = new Map<string, TrackTrims | null>()
+/** Source-specific results used by consumers that can select fallback URLs. */
+const pendingBySource = new Map<string, Promise<TrackTrims | null>>()
 /** Serializes analyses so at most one decode is in memory at a time. */
 let lastJob: Promise<unknown> = Promise.resolve()
 
@@ -104,6 +106,30 @@ async function analyze(url: string): Promise<TrackTrims | null> {
 }
 
 /**
+ * Analyze one concrete source URL. This is intentionally source-keyed rather
+ * than track-keyed: a logical track can fall back to a different encoding or
+ * CDN object whose leading silence does not match the primary file.
+ *
+ * Kept as a module-level API (rather than a package-root export) for engines
+ * that already selected a source. Automix continues to use
+ * `ensureTrackAnalysis(track)` and retains its existing default behavior.
+ */
+export function ensureSourceAnalysis(sourceUrl: string): Promise<TrackTrims | null> {
+    const url = normalizeSourceUrl(sourceUrl)
+    if (!url) return Promise.resolve(null)
+    const existing = pendingBySource.get(url)
+    if (existing) return existing
+
+    const job = lastJob
+        .catch(() => {})
+        .then(() => analyze(url))
+        .catch(() => null)
+    lastJob = job
+    pendingBySource.set(url, job)
+    return job
+}
+
+/**
  * Kick off (or join) silence analysis for a track. Results are cached for the
  * lifetime of the page; analyses run one at a time. Resolves to `null` when
  * analysis is unavailable or unreliable — callers must fall back to the
@@ -115,20 +141,16 @@ export function ensureTrackAnalysis(track: Track): Promise<TrackTrims | null> {
     if (!key || !url) return Promise.resolve(null)
     const existing = pending.get(key)
     if (existing) return existing
-    const job = lastJob
-        .catch(() => {})
-        .then(() => analyze(url))
-        .then(
-            (trims) => {
-                settled.set(key, trims)
-                return trims
-            },
-            () => {
-                settled.set(key, null)
-                return null
-            }
-        )
-    lastJob = job
+    const job = ensureSourceAnalysis(url).then(
+        (trims) => {
+            settled.set(key, trims)
+            return trims
+        },
+        () => {
+            settled.set(key, null)
+            return null
+        }
+    )
     pending.set(key, job)
     return job
 }
