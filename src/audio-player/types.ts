@@ -62,9 +62,9 @@ export interface FallbackSourceEvent {
     nextSource: string
     /** Optional MIME type hint from the selected fallback source. */
     nextSourceType?: string
-    /** Zero-based index of `nextSource` in the declared source list. */
+    /** Zero-based index of `nextSource` in the resolved, deduplicated source list. */
     sourceIndex: number
-    /** Total number of declared source candidates for the current track. */
+    /** Total number of resolved, deduplicated, and filtered candidates for the track. */
     sourceCount: number
     /** Normalized backend error, when available. */
     error?: AudioBackendErrorCode | string | null

@@ -272,6 +272,7 @@ export {
 export type {
   SceneMixEngineOptions,
   SceneCrossfadeOptions,
+  SceneMixAnalysisPolicy,
   SceneMixTransitionState,
   SceneMixFailureReason,
   SceneMixFailure,

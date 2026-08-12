@@ -2,10 +2,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { createSceneMixEngine } from "../SceneMixEngine"
 import type { SceneMixStatusSnapshot } from "../SceneMixEngine"
-import type { Track } from "../../types"
+import type { FallbackSourceEvent, Track, TrackTrims } from "../../types"
+
+const analysisMocks = vi.hoisted(() => ({
+    ensureSourceAnalysis: vi.fn(),
+}))
+
+vi.mock("../../automix/silenceAnalysis", () => ({
+    ensureSourceAnalysis: analysisMocks.ensureSourceAnalysis,
+}))
 
 type VolumeWriteBehavior = "normal" | "ignore" | "throw"
-type PlayBehavior = "resolve" | "not-allowed" | "reject" | "throw" | (() => Promise<void>)
+type PlayBehavior =
+    | "resolve"
+    | "not-allowed"
+    | "reject"
+    | "throw"
+    | ((audio: FakeAudio) => Promise<void>)
 
 /**
  * Minimal Audio stand-in: enough surface for SceneMixEngine's deck lifecycle,
@@ -22,14 +35,17 @@ class FakeAudio {
     muted = false
     paused = true
     readyState = 0
-    currentTime = 0
+    duration = Number.NaN
     src = ""
     error: MediaError | null = null
     playCalls = 0
     pauseCalls = 0
+    loadCalls = 0
+    currentTimeWrites: number[] = []
 
     private readonly volumeWriteBehavior: VolumeWriteBehavior
     private volumeValue = 1
+    private currentTimeValue = 0
     private listeners = new Map<string, Set<EventListener>>()
 
     constructor() {
@@ -47,6 +63,15 @@ class FakeAudio {
         }
         if (this.volumeWriteBehavior === "ignore") return
         this.volumeValue = value
+    }
+
+    get currentTime(): number {
+        return this.currentTimeValue
+    }
+
+    set currentTime(value: number) {
+        this.currentTimeValue = value
+        this.currentTimeWrites.push(value)
     }
 
     addEventListener(
@@ -73,7 +98,9 @@ class FakeAudio {
         this.src = ""
     }
 
-    load(): void {}
+    load(): void {
+        this.loadCalls += 1
+    }
 
     pause(): void {
         this.pauseCalls += 1
@@ -92,13 +119,14 @@ class FakeAudio {
         if (behavior === "reject") {
             return Promise.reject(new Error("decode failure"))
         }
-        const result = typeof behavior === "function" ? behavior() : Promise.resolve()
+        const result = typeof behavior === "function" ? behavior(this) : Promise.resolve()
         return result.then(() => {
             this.paused = false
         })
     }
 
     dispatch(type: string): void {
+        if (type === "loadedmetadata") this.readyState = 1
         const event = new Event(type)
         for (const listener of this.listeners.get(type) ?? []) {
             listener(event)
@@ -113,6 +141,19 @@ class FakeAudio {
 const TRACK: Track = { id: "SCENE_1", title: "Scene 1", artist: "t", audioFile: "https://cdn.example/score.mp3" }
 const TRACK_2: Track = { id: "SCENE_2", title: "Scene 2", artist: "t", audioFile: "https://cdn.example/score-2.mp3" }
 const TRACK_3: Track = { id: "SCENE_3", title: "Scene 3", artist: "t", audioFile: "https://cdn.example/score-3.mp3" }
+const FALLBACK_TRACK: Track = {
+    id: "SCENE_FALLBACK",
+    title: "Fallback scene",
+    artist: "t",
+    audioFile: "https://legacy.example/ignored.mp3",
+    fallbackSources: ["https://legacy.example/ignored-backup.mp3"],
+    sources: [
+        { url: " /scene/primary.webm ", type: "audio/webm" },
+        { url: "http://localhost:3000/scene/primary.webm" },
+        { url: "" },
+        { url: "/scene/fallback.mp3", type: "audio/mpeg" },
+    ],
+}
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
 const flushMicrotasks = async () => {
@@ -121,10 +162,10 @@ const flushMicrotasks = async () => {
     await Promise.resolve()
 }
 
-const deferred = () => {
-    let resolve!: () => void
+const deferred = <T = void>() => {
+    let resolve!: (value: T | PromiseLike<T>) => void
     let reject!: (error: unknown) => void
-    const promise = new Promise<void>((resolvePromise, rejectPromise) => {
+    const promise = new Promise<T>((resolvePromise, rejectPromise) => {
         resolve = resolvePromise
         reject = rejectPromise
     })
@@ -140,6 +181,8 @@ describe("SceneMixEngine", () => {
         FakeAudio.created = []
         FakeAudio.playBehavior = "resolve"
         FakeAudio.volumeWriteBehaviors = []
+        analysisMocks.ensureSourceAnalysis.mockReset()
+        analysisMocks.ensureSourceAnalysis.mockResolvedValue(null)
     })
 
     afterEach(() => {
@@ -505,7 +548,7 @@ describe("SceneMixEngine", () => {
         mix.subscribeStatus((snapshot) => snapshots.push(snapshot))
 
         FakeAudio.playBehavior = () => delayedB.promise
-        mix.crossfadeTo(TRACK_2)
+        mix.crossfadeTo(FALLBACK_TRACK)
         const deckB = FakeAudio.created[1]
 
         FakeAudio.playBehavior = () => delayedC.promise
@@ -513,6 +556,7 @@ describe("SceneMixEngine", () => {
         delayedB.reject(new Error("stale B failure"))
         await flushMicrotasks()
         expect(deckB.src).toBe("")
+        expect(FakeAudio.created).toHaveLength(3)
         expect(mix.getCurrentTrackKey()).toBe("id:SCENE_1")
         expect(mix.getStatusSnapshot()).toMatchObject({
             state: "loading",
@@ -583,6 +627,463 @@ describe("SceneMixEngine", () => {
             audibleTrackKey: null,
             failure: null,
         })
+    })
+
+    it("uses authoritative normalized sources and reports a successful fallback", async () => {
+        const fallbackEvents: FallbackSourceEvent[] = []
+        const mix = createSceneMixEngine({
+            fadeMs: 0,
+            onFallbackSource: (event) => {
+                fallbackEvents.push(event)
+                throw new Error("host fallback listener failed")
+            },
+        })
+        mix.crossfadeTo(TRACK)
+        await flushMicrotasks()
+        const survivor = FakeAudio.created[0]
+
+        FakeAudio.playBehavior = (audio) => {
+            if (audio.src.endsWith("/scene/primary.webm")) {
+                const error = new Error("primary unsupported")
+                error.name = "NotSupportedError"
+                throw error
+            }
+            return Promise.resolve()
+        }
+        mix.crossfadeTo(FALLBACK_TRACK)
+
+        expect(FakeAudio.created).toHaveLength(3)
+        expect(FakeAudio.created[1].src).toBe("")
+        expect(FakeAudio.created[2].src).toBe("http://localhost:3000/scene/fallback.mp3")
+        expect(FakeAudio.created.some((audio) => audio.src.includes("legacy.example"))).toBe(false)
+        expect(survivor.paused).toBe(false)
+        expect(survivor.pauseCalls).toBe(0)
+        expect(fallbackEvents).toEqual([
+            {
+                failedSource: "http://localhost:3000/scene/primary.webm",
+                nextSource: "http://localhost:3000/scene/fallback.mp3",
+                nextSourceType: "audio/mpeg",
+                sourceIndex: 1,
+                sourceCount: 2,
+                error: "src-not-supported",
+            },
+        ])
+        expect(Object.isFrozen(fallbackEvents[0])).toBe(true)
+
+        await flushMicrotasks()
+        expect(mix.getCurrentTrackKey()).toBe("id:SCENE_FALLBACK")
+        expect(mix.getStatusSnapshot().state).toBe("playing")
+        mix.dispose()
+    })
+
+    it("advances network, decode, and media failures without accepting stale events", async () => {
+        const primaryPlay = deferred()
+        const mediaPlay = deferred()
+        const fallbackEvents: FallbackSourceEvent[] = []
+        const track: Track = {
+            id: "FAILURE_CHAIN",
+            title: "Failure chain",
+            artist: "t",
+            sources: [
+                { url: "/chain/network.mp3" },
+                { url: "/chain/decode.mp3" },
+                { url: "/chain/media.mp3" },
+                { url: "/chain/working.mp3" },
+            ],
+        }
+        FakeAudio.playBehavior = (audio) => {
+            if (audio.src.endsWith("/chain/network.mp3")) return primaryPlay.promise
+            if (audio.src.endsWith("/chain/decode.mp3")) {
+                const error = new Error("decode rejected")
+                error.name = "EncodingError"
+                return Promise.reject(error)
+            }
+            if (audio.src.endsWith("/chain/media.mp3")) return mediaPlay.promise
+            return Promise.resolve()
+        }
+        const mix = createSceneMixEngine({
+            onFallbackSource: (event) => fallbackEvents.push(event),
+        })
+
+        mix.crossfadeTo(track)
+        const networkDeck = FakeAudio.created[0]
+        networkDeck.error = { code: 2, message: "" } as MediaError
+        networkDeck.dispatch("error")
+        await flushMicrotasks()
+        const mediaDeck = FakeAudio.created[2]
+        mediaDeck.error = { code: 3, message: "" } as MediaError
+        mediaDeck.dispatch("error")
+        await flushMicrotasks()
+
+        expect(FakeAudio.created.map((audio) => audio.src)).toEqual([
+            "",
+            "",
+            "",
+            "http://localhost:3000/chain/working.mp3",
+        ])
+        expect(fallbackEvents.map((event) => event.error)).toEqual([
+            "network",
+            "decode",
+            "decode",
+        ])
+        expect(mix.getCurrentTrackKey()).toBe("id:FAILURE_CHAIN")
+
+        const settledSnapshot = mix.getStatusSnapshot()
+        primaryPlay.resolve()
+        mediaPlay.reject(new Error("late media play rejection"))
+        networkDeck.dispatch("error")
+        mediaDeck.dispatch("loadedmetadata")
+        await flushMicrotasks()
+        expect(FakeAudio.created).toHaveLength(4)
+        expect(mix.getStatusSnapshot()).toBe(settledSnapshot)
+        mix.dispose()
+    })
+
+    it("does not consume a fallback while autoplay is blocked", async () => {
+        const fallbackEvents: FallbackSourceEvent[] = []
+        FakeAudio.playBehavior = "not-allowed"
+        const mix = createSceneMixEngine({
+            onFallbackSource: (event) => fallbackEvents.push(event),
+        })
+
+        mix.crossfadeTo(FALLBACK_TRACK)
+        await flushMicrotasks()
+        const primary = FakeAudio.created[0]
+        expect(primary.src).toBe("http://localhost:3000/scene/primary.webm")
+        expect(FakeAudio.created).toHaveLength(1)
+        expect(fallbackEvents).toHaveLength(0)
+        expect(mix.getStatusSnapshot().state).toBe("autoplay-blocked")
+
+        FakeAudio.playBehavior = (audio) =>
+            audio === primary
+                ? Promise.reject(new Error("retry failed"))
+                : Promise.resolve()
+        document.dispatchEvent(new Event("pointerdown"))
+        await flushMicrotasks()
+
+        expect(primary.playCalls).toBe(2)
+        expect(FakeAudio.created).toHaveLength(2)
+        expect(fallbackEvents).toHaveLength(1)
+        expect(fallbackEvents[0].sourceIndex).toBe(1)
+        expect(mix.getCurrentTrackKey()).toBe("id:SCENE_FALLBACK")
+        mix.dispose()
+    })
+
+    it("publishes one terminal failure after every candidate fails and preserves the survivor", async () => {
+        const fallbackEvents: FallbackSourceEvent[] = []
+        const snapshots: SceneMixStatusSnapshot[] = []
+        const track: Track = {
+            id: "ALL_FAILED",
+            title: "All failed",
+            artist: "t",
+            audioFile: "/failed/primary.mp3",
+            fallbackSources: [
+                " ",
+                "http://localhost:3000/failed/primary.mp3",
+                "/failed/second.mp3",
+                "/failed/third.mp3",
+            ],
+        }
+        const mix = createSceneMixEngine({
+            fadeMs: 0,
+            onFallbackSource: (event) => fallbackEvents.push(event),
+        })
+        mix.crossfadeTo(TRACK)
+        await flushMicrotasks()
+        const survivor = FakeAudio.created[0]
+        mix.subscribeStatus((snapshot) => snapshots.push(snapshot))
+
+        FakeAudio.playBehavior = "throw"
+        mix.crossfadeTo(track)
+
+        expect(fallbackEvents).toHaveLength(2)
+        expect(FakeAudio.created).toHaveLength(4)
+        expect(FakeAudio.created.slice(1).every((audio) => audio.src === "")).toBe(true)
+        expect(snapshots.filter((snapshot) => snapshot.state === "failed")).toHaveLength(1)
+        expect(mix.getStatusSnapshot()).toMatchObject({
+            state: "failed",
+            requestedTrackKey: "id:ALL_FAILED",
+            audibleTrackKey: "id:SCENE_1",
+        })
+        expect(survivor.paused).toBe(false)
+        expect(survivor.pauseCalls).toBe(0)
+        mix.dispose()
+    })
+
+    it("recovers the outgoing deck while an active source moves to its fallback", async () => {
+        const fallbackPlay = deferred()
+        const fallbackEvents: FallbackSourceEvent[] = []
+        const mix = createSceneMixEngine({
+            fadeMs: 1000,
+            onFallbackSource: (event) => fallbackEvents.push(event),
+        })
+        mix.crossfadeTo(TRACK)
+        await flushMicrotasks()
+        const survivor = FakeAudio.created[0]
+
+        mix.crossfadeTo(FALLBACK_TRACK)
+        await flushMicrotasks()
+        const selectedPrimary = FakeAudio.created[1]
+        expect(mix.getCurrentTrackKey()).toBe("id:SCENE_FALLBACK")
+
+        FakeAudio.playBehavior = () => fallbackPlay.promise
+        selectedPrimary.error = { code: 2, message: "" } as MediaError
+        selectedPrimary.dispatch("error")
+        const selectedFallback = FakeAudio.created[2]
+
+        expect(mix.getCurrentTrackKey()).toBe("id:SCENE_1")
+        expect(survivor.paused).toBe(false)
+        expect(survivor.pauseCalls).toBe(0)
+        expect(selectedFallback.src).toBe("http://localhost:3000/scene/fallback.mp3")
+        expect(mix.getStatusSnapshot()).toMatchObject({
+            state: "loading",
+            requestedTrackKey: "id:SCENE_FALLBACK",
+            audibleTrackKey: "id:SCENE_1",
+        })
+        expect(fallbackEvents).toHaveLength(1)
+
+        fallbackPlay.resolve()
+        await flushMicrotasks()
+        expect(mix.getCurrentTrackKey()).toBe("id:SCENE_FALLBACK")
+        mix.dispose()
+    })
+
+    it("tears down a pending fallback and ignores late candidate work on dispose", async () => {
+        const primaryPlay = deferred()
+        const fallbackPlay = deferred()
+        const fallbackEvents: FallbackSourceEvent[] = []
+        FakeAudio.playBehavior = (audio) =>
+            audio.src.endsWith("/scene/primary.webm")
+                ? primaryPlay.promise
+                : fallbackPlay.promise
+        const mix = createSceneMixEngine({
+            onFallbackSource: (event) => fallbackEvents.push(event),
+        })
+
+        mix.crossfadeTo(FALLBACK_TRACK)
+        const primary = FakeAudio.created[0]
+        primary.dispatch("error")
+        const fallback = FakeAudio.created[1]
+        mix.dispose()
+        const stoppedSnapshot = mix.getStatusSnapshot()
+
+        primaryPlay.resolve()
+        fallbackPlay.resolve()
+        primary.dispatch("error")
+        fallback.dispatch("error")
+        fallback.dispatch("loadedmetadata")
+        document.dispatchEvent(new Event("pointerdown"))
+        await flushMicrotasks()
+
+        expect(fallbackEvents).toHaveLength(1)
+        expect(FakeAudio.created).toHaveLength(2)
+        expect(primary.src).toBe("")
+        expect(fallback.src).toBe("")
+        expect(primary.listenerCount("error")).toBe(0)
+        expect(fallback.listenerCount("error")).toBe(0)
+        expect(mix.getStatusSnapshot()).toBe(stoppedSnapshot)
+    })
+
+    it("skips silence analysis in off mode", async () => {
+        const mix = createSceneMixEngine({ analysisPolicy: "off" })
+
+        mix.crossfadeTo(TRACK)
+        await flushMicrotasks()
+        const deck = FakeAudio.created[0]
+        deck.dispatch("loadedmetadata")
+
+        expect(analysisMocks.ensureSourceAnalysis).not.toHaveBeenCalled()
+        expect(deck.currentTime).toBe(0)
+        expect(deck.currentTimeWrites).toHaveLength(0)
+        expect(mix.getStatusSnapshot().state).toBe("playing")
+        mix.dispose()
+    })
+
+    it("applies a supplied trim after metadata and performs no analysis", async () => {
+        const mix = createSceneMixEngine()
+
+        mix.crossfadeTo(TRACK, { trimStartMs: 2500 })
+        const deck = FakeAudio.created[0]
+        deck.duration = 20
+        expect(deck.playCalls).toBe(0)
+        expect(analysisMocks.ensureSourceAnalysis).not.toHaveBeenCalled()
+
+        deck.dispatch("loadedmetadata")
+        expect(deck.currentTime).toBe(2.5)
+        expect(deck.currentTimeWrites).toEqual([2.5])
+        expect(deck.playCalls).toBe(1)
+        await flushMicrotasks()
+        expect(mix.getStatusSnapshot().state).toBe("playing")
+
+        mix.crossfadeTo(TRACK_2, { trimStartMs: 0 })
+        await flushMicrotasks()
+        expect(FakeAudio.created[1].playCalls).toBe(1)
+        expect(analysisMocks.ensureSourceAnalysis).not.toHaveBeenCalled()
+
+        mix.crossfadeTo(TRACK_3, { trimStartMs: 30_000 })
+        const outOfRangeDeck = FakeAudio.created[2]
+        outOfRangeDeck.duration = 20
+        expect(outOfRangeDeck.playCalls).toBe(0)
+        outOfRangeDeck.dispatch("loadedmetadata")
+        expect(outOfRangeDeck.currentTimeWrites).toHaveLength(0)
+        expect(outOfRangeDeck.playCalls).toBe(1)
+        await flushMicrotasks()
+        expect(analysisMocks.ensureSourceAnalysis).not.toHaveBeenCalled()
+        mix.dispose()
+    })
+
+    it("applies automatic source analysis before a pending play commits", async () => {
+        const pendingPlay = deferred()
+        FakeAudio.playBehavior = () => pendingPlay.promise
+        analysisMocks.ensureSourceAnalysis.mockResolvedValueOnce({
+            trimStartMs: 1500,
+            trimEndMs: 0,
+        })
+        const mix = createSceneMixEngine()
+
+        mix.crossfadeTo(TRACK)
+        const deck = FakeAudio.created[0]
+        deck.duration = 20
+        deck.dispatch("loadedmetadata")
+        await flushMicrotasks()
+
+        expect(analysisMocks.ensureSourceAnalysis).toHaveBeenCalledWith(
+            "https://cdn.example/score.mp3",
+        )
+        expect(deck.currentTime).toBe(1.5)
+        pendingPlay.resolve()
+        await flushMicrotasks()
+        expect(mix.getStatusSnapshot().state).toBe("playing")
+        mix.dispose()
+    })
+
+    it("keeps playback at natural start when automatic analysis returns no trim", async () => {
+        const mix = createSceneMixEngine()
+
+        mix.crossfadeTo(TRACK_2)
+        await flushMicrotasks()
+        const naturalDeck = FakeAudio.created[0]
+        naturalDeck.dispatch("loadedmetadata")
+        await flushMicrotasks()
+
+        expect(naturalDeck.currentTime).toBe(0)
+        expect(mix.getStatusSnapshot()).toMatchObject({
+            state: "playing",
+            failure: null,
+        })
+        mix.dispose()
+    })
+
+    it("does not gate streaming playback on slow automatic analysis", async () => {
+        const slowAnalysis = deferred<TrackTrims | null>()
+        analysisMocks.ensureSourceAnalysis.mockReturnValue(slowAnalysis.promise)
+        const mix = createSceneMixEngine()
+
+        mix.crossfadeTo(TRACK)
+        const deck = FakeAudio.created[0]
+        expect(deck.playCalls).toBe(1)
+        await flushMicrotasks()
+        expect(mix.getStatusSnapshot().state).toBe("playing")
+
+        deck.duration = 20
+        deck.dispatch("loadedmetadata")
+        slowAnalysis.resolve({ trimStartMs: 2000, trimEndMs: 0 })
+        await flushMicrotasks()
+
+        expect(deck.currentTime).toBe(0)
+        expect(deck.currentTimeWrites).toHaveLength(0)
+        expect(mix.getStatusSnapshot()).toMatchObject({
+            state: "playing",
+            failure: null,
+        })
+        mix.dispose()
+    })
+
+    it("applies analysis only from the fallback source that remains selected", async () => {
+        const primaryAnalysis = deferred<TrackTrims | null>()
+        const fallbackAnalysis = deferred<TrackTrims | null>()
+        const primaryPlay = deferred()
+        const fallbackPlay = deferred()
+        analysisMocks.ensureSourceAnalysis.mockImplementation((url: string) =>
+            url.endsWith("/scene/primary.webm")
+                ? primaryAnalysis.promise
+                : fallbackAnalysis.promise,
+        )
+        FakeAudio.playBehavior = (audio) =>
+            audio.src.endsWith("/scene/primary.webm")
+                ? primaryPlay.promise
+                : fallbackPlay.promise
+        const mix = createSceneMixEngine()
+
+        mix.crossfadeTo(FALLBACK_TRACK)
+        const primary = FakeAudio.created[0]
+        primary.duration = 30
+        primary.dispatch("loadedmetadata")
+        primary.error = { code: 2, message: "" } as MediaError
+        primary.dispatch("error")
+        const fallback = FakeAudio.created[1]
+        fallback.duration = 30
+        fallback.dispatch("loadedmetadata")
+
+        fallbackAnalysis.resolve({ trimStartMs: 3000, trimEndMs: 0 })
+        await flushMicrotasks()
+        expect(fallback.currentTime).toBe(3)
+        expect(analysisMocks.ensureSourceAnalysis.mock.calls.map(([url]) => url)).toEqual([
+            "http://localhost:3000/scene/primary.webm",
+            "http://localhost:3000/scene/fallback.mp3",
+        ])
+
+        primaryAnalysis.resolve({ trimStartMs: 9000, trimEndMs: 0 })
+        await flushMicrotasks()
+        expect(primary.currentTimeWrites).toHaveLength(0)
+        expect(fallback.currentTime).toBe(3)
+
+        fallbackPlay.resolve()
+        await flushMicrotasks()
+        expect(mix.getCurrentTrackKey()).toBe("id:SCENE_FALLBACK")
+        primaryPlay.resolve()
+        await flushMicrotasks()
+        expect(mix.getCurrentTrackKey()).toBe("id:SCENE_FALLBACK")
+        mix.dispose()
+    })
+
+    it("ignores late analysis after supersession and disposal", async () => {
+        const staleAnalysis = deferred<TrackTrims | null>()
+        const currentAnalysis = deferred<TrackTrims | null>()
+        const stalePlay = deferred()
+        const currentPlay = deferred()
+        analysisMocks.ensureSourceAnalysis.mockImplementation((url: string) =>
+            url.endsWith("score-2.mp3") ? staleAnalysis.promise : currentAnalysis.promise,
+        )
+        FakeAudio.playBehavior = (audio) =>
+            audio.src.endsWith("score-2.mp3") ? stalePlay.promise : currentPlay.promise
+        const mix = createSceneMixEngine()
+
+        mix.crossfadeTo(TRACK_2)
+        const staleDeck = FakeAudio.created[0]
+        staleDeck.duration = 20
+        staleDeck.dispatch("loadedmetadata")
+        mix.crossfadeTo(TRACK_3)
+        const currentDeck = FakeAudio.created[1]
+        currentDeck.duration = 20
+        currentDeck.dispatch("loadedmetadata")
+
+        staleAnalysis.resolve({ trimStartMs: 4000, trimEndMs: 0 })
+        stalePlay.resolve()
+        await flushMicrotasks()
+        expect(staleDeck.currentTimeWrites).toHaveLength(0)
+        expect(mix.getStatusSnapshot()).toMatchObject({
+            state: "loading",
+            requestedTrackKey: "id:SCENE_3",
+        })
+
+        mix.dispose()
+        const stoppedSnapshot = mix.getStatusSnapshot()
+        currentAnalysis.resolve({ trimStartMs: 6000, trimEndMs: 0 })
+        currentPlay.resolve()
+        await flushMicrotasks()
+        expect(currentDeck.currentTimeWrites).toHaveLength(0)
+        expect(mix.getStatusSnapshot()).toBe(stoppedSnapshot)
     })
 
     it("keeps volume-lock detection isolated between engine instances", async () => {
