@@ -337,7 +337,7 @@ export interface TrackAnalysis {
     rmsDbfs?: number
     /** Difference between sample peak and overall RMS level. */
     crestFactorDb?: number
-    /** 95th-to-10th percentile range of non-silent 50ms RMS windows. */
+    /** 95th-to-10th percentile range of 50ms RMS windows above -60 dBFS. */
     rmsRangeDb?: number
     /** Fraction of analyzed samples whose absolute amplitude is at least 0.999. */
     clippingSampleRatio?: number

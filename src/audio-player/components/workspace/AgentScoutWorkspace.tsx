@@ -18,21 +18,30 @@ import {
 
 export type { AgentScoutVariant } from "./agentScoutContract"
 
-const AGENT_COPY: Record<AgentScoutVariant, { lead: string; sub: string; actionLabel: string }> = {
+const AGENT_COPY: Record<
+    AgentScoutVariant,
+    { lead: string; sub: string; actionLabel: string; initialPrompt: string }
+> = {
     "demo-scout": {
         lead: "Demo Scout",
         sub: "Measures the decoded demo audio, waveform, rhythm, metadata, and lyrics to help prioritize what to finish.",
         actionLabel: "Analyze Demo Audio",
+        initialPrompt:
+            "Use the decoded audio measurements and track context to assess whether this demo is worth finishing next.",
     },
     "studio-scout": {
         lead: "Studio Scout",
         sub: "Reviews decoded level, dynamics, stereo, waveform, and rhythm measurements. Requires the Studio entitlement.",
         actionLabel: "Analyze Studio Audio",
+        initialPrompt:
+            "Review the decoded level, dynamics, stereo, waveform, and rhythm measurements for this track.",
     },
     memoir: {
         lead: "Memoir",
         sub: "Builds an evidence-grounded portrait from the track audio, lyrics, metadata, and available vault context.",
         actionLabel: "Analyze Track Story",
+        initialPrompt:
+            "Create an evidence-grounded portrait of this track without inventing unavailable history.",
     },
 }
 
@@ -262,7 +271,7 @@ export function AgentScoutWorkspace({ variant }: { variant: AgentScoutVariant })
                 )
             }
 
-            const data = (await response.json()) as Partial<AgentScoutResponse>
+            const data = (await response.json().catch(() => ({}))) as Partial<AgentScoutResponse>
             const assistantContent = data.content
 
             if (typeof assistantContent !== "string" || !assistantContent.trim()) {
@@ -295,13 +304,7 @@ export function AgentScoutWorkspace({ variant }: { variant: AgentScoutVariant })
     }
 
     const startInitialAnalysis = () => {
-        const initialPrompt =
-            variant === "demo-scout"
-                ? "Use the decoded audio measurements and track context to assess whether this demo is worth finishing next."
-                : variant === "studio-scout"
-                  ? "Review the decoded level, dynamics, stereo, waveform, and rhythm measurements for this track."
-                  : "Create an evidence-grounded portrait of this track without inventing unavailable history."
-        void handleSendMessage(initialPrompt)
+        void handleSendMessage(copy.initialPrompt)
     }
 
     const clearChat = () => {
@@ -413,6 +416,7 @@ export function AgentScoutWorkspace({ variant }: { variant: AgentScoutVariant })
 
                         {error && (
                             <div
+                                role="alert"
                                 className="sap-ctl__agent-loading-container"
                                 style={{ color: "#ef4444" }}
                             >

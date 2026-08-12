@@ -11,8 +11,6 @@ const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 const MAX_BODY_LENGTH = 64_000
 const MAX_MESSAGES = 12
 const MAX_TOTAL_MESSAGE_LENGTH = 24_000
-const RATE_LIMIT_WINDOW_MS = 60_000
-const RATE_LIMIT_REQUESTS = 6
 const UPSTREAM_TIMEOUT_MS = 30_000
 
 const PRESET_ENV_KEYS: Record<AgentScoutVariant, string> = {
@@ -27,18 +25,14 @@ const PRESET_DEFAULTS: Record<AgentScoutVariant, string> = {
     memoir: "@preset/sea-demo-memoir-dev",
 }
 
-interface RateLimitEntry {
-    count: number
-    resetAt: number
-}
-
 interface AgentScoutServerOptions {
     env?: Record<string, string | undefined>
     fetch?: typeof fetch
-    now?: () => number
+    rateLimit: (request: Request) => Promise<{
+        allowed: boolean
+        retryAfterSeconds?: number
+    }>
 }
-
-const rateLimits = new Map<string, RateLimitEntry>()
 
 function json(body: unknown, status = 200, headers: HeadersInit = {}): Response {
     return Response.json(body, {
@@ -289,42 +283,6 @@ ${queue}
 Act as Memoir. Write a metadata-, lyric-, and measurement-grounded current-track portrait. Do not invent recording sessions, version history, or an evolutionary arc that the supplied data does not establish. Explicitly note unavailable history before offering any clearly labeled imaginative interpretation.`
 }
 
-function clientIp(request: Request): string {
-    return (
-        request.headers.get("x-real-ip") ??
-        request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-        "unknown"
-    )
-}
-
-function allowRequest(request: Request, now: number): { allowed: boolean; retryAfter: number } {
-    if (rateLimits.size > 1_024) {
-        for (const [key, entry] of rateLimits) {
-            if (entry.resetAt <= now) rateLimits.delete(key)
-        }
-        while (rateLimits.size > 1_024) {
-            const oldestKey = rateLimits.keys().next().value as string | undefined
-            if (!oldestKey) break
-            rateLimits.delete(oldestKey)
-        }
-    }
-
-    const key = clientIp(request)
-    const existing = rateLimits.get(key)
-    if (!existing || existing.resetAt <= now) {
-        rateLimits.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS })
-        return { allowed: true, retryAfter: 0 }
-    }
-    if (existing.count >= RATE_LIMIT_REQUESTS) {
-        return {
-            allowed: false,
-            retryAfter: Math.max(1, Math.ceil((existing.resetAt - now) / 1000)),
-        }
-    }
-    existing.count++
-    return { allowed: true, retryAfter: 0 }
-}
-
 function sameOrigin(request: Request): boolean {
     const origin = request.headers.get("origin")
     if (!origin) return false
@@ -336,7 +294,7 @@ function sameOrigin(request: Request): boolean {
 }
 
 /** Create the Web-standard handler used by the Vercel `/api/agent-scout` function. */
-export function createAgentScoutHandler(options: AgentScoutServerOptions = {}) {
+export function createAgentScoutHandler(options: AgentScoutServerOptions) {
     return {
         async fetch(request: Request): Promise<Response> {
             if (request.method !== "POST") {
@@ -346,11 +304,18 @@ export function createAgentScoutHandler(options: AgentScoutServerOptions = {}) {
                 return json({ error: "Cross-origin requests are not allowed." }, 403)
             }
 
-            const now = options.now?.() ?? Date.now()
-            const rateLimit = allowRequest(request, now)
+            let rateLimit: Awaited<ReturnType<AgentScoutServerOptions["rateLimit"]>>
+            try {
+                rateLimit = await options.rateLimit(request)
+            } catch {
+                console.error("Agent Scout rate limiter unavailable")
+                return json({ error: "Agent Scout is temporarily unavailable." }, 503)
+            }
             if (!rateLimit.allowed) {
                 return json({ error: "Too many Scout requests. Please wait and try again." }, 429, {
-                    "Retry-After": String(rateLimit.retryAfter),
+                    "Retry-After": String(
+                        Math.max(1, Math.ceil(rateLimit.retryAfterSeconds ?? 60))
+                    ),
                 })
             }
 
@@ -412,8 +377,7 @@ export function createAgentScoutHandler(options: AgentScoutServerOptions = {}) {
                 })
 
                 if (!response.ok) {
-                    const detail = await response.text().catch(() => "")
-                    console.error("Agent Scout OpenRouter request failed", response.status, detail)
+                    console.error("Agent Scout OpenRouter request failed", response.status)
                     return json({ error: "Agent Scout is temporarily unavailable." }, 502)
                 }
 
@@ -434,9 +398,4 @@ export function createAgentScoutHandler(options: AgentScoutServerOptions = {}) {
             }
         },
     }
-}
-
-/** Test seam for the process-local best-effort rate limiter. */
-export function resetAgentScoutRateLimitsForTests(): void {
-    rateLimits.clear()
 }

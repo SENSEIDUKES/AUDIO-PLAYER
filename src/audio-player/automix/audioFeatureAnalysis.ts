@@ -5,6 +5,8 @@ export const SCOUT_WAVEFORM_BIN_COUNT = 32
 
 const WINDOW_MS = 50
 const SILENCE_RMS = 0.01
+/** Windows at or below this level are excluded from the RMS range percentiles. */
+const RANGE_FLOOR_DBFS = -60
 const ENERGY_FULL_SCALE_RMS = 0.35
 const MIN_DBFS = -160
 
@@ -165,7 +167,9 @@ export function extractAudioFeatures(
     const rms = Math.sqrt(totalSquares / totalSamples)
     const peakDbfs = toDbfs(peak)
     const rmsDbfs = toDbfs(rms)
-    const activeWindowLevels = windowDbfs.filter((level) => level > -60).sort((a, b) => a - b)
+    const activeWindowLevels = windowDbfs
+        .filter((level) => level > RANGE_FLOOR_DBFS)
+        .sort((a, b) => a - b)
     const rmsRangeDb = Math.max(
         0,
         percentile(activeWindowLevels, 0.95) - percentile(activeWindowLevels, 0.1)

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { Track } from "../../types"
+import { SCOUT_WAVEFORM_BIN_COUNT } from "../audioFeatureAnalysis"
 import { getTrackTrims } from "../silenceAnalysis"
 import {
     configureTrackAnalysis,
@@ -54,7 +55,7 @@ describe("ensureProTrackAnalysis", () => {
         expect(analysis?.channelCount).toBe(1)
         expect(analysis?.peakDbfs).toBeCloseTo(-20, 1)
         expect(analysis?.rmsDbfs).toBeCloseTo(-20, 1)
-        expect(analysis?.waveformRmsDbfs).toHaveLength(32)
+        expect(analysis?.waveformRmsDbfs).toHaveLength(SCOUT_WAVEFORM_BIN_COUNT)
     })
 
     it("analyzes head and tail segments of a long track at the right offsets", async () => {

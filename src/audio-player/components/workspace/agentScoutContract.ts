@@ -97,10 +97,14 @@ export function toAgentScoutAudioEvidence(
         clippingSampleRatio: analysis.clippingSampleRatio as number,
         silenceRatio: analysis.silenceRatio as number,
         stereoCorrelation:
-            typeof analysis.stereoCorrelation === "number" ? analysis.stereoCorrelation : null,
+            typeof analysis.stereoCorrelation === "number" &&
+            Number.isFinite(analysis.stereoCorrelation)
+                ? analysis.stereoCorrelation
+                : null,
         waveformRmsDbfs: [...analysis.waveformRmsDbfs],
         energy: analysis.energy as number,
-        bpm: typeof analysis.bpm === "number" ? analysis.bpm : null,
+        bpm:
+            typeof analysis.bpm === "number" && Number.isFinite(analysis.bpm) ? analysis.bpm : null,
         beatCount: analysis.beats?.length ?? 0,
         rhythmConfidence: analysis.confidence as number,
         trimStartMs: analysis.trimStartMs as number,

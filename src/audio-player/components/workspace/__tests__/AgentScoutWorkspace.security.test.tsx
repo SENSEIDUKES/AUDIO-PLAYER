@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import AgentScoutWorkspace from "../AgentScoutWorkspace"
 import { useAudioSession } from "../../../session/AudioSessionContext"
@@ -36,6 +36,28 @@ function mockAudioSession(value: Partial<ReturnType<typeof useAudioSession>>) {
     vi.mocked(useAudioSession).mockReturnValue(value as ReturnType<typeof useAudioSession>)
 }
 
+function completedAnalysis() {
+    return {
+        durationMs: 120_000,
+        sampleRateHz: 44_100,
+        channelCount: 2,
+        peakDbfs: -1,
+        rmsDbfs: -14,
+        crestFactorDb: 13,
+        rmsRangeDb: 8,
+        clippingSampleRatio: 0,
+        silenceRatio: 0.02,
+        stereoCorrelation: 0.5,
+        waveformRmsDbfs: Array(32).fill(-18),
+        energy: 0.6,
+        bpm: 120,
+        beats: [500, 1_000],
+        confidence: 0.9,
+        trimStartMs: 200,
+        trimEndMs: 500,
+    }
+}
+
 describe("AgentScoutWorkspace Security", () => {
     beforeAll(() => {
         window.HTMLElement.prototype.scrollIntoView = vi.fn()
@@ -47,7 +69,9 @@ describe("AgentScoutWorkspace Security", () => {
     })
 
     afterEach(() => {
+        cleanup()
         vi.unstubAllGlobals()
+        vi.restoreAllMocks()
     })
 
     it("should escape HTML tags and not render them as elements", () => {
@@ -108,25 +132,7 @@ describe("AgentScoutWorkspace Security", () => {
             currentSrc: "https://cdn.example/resolved.mp3",
             queue: [],
         })
-        vi.mocked(ensureProTrackAnalysis).mockResolvedValue({
-            durationMs: 120_000,
-            sampleRateHz: 44_100,
-            channelCount: 2,
-            peakDbfs: -1,
-            rmsDbfs: -14,
-            crestFactorDb: 13,
-            rmsRangeDb: 8,
-            clippingSampleRatio: 0,
-            silenceRatio: 0.02,
-            stereoCorrelation: 0.5,
-            waveformRmsDbfs: Array(32).fill(-18),
-            energy: 0.6,
-            bpm: 120,
-            beats: [500, 1_000],
-            confidence: 0.9,
-            trimStartMs: 200,
-            trimEndMs: 500,
-        })
+        vi.mocked(ensureProTrackAnalysis).mockResolvedValue(completedAnalysis())
         const fetchMock = vi.fn<typeof fetch>(async () =>
             Response.json({ content: "Evidence-based review" })
         )
@@ -153,6 +159,43 @@ describe("AgentScoutWorkspace Security", () => {
             beatCount: 2,
         })
         expect(String(init?.body)).not.toContain("https://cdn.example/resolved.mp3")
+        expect(String(init?.body)).not.toContain("https://cdn.example/original.mp3")
+    })
+
+    it("shows the stable empty-response error for malformed success bodies", async () => {
+        mockAudioSession({
+            currentTrack: {
+                id: "1",
+                title: "Malformed Response Track",
+                artist: "Test Artist",
+                audioFile: "https://cdn.example/track.mp3",
+            },
+            currentSrc: "https://cdn.example/track.mp3",
+            queue: [],
+        })
+        vi.mocked(ensureProTrackAnalysis).mockResolvedValue(completedAnalysis())
+        vi.stubGlobal(
+            "fetch",
+            vi.fn<typeof fetch>(
+                async () =>
+                    new Response("<html>not json</html>", {
+                        status: 200,
+                        headers: { "Content-Type": "text/html" },
+                    })
+            )
+        )
+        const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined)
+
+        render(<AgentScoutWorkspace variant="demo-scout" />)
+        fireEvent.click(screen.getByRole("button", { name: "Analyze Demo Audio" }))
+
+        await waitFor(() =>
+            expect(screen.getByRole("alert").textContent).toBe(
+                "Agent Scout returned an empty response."
+            )
+        )
+        expect(screen.getByRole("alert").textContent).not.toMatch(/unexpected token/i)
+        consoleError.mockRestore()
     })
 
     it("stops instead of requesting speculative text feedback when decoding fails", async () => {

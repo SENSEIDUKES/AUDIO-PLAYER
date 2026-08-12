@@ -1,5 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
-import { createAgentScoutHandler, resetAgentScoutRateLimitsForTests } from "../agentScout"
+import { describe, expect, it, vi } from "vitest"
+import { createAgentScoutHandler } from "../agentScout"
+
+const allowRequest = async () => ({ allowed: true })
 
 function validBody() {
     return {
@@ -46,10 +48,6 @@ function request(body: unknown, headers: Record<string, string> = {}): Request {
     })
 }
 
-beforeEach(() => {
-    resetAgentScoutRateLimitsForTests()
-})
-
 describe("Agent Scout server handler", () => {
     it("keeps the API key and model server-side and forwards measured evidence", async () => {
         const upstream = vi.fn<typeof fetch>(async () =>
@@ -61,6 +59,7 @@ describe("Agent Scout server handler", () => {
                 OPENROUTER_PRESET_STUDIO_SCOUT: "server/studio-preset",
             },
             fetch: upstream,
+            rateLimit: allowRequest,
         })
 
         const response = await handler.fetch(request({ ...validBody(), model: "attacker/model" }))
@@ -85,6 +84,7 @@ describe("Agent Scout server handler", () => {
         const handler = createAgentScoutHandler({
             env: { OPENROUTER_API_KEY: "server-secret" },
             fetch: upstream,
+            rateLimit: allowRequest,
         })
         const body = validBody()
         Reflect.deleteProperty(body, "audio")
@@ -100,6 +100,7 @@ describe("Agent Scout server handler", () => {
         const handler = createAgentScoutHandler({
             env: { OPENROUTER_API_KEY: "server-secret" },
             fetch: upstream,
+            rateLimit: allowRequest,
         })
 
         const response = await handler.fetch(
@@ -114,10 +115,15 @@ describe("Agent Scout server handler", () => {
         const upstream = vi.fn(async () =>
             Response.json({ choices: [{ message: { content: "Measured review" } }] })
         )
+        let requestCount = 0
+        const rateLimit = vi.fn(async () => ({
+            allowed: ++requestCount <= 6,
+            retryAfterSeconds: 60,
+        }))
         const handler = createAgentScoutHandler({
             env: { OPENROUTER_API_KEY: "server-secret" },
             fetch: upstream,
-            now: () => 10_000,
+            rateLimit,
         })
 
         for (let index = 0; index < 6; index++) {
@@ -128,5 +134,49 @@ describe("Agent Scout server handler", () => {
         expect(limited.status).toBe(429)
         expect(limited.headers.get("Retry-After")).toBe("60")
         expect(upstream).toHaveBeenCalledTimes(6)
+        expect(rateLimit).toHaveBeenCalledTimes(7)
+    })
+
+    it("fails closed when the shared rate limiter is unavailable", async () => {
+        const upstream = vi.fn()
+        const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined)
+        const handler = createAgentScoutHandler({
+            env: { OPENROUTER_API_KEY: "server-secret" },
+            fetch: upstream,
+            rateLimit: async () => {
+                throw new Error("shared limiter unavailable")
+            },
+        })
+
+        const response = await handler.fetch(request(validBody()))
+
+        expect(response.status).toBe(503)
+        await expect(response.json()).resolves.toEqual({
+            error: "Agent Scout is temporarily unavailable.",
+        })
+        expect(upstream).not.toHaveBeenCalled()
+        expect(consoleError).toHaveBeenCalledWith("Agent Scout rate limiter unavailable")
+        consoleError.mockRestore()
+    })
+
+    it("does not log an upstream response body", async () => {
+        const upstream = vi.fn<typeof fetch>(
+            async () => new Response("sensitive provider diagnostic", { status: 400 })
+        )
+        const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined)
+        const handler = createAgentScoutHandler({
+            env: { OPENROUTER_API_KEY: "server-secret" },
+            fetch: upstream,
+            rateLimit: allowRequest,
+        })
+
+        const response = await handler.fetch(request(validBody()))
+
+        expect(response.status).toBe(502)
+        expect(consoleError).toHaveBeenCalledWith("Agent Scout OpenRouter request failed", 400)
+        expect(JSON.stringify(consoleError.mock.calls)).not.toContain(
+            "sensitive provider diagnostic"
+        )
+        consoleError.mockRestore()
     })
 })

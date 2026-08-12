@@ -232,7 +232,8 @@ decoded, Scout stops instead of substituting metadata-only sonic feedback.
 The audio file and its URL are not sent to the agent endpoint. Only the bounded
 measurement report, track metadata, lyrics, and chat messages are posted to the
 same-origin `/api/agent-scout` function. That function owns the OpenRouter key,
-model presets, prompt, input validation, request limit, and upstream call.
+model presets, prompt, input validation, and upstream call. Its request limit is
+enforced by Vercel Firewall rather than process-local function memory.
 
 Copy `.env.example` to `.env.local` and set `OPENROUTER_API_KEY` in the server
 environment. Never use a `VITE_` prefix for this credential because Vite
@@ -242,6 +243,12 @@ server-only:
 - `OPENROUTER_PRESET_DEMO_SCOUT`
 - `OPENROUTER_PRESET_STUDIO_SCOUT`
 - `OPENROUTER_PRESET_MEMOIR`
+
+Before enabling Scout on Vercel, publish a WAF rate-limit rule whose
+`@vercel/firewall` ID is `agent-scout`: use a fixed 60-second window, allow six
+requests per source IP, and return 429 after the limit. The function fails
+closed with 503 if that rule is missing or the shared limiter is unavailable.
+See [Vercel's Rate Limiting SDK setup](https://vercel.com/docs/vercel-firewall/vercel-waf/rate-limiting-sdk).
 
 Use `vercel dev` when exercising the complete local Scout flow; the plain Vite
 development server does not execute files in `api/`. Installed-package hosts

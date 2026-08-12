@@ -102,4 +102,15 @@ describe("extractAudioFeatures", () => {
 
         expect(features?.energy).toBeCloseTo((0.1 + 0.2) / 2 / 0.35, 4)
     })
+
+    it("returns null when the trims collapse the analyzed region", () => {
+        const samples = new Float32Array(1_000).fill(0.5)
+
+        const features = extractAudioFeatures(fakeBuffer([samples], 1_000), {
+            trimStartMs: 600,
+            trimEndMs: 600,
+        })
+
+        expect(features).toBeNull()
+    })
 })

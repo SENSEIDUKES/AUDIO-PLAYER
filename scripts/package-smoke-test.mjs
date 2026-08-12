@@ -169,10 +169,7 @@ try {
         throw new Error("Packed artifact did not install as @seihouse/audio-player")
     }
 
-    const forbiddenBrowserMarkers = [
-        "VITE_OPENROUTER_API_KEY",
-        "https://openrouter.ai/api/v1/chat/completions",
-    ]
+    const forbiddenBrowserMarkers = ["OPENROUTER_API_KEY", "openrouter.ai"]
     for (const bundleName of ["index.js", "index.cjs"]) {
         const bundle = await readFile(path.join(packageRoot, "dist", bundleName), "utf8")
         const exposedMarker = forbiddenBrowserMarkers.find((marker) => bundle.includes(marker))
