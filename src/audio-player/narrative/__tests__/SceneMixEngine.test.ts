@@ -932,7 +932,7 @@ describe("SceneMixEngine", () => {
         mix.dispose()
     })
 
-    it("uses automatic source analysis without making analysis failure fatal", async () => {
+    it("applies automatic source analysis before a pending play commits", async () => {
         const pendingPlay = deferred()
         FakeAudio.playBehavior = () => pendingPlay.promise
         analysisMocks.ensureSourceAnalysis.mockResolvedValueOnce({
@@ -955,22 +955,23 @@ describe("SceneMixEngine", () => {
         await flushMicrotasks()
         expect(mix.getStatusSnapshot().state).toBe("playing")
         mix.dispose()
+    })
 
-        analysisMocks.ensureSourceAnalysis.mockReset()
-        analysisMocks.ensureSourceAnalysis.mockResolvedValue(null)
-        FakeAudio.playBehavior = "resolve"
-        const failureMix = createSceneMixEngine()
-        failureMix.crossfadeTo(TRACK_2)
+    it("keeps playback at natural start when automatic analysis returns no trim", async () => {
+        const mix = createSceneMixEngine()
+
+        mix.crossfadeTo(TRACK_2)
         await flushMicrotasks()
-        const naturalDeck = FakeAudio.created[1]
+        const naturalDeck = FakeAudio.created[0]
         naturalDeck.dispatch("loadedmetadata")
         await flushMicrotasks()
+
         expect(naturalDeck.currentTime).toBe(0)
-        expect(failureMix.getStatusSnapshot()).toMatchObject({
+        expect(mix.getStatusSnapshot()).toMatchObject({
             state: "playing",
             failure: null,
         })
-        failureMix.dispose()
+        mix.dispose()
     })
 
     it("does not gate streaming playback on slow automatic analysis", async () => {

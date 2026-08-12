@@ -471,9 +471,9 @@ export class SceneMixEngine {
 
         this.pendingTransition = null
         this.disarmGestureRetry?.()
-        for (const deck of this.decks) {
-            if (deck !== transition.incoming) {
-                this.retire(deck, transition.request.fadeMs)
+        for (const otherDeck of this.decks) {
+            if (otherDeck !== transition.incoming) {
+                this.retire(otherDeck, transition.request.fadeMs)
             }
         }
 
@@ -548,15 +548,9 @@ export class SceneMixEngine {
         // deck while it exists. A stale retiring deck can never displace a
         // newer active owner.
         const pendingIncoming = this.pendingTransition?.incoming ?? null
-        const survivor = [...this.decks]
+        const recoverableSurvivor = [...this.decks]
             .reverse()
-            .find((candidate) => candidate !== pendingIncoming)
-        const recoverableSurvivor =
-            survivor === deck
-                ? [...this.decks]
-                      .reverse()
-                      .find((candidate) => candidate !== pendingIncoming && candidate !== deck)
-                : survivor
+            .find((candidate) => candidate !== pendingIncoming && candidate !== deck)
         if (recoverableSurvivor) {
             this.unretire(recoverableSurvivor, deck.request.fadeMs)
             this.active = recoverableSurvivor

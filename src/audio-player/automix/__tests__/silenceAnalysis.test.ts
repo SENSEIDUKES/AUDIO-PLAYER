@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { Track } from "../../types"
-import { createSceneMixEngine } from "../../narrative/SceneMixEngine"
 
 const decodeMocks = vi.hoisted(() => ({
     fetchAndDecodeTrack: vi.fn(),
@@ -10,7 +9,9 @@ vi.mock("../decodeTrack", () => ({
     fetchAndDecodeTrack: decodeMocks.fetchAndDecodeTrack,
 }))
 
-import { ensureSourceAnalysis, ensureTrackAnalysis } from "../silenceAnalysis"
+let createSceneMixEngine: typeof import("../../narrative/SceneMixEngine").createSceneMixEngine
+let ensureSourceAnalysis: typeof import("../silenceAnalysis").ensureSourceAnalysis
+let ensureTrackAnalysis: typeof import("../silenceAnalysis").ensureTrackAnalysis
 
 class PolicyAudio {
     loop = false
@@ -52,10 +53,17 @@ function audibleBuffer(): AudioBuffer {
 }
 
 describe("silence analysis source selection", () => {
-    beforeEach(() => {
+    beforeEach(async () => {
         decodeMocks.fetchAndDecodeTrack.mockReset()
         decodeMocks.fetchAndDecodeTrack.mockResolvedValue(audibleBuffer())
         vi.stubGlobal("Audio", PolicyAudio as unknown as typeof Audio)
+        vi.resetModules()
+
+        const analysisModule = await import("../silenceAnalysis")
+        ensureSourceAnalysis = analysisModule.ensureSourceAnalysis
+        ensureTrackAnalysis = analysisModule.ensureTrackAnalysis
+        const sceneMixModule = await import("../../narrative/SceneMixEngine")
+        createSceneMixEngine = sceneMixModule.createSceneMixEngine
     })
 
     afterEach(() => {
