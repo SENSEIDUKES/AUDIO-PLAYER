@@ -79,10 +79,11 @@ export function ActivityLogPanel() {
         search: "",
     })
     const [copied, setCopied] = useState(false)
+    const [isConfirmingClear, setIsConfirmingClear] = useState(false)
 
     // Reset scroll to top when filters change.
     useEffect(() => {
-        listRef.current?.scrollTo({ top: 0 })
+        listRef.current?.scrollTo?.({ top: 0 })
     }, [filters])
 
     // Filtered events, newest first (the store already presents them newest first).
@@ -127,12 +128,8 @@ export function ActivityLogPanel() {
     }, [])
 
     const handleClear = useCallback(() => {
-        if (
-            typeof window !== "undefined" &&
-            window.confirm("Are you sure you want to clear the activity log?")
-        ) {
-            log.clear()
-        }
+        log.clear()
+        setIsConfirmingClear(false)
     }, [log])
 
     const handleCopy = useCallback(() => {
@@ -230,15 +227,40 @@ export function ActivityLogPanel() {
                     >
                         JSON
                     </button>
-                    <button
-                        type="button"
-                        className="al__btn al__btn--clear"
-                        onClick={handleClear}
-                        aria-label="Clear log"
-                        title="Clear all events"
-                    >
-                        Clear
-                    </button>
+                    {isConfirmingClear ? (
+                        <div
+                            className="al__clear-confirmation"
+                            role="group"
+                            aria-label="Confirm clearing activity log"
+                        >
+                            <button
+                                type="button"
+                                className="al__btn al__btn--clear"
+                                onClick={handleClear}
+                                aria-label="Confirm clear log"
+                            >
+                                Confirm
+                            </button>
+                            <button
+                                type="button"
+                                className="al__btn"
+                                onClick={() => setIsConfirmingClear(false)}
+                                aria-label="Cancel clearing log"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            className="al__btn al__btn--clear"
+                            onClick={() => setIsConfirmingClear(true)}
+                            aria-label="Clear log"
+                            title="Clear all events"
+                        >
+                            Clear
+                        </button>
+                    )}
                 </div>
             </div>
 
