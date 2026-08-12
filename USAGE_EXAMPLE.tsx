@@ -44,11 +44,12 @@ function CustomPlayerControls() {
 
     return (
         <div className="custom-player">
-            <button onClick={() => (isPlaying ? pause() : play())}>
+            <button type="button" onClick={() => (isPlaying ? pause() : play())}>
                 {isPlaying ? "Pause" : "Play"}
             </button>
             <input
                 type="range"
+                aria-label="Seek within track"
                 min={0}
                 max={Math.max(duration, 0)}
                 value={currentTime}

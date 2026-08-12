@@ -148,14 +148,21 @@ An advanced host should keep the backend boundary explicit:
 ```typescript
 import type { AudioBackend } from "@seihouse/audio-player"
 
-function configureStereo(backend: AudioBackend) {
+function configureSpatialAudio(backend: AudioBackend) {
     if (!backend.supportsSpatial()) return
 
-    // Pan hard left, then center, then hard right.
-    backend.setStereo(-1)
-    backend.setStereo(0)
-    backend.setStereo(1)
+    // Apply one or more of the spatial operations below.
 }
+```
+
+The following snippets are operation bodies for that function (or another
+advanced-integration callback that receives the same `backend`).
+
+```typescript
+// Pan hard left, then center, then hard right.
+backend.setStereo(-1)
+backend.setStereo(0)
+backend.setStereo(1)
 ```
 
 ### Example 2: 3D Positioning

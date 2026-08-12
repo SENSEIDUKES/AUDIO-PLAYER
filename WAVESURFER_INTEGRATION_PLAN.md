@@ -2,7 +2,7 @@
 
 > **Historical planning record.** This document predates the current public
 > plugin, waveform, and backend contracts. Its proposed paths and snippets are
-> not supported consumer API. Use [`docs/public-api.md`](./docs/public-api.md),
+> not supported consumer APIs. Use [`docs/public-api.md`](./docs/public-api.md),
 > [`docs/automix.md`](./docs/automix.md), and the current source tree for new
 > work.
 

@@ -115,24 +115,28 @@ external package state and must remain an explicit release-owner action.
 
 ## What ships
 
-The `files` field restricts the package payload to:
+The `files` field declares the intended project files in the package payload:
 
 - `dist/` — ESM, CommonJS, declarations, CSS, and code-split assets
 - `README.md`
 - `LICENSE`
 
-Run `npm pack --dry-run` to inspect the exact artifact for the current build.
-Do not assume a fixed asset list or bundle size; code-split worker names and
-their hashes are build outputs.
+npm also always includes `package.json` and standard metadata files such as the
+README and license. Run `npm pack --dry-run` to inspect the exact artifact for
+the current build. Do not assume a fixed asset list or bundle size; code-split
+worker names and their hashes are build outputs.
 
 ## Updating a Git consumer
 
-For a branch-tracking consumer, reinstall after the upstream ref changes:
+For a branch-tracking consumer, refresh the moving Git reference explicitly
+after the upstream ref changes. This updates the resolved commit in
+`package-lock.json` when the consumer uses one:
 
 ```bash
-npm install
+npm install github:SENSEIDUKES/AUDIO-PLAYER#main
 ```
 
-For a pinned consumer, update the commit SHA in `package.json`, review the
-public API and release changes, then run `npm install`. `npm update
-@seihouse/audio-player` is not the source of truth for Git-pinned dependencies.
+Review and commit the resulting lockfile change. For a pinned consumer, update
+the commit SHA in `package.json`, review the public API and release changes,
+then run `npm install`. `npm update @seihouse/audio-player` is not the source
+of truth for Git-pinned dependencies.
