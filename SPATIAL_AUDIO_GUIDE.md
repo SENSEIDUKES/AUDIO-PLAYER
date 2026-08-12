@@ -1,5 +1,12 @@
 # Spatial Audio Implementation Guide
 
+> **Public integration status:** spatial controls live on the advanced
+> `AudioBackend` contract. `AudioPlayer` and `useAudioPlayer` let a host select
+> `audioBackend="webaudio"` and inspect `getBackendInfo()`, but they do not expose
+> a mutable `engine.backend` property. Do not cast an engine to reach backend
+> internals. A host that needs runtime spatial control must own an advanced
+> backend integration and pass its `AudioBackend` to its spatial-control code.
+
 ## Overview
 
 SAP (SeiHouse Audio Player) now includes comprehensive spatial audio support modeled after Howler.js's spatial API. This implementation provides:
@@ -38,6 +45,10 @@ SAP (SeiHouse Audio Player) now includes comprehensive spatial audio support mod
 ## API Reference
 
 ### Types
+
+`SpatialAudioOptions` and `SpatialAudioState` are exported type contracts. They
+describe spatial state, but there is not currently a single `AudioPlayer` prop
+that applies them automatically.
 
 ```typescript
 // Distance modeling algorithms
@@ -132,33 +143,38 @@ backend.isLiteMode(): boolean
 
 ### Example 1: Basic Stereo Panning
 
-```typescript
-import { useAudioPlayer } from '@seihouse/audio-player'
+An advanced host should keep the backend boundary explicit:
 
-function MyComponent() {
-    const engine = useAudioPlayer({ src: '/audio/track.mp3', audioBackend: 'webaudio' })
-    
-    // Pan hard left
-    engine.backend?.setStereo(-1)
-    
-    // Center
-    engine.backend?.setStereo(0)
-    
-    // Pan hard right
-    engine.backend?.setStereo(1)
+```typescript
+import type { AudioBackend } from "@seihouse/audio-player"
+
+function configureSpatialAudio(backend: AudioBackend) {
+    if (!backend.supportsSpatial()) return
+
+    // Apply one or more of the spatial operations below.
 }
+```
+
+The following snippets are operation bodies for that function (or another
+advanced-integration callback that receives the same `backend`).
+
+```typescript
+// Pan hard left, then center, then hard right.
+backend.setStereo(-1)
+backend.setStereo(0)
+backend.setStereo(1)
 ```
 
 ### Example 2: 3D Positioning
 
 ```typescript
 // Place sound 5 units to the right, 2 units up, 10 units forward
-engine.backend?.setPos(5, 2, 10)
+backend.setPos(5, 2, 10)
 
 // Move sound in a circle
 const angle = Date.now() * 0.001
 const radius = 5
-engine.backend?.setPos(
+backend.setPos(
     Math.sin(angle) * radius,
     0,
     Math.cos(angle) * radius
@@ -169,22 +185,22 @@ engine.backend?.setPos(
 
 ```typescript
 // Configure distance falloff
-engine.backend?.setDistanceModel('inverse')  // Natural sound decay
-engine.backend?.setRefDistance(1)            // Start attenuating at 1 unit
-engine.backend?.setMaxDistance(50)           // Silent beyond 50 units
-engine.backend?.setRolloffFactor(1)          // Standard rolloff
+backend.setDistanceModel('inverse')  // Natural sound decay
+backend.setRefDistance(1)            // Start attenuating at 1 unit
+backend.setMaxDistance(50)           // Silent beyond 50 units
+backend.setRolloffFactor(1)          // Standard rolloff
 ```
 
 ### Example 4: Directional Audio (Cone Effect)
 
 ```typescript
 // Sound points forward (default orientation is [1, 0, 0])
-engine.backend?.setOrientation(1, 0, 0)
+backend.setOrientation(1, 0, 0)
 
 // Narrow cone: full volume within 30°, reduced outside
-engine.backend?.setConeInnerAngle(30)
-engine.backend?.setConeOuterAngle(90)
-engine.backend?.setConeOuterGain(0.3)  // 30% volume outside cone
+backend.setConeInnerAngle(30)
+backend.setConeOuterAngle(90)
+backend.setConeOuterGain(0.3)  // 30% volume outside cone
 ```
 
 ### Example 5: Mobile Lite Mode
@@ -192,24 +208,24 @@ engine.backend?.setConeOuterGain(0.3)  // 30% volume outside cone
 ```typescript
 // Detect mobile and enable lite mode
 if (isMobileDevice()) {
-    engine.backend?.setLiteMode(true)  // Uses equalpower instead of HRTF
+    backend.setLiteMode(true)  // Uses equalpower instead of HRTF
 }
 
 // Still supports stereo pan in lite mode
-engine.backend?.setStereo(0.5)
+backend.setStereo(0.5)
 ```
 
 ### Example 6: Playback Rate Control
 
 ```typescript
 // Slow motion (0.5x)
-engine.backend?.setRate(0.5)
+backend.setRate(0.5)
 
 // Normal speed
-engine.backend?.setRate(1.0)
+backend.setRate(1.0)
 
 // Fast forward (2x)
-engine.backend?.setRate(2.0)
+backend.setRate(2.0)
 ```
 
 ## Global Listener Position
@@ -221,8 +237,8 @@ Web Audio API has **one listener per AudioContext**. SAP shares one AudioContext
 - To move the listener (camera), access the shared AudioContext:
 
 ```typescript
-// Access shared context through any webaudio backend
-const ctx = (backend as WebAudioBackend).getAudioContext()
+// Access the shared context through an advanced Web Audio backend.
+const ctx = backend.getAudioContext?.()
 if (ctx) {
     // Move listener to origin
     ctx.listener.positionX.value = 0
@@ -250,7 +266,7 @@ When spatial audio is requested on HTML5 backend:
 3. **Graceful defaults**: Getters return sensible defaults (e.g., `getStereo()` returns 0)
 
 ```typescript
-// This won't break anything, even on html5 backend
+// This won't break anything, even on html5 backend.
 backend.setStereo(0.5)  // Console warning on html5, works on webaudio
 backend.setPos(5, 0, 10)  // Console warning on html5, works on webaudio
 ```
@@ -278,7 +294,7 @@ Enable lite mode when:
 - Simple stereo positioning is sufficient
 
 ```typescript
-// Auto-detect and enable lite mode
+// Auto-detect and enable lite mode in an advanced backend integration.
 if (isMobileDevice() || isLowPowerMode()) {
     backend.setLiteMode(true)
 }
@@ -307,7 +323,7 @@ If migrating from Howler.js, the API is intentionally similar:
 ### Verify Spatial Audio is Active
 
 ```typescript
-const backend = engine.backend
+// `backend` is the AudioBackend owned by the advanced integration.
 console.log('Supports spatial:', backend.supportsSpatial())
 console.log('Current position:', backend.getPos())
 console.log('Lite mode:', backend.isLiteMode())
@@ -318,7 +334,9 @@ console.log('Distance model:', backend.getDistanceModel())
 
 **Issue**: "setStereo() called but spatial audio is not supported"
 - **Cause**: Using HTML5 backend
-- **Solution**: Switch to `audioBackend: 'webaudio'` in player props
+- **Solution**: Use a Web Audio backend in an advanced backend integration.
+  Setting `audioBackend: 'webaudio'` on the standard player selects that backend
+  but does not itself expose spatial-control methods to the host.
 
 **Issue**: No 3D effect on mobile
 - **Cause**: HRTF may be disabled or lite mode active

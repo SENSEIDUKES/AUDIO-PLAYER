@@ -1,70 +1,59 @@
-// Example: Using the Audio Player in another repository
+// Copy-paste examples for a consuming React application.
+// This file is type-checked by `npm run test:docs`.
 
-import React from "react"
+import { useMemo } from "react"
 import {
     AudioPlayer,
-    FullCardPlayer,
-    StickyBottomPlayer,
-    useAudioSession,
     AudioSessionProvider,
+    createAutomixPlugin,
+    createKeyboardShortcutPlugin,
+    StickyBottomPlayer,
+    type Track,
+    useAudioSession,
 } from "@seihouse/audio-player"
 import "@seihouse/audio-player/styles.css"
 
-// Define your tracks
-const tracks = [
+const tracks: Track[] = [
     {
         id: "track-1",
         title: "Song Title",
         artist: "Artist Name",
-        albumArt: "https://example.com/cover.jpg",
-        src: "https://example.com/audio.mp3",
-        duration: 240, // seconds
+        artwork: "https://example.com/cover.jpg",
+        audioFile: "https://example.com/audio.mp3",
     },
-    // ... more tracks
 ]
 
-// Basic usage with default player
-export function MyApp() {
-    return (
-        <div className="app">
-            <h1>My Music App</h1>
-            <AudioPlayer
-                tracks={tracks}
-                initialTrackId={tracks[0].id}
-                theme={{
-                    primaryColor: "#6366f1",
-                    backgroundColor: "#0f172a",
-                }}
-            />
-        </div>
-    )
+// One self-contained player. AudioPlayer owns its session internally.
+export function StandalonePlayerExample() {
+    return <AudioPlayer tracks={tracks} accentColor="#6366f1" backgroundColor="#0f172a" />
 }
 
-// Usage with session provider for multiple player instances
-export function MultiPlayerApp() {
+// One shared queue with custom controls and a skin. Every child uses the same
+// audio element, playback state, and queue from AudioSessionProvider.
+export function SharedSessionExample() {
     return (
-        <AudioSessionProvider>
-            <Header />
-            <MainContent />
-            {/* Sticky player at bottom */}
+        <AudioSessionProvider initialQueue={tracks}>
+            <CustomPlayerControls />
             <StickyBottomPlayer />
         </AudioSessionProvider>
     )
 }
 
-// Headless usage with custom UI
-export function CustomPlayerUI() {
-    const { isPlaying, currentTime, duration, play, pause, seek } = useAudioSession()
+function CustomPlayerControls() {
+    const { isPlaying, currentTime, duration, pause, play, seek } = useAudioSession()
 
     return (
         <div className="custom-player">
-            <button onClick={isPlaying ? pause : play}>{isPlaying ? "Pause" : "Play"}</button>
+            <button type="button" onClick={() => (isPlaying ? pause() : play())}>
+                {isPlaying ? "Pause" : "Play"}
+            </button>
             <input
                 type="range"
+                aria-label="Seek within track"
                 min={0}
-                max={duration}
+                max={Math.max(duration, 0)}
                 value={currentTime}
-                onChange={(e) => seek(Number(e.target.value))}
+                onChange={(event) => seek(Number(event.target.value))}
             />
             <span>
                 {Math.floor(currentTime)}s / {Math.floor(duration)}s
@@ -73,22 +62,15 @@ export function CustomPlayerUI() {
     )
 }
 
-// With plugins
-import {
-    PluginRegistryProvider,
-    createAutomixPlugin,
-    createKeyboardShortcutPlugin,
-} from "@seihouse/audio-player"
-
-export function AppWithPlugins() {
-    const plugins = [
-        createAutomixPlugin({ enabled: true, crossfadeMs: 3000 }),
-        createKeyboardShortcutPlugin({ enabled: true }),
-    ]
-
-    return (
-        <PluginRegistryProvider plugins={plugins}>
-            <AudioPlayer tracks={tracks} />
-        </PluginRegistryProvider>
+// Plugins are lifecycle objects, so keep their array stable across renders.
+export function PluginExample() {
+    const plugins = useMemo(
+        () => [
+            createAutomixPlugin({ confidenceMin: 0.6 }),
+            createKeyboardShortcutPlugin({ scope: "document" }),
+        ],
+        []
     )
+
+    return <AudioPlayer tracks={tracks} plugins={plugins} />
 }

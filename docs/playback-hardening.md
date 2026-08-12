@@ -28,16 +28,15 @@ New pure helper (DOM-free, unit-tested): `shouldEnterBuffering`
 
 ## 2. One Automix path (no duplicate controllers)
 
-**Problem.** `AudioPlayer.tsx` and `AudioSessionContext.tsx` both mounted the legacy
-`useAutomix` hook (driven by the `automix` prop/menu) **and** a `pluginManager`
-that could also hold an external `AutomixPlugin`. With both present, two
+**Problem.** `AudioPlayer.tsx` and `AudioSessionContext.tsx` previously had
+separate Automix lifecycle paths for the `automix` prop/menu and an external
+`AutomixPlugin` in the `pluginManager`. With both present, two
 independent transition lifecycles could each call `requestAdvance()` → double
 advance / double play.
 
 **Fix.** The `automix` prop/menu now drives a **single internal `AutomixPlugin`**
-registered through the plugin system; legacy `useAutomix` is no longer mounted
-(the hook + its public export remain for backwards compatibility, already marked
-deprecated).
+registered through the plugin system. The former standalone `useAutomix` hook
+is not part of the current public package surface.
 - The internal plugin is created once via a ref (stable identity) so the rAF
   re-render loop can't destroy/recreate it.
 - `enabled` is driven from the prop/menu through `updateConfig` (no re-register).

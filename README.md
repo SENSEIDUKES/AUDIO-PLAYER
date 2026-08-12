@@ -45,19 +45,21 @@ The player currently supports:
 
 ---
 
-## Install / download this player into another app
+## Install in another app
 
-This repo is already configured as the package **`@seihouse/audio-player`**. Until the package is officially published to npm, the easiest way to use it inside another SEIHouse app is to install it straight from GitHub.
+The package name is **`@seihouse/audio-player`**, but it is not currently
+published to the public npm registry. Install it from the canonical GitHub
+repository or use a local link while developing.
 
-### 1. Install from GitHub
+### Install from GitHub
 
-From the app that needs the audio player, run:
+From the consuming app:
 
 ```bash
-npm install git+https://github.com/SENSEIDUKES/AUDIO-PLAYER.git
+npm install github:SENSEIDUKES/AUDIO-PLAYER#main
 ```
 
-Or add it manually to that app's `package.json`:
+Or declare the dependency explicitly:
 
 ```json
 {
@@ -67,27 +69,27 @@ Or add it manually to that app's `package.json`:
 }
 ```
 
-Then run:
+Git installations run this repository's `prepare` lifecycle, which builds the
+library before npm installs it. See the
+[distribution and publishing guide](https://github.com/SENSEIDUKES/AUDIO-PLAYER/blob/main/PUBLISHING_GUIDE.md)
+for the supported Git, local-link, and future registry-release workflows.
 
-```bash
-npm install
-```
+### Use it in React
 
-### 2. Use it in React
-
-Import the player and its CSS once in your app:
+Import only from the package root and import the stylesheet once in the host
+application:
 
 ```tsx
-import { AudioPlayer } from '@seihouse/audio-player'
-import '@seihouse/audio-player/styles.css'
+import { AudioPlayer, type Track } from "@seihouse/audio-player"
+import "@seihouse/audio-player/styles.css"
 
-const tracks = [
+const tracks: Track[] = [
   {
-    id: 'demo-track',
-    title: 'Demo Track',
-    artist: 'SEIHouse',
-    audioFile: 'https://example.com/audio/demo-track.mp3',
-    artwork: 'https://example.com/art/demo-cover.jpg',
+    id: "demo-track",
+    title: "Demo Track",
+    artist: "SEIHouse",
+    audioFile: "https://example.com/audio/demo-track.mp3",
+    artwork: "https://example.com/art/demo-cover.jpg",
   },
 ]
 
@@ -96,7 +98,11 @@ export function PlayerExample() {
 }
 ```
 
-A track needs at least `title`, `artist`, and either `audioFile` or `sources`. Use `id` whenever possible so the player can reliably tell tracks apart.
+A track needs `title`, `artist`, and either `audioFile` or `sources`. Use a
+stable `id` whenever possible so the player can reliably distinguish tracks.
+
+To pin a Git installation reproducibly, replace `main` with a verified commit
+SHA. Do not reference a version tag until that tag exists in this repository.
 
 ### Managed offline or private sources
 
@@ -124,21 +130,20 @@ the resolver and warms declared URLs only; resolver-owned resources are acquired
 only for the active playback source. Automix and waveform pre-analysis keep
 their existing declared-URL behavior.
 
-### 3. Use a specific version later
+---
 
-When this repo starts using tags, install a locked release like this:
+## Public API and integration boundaries
 
-```bash
-npm install git+https://github.com/SENSEIDUKES/AUDIO-PLAYER.git#v1.0.0
-```
+The package has a large public surface, so integrations should use the root
+entry point (`@seihouse/audio-player`) and the single stylesheet subpath
+(`@seihouse/audio-player/styles.css`). Do not deep-import files from `src/` or
+`dist/`; those paths are implementation details and are not package exports.
 
-When the package is eventually published to npm, installs can become:
-
-```bash
-npm install @seihouse/audio-player
-```
-
-For the full publish and linking workflow, see [`PUBLISHING_GUIDE.md`](./PUBLISHING_GUIDE.md).
+[The public API map](https://github.com/SENSEIDUKES/AUDIO-PLAYER/blob/main/docs/public-api.md)
+is the canonical map of playback, sessions, skins, plugins, cues, narrative
+engines, diagnostics, workspaces, agents, Automix, and advanced utilities. It
+links each family to its focused guide and identifies the appropriate entry
+point for a new integration.
 
 ---
 
@@ -165,7 +170,8 @@ This repo is still in active development. Planned and ongoing directions include
 
 Primary source locations:
 
-- Component entry point: `src/audio-player/AudioPlayer.tsx`
+- Public package entry point: `src/audio-player/index.ts`
+- Standalone component: `src/audio-player/AudioPlayer.tsx`
 - Hook / audio engine: `src/audio-player/useAudioPlayer.ts`
 - Demo harness: `src/demo/main.tsx`
 - Demo styling: `src/demo/audio-player-lab.css`
@@ -216,7 +222,8 @@ The built-in light-mode crossfade is also available without the plugin via the
 
 With Automix off, normal playback behavior is unchanged.
 
-See [`docs/automix.md`](./docs/automix.md) for details, fallbacks, and known limits.
+See the [Automix guide](https://github.com/SENSEIDUKES/AUDIO-PLAYER/blob/main/docs/automix.md)
+for details, fallbacks, and known limits.
 
 ---
 
@@ -259,13 +266,17 @@ provider credentials outside the browser bundle.
 
 ## Playback resilience & Media Session API
 
-Details on error recovery, retry flow, autoplay-blocked handling, token-based stale-callback protection, and the Media Session API integration (lock-screen metadata, hardware media keys) are documented in [`docs/playback-resilience-and-media-session.md`](./docs/playback-resilience-and-media-session.md).
+Details on error recovery, retry flow, autoplay-blocked handling, token-based
+stale-callback protection, and the Media Session API integration (lock-screen
+metadata, hardware media keys) are in the
+[playback resilience and Media Session guide](https://github.com/SENSEIDUKES/AUDIO-PLAYER/blob/main/docs/playback-resilience-and-media-session.md).
 
 ---
 
 ## Browser / mobile quality matrix
 
-The officially supported browser and mobile behavior is documented in [`docs/browser-mobile-quality-matrix.md`](./docs/browser-mobile-quality-matrix.md).
+The officially supported browser and mobile behavior is documented in the
+[browser and mobile quality matrix](https://github.com/SENSEIDUKES/AUDIO-PLAYER/blob/main/docs/browser-mobile-quality-matrix.md).
 
 Use it to verify:
 
@@ -311,13 +322,26 @@ Open the printed Vite preview URL to inspect the production build. The preview s
 
 ---
 
-## Development status
+## Documentation checks
 
-This project is currently in active internal development.
+Run `npm run test:docs` to verify the canonical repository metadata, public API
+map, supported consumer imports, local Markdown links, and the type-checked
+consumer example.
 
-The repository should be treated as an evolving SEIHouse infrastructure component, not a finished public package. APIs, file structure, player surfaces, and internal playback behavior may change as the player is refined for SEA Portal, Vault, Arc Notes, Vault Radio, and other SEIHouse use cases.
+## Development status and demo
 
-Live demo: https://sap.seaportal.world/
+This project is currently in active internal development. The repository does
+not designate a hosted demo URL; the canonical demonstration surface is the
+local Lab:
+
+```bash
+npm run dev
+```
+
+The repository should be treated as an evolving SEIHouse infrastructure
+component, not a finished public package. APIs, file structure, player
+surfaces, and internal playback behavior may change as the player is refined
+for SEA Portal, Vault, Arc Notes, Vault Radio, and other SEIHouse use cases.
 
 ---
 
