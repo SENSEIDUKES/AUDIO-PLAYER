@@ -1,10 +1,11 @@
-import type { Track, TrackAnalysis, TrackTrims } from "../types"
+import type { Track, TrackAnalysis } from "../types"
 import { trackKey } from "../utils/trackKey"
 import { getPrimaryTrackSource } from "../utils/sources"
 import { fetchAndDecodeTrack } from "./decodeTrack"
 import { scanSilenceEdges, seedTrackTrims } from "./silenceAnalysis"
 import { analyzeRhythm, type RhythmSegmentResult } from "./rhythmClient"
 import { readStoredAnalysis, writeStoredAnalysis } from "./analysisStore"
+import { extractAudioFeatures } from "./audioFeatureAnalysis"
 import {
     bpmCompatibility,
     computeTransitionPoints,
@@ -32,10 +33,6 @@ const HEAD_SEGMENT_MS = 60_000
 const TAIL_SEGMENT_MS = 120_000
 /** Tracks whose trimmed length fits in this analyze as a single segment. */
 const SINGLE_SEGMENT_MAX_MS = HEAD_SEGMENT_MS + TAIL_SEGMENT_MS
-/** RMS window for the energy estimate, matching the silence scan. */
-const ENERGY_WINDOW_MS = 50
-/** Window RMS treated as "full" energy when mapping to 0..1. */
-const ENERGY_FULL_SCALE_RMS = 0.35
 /** Penalty applied when head and tail disagree about the tempo. */
 const SEGMENT_DISAGREEMENT_PENALTY = 0.7
 /** Fade length used to bake default transition points into the analysis. */
@@ -105,37 +102,6 @@ function extractMonoSegment(
     return out
 }
 
-/** Mean windowed RMS over the trimmed region, mapped to 0..1. */
-function computeEnergy(buffer: AudioBuffer, trims: TrackTrims): number {
-    const win = Math.max(1, Math.round((ENERGY_WINDOW_MS / 1000) * buffer.sampleRate))
-    const start = Math.floor((trims.trimStartMs / 1000) * buffer.sampleRate)
-    const end = buffer.length - Math.floor((trims.trimEndMs / 1000) * buffer.sampleRate)
-    const channels: Float32Array[] = []
-    for (let c = 0; c < Math.min(buffer.numberOfChannels, 2); c++) {
-        channels.push(buffer.getChannelData(c))
-    }
-    if (channels.length === 0 || end - start < win) return 0
-
-    let total = 0
-    let windows = 0
-    for (let pos = start; pos + win <= end; pos += win) {
-        let loudest = 0
-        for (const data of channels) {
-            let sum = 0
-            for (let i = pos; i < pos + win; i++) {
-                const v = data[i]
-                sum += v * v
-            }
-            const rms = Math.sqrt(sum / win)
-            if (rms > loudest) loudest = rms
-        }
-        total += loudest
-        windows++
-    }
-    if (windows === 0) return 0
-    return Math.min(1, total / windows / ENERGY_FULL_SCALE_RMS)
-}
-
 interface MergedRhythm {
     bpm?: number
     beats?: number[]
@@ -199,7 +165,8 @@ async function analyze(key: string, url: string): Promise<TrackAnalysis | null> 
     // Publish trims immediately: getTrackTrims() consumers (and the Lite
     // fallback inside AutomixPlugin) shouldn't wait out the rhythm extraction.
     seedTrackTrims(key, trims)
-    const energy = computeEnergy(buffer, trims)
+    const audioFeatures = extractAudioFeatures(buffer, trims)
+    if (!audioFeatures) return null
     const durationMs = buffer.duration * 1000
     const trimmedEndMs = durationMs - trims.trimEndMs
     const trimmedLengthMs = trimmedEndMs - trims.trimStartMs
@@ -234,7 +201,7 @@ async function analyze(key: string, url: string): Promise<TrackAnalysis | null> 
     const analysis: TrackAnalysis = {
         trimStartMs: trims.trimStartMs,
         trimEndMs: trims.trimEndMs,
-        energy,
+        ...audioFeatures,
         confidence: rhythm.confidence,
     }
     if (rhythm.bpm !== undefined && rhythm.confidence > 0) {

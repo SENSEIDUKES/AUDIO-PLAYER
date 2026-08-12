@@ -1,0 +1,211 @@
+import type { TrackAnalysis, TrackTrims } from "../types"
+
+/** Number of RMS bins sent to Agent Scout as a compact waveform envelope. */
+export const SCOUT_WAVEFORM_BIN_COUNT = 32
+
+const WINDOW_MS = 50
+const SILENCE_RMS = 0.01
+/** Windows at or below this level are excluded from the RMS range percentiles. */
+const RANGE_FLOOR_DBFS = -60
+const ENERGY_FULL_SCALE_RMS = 0.35
+const MIN_DBFS = -160
+
+type AudioFeatureFields = Required<
+    Pick<
+        TrackAnalysis,
+        | "durationMs"
+        | "sampleRateHz"
+        | "channelCount"
+        | "peakDbfs"
+        | "rmsDbfs"
+        | "crestFactorDb"
+        | "rmsRangeDb"
+        | "clippingSampleRatio"
+        | "silenceRatio"
+        | "stereoCorrelation"
+        | "waveformRmsDbfs"
+        | "energy"
+    >
+>
+
+function toDbfs(amplitude: number): number {
+    if (!Number.isFinite(amplitude) || amplitude <= 0) return MIN_DBFS
+    return Math.max(MIN_DBFS, 20 * Math.log10(amplitude))
+}
+
+function round(value: number, digits = 3): number {
+    const scale = 10 ** digits
+    return Math.round(value * scale) / scale
+}
+
+function percentile(sorted: readonly number[], fraction: number): number {
+    if (sorted.length === 0) return MIN_DBFS
+    const index = Math.min(sorted.length - 1, Math.max(0, Math.floor(fraction * sorted.length)))
+    return sorted[index]
+}
+
+/**
+ * Extract deterministic PCM and waveform measurements from a decoded track.
+ *
+ * This intentionally reports sample/RMS measurements rather than pretending
+ * they are broadcast loudness, true peak, or a mastering-grade spectrum. The
+ * first two channels feed level/stereo metrics; `channelCount` still reports
+ * the source buffer's actual channel count.
+ */
+export function extractAudioFeatures(
+    buffer: AudioBuffer,
+    trims: TrackTrims
+): AudioFeatureFields | null {
+    const analyzedChannels = Math.min(buffer.numberOfChannels, 2)
+    if (analyzedChannels === 0 || buffer.length === 0 || buffer.sampleRate <= 0) return null
+
+    const leftChannel = buffer.getChannelData(0)
+    const rightChannel = analyzedChannels === 2 ? buffer.getChannelData(1) : null
+
+    const start = Math.min(
+        buffer.length,
+        Math.max(0, Math.floor((trims.trimStartMs / 1000) * buffer.sampleRate))
+    )
+    const end = Math.max(
+        start,
+        Math.min(
+            buffer.length,
+            buffer.length - Math.floor((trims.trimEndMs / 1000) * buffer.sampleRate)
+        )
+    )
+    if (end <= start) return null
+
+    const windowSize = Math.max(1, Math.round((WINDOW_MS / 1000) * buffer.sampleRate))
+    const windowCount = Math.ceil((end - start) / windowSize)
+    const windowDbfs: number[] = []
+    const waveformSquares = new Float64Array(SCOUT_WAVEFORM_BIN_COUNT)
+    const waveformSamples = new Float64Array(SCOUT_WAVEFORM_BIN_COUNT)
+
+    let totalSquares = 0
+    let totalSamples = 0
+    let peak = 0
+    let clippedSamples = 0
+    let silentWindows = 0
+    let energyTotal = 0
+    let energyWindows = 0
+
+    let stereoSamples = 0
+    let leftSum = 0
+    let rightSum = 0
+    let leftSquares = 0
+    let rightSquares = 0
+    let crossProducts = 0
+
+    for (let windowIndex = 0; windowIndex < windowCount; windowIndex++) {
+        const windowStart = start + windowIndex * windowSize
+        const windowEnd = Math.min(end, windowStart + windowSize)
+        const samplesPerChannel = windowEnd - windowStart
+        let leftWindowSquares = 0
+        let rightWindowSquares = 0
+
+        if (rightChannel) {
+            for (let sampleIndex = windowStart; sampleIndex < windowEnd; sampleIndex++) {
+                const left = leftChannel[sampleIndex]
+                const right = rightChannel[sampleIndex]
+                const leftAbsolute = Math.abs(left)
+                const rightAbsolute = Math.abs(right)
+                const leftSquare = left * left
+                const rightSquare = right * right
+
+                peak = Math.max(peak, leftAbsolute, rightAbsolute)
+                if (leftAbsolute >= 0.999) clippedSamples++
+                if (rightAbsolute >= 0.999) clippedSamples++
+                leftWindowSquares += leftSquare
+                rightWindowSquares += rightSquare
+                totalSquares += leftSquare + rightSquare
+                leftSum += left
+                rightSum += right
+                leftSquares += leftSquare
+                rightSquares += rightSquare
+                crossProducts += left * right
+            }
+            stereoSamples += samplesPerChannel
+        } else {
+            for (let sampleIndex = windowStart; sampleIndex < windowEnd; sampleIndex++) {
+                const sample = leftChannel[sampleIndex]
+                const absolute = Math.abs(sample)
+                const square = sample * sample
+
+                peak = Math.max(peak, absolute)
+                if (absolute >= 0.999) clippedSamples++
+                leftWindowSquares += square
+                totalSquares += square
+            }
+        }
+
+        const windowSquares = leftWindowSquares + rightWindowSquares
+        const windowSamples = samplesPerChannel * analyzedChannels
+        totalSamples += windowSamples
+
+        const windowRms = windowSamples > 0 ? Math.sqrt(windowSquares / windowSamples) : 0
+        const windowLevel = toDbfs(windowRms)
+        windowDbfs.push(windowLevel)
+        if (windowRms < SILENCE_RMS) silentWindows++
+
+        // Preserve Automix Pro's established energy semantics: mean 50ms RMS
+        // of the louder channel, excluding a final partial window.
+        if (samplesPerChannel === windowSize) {
+            energyTotal += Math.sqrt(Math.max(leftWindowSquares, rightWindowSquares) / windowSize)
+            energyWindows++
+        }
+
+        const bin = Math.min(
+            SCOUT_WAVEFORM_BIN_COUNT - 1,
+            Math.floor((windowIndex / windowCount) * SCOUT_WAVEFORM_BIN_COUNT)
+        )
+        waveformSquares[bin] += windowSquares
+        waveformSamples[bin] += windowSamples
+    }
+
+    if (totalSamples === 0) return null
+
+    const rms = Math.sqrt(totalSquares / totalSamples)
+    const peakDbfs = toDbfs(peak)
+    const rmsDbfs = toDbfs(rms)
+    const activeWindowLevels = windowDbfs
+        .filter((level) => level > RANGE_FLOOR_DBFS)
+        .sort((a, b) => a - b)
+    const rmsRangeDb = Math.max(
+        0,
+        percentile(activeWindowLevels, 0.95) - percentile(activeWindowLevels, 0.1)
+    )
+
+    let stereoCorrelation: number | null = null
+    if (stereoSamples > 1) {
+        const covariance = crossProducts - (leftSum * rightSum) / stereoSamples
+        const leftVariance = leftSquares - (leftSum * leftSum) / stereoSamples
+        const rightVariance = rightSquares - (rightSum * rightSum) / stereoSamples
+        const denominator = Math.sqrt(Math.max(0, leftVariance) * Math.max(0, rightVariance))
+        if (denominator > 0) stereoCorrelation = Math.max(-1, Math.min(1, covariance / denominator))
+    }
+
+    const waveformRmsDbfs = Array.from(waveformSquares, (squares, index) => {
+        const samples = waveformSamples[index]
+        return round(toDbfs(samples > 0 ? Math.sqrt(squares / samples) : 0), 1)
+    })
+
+    return {
+        durationMs: round(buffer.duration * 1000, 1),
+        sampleRateHz: buffer.sampleRate,
+        channelCount: buffer.numberOfChannels,
+        peakDbfs: round(peakDbfs, 2),
+        rmsDbfs: round(rmsDbfs, 2),
+        crestFactorDb: round(Math.max(0, peakDbfs - rmsDbfs), 2),
+        rmsRangeDb: round(rmsRangeDb, 2),
+        clippingSampleRatio: round(clippedSamples / totalSamples, 6),
+        silenceRatio: round(silentWindows / windowCount, 4),
+        stereoCorrelation: stereoCorrelation === null ? null : round(stereoCorrelation, 4),
+        waveformRmsDbfs,
+        energy: round(
+            energyWindows > 0
+                ? Math.min(1, energyTotal / energyWindows / ENERGY_FULL_SCALE_RMS)
+                : 0,
+            4
+        ),
+    }
+}
