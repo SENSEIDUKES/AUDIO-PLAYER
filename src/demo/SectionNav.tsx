@@ -119,9 +119,7 @@ export function SectionNav({
     }
 
     const hintText =
-        sections.length >= 10
-            ? "Keys 1–9, 0"
-            : `Keys 1–${Math.min(sections.length, 9)}`
+        sections.length >= 10 ? "Keys 1–9, 0" : `Keys 1–${Math.min(sections.length, 9)}`
 
     return (
         <div
@@ -142,13 +140,20 @@ export function SectionNav({
             </button>
 
             {/* Vertical menu drawer/dock */}
-            <div className="showcase-subnav showcase-vnav" role="navigation" aria-label="Page sections">
+            <div
+                className="showcase-subnav showcase-vnav"
+                role="navigation"
+                aria-label="Page sections"
+            >
                 <div className="showcase-vnav__header">
                     <div className="showcase-vnav__header-left">
                         <Layers size={13} className="showcase-vnav__header-icon" />
                         <span className="showcase-subnav__label showcase-vnav__label">Index</span>
                     </div>
-                    <span className="showcase-vnav__header-hint" title="Press number keys on keyboard to jump">
+                    <span
+                        className="showcase-vnav__header-hint"
+                        title="Press number keys on keyboard to jump"
+                    >
                         {hintText}
                     </span>
                     {isMobileMenuOpen && (

@@ -19,7 +19,8 @@ describe("SectionNav Component & Keyboard Shortcuts", () => {
             unobserve = vi.fn()
             disconnect = vi.fn()
         }
-        window.IntersectionObserver = MockIntersectionObserver as unknown as typeof IntersectionObserver
+        window.IntersectionObserver =
+            MockIntersectionObserver as unknown as typeof IntersectionObserver
     })
 
     afterEach(() => {

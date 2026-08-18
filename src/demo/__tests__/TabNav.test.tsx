@@ -58,5 +58,3 @@ describe("TabNav", () => {
         expect(onTabChange).toHaveBeenCalledWith("surfaces")
     })
 })
-
-

@@ -11,7 +11,7 @@ import type {
     VisualComponentProps,
     VisualSettingsPanelProps,
 } from "../../../types"
-// import RawComponent from "./raw"
+import RawComponent from "./raw"
 import "./sample-skin.css"
 
 // ─── Settings ────────────────────────────────────────────────────────────────
@@ -33,11 +33,9 @@ export function SampleSkin({ settings, playback }: VisualComponentProps<SampleSk
     // TODO(skin): map `settings` and `playback` to props your raw component expects.
     // Example: <RawComponent primaryColor={settings.primaryColor as string} />
     void playback
-    void settings
     return (
         <div className="sap-visual-sample-skin">
-            {/* <RawComponent primaryColor={settings.primaryColor} label={settings.label} /> */}
-            <p>Raw component placeholder</p>
+            <RawComponent primaryColor={settings.primaryColor} label={settings.label} />
         </div>
     )
 }

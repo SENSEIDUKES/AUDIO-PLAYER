@@ -13,7 +13,8 @@ describe("Workshop Vertical Navigation", () => {
             unobserve = vi.fn()
             disconnect = vi.fn()
         }
-        window.IntersectionObserver = MockIntersectionObserver as unknown as typeof IntersectionObserver
+        window.IntersectionObserver =
+            MockIntersectionObserver as unknown as typeof IntersectionObserver
     })
 
     afterEach(() => {

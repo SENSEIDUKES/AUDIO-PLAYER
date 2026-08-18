@@ -13,7 +13,8 @@ describe("Lab page navigation", () => {
             unobserve = vi.fn()
             disconnect = vi.fn()
         }
-        window.IntersectionObserver = MockIntersectionObserver as unknown as typeof IntersectionObserver
+        window.IntersectionObserver =
+            MockIntersectionObserver as unknown as typeof IntersectionObserver
         window.HTMLElement.prototype.scrollIntoView = vi.fn()
     })
 

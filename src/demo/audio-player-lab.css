@@ -9,7 +9,8 @@
 :root {
     --font-display: "Alegreya", "Alegreya SC", Georgia, serif;
     --font-display-sc: "Alegreya SC", "Alegreya", Georgia, serif;
-    --font-ui: "Rubik", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-ui:
+        "Rubik", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     --font-reading: "Noto Serif", Georgia, serif;
     --lab-bg: #07070a;
     --lab-bg-elev: #121218;
@@ -1402,7 +1403,9 @@ body {
     backdrop-filter: blur(28px);
     -webkit-backdrop-filter: blur(28px);
     box-sizing: border-box;
-    transition: background 0.2s ease, border-color 0.2s ease;
+    transition:
+        background 0.2s ease,
+        border-color 0.2s ease;
 }
 .demo-mode__meta {
     min-width: 0;
@@ -1502,7 +1505,7 @@ button#tab-showcase.demo-mode__button--active {
     gap: 6px;
     width: 172px;
     padding: 12px 10px;
-    background: rgba(12, 13, 22, 0.90);
+    background: rgba(12, 13, 22, 0.9);
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 20px;
     backdrop-filter: blur(28px);
@@ -1655,11 +1658,11 @@ button#tab-showcase.demo-mode__button--active {
     transform: translateX(-3px);
 }
 .showcase-subnav__pill.showcase-vnav__item--active .showcase-vnav__number {
-    color: #22D3A6;
+    color: #22d3a6;
     opacity: 1;
 }
 .showcase-subnav__pill.showcase-vnav__item--active .showcase-vnav__kbd {
-    color: #22D3A6;
+    color: #22d3a6;
     background: rgba(34, 211, 166, 0.12);
     border-color: rgba(34, 211, 166, 0.3);
     opacity: 1;
@@ -1667,7 +1670,7 @@ button#tab-showcase.demo-mode__button--active {
 .showcase-subnav__pill.showcase-vnav__item--active .showcase-vnav__arrow {
     opacity: 1;
     transform: translateX(0);
-    color: #22D3A6;
+    color: #22d3a6;
 }
 
 @keyframes vnavSlideUp {
@@ -1930,11 +1933,15 @@ button#tab-showcase.demo-mode__button--active {
     padding: 26px;
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 24px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.015) 100%), #0c0d16;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.015) 100%),
+        #0c0d16;
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
-    transition: transform 0.2s var(--lab-ease), border-color 0.2s var(--lab-ease);
+    transition:
+        transform 0.2s var(--lab-ease),
+        border-color 0.2s var(--lab-ease);
 }
 .product-preview__details article:hover {
     border-color: rgba(255, 255, 255, 0.18);
@@ -2028,14 +2035,14 @@ button#tab-showcase.demo-mode__button--active {
         box-shadow: 0 16px 40px rgba(0, 0, 0, 0.75);
     }
     .showcase-vnav-trigger__icon {
-        color: #22D3A6;
+        color: #22d3a6;
     }
     .showcase-vnav-trigger__current {
         font-weight: 600;
     }
     .showcase-vnav-trigger__badge {
         background: rgba(34, 211, 166, 0.18);
-        color: #22D3A6;
+        color: #22d3a6;
         font-size: 10px;
         font-weight: 700;
         padding: 2px 6px;
@@ -2209,7 +2216,9 @@ button#tab-showcase.demo-mode__button--active {
     align-items: start;
 }
 .showcase-face {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.015) 100%), #0c0d16;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.015) 100%),
+        #0c0d16;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 24px;
     padding: 24px;
@@ -2218,7 +2227,9 @@ button#tab-showcase.demo-mode__button--active {
     gap: 18px;
     min-width: 0;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-    transition: border-color 0.2s var(--lab-ease), transform 0.2s var(--lab-ease);
+    transition:
+        border-color 0.2s var(--lab-ease),
+        transform 0.2s var(--lab-ease);
 }
 .showcase-face:hover {
     border-color: rgba(255, 255, 255, 0.2);
@@ -2296,7 +2307,9 @@ button#tab-showcase.demo-mode__button--active {
     gap: 20px;
 }
 .showcase-family {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%), #0c0d16;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%),
+        #0c0d16;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 24px;
     padding: 24px;

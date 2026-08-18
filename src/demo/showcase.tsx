@@ -210,9 +210,7 @@ function FamilyExplainer() {
             <header className="showcase-gallery-head">
                 <div className="showcase-section-kicker">Architecture · 2 Systems</div>
                 <h2 id="showcase-families-title">Two player families</h2>
-                <p>
-                    Single shared audio engine tuned for different surface demands.
-                </p>
+                <p>Single shared audio engine tuned for different surface demands.</p>
             </header>
             <div className="showcase-families">
                 <article className="showcase-family showcase-family--primary">
@@ -224,12 +222,15 @@ function FamilyExplainer() {
                         <span className="showcase-family__role-badge">Release Faces</span>
                     </div>
                     <p className="showcase-family__role">
-                        Full release experiences with rich artwork, metadata, SEICanvas visualizer, and waveform scrubbing.
+                        Full release experiences with rich artwork, metadata, SEICanvas visualizer,
+                        and waveform scrubbing.
                     </p>
                     <ul className="showcase-family__list">
                         <li className="showcase-family__item">
                             <span className="showcase-family__item-name">FullCardPlayer</span>
-                            <span className="showcase-family__item-tag showcase-family__item-tag--featured">Flagship</span>
+                            <span className="showcase-family__item-tag showcase-family__item-tag--featured">
+                                Flagship
+                            </span>
                         </li>
                         <li className="showcase-family__item">
                             <span className="showcase-family__item-name">SeaCardPlayer</span>
@@ -241,7 +242,9 @@ function FamilyExplainer() {
                         </li>
                         <li className="showcase-family__item is-future">
                             <span className="showcase-family__item-name">Canvas / Mobile Mode</span>
-                            <span className="showcase-family__item-tag showcase-family__item-tag--future">Roadmap</span>
+                            <span className="showcase-family__item-tag showcase-family__item-tag--future">
+                                Roadmap
+                            </span>
                         </li>
                     </ul>
                 </article>
@@ -263,7 +266,9 @@ function FamilyExplainer() {
                         </li>
                         <li className="showcase-family__item">
                             <span className="showcase-family__item-name">StickyBottomPlayer</span>
-                            <span className="showcase-family__item-tag showcase-family__item-tag--featured">Master Scrubber</span>
+                            <span className="showcase-family__item-tag showcase-family__item-tag--featured">
+                                Master Scrubber
+                            </span>
                         </li>
                         <li className="showcase-family__item">
                             <span className="showcase-family__item-name">VaultRowPlayer</span>
@@ -271,7 +276,9 @@ function FamilyExplainer() {
                         </li>
                         <li className="showcase-family__item is-future">
                             <span className="showcase-family__item-name">QueueRowPlayer</span>
-                            <span className="showcase-family__item-tag showcase-family__item-tag--future">Roadmap</span>
+                            <span className="showcase-family__item-tag showcase-family__item-tag--future">
+                                Roadmap
+                            </span>
                         </li>
                     </ul>
                 </article>
@@ -311,7 +318,8 @@ export function Showcase() {
                         One playback layer, two player families.
                     </h1>
                     <p className="product-preview__lede">
-                        Unified audio engine powering flagship release surfaces and compact utility players.
+                        Unified audio engine powering flagship release surfaces and compact utility
+                        players.
                     </p>
                     <div className="product-preview__actions">
                         <button
@@ -390,7 +398,8 @@ export function Showcase() {
                         <div className="showcase-section-kicker">Primary Family · Flagship</div>
                         <h2 id="showcase-primary-title">PrimaryPlayer family</h2>
                         <p>
-                            Rich release surfaces with interactive waveform scrubbers, SEICanvas slots, and action wheels.
+                            Rich release surfaces with interactive waveform scrubbers, SEICanvas
+                            slots, and action wheels.
                         </p>
                     </header>
                     <div className="showcase-gallery">
@@ -421,7 +430,8 @@ export function Showcase() {
                         <div className="showcase-section-kicker">Compact Family · Utility</div>
                         <h2 id="showcase-compact-title">CompactPlayer family</h2>
                         <p>
-                            Minimal utility surfaces synchronized to the shared StickyBottom master transport.
+                            Minimal utility surfaces synchronized to the shared StickyBottom master
+                            transport.
                         </p>
                     </header>
                     <div className="showcase-gallery">
@@ -469,14 +479,16 @@ export function Showcase() {
                     <span>02</span>
                     <h2>One shared session</h2>
                     <p>
-                        Both galleries run on a single AudioSessionProvider, keeping all surfaces synchronized across one queue.
+                        Both galleries run on a single AudioSessionProvider, keeping all surfaces
+                        synchronized across one queue.
                     </p>
                 </article>
                 <article>
                     <span>03</span>
                     <h2>Test &amp; customize</h2>
                     <p>
-                        Switch to Lab for QA, broken states, backends, and plugins — or Workshop to customize faces and presets.
+                        Switch to Lab for QA, broken states, backends, and plugins — or Workshop to
+                        customize faces and presets.
                     </p>
                 </article>
             </section>

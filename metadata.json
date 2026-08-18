@@ -1,6 +1,0 @@
-{
-  "name": "SEIHouse Audio Player Lab",
-  "description": "Showcase, test, and customize SEIHouse portable audio player faces and plugins.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

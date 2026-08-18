@@ -13,7 +13,8 @@ describe("Showcase Mobile & Navigation Layout", () => {
             unobserve = vi.fn()
             disconnect = vi.fn()
         }
-        window.IntersectionObserver = MockIntersectionObserver as unknown as typeof IntersectionObserver
+        window.IntersectionObserver =
+            MockIntersectionObserver as unknown as typeof IntersectionObserver
     })
 
     afterEach(() => {
@@ -70,7 +71,9 @@ describe("Showcase Mobile & Navigation Layout", () => {
         expect(scrollIntoViewMock).toHaveBeenCalledTimes(2)
 
         expect(
-            screen.getByText("Unified audio engine powering flagship release surfaces and compact utility players.")
+            screen.getByText(
+                "Unified audio engine powering flagship release surfaces and compact utility players."
+            )
         ).toBeInTheDocument()
     })
 })
