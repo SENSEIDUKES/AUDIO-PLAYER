@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import type { ReactNode } from "react"
+import { SectionNav } from "./SectionNav"
 import {
     AudioPlayer,
     AudioSessionProvider,
@@ -34,6 +35,19 @@ import {
     SEA_ARTS,
 } from "./data"
 
+const LAB_SECTIONS = [
+    { id: "lab-overview", label: "Overview", number: "01", category: "Intro" },
+    { id: "lab-cards", label: "Card Grid", number: "02", category: "Layout" },
+    { id: "lab-sidebar", label: "Sidebar", number: "03", category: "Layout" },
+    { id: "lab-mobile", label: "Mobile", number: "04", category: "Responsive" },
+    { id: "lab-matrix", label: "Matrix", number: "05", category: "Responsive" },
+    { id: "lab-sticky", label: "Sticky", number: "06", category: "Scroll" },
+    { id: "lab-stress", label: "Stress Test", number: "07", category: "QA" },
+    { id: "lab-errors", label: "State Tests", number: "08", category: "QA" },
+    { id: "lab-plugins", label: "Plugins", number: "09", category: "Session" },
+    { id: "lab-backends", label: "Backends", number: "10", category: "Engine" },
+] as const
+
 /* ----------------------------- Reusable lab chrome ----------------------------- */
 function Checklist() {
     return (
@@ -63,9 +77,9 @@ function Checklist() {
 
 /* Group heading so the QA feed reads as a handful of debugging areas instead
    of one long numbered list. */
-function LabGroup({ title, children }: { title: string; children: ReactNode }) {
+function LabGroup({ id, title, children }: { id?: string; title: string; children: ReactNode }) {
     return (
-        <div className="lab-group">
+        <div id={id} className="lab-group">
             <h2 className="lab-group__title">{title}</h2>
             {children}
         </div>
@@ -105,7 +119,7 @@ const MATRIX_WIDTHS = [320, 375, 390, 430] as const
 
 function MobileWidthMatrixSection() {
     return (
-        <section className="lab-section">
+        <section id="lab-matrix" className="lab-section">
             <h2 className="lab-section__title">
                 Mobile width matrix
                 <small>320 · 375 · 390 · 430</small>
@@ -658,7 +672,12 @@ function WaveformSection() {
 export function Lab() {
     return (
         <div className="lab-shell">
-            <header className="lab-header">
+            <SectionNav
+                sections={LAB_SECTIONS}
+                defaultSectionId="lab-overview"
+                ariaLabel="Lab quick navigation"
+            />
+            <header id="lab-overview" className="lab-header">
                 <div>
                     <h1 className="lab-header__title">Lab — testing &amp; QA</h1>
                     <p className="lab-header__sub">
@@ -675,7 +694,7 @@ export function Lab() {
             <Checklist />
 
             <LabGroup title="Layout & stress">
-                <section className="lab-section">
+                <section id="lab-cards" className="lab-section">
                     <h2 className="lab-section__title">
                         Album / marketplace cards
                         <small>Grid</small>
@@ -747,7 +766,7 @@ export function Lab() {
                     </div>
                 </section>
 
-                <section className="lab-section">
+                <section id="lab-sidebar" className="lab-section">
                     <h2 className="lab-section__title">
                         Sidebar widget inside a dashboard
                         <small>Layout stress</small>
@@ -804,7 +823,7 @@ export function Lab() {
                     </div>
                 </section>
 
-                <section className="lab-section">
+                <section id="lab-mobile" className="lab-section">
                     <h2 className="lab-section__title">
                         Mobile preview
                         <small>Responsive</small>
@@ -854,7 +873,7 @@ export function Lab() {
 
                 <MobileWidthMatrixSection />
 
-                <section className="lab-section">
+                <section id="lab-sticky" className="lab-section">
                     <h2 className="lab-section__title">
                         Sticky player inside a scrollable list
                         <small>Overflow</small>
@@ -904,7 +923,7 @@ export function Lab() {
                     </div>
                 </section>
 
-                <section className="lab-section">
+                <section id="lab-stress" className="lab-section">
                     <h2 className="lab-section__title">
                         Rapid interaction
                         <small>Stress test</small>
@@ -964,7 +983,7 @@ export function Lab() {
                 </section>
             </LabGroup>
 
-            <LabGroup title="Error states">
+            <LabGroup id="lab-errors" title="Error states">
                 <section className="lab-section">
                     <h2 className="lab-section__title">
                         State tests
@@ -1050,7 +1069,7 @@ export function Lab() {
                 </section>
             </LabGroup>
 
-            <LabGroup title="Session & plugins">
+            <LabGroup id="lab-plugins" title="Session & plugins">
                 <GlobalSessionSection />
 
                 <PluginArchitectureSection />
@@ -1062,7 +1081,7 @@ export function Lab() {
                 <AutomixSection />
             </LabGroup>
 
-            <LabGroup title="Backends & waveform">
+            <LabGroup id="lab-backends" title="Backends & waveform">
                 <AudioBackendSection />
 
                 <WaveformSection />

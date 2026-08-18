@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react"
 import type { ReactNode } from "react"
+import { SectionNav } from "./SectionNav"
 import {
     AudioPlayer,
     AudioSessionProvider,
@@ -201,45 +202,76 @@ function FaceCard({
 /* Top-of-page explainer: the two families and what each is for. */
 function FamilyExplainer() {
     return (
-        <section className="showcase-families-section" aria-labelledby="showcase-families-title">
+        <section
+            id="showcase-families"
+            className="showcase-families-section"
+            aria-labelledby="showcase-families-title"
+        >
             <header className="showcase-gallery-head">
+                <div className="showcase-section-kicker">Architecture · 2 Systems</div>
                 <h2 id="showcase-families-title">Two player families</h2>
                 <p>
-                    Every SEIHouse player face belongs to one of two families. Same shared engine —
-                    different jobs.
+                    Single shared audio engine tuned for different surface demands.
                 </p>
             </header>
             <div className="showcase-families">
                 <article className="showcase-family showcase-family--primary">
-                    <span className="showcase-family__badge">PrimaryPlayer</span>
+                    <div className="showcase-family__header">
+                        <div className="showcase-family__badge-wrap">
+                            <span className="showcase-family__dot showcase-family__dot--primary" />
+                            <span className="showcase-family__badge">PrimaryPlayer</span>
+                        </div>
+                        <span className="showcase-family__role-badge">Release Faces</span>
+                    </div>
                     <p className="showcase-family__role">
-                        Full release experiences — rich artwork, metadata, SEICanvas, and waveform.
+                        Full release experiences with rich artwork, metadata, SEICanvas visualizer, and waveform scrubbing.
                     </p>
                     <ul className="showcase-family__list">
-                        <li>
-                            FullCard <span>flagship</span>
+                        <li className="showcase-family__item">
+                            <span className="showcase-family__item-name">FullCardPlayer</span>
+                            <span className="showcase-family__item-tag showcase-family__item-tag--featured">Flagship</span>
                         </li>
-                        <li>SeaCard / Marketplace</li>
-                        <li>Portable full player</li>
-                        <li className="is-future">
-                            Canvas / mobile mode <span>soon</span>
+                        <li className="showcase-family__item">
+                            <span className="showcase-family__item-name">SeaCardPlayer</span>
+                            <span className="showcase-family__item-tag">Marketplace</span>
+                        </li>
+                        <li className="showcase-family__item">
+                            <span className="showcase-family__item-name">Portable Full Player</span>
+                            <span className="showcase-family__item-tag">Zero-Dep</span>
+                        </li>
+                        <li className="showcase-family__item is-future">
+                            <span className="showcase-family__item-name">Canvas / Mobile Mode</span>
+                            <span className="showcase-family__item-tag showcase-family__item-tag--future">Roadmap</span>
                         </li>
                     </ul>
                 </article>
                 <article className="showcase-family showcase-family--compact">
-                    <span className="showcase-family__badge">CompactPlayer</span>
+                    <div className="showcase-family__header">
+                        <div className="showcase-family__badge-wrap">
+                            <span className="showcase-family__dot showcase-family__dot--compact" />
+                            <span className="showcase-family__badge">CompactPlayer</span>
+                        </div>
+                        <span className="showcase-family__role-badge">Utility Faces</span>
+                    </div>
                     <p className="showcase-family__role">
-                        Utility playback surfaces — minimal and fast, synced to the StickyBottom
-                        master transport.
+                        Lightweight utility surfaces synced to the master StickyBottom transport.
                     </p>
                     <ul className="showcase-family__list">
-                        <li>MiniSidebar</li>
-                        <li>
-                            StickyBottom <span>shared scrubber</span>
+                        <li className="showcase-family__item">
+                            <span className="showcase-family__item-name">MiniSidebarPlayer</span>
+                            <span className="showcase-family__item-tag">Sidebar</span>
                         </li>
-                        <li>VaultRow</li>
-                        <li className="is-future">
-                            QueueRow <span>soon</span>
+                        <li className="showcase-family__item">
+                            <span className="showcase-family__item-name">StickyBottomPlayer</span>
+                            <span className="showcase-family__item-tag showcase-family__item-tag--featured">Master Scrubber</span>
+                        </li>
+                        <li className="showcase-family__item">
+                            <span className="showcase-family__item-name">VaultRowPlayer</span>
+                            <span className="showcase-family__item-tag">Catalog Row</span>
+                        </li>
+                        <li className="showcase-family__item is-future">
+                            <span className="showcase-family__item-name">QueueRowPlayer</span>
+                            <span className="showcase-family__item-tag showcase-family__item-tag--future">Roadmap</span>
                         </li>
                     </ul>
                 </article>
@@ -249,26 +281,60 @@ function FamilyExplainer() {
 }
 
 /* ----------------------------- Showcase page ----------------------------- */
+const SHOWCASE_SECTIONS = [
+    { id: "showcase-hero", label: "Featured", number: "01", category: "Release" },
+    { id: "showcase-families", label: "Families", number: "02", category: "Design" },
+    { id: "showcase-primary", label: "Primary", number: "03", category: "Playback" },
+    { id: "showcase-compact", label: "Compact", number: "04", category: "Surfaces" },
+    { id: "showcase-notes", label: "Specs", number: "05", category: "Engine" },
+] as const
+
 /* The clean gallery: the two player families, all playing the "No Luck"
    release. No broken URLs, debug panels, or stress tests here — that material
    lives in the Lab tab. */
 export function Showcase() {
     return (
         <main className="product-preview" aria-labelledby="showcase-title">
-            <section className="product-preview__hero">
+            <SectionNav
+                sections={SHOWCASE_SECTIONS}
+                defaultSectionId="showcase-hero"
+                ariaLabel="Showcase quick navigation"
+            />
+
+            <section id="showcase-hero" className="product-preview__hero">
                 <div className="product-preview__copy">
                     <div className="product-preview__pill">
-                        Featured release · Portable AudioPlayer
+                        <span className="product-preview__pill-dot" aria-hidden="true" />
+                        Featured Release · Portable Core
                     </div>
                     <h1 id="showcase-title" className="product-preview__title">
                         One playback layer, two player families.
                     </h1>
                     <p className="product-preview__lede">
-                        The same SEIHouse player engine powers the Vault, SEA cards, album worlds,
-                        artist pages, and Vault Radio. This page shows both families working cleanly
-                        — the portable full player below, then the PrimaryPlayer and CompactPlayer
-                        galleries all playing <strong>No Luck</strong> by SENSEI.
+                        Unified audio engine powering flagship release surfaces and compact utility players.
                     </p>
+                    <div className="product-preview__actions">
+                        <button
+                            type="button"
+                            className="product-preview__btn product-preview__btn--primary"
+                            onClick={() => {
+                                const el = document.getElementById("showcase-primary")
+                                el?.scrollIntoView({ behavior: "smooth" })
+                            }}
+                        >
+                            Explore Faces
+                        </button>
+                        <button
+                            type="button"
+                            className="product-preview__btn product-preview__btn--secondary"
+                            onClick={() => {
+                                const el = document.getElementById("showcase-families")
+                                el?.scrollIntoView({ behavior: "smooth" })
+                            }}
+                        >
+                            Architecture
+                        </button>
+                    </div>
                     <div className="product-preview__metrics" aria-label="Release highlights">
                         <span>
                             <strong>6</strong> tracks
@@ -316,15 +382,15 @@ export function Showcase() {
 
             <AudioSessionProvider initialQueue={noLuckTracks}>
                 <section
+                    id="showcase-primary"
                     className="showcase-gallery-section"
                     aria-labelledby="showcase-primary-title"
                 >
                     <header className="showcase-gallery-head">
+                        <div className="showcase-section-kicker">Primary Family · Flagship</div>
                         <h2 id="showcase-primary-title">PrimaryPlayer family</h2>
                         <p>
-                            Rich, full release surfaces. They carry artwork, metadata, the
-                            SEICanvas, and the interactive waveform scrubber. The portable full
-                            player is the release player in the hero above.
+                            Rich release surfaces with interactive waveform scrubbers, SEICanvas slots, and action wheels.
                         </p>
                     </header>
                     <div className="showcase-gallery">
@@ -338,7 +404,7 @@ export function Showcase() {
                         </FaceCard>
                         <FaceCard
                             name="SeaCardPlayer"
-                            surface="Marketplace / card variant — embeddable SEA drop cards built on the primary contract."
+                            surface="Marketplace / card variant — embeddable SEA drop cards built on the primary contract. Swipeable on mobile."
                             tags={["SEICanvas", "Waveform / ScrubberCanvas", "Action button"]}
                         >
                             <ShowcaseSeaCards />
@@ -347,15 +413,15 @@ export function Showcase() {
                 </section>
 
                 <section
+                    id="showcase-compact"
                     className="showcase-gallery-section"
                     aria-labelledby="showcase-compact-title"
                 >
                     <header className="showcase-gallery-head">
+                        <div className="showcase-section-kicker">Compact Family · Utility</div>
                         <h2 id="showcase-compact-title">CompactPlayer family</h2>
                         <p>
-                            Small utility surfaces. They stay minimal — no per-face scrubbers.
-                            StickyBottom is the shared compact master transport that owns the
-                            scrubber for the whole family.
+                            Minimal utility surfaces synchronized to the shared StickyBottom master transport.
                         </p>
                     </header>
                     <div className="showcase-gallery">
@@ -386,29 +452,31 @@ export function Showcase() {
                 </section>
             </AudioSessionProvider>
 
-            <section className="product-preview__details" aria-label="Showcase notes">
+            <section
+                id="showcase-notes"
+                className="product-preview__details"
+                aria-label="Showcase notes"
+            >
                 <article>
                     <span>01</span>
                     <h2>Two families, one engine</h2>
                     <p>
                         PrimaryPlayer carries the full release experience; CompactPlayer stays
-                        minimal. Both are the production components that ship to SEIHouse surfaces.
+                        minimal. Both share the unified core engine.
                     </p>
                 </article>
                 <article>
                     <span>02</span>
                     <h2>One shared session</h2>
                     <p>
-                        Both galleries run on a single AudioSessionProvider, so the SEA cards, mini
-                        sidebar, Vault rows, and the StickyBottom master all mirror one queue.
+                        Both galleries run on a single AudioSessionProvider, keeping all surfaces synchronized across one queue.
                     </p>
                 </article>
                 <article>
                     <span>03</span>
                     <h2>Test &amp; customize</h2>
                     <p>
-                        Switch to Lab for QA, broken states, backends, and plugin coverage — or to
-                        Workshop to restyle a face and save presets.
+                        Switch to Lab for QA, broken states, backends, and plugins — or Workshop to customize faces and presets.
                     </p>
                 </article>
             </section>
