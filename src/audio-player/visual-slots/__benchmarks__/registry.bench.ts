@@ -8,10 +8,10 @@ import {
 import type { VisualComponentDefinition } from "../types"
 
 const COMPONENT_COUNT = 1000
-const SLOTS = ["seiCanvas", "scrubberCanvas", "controllerPanel"] as const
+type SlotName = "seiCanvas" | "scrubberCanvas" | "controllerPanel"
 
 // Helper to create a dummy component definition
-function createDef(id: string, slot: (typeof SLOTS)[number]): VisualComponentDefinition {
+function createDef(id: string, slot: SlotName): VisualComponentDefinition {
     return {
         id,
         name: `Component ${id}`,

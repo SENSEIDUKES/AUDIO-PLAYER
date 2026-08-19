@@ -71,7 +71,7 @@ describe("composeEventHandlers", () => {
     })
 
     it("stops the chain immediately if a handler sets defaultPrevented", () => {
-        const handler1 = vi.fn((e: any) => {
+        const handler1 = vi.fn((e: { defaultPrevented: boolean }) => {
             e.defaultPrevented = true
         })
         const handler2 = vi.fn()
@@ -85,7 +85,7 @@ describe("composeEventHandlers", () => {
     })
 
     it("stops the chain immediately if a handler sets sapPreventDefault", () => {
-        const handler1 = vi.fn((e: any) => {
+        const handler1 = vi.fn((e: { sapPreventDefault: boolean }) => {
             e.sapPreventDefault = true
         })
         const handler2 = vi.fn()
@@ -99,7 +99,7 @@ describe("composeEventHandlers", () => {
     })
 
     it("stops the chain if a handler sets nativeEvent.sapPreventDefault", () => {
-        const handler1 = vi.fn((e: any) => {
+        const handler1 = vi.fn((e: { nativeEvent: { sapPreventDefault: boolean } }) => {
             e.nativeEvent.sapPreventDefault = true
         })
         const handler2 = vi.fn()

@@ -185,6 +185,7 @@ export function SEICanvasActionMenu({
     // and restores to the trigger on close (same pattern as SAPController).
     useEffect(() => {
         if (!open) return
+        const trigger = triggerRef.current
         const prevOverflow = document.body.style.overflow
         document.body.style.overflow = "hidden"
         const raf = requestAnimationFrame(() => centerRef.current?.focus())
@@ -196,7 +197,6 @@ export function SEICanvasActionMenu({
             document.body.style.overflow = prevOverflow
             cancelAnimationFrame(raf)
             document.removeEventListener("keydown", handleKey)
-            const trigger = triggerRef.current
             if (trigger?.isConnected) trigger.focus()
         }
     }, [open, close])

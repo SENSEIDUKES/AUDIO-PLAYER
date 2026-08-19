@@ -4,8 +4,21 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { createAutomixPlugin } from "../AutomixPlugin"
 import type { PluginPlayerContext } from "../../core/plugins/PluginInterface"
-import * as trackAnalysis from "../../automix/trackAnalysis"
 import type { AudioPlayerEngine } from "../../types"
+import * as trackAnalysis from "../../automix/trackAnalysis"
+import {
+    createMockAudioEngine,
+    createMockPluginContext,
+    createMockTrack,
+    type MockAudioEngine,
+} from "../../testing/testMocks"
+
+interface AutomixPluginInternal {
+    deck: (MockAudio & HTMLAudioElement) | null
+    phase: "idle" | "preloading" | "fading" | "handoff"
+    preloadedKey: string | null
+    transitioning: boolean
+}
 
 vi.mock("../../automix/silenceAnalysis", () => ({
     ensureTrackAnalysis: vi.fn().mockResolvedValue(undefined),
@@ -25,6 +38,8 @@ vi.mock("../../utils/sources", () => ({
     getPrimaryTrackSource: vi.fn().mockReturnValue("blob:test"),
 }))
 
+type EventCallback = (event?: unknown) => void
+
 // Mock global Audio
 class MockAudio {
     preload: string = ""
@@ -33,14 +48,14 @@ class MockAudio {
     currentTime: number = 0
     muted: boolean = false
     readyState: number = 0
-    listeners: Record<string, Function[]> = {}
+    listeners: Record<string, EventCallback[]> = {}
 
-    addEventListener(event: string, callback: Function) {
+    addEventListener(event: string, callback: EventCallback) {
         if (!this.listeners[event]) this.listeners[event] = []
         this.listeners[event].push(callback)
     }
 
-    removeEventListener(event: string, callback: Function) {
+    removeEventListener(event: string, callback: EventCallback) {
         if (!this.listeners[event]) return
         this.listeners[event] = this.listeners[event].filter((cb) => cb !== callback)
     }
@@ -121,8 +136,8 @@ describe("AutomixPlugin", () => {
 
     describe("Transitions and Supervise", () => {
         let mockContext: PluginPlayerContext
-        let mockEngine: any
-        let mockMainAudio: any
+        let mockEngine: MockAudioEngine
+        let mockMainAudio: MockAudio
 
         beforeEach(() => {
             vi.useFakeTimers()
@@ -132,7 +147,7 @@ describe("AutomixPlugin", () => {
             mockMainAudio = new MockAudio()
             mockMainAudio.readyState = 4
 
-            mockEngine = {
+            mockEngine = createMockAudioEngine({
                 isPlaying: true,
                 isSeeking: false,
                 hasError: false,
@@ -140,16 +155,16 @@ describe("AutomixPlugin", () => {
                 currentTime: 0,
                 volume: 1,
                 volumeUnsupported: false,
-            }
+            })
 
-            mockContext = {
+            mockContext = createMockPluginContext({
                 getEngine: vi.fn().mockReturnValue(mockEngine),
-                getCurrentTrack: vi.fn().mockReturnValue({ id: "current", url: "url1" }),
-                getNextTrack: vi.fn().mockReturnValue({ id: "next", url: "url2" }),
+                getCurrentTrack: vi.fn().mockReturnValue(createMockTrack("current", { audioFile: "url1" })),
+                getNextTrack: vi.fn().mockReturnValue(createMockTrack("next", { audioFile: "url2" })),
                 getSourceKey: vi.fn().mockReturnValue("local"),
-                getAudioElement: vi.fn().mockReturnValue(mockMainAudio),
+                getAudioElement: vi.fn().mockReturnValue(mockMainAudio as unknown as HTMLAudioElement),
                 requestAdvance: vi.fn(),
-            } as unknown as PluginPlayerContext
+            })
         })
 
         afterEach(() => {
@@ -162,7 +177,7 @@ describe("AutomixPlugin", () => {
             const plugin = createAutomixPlugin({ enabled: true })
             plugin.init(mockContext)
 
-            plugin.onTrackLoad?.({ id: "loaded", url: "url" } as any)
+            plugin.onTrackLoad?.(createMockTrack("loaded", { audioFile: "url" }))
             expect(trackAnalysis.ensureProTrackAnalysis).toHaveBeenCalled()
         })
 
@@ -173,17 +188,18 @@ describe("AutomixPlugin", () => {
             mockEngine.currentTime = 175
             plugin.onTimeUpdate?.(175)
 
-            const deck = (plugin as any).deck
+            const internal = plugin as unknown as AutomixPluginInternal
+            const deck = internal.deck
             if (deck) {
                 deck.readyState = 4
                 deck._trigger("loadedmetadata")
                 mockEngine.currentTime = 176
                 plugin.onTimeUpdate?.(176)
-                expect((plugin as any).phase).toBe("fading")
+                expect(internal.phase).toBe("fading")
 
                 mockEngine.currentTime = 170
                 plugin.onSeek?.(170)
-                expect((plugin as any).phase).toBe("idle")
+                expect(internal.phase).toBe("idle")
             }
         })
 
@@ -193,12 +209,13 @@ describe("AutomixPlugin", () => {
 
             mockEngine.currentTime = 100
             plugin.onTimeUpdate?.(100)
-            expect((plugin as any).phase).toBe("idle")
+            const internal = plugin as unknown as AutomixPluginInternal
+            expect(internal.phase).toBe("idle")
 
             mockEngine.currentTime = 166
             plugin.onTimeUpdate?.(166)
-            expect((plugin as any).phase).toBe("preloading")
-            expect((plugin as any).preloadedKey).toBe("id:next")
+            expect(internal.phase).toBe("preloading")
+            expect(internal.preloadedKey).toBe("id:next")
         })
 
         it("does nothing if track is too short", () => {
@@ -208,7 +225,8 @@ describe("AutomixPlugin", () => {
 
             mockEngine.currentTime = 18
             plugin.onTimeUpdate?.(18)
-            expect((plugin as any).phase).toBe("idle")
+            const internal = plugin as unknown as AutomixPluginInternal
+            expect(internal.phase).toBe("idle")
         })
 
         it("starts fading and requests advance after ramp", async () => {
@@ -219,13 +237,14 @@ describe("AutomixPlugin", () => {
             mockEngine.currentTime = 166
             plugin.onTimeUpdate?.(166)
 
-            const deck = (plugin as any).deck
-            deck.readyState = 4
+            const internal = plugin as unknown as AutomixPluginInternal
+            const deck = internal.deck
+            if (deck) deck.readyState = 4
 
             mockEngine.currentTime = 176
             plugin.onTimeUpdate?.(176)
 
-            expect((plugin as any).phase).toBe("fading")
+            expect(internal.phase).toBe("fading")
             expect(onTransitionChange).toHaveBeenCalledWith(true)
 
             await Promise.resolve() // let deck.play() resolve and trigger runRamp
@@ -233,7 +252,7 @@ describe("AutomixPlugin", () => {
             vi.spyOn(performance, "now").mockReturnValue(1000 + 6000)
             vi.advanceTimersByTime(6000)
 
-            expect((plugin as any).phase).toBe("handoff")
+            expect(internal.phase).toBe("handoff")
             expect(mockContext.requestAdvance).toHaveBeenCalled()
         })
 
@@ -241,7 +260,8 @@ describe("AutomixPlugin", () => {
             const plugin = createAutomixPlugin()
             plugin.init(mockContext)
 
-            ;(plugin as any).phase = "handoff"
+            const internal = plugin as unknown as AutomixPluginInternal
+            internal.phase = "handoff"
             expect(plugin.handleTrackEnded()).toBe(true)
         })
 
@@ -249,9 +269,10 @@ describe("AutomixPlugin", () => {
             const plugin = createAutomixPlugin()
             plugin.init(mockContext)
 
-            ;(plugin as any).phase = "fading"
+            const internal = plugin as unknown as AutomixPluginInternal
+            internal.phase = "fading"
             expect(plugin.handleTrackEnded()).toBe(false)
-            expect((plugin as any).phase).toBe("handoff")
+            expect(internal.phase).toBe("handoff")
         })
 
         it("aborts preloading if next track changes", () => {
@@ -260,14 +281,15 @@ describe("AutomixPlugin", () => {
 
             mockEngine.currentTime = 166
             plugin.onTimeUpdate?.(166)
-            expect((plugin as any).phase).toBe("preloading")
+            const internal = plugin as unknown as AutomixPluginInternal
+            expect(internal.phase).toBe("preloading")
 
             // Change next track
-            mockContext.getNextTrack = vi.fn().mockReturnValue({ id: "another_next" })
+            mockContext.getNextTrack = vi.fn().mockReturnValue(createMockTrack("another_next"))
             plugin.onTimeUpdate?.(166)
 
-            expect((plugin as any).phase).toBe("idle")
-            expect((plugin as any).deck).toBeNull()
+            expect(internal.phase).toBe("idle")
+            expect(internal.deck).toBeNull()
         })
 
         it("aborts handoff and restores volume if flip times out", async () => {
@@ -276,8 +298,9 @@ describe("AutomixPlugin", () => {
 
             mockEngine.currentTime = 166
             plugin.onTimeUpdate?.(166)
-            const deck = (plugin as any).deck
-            deck.readyState = 4
+            const internal = plugin as unknown as AutomixPluginInternal
+            const deck = internal.deck
+            if (deck) deck.readyState = 4
             mockEngine.currentTime = 176
             plugin.onTimeUpdate?.(176)
 
@@ -286,16 +309,16 @@ describe("AutomixPlugin", () => {
             vi.spyOn(performance, "now").mockReturnValue(1000 + 6000)
             vi.advanceTimersByTime(6000)
 
-            expect((plugin as any).phase).toBe("handoff")
+            expect(internal.phase).toBe("handoff")
 
             // Simulating track load on handoff (source key MUST change)
             mockContext.getSourceKey = vi.fn().mockReturnValue("new_source_key")
-            plugin.onTrackLoad?.({ id: "next", url: "url2" } as any)
+            plugin.onTrackLoad?.(createMockTrack("next", { audioFile: "url2" }))
 
             vi.advanceTimersByTime(7000) // HANDOFF_TIMEOUT_MS is 6000
 
-            expect((plugin as any).phase).toBe("idle")
-            expect((plugin as any).transitioning).toBe(false)
+            expect(internal.phase).toBe("idle")
+            expect(internal.transitioning).toBe(false)
         })
 
         it("successfully completes handoff when main starts playing", async () => {
@@ -304,8 +327,9 @@ describe("AutomixPlugin", () => {
 
             mockEngine.currentTime = 166
             plugin.onTimeUpdate?.(166)
-            const deck = (plugin as any).deck
-            deck.readyState = 4
+            const internal = plugin as unknown as AutomixPluginInternal
+            const deck = internal.deck
+            if (deck) deck.readyState = 4
             mockEngine.currentTime = 176
             plugin.onTimeUpdate?.(176)
 
@@ -314,16 +338,16 @@ describe("AutomixPlugin", () => {
             vi.spyOn(performance, "now").mockReturnValue(1000 + 6000)
             vi.advanceTimersByTime(6000)
 
-            expect((plugin as any).phase).toBe("handoff")
+            expect(internal.phase).toBe("handoff")
 
             mockContext.getSourceKey = vi.fn().mockReturnValue("new_source_key")
-            plugin.onTrackLoad?.({ id: "next", url: "url2" } as any)
+            plugin.onTrackLoad?.(createMockTrack("next", { audioFile: "url2" }))
 
             // Trigger playing on main
             mockMainAudio._trigger("playing")
 
-            expect((plugin as any).phase).toBe("idle")
-            expect((plugin as any).transitioning).toBe(false)
+            expect(internal.phase).toBe("idle")
+            expect(internal.transitioning).toBe(false)
             expect(mockMainAudio.volume).toBe(1)
         })
     })

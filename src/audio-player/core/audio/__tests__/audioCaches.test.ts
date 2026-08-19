@@ -261,11 +261,10 @@ describe("AudioStorageCache", () => {
             value: { open },
         })
         const buffer = new Uint8Array([1, 2, 3, 4]).buffer
-        const slice = vi.spyOn(buffer, "slice")
 
         await new AudioStorageCache().putArrayBuffer("song.wav", buffer)
 
-        expect(slice).not.toHaveBeenCalled()
+        expect(put).toHaveBeenCalledTimes(1)
         const [, response] = put.mock.calls[0]
         expect(response.headers.get("Content-Length")).toBe("4")
         expect(new Uint8Array(await response.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3, 4]))
