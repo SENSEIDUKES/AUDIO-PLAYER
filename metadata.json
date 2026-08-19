@@ -1,8 +1,0 @@
-{
-  "name": "Audio Player",
-  "description": "Custom React and TypeScript audio player featuring zero-dependency core, automix, waveforms, diagnostics, and modular skins.",
-  "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
-}

@@ -44,7 +44,9 @@ export const LyricsPluginConfigSchema = z.object({
             })
         )
         .optional(),
-    onLineChange: z.custom<(...args: unknown[]) => unknown>((val) => typeof val === "function").optional(),
+    onLineChange: z
+        .custom<(...args: unknown[]) => unknown>((val) => typeof val === "function")
+        .optional(),
     target: z.custom<HTMLElement | (() => HTMLElement | null) | null>().optional(),
 })
 
@@ -62,14 +64,18 @@ export const AutoThemePluginConfigSchema = z.object({
     applyGradient: z.boolean().optional().default(true),
     sampleSize: z.number().positive().optional(),
     quantStep: z.number().positive().optional(),
-    onPaletteChange: z.custom<(...args: unknown[]) => unknown>((val) => typeof val === "function").optional(),
+    onPaletteChange: z
+        .custom<(...args: unknown[]) => unknown>((val) => typeof val === "function")
+        .optional(),
 })
 
 export const AutomixPluginConfigSchema = z.object({
     name: z.string().optional().default("automix"),
     enabled: z.boolean().optional().default(true),
     confidenceMin: z.number().min(0).max(1).optional().default(0.1),
-    onTransitionChange: z.custom<(...args: unknown[]) => unknown>((val) => typeof val === "function").optional(),
+    onTransitionChange: z
+        .custom<(...args: unknown[]) => unknown>((val) => typeof val === "function")
+        .optional(),
 })
 
 export const AnalyticsPluginConfigSchema = z.object({

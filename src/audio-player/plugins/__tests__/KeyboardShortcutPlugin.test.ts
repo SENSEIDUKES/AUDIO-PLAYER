@@ -4,7 +4,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { createKeyboardShortcutPlugin } from "../KeyboardShortcutPlugin"
 import type { PluginPlayerContext } from "../../core/plugins/PluginInterface"
-import { createMockAudioEngine, createMockPluginContext, type MockAudioEngine } from "../../testing/testMocks"
+import {
+    createMockAudioEngine,
+    createMockPluginContext,
+    type MockAudioEngine,
+} from "../../testing/testMocks"
 
 describe("KeyboardShortcutPlugin", () => {
     let mockContext: PluginPlayerContext

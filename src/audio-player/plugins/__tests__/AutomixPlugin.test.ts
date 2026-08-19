@@ -159,10 +159,16 @@ describe("AutomixPlugin", () => {
 
             mockContext = createMockPluginContext({
                 getEngine: vi.fn().mockReturnValue(mockEngine),
-                getCurrentTrack: vi.fn().mockReturnValue(createMockTrack("current", { audioFile: "url1" })),
-                getNextTrack: vi.fn().mockReturnValue(createMockTrack("next", { audioFile: "url2" })),
+                getCurrentTrack: vi
+                    .fn()
+                    .mockReturnValue(createMockTrack("current", { audioFile: "url1" })),
+                getNextTrack: vi
+                    .fn()
+                    .mockReturnValue(createMockTrack("next", { audioFile: "url2" })),
                 getSourceKey: vi.fn().mockReturnValue("local"),
-                getAudioElement: vi.fn().mockReturnValue(mockMainAudio as unknown as HTMLAudioElement),
+                getAudioElement: vi
+                    .fn()
+                    .mockReturnValue(mockMainAudio as unknown as HTMLAudioElement),
                 requestAdvance: vi.fn(),
             })
         })

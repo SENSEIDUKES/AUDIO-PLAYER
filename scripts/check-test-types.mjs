@@ -44,7 +44,10 @@ for (const filePath of testFiles) {
         // Simple regex matching `as any`, `: any`, `any[]`, `<any>`
         const anyMatch = line.match(/(\bas\s+any\b|:\s*any\b|\bany\[\]|<any>)/)
         // Skip comment lines
-        const isComment = line.trim().startsWith("//") || line.trim().startsWith("/*") || line.trim().startsWith("*")
+        const isComment =
+            line.trim().startsWith("//") ||
+            line.trim().startsWith("/*") ||
+            line.trim().startsWith("*")
         if (anyMatch && !isComment) {
             totalAnyFound++
             report.push({
@@ -62,15 +65,21 @@ console.log("==================================================")
 
 if (totalAnyFound === 0) {
     console.log(" All test fixtures and mocks are strictly typed! No untyped `any` casts found.")
-    console.log("Tip: Use `src/audio-player/testing/testMocks.ts` for MockAudioEngine, MockPluginContext, etc.\n")
+    console.log(
+        "Tip: Use `src/audio-player/testing/testMocks.ts` for MockAudioEngine, MockPluginContext, etc.\n"
+    )
     process.exit(0)
 } else {
-    console.log(` Found ${totalAnyFound} explicit \`any\` occurrences across ${testFiles.length} test files:\n`)
+    console.log(
+        ` Found ${totalAnyFound} explicit \`any\` occurrences across ${testFiles.length} test files:\n`
+    )
     for (const item of report) {
         console.log(`  ${item.file}:${item.line}`)
         console.log(`    ${item.snippet}\n`)
     }
-    console.log("Recommendation: Replace these with typed mock interfaces from `src/audio-player/testing/testMocks.ts`.")
+    console.log(
+        "Recommendation: Replace these with typed mock interfaces from `src/audio-player/testing/testMocks.ts`."
+    )
     // Non-zero exit if STRICT_TEST_TYPES is enabled, otherwise informative advisory
     if (process.env.STRICT_TEST_TYPES === "true" || process.env.STRICT_TEST_TYPES === "1") {
         process.exit(1)

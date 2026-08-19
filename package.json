@@ -35,10 +35,11 @@
         "lint:test-types": "node scripts/check-test-types.mjs",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
+        "test:repository": "node scripts/check-repository-contract.mjs",
         "test:unit": "vitest run",
         "test:docs": "node scripts/check-documentation.mjs && tsc --noEmit -p tsconfig.examples.json",
         "test:package": "npm run build:lib && node scripts/package-smoke-test.mjs",
-        "test": "npm run lint && npm run format:check && npm run typecheck && npm run test:docs && npm run test:unit && npm run test:package && npm run build && npm run preview:smoke",
+        "test": "npm run test:repository && npm run lint && npm run format:check && npm run typecheck && npm run test:docs && npm run test:unit && npm run test:package && npm run build && npm run preview:smoke",
         "skin:import": "node scripts/import-skin.mjs"
     },
     "peerDependencies": {

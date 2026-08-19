@@ -97,9 +97,7 @@ export function createMockPluginContext(
 /**
  * Typed mock for PluginSoundLayer.
  */
-export function createMockSoundLayer(
-    overrides: Partial<PluginSoundLayer> = {}
-): PluginSoundLayer {
+export function createMockSoundLayer(overrides: Partial<PluginSoundLayer> = {}): PluginSoundLayer {
     return {
         loadSpritePack: vi.fn().mockResolvedValue(undefined),
         playSprite: vi.fn().mockReturnValue("sprite-1"),
@@ -115,9 +113,7 @@ export function createMockSoundLayer(
  */
 export type MockAudioContext = Partial<AudioContext>
 
-export function createMockAudioContext(
-    overrides: Partial<AudioContext> = {}
-): AudioContext {
+export function createMockAudioContext(overrides: Partial<AudioContext> = {}): AudioContext {
     const ctx = {
         state: "running" as AudioContextState,
         sampleRate: 44100,
