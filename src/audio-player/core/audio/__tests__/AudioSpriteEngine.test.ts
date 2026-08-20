@@ -1,3 +1,6 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { AudioSpriteEngine } from "../AudioSpriteEngine"
 
@@ -59,20 +62,22 @@ describe("AudioSpriteEngine", () => {
 
     beforeEach(() => {
         context = new FakeAudioContext()
-        ;(globalThis as any).window = {
-            AudioContext: vi.fn(function AudioContextMock() {
-                return context
-            }),
-        }
-        globalThis.fetch = vi.fn(async () => ({
-            ok: true,
-            arrayBuffer: async () => new ArrayBuffer(8),
-        })) as unknown as typeof fetch
+        const MockAudioContextCtor = vi.fn(function () {
+            return context
+        })
+        vi.stubGlobal("AudioContext", MockAudioContextCtor)
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () => ({
+                ok: true,
+                arrayBuffer: async () => new ArrayBuffer(8),
+            }))
+        )
     })
 
     afterEach(() => {
+        vi.unstubAllGlobals()
         vi.restoreAllMocks()
-        delete (globalThis as any).window
     })
 
     it("loads one pack and plays named clips by offset and duration", async () => {

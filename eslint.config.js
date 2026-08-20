@@ -38,6 +38,20 @@ export default tseslint.config(
             "prefer-const": "warn",
         },
     },
+    // Test fixture and test mock configuration — encourages typed mock interfaces
+    // over `any` casts in test suites.
+    {
+        files: [
+            "**/__tests__/**/*.{ts,tsx}",
+            "**/*.test.{ts,tsx}",
+            "**/*.spec.{ts,tsx}",
+            "**/testing/**/*.{ts,tsx}",
+        ],
+        rules: {
+            "@typescript-eslint/no-explicit-any": "warn",
+            "@typescript-eslint/no-unsafe-function-type": "warn",
+        },
+    },
     // Node scripts (.mjs) run outside the TS program; give them Node globals.
     {
         files: ["**/*.mjs"],

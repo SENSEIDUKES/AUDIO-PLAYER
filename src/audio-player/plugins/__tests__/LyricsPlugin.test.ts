@@ -2,29 +2,24 @@
  * @vitest-environment jsdom
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { createLyricsPlugin } from "../LyricsPlugin"
+import { createLyricsPlugin, type TimedLyricLine } from "../LyricsPlugin"
 import type { PluginPlayerContext } from "../../core/plugins/PluginInterface"
+import {
+    createMockAudioEngine,
+    createMockPluginContext,
+    createMockTrack,
+    type MockAudioEngine,
+} from "../../testing/testMocks"
 
 describe("LyricsPlugin", () => {
     let mockContext: PluginPlayerContext
-    let mockEngine: any
+    let mockEngine: MockAudioEngine
 
     beforeEach(() => {
-        mockEngine = {
-            duration: 180,
-        }
-        mockContext = {
-            getCurrentTrack: vi.fn(),
+        mockEngine = createMockAudioEngine({ duration: 180 })
+        mockContext = createMockPluginContext({
             getEngine: vi.fn().mockReturnValue(mockEngine),
-            getPlugins: vi.fn(),
-            play: vi.fn(),
-            pause: vi.fn(),
-            togglePlay: vi.fn(),
-            seek: vi.fn(),
-            next: vi.fn(),
-            previous: vi.fn(),
-            setVolume: vi.fn(),
-        } as unknown as PluginPlayerContext
+        })
     })
 
     describe("LRC parsing", () => {
@@ -58,7 +53,7 @@ describe("LyricsPlugin", () => {
             })
             plugin.init(mockContext)
 
-            let lines: any[] = []
+            const lines: (TimedLyricLine | null)[] = []
             const testPlugin = createLyricsPlugin({
                 lyrics: "Just text without timestamp\n[invalid] Not LRC\n[00:10.00] Valid",
                 onLineChange: (line) => {
@@ -67,7 +62,7 @@ describe("LyricsPlugin", () => {
             })
             testPlugin.init(mockContext)
             testPlugin.onTimeUpdate?.(5)
-            expect(lines[0].text).toBe("[invalid] Not LRC") // It will match the last line with time <= 5 (which is index 1, time 0)
+            expect(lines[0]?.text).toBe("[invalid] Not LRC") // It will match the last line with time <= 5 (which is index 1, time 0)
         })
 
         it("handles empty lyrics", () => {
@@ -89,10 +84,10 @@ describe("LyricsPlugin", () => {
             plugin.init(mockContext)
 
             plugin.onTimeUpdate?.(5)
-            expect(onLineChange).toHaveBeenCalledWith({ time: 0, text: "Line 1" }, 0, undefined)
+            expect(onLineChange).toHaveBeenCalledWith({ time: 0, text: "Line 1" }, 0, null)
 
             plugin.onTimeUpdate?.(15)
-            expect(onLineChange).toHaveBeenCalledWith({ time: 10, text: "Line 2" }, 1, undefined)
+            expect(onLineChange).toHaveBeenCalledWith({ time: 10, text: "Line 2" }, 1, null)
         })
 
         it("does not trigger callback if line index hasn't changed", () => {
@@ -125,16 +120,16 @@ describe("LyricsPlugin", () => {
             // 135 - 180s: Line 4 (3)
 
             plugin.onTimeUpdate?.(20)
-            expect(onLineChange).toHaveBeenCalledWith({ time: 0, text: "Line 1" }, 0, undefined)
+            expect(onLineChange).toHaveBeenCalledWith({ time: 0, text: "Line 1" }, 0, null)
 
             plugin.onTimeUpdate?.(60)
-            expect(onLineChange).toHaveBeenCalledWith({ time: 0, text: "Line 2" }, 1, undefined)
+            expect(onLineChange).toHaveBeenCalledWith({ time: 0, text: "Line 2" }, 1, null)
 
             plugin.onTimeUpdate?.(100)
-            expect(onLineChange).toHaveBeenCalledWith({ time: 0, text: "Line 3" }, 2, undefined)
+            expect(onLineChange).toHaveBeenCalledWith({ time: 0, text: "Line 3" }, 2, null)
 
             plugin.onTimeUpdate?.(150)
-            expect(onLineChange).toHaveBeenCalledWith({ time: 0, text: "Line 4" }, 3, undefined)
+            expect(onLineChange).toHaveBeenCalledWith({ time: 0, text: "Line 4" }, 3, null)
         })
     })
 
@@ -178,15 +173,12 @@ describe("LyricsPlugin", () => {
             })
             plugin.init(mockContext)
 
-            const newTrack = {
-                id: "1",
-                title: "Test",
-                url: "url",
+            const newTrack = createMockTrack("1", {
                 lyrics: "[00:00.00] Track Lyrics",
-            }
+            })
             mockContext.getCurrentTrack = vi.fn().mockReturnValue(newTrack)
 
-            plugin.onTrackLoad?.(newTrack as any)
+            plugin.onTrackLoad?.(newTrack)
             plugin.onTimeUpdate?.(5)
 
             expect(onLineChange).toHaveBeenCalledWith(

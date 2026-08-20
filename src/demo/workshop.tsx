@@ -11,6 +11,16 @@ import type { WorkshopFaceId, WorkshopSettings } from "./workshopFaces"
 import { loadPresets, savePreset, deletePreset } from "./workshopPresets"
 import type { WorkshopPreset } from "./workshopPresets"
 import { SchemaPanel } from "./panel/SchemaPanel"
+import { SectionNav } from "./SectionNav"
+
+const WORKSHOP_SECTIONS = [
+    { id: "workshop-header", label: "Overview", number: "01", category: "Intro" },
+    { id: "workshop-face", label: "Face Picker", number: "02", category: "Face" },
+    { id: "workshop-controls", label: "Controls", number: "03", category: "Tuning" },
+    { id: "workshop-plugins", label: "Plugins", number: "04", category: "Addons" },
+    { id: "workshop-preview", label: "Preview", number: "05", category: "Stage" },
+    { id: "workshop-presets", label: "Presets", number: "06", category: "Storage" },
+] as const
 
 /* ----------------------------- Preset bar ----------------------------- */
 function PresetBar({
@@ -31,7 +41,7 @@ function PresetBar({
     const faceLabel = (id: WorkshopFaceId) => WORKSHOP_FACES.find((f) => f.id === id)?.label ?? id
 
     return (
-        <div className="workshop-presets">
+        <div id="workshop-presets" className="workshop-presets">
             <div className="workshop-presets__head">
                 <h3 className="workshop-presets__title">Presets</h3>
                 <p className="workshop-presets__hint">
@@ -167,7 +177,13 @@ function WorkshopInner() {
 
     return (
         <div className="lab-shell">
-            <header className="lab-header">
+            <SectionNav
+                sections={WORKSHOP_SECTIONS}
+                defaultSectionId="workshop-header"
+                ariaLabel="Workshop quick navigation"
+            />
+
+            <header id="workshop-header" className="lab-header">
                 <div>
                     <h1 className="lab-header__title">Workshop — customize a face</h1>
                     <p className="lab-header__sub">
@@ -181,7 +197,7 @@ function WorkshopInner() {
 
             <div className="workshop">
                 <div className="workshop__panel">
-                    <div className="framer-panel__row workshop__face-picker">
+                    <div id="workshop-face" className="framer-panel__row workshop__face-picker">
                         <label className="framer-panel__label" htmlFor="ws-face">
                             Player face
                         </label>
@@ -198,17 +214,21 @@ function WorkshopInner() {
                             ))}
                         </select>
                     </div>
-                    <SchemaPanel
-                        face={face}
-                        settings={settings}
-                        onChange={setSettings}
-                        onReset={() => setSettings(defaultWorkshopSettings())}
-                    />
-                    <PluginManagerPanel />
+                    <div id="workshop-controls" className="workshop__controls-wrap">
+                        <SchemaPanel
+                            face={face}
+                            settings={settings}
+                            onChange={setSettings}
+                            onReset={() => setSettings(defaultWorkshopSettings())}
+                        />
+                    </div>
+                    <div id="workshop-plugins" className="workshop__plugins-wrap">
+                        <PluginManagerPanel />
+                    </div>
                 </div>
 
                 <div className="workshop__main">
-                    <div className="workshop__preview">
+                    <div id="workshop-preview" className="workshop__preview">
                         <div className="workshop__preview-head">
                             <h3 className="workshop__preview-title">{face.label}</h3>
                             <p className="workshop__preview-desc">{face.description}</p>

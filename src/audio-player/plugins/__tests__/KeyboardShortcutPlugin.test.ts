@@ -4,27 +4,29 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { createKeyboardShortcutPlugin } from "../KeyboardShortcutPlugin"
 import type { PluginPlayerContext } from "../../core/plugins/PluginInterface"
+import {
+    createMockAudioEngine,
+    createMockPluginContext,
+    type MockAudioEngine,
+} from "../../testing/testMocks"
 
 describe("KeyboardShortcutPlugin", () => {
     let mockContext: PluginPlayerContext
-    let mockEngine: any
+    let mockEngine: MockAudioEngine
     let rootElement: HTMLElement
 
     beforeEach(() => {
         rootElement = document.createElement("div")
         document.body.appendChild(rootElement)
 
-        mockEngine = {
-            toggle: vi.fn(),
-            seekBy: vi.fn(),
-        }
+        mockEngine = createMockAudioEngine()
 
-        mockContext = {
+        mockContext = createMockPluginContext({
             getEngine: vi.fn().mockReturnValue(mockEngine),
             getRootElement: vi.fn().mockReturnValue(rootElement),
             next: vi.fn(),
             previous: vi.fn(),
-        } as unknown as PluginPlayerContext
+        })
     })
 
     afterEach(() => {

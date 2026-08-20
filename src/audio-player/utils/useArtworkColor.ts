@@ -54,7 +54,7 @@ export function useArtworkColor(src: string | undefined): string | null {
                         `rgb(${Math.round(r / totalAlpha)}, ${Math.round(g / totalAlpha)}, ${Math.round(b / totalAlpha)})`
                     )
                 }
-            } catch (err) {
+            } catch {
                 // Ignore CORS errors (canvas tainted)
                 if (isMounted) setColor(null)
             }

@@ -4,25 +4,33 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { createAnalyticsPlugin } from "../AnalyticsPlugin"
 import type { PluginPlayerContext } from "../../core/plugins/PluginInterface"
+import {
+    createMockAudioEngine,
+    createMockPluginContext,
+    createMockTrack,
+    type MockAudioEngine,
+} from "../../testing/testMocks"
 
 describe("AnalyticsPlugin", () => {
     let mockContext: PluginPlayerContext
-    let mockEngine: any
+    let mockEngine: MockAudioEngine
 
     beforeEach(() => {
         vi.useFakeTimers()
         vi.setSystemTime(new Date("2024-01-01T00:00:00Z"))
 
-        mockEngine = {
+        mockEngine = createMockAudioEngine({
             currentTime: 10,
             duration: 100,
-        }
+        })
 
-        mockContext = {
+        const mockTrack = createMockTrack("1", { title: "Test", artist: "Test Artist" })
+
+        mockContext = createMockPluginContext({
             getEngine: vi.fn().mockReturnValue(mockEngine),
-            getCurrentTrack: vi.fn().mockReturnValue({ id: "1", title: "Test" }),
+            getCurrentTrack: vi.fn().mockReturnValue(mockTrack),
             getSourceKey: vi.fn().mockReturnValue("local"),
-        } as unknown as PluginPlayerContext
+        })
 
         // Mock global objects
         vi.stubGlobal("fetch", vi.fn().mockResolvedValue({}))
@@ -48,7 +56,7 @@ describe("AnalyticsPlugin", () => {
 
             expect(sendCallback).toHaveBeenCalledWith({
                 type: "track_load",
-                track: { id: "1", title: "Test" },
+                track: expect.objectContaining({ id: "1", title: "Test" }),
                 sourceKey: "local",
                 position: 10,
                 duration: 100,
@@ -230,17 +238,17 @@ describe("AnalyticsPlugin", () => {
             const plugin = createAnalyticsPlugin({ endpoint: "/api/events" })
             plugin.init(mockContext)
 
-            const originalWindow = (globalThis as any).window
+            const originalWindow = (globalThis as typeof globalThis & { window?: unknown }).window
             try {
-                // @ts-ignore
-                delete (globalThis as any).window
+                // @ts-expect-error test environment window removal simulation
+                delete (globalThis as typeof globalThis & { window?: unknown }).window
 
                 plugin.onPlay?.()
 
                 expect(navigator.sendBeacon).not.toHaveBeenCalled()
                 expect(fetch).not.toHaveBeenCalled()
             } finally {
-                ;(globalThis as any).window = originalWindow
+                ;(globalThis as typeof globalThis & { window?: unknown }).window = originalWindow
             }
         })
     })

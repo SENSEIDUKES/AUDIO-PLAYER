@@ -3,10 +3,11 @@ import { describe, it, expect, vi } from "vitest"
 import React from "react"
 import { createRoot } from "react-dom/client"
 import { AudioSessionProvider, useAudioSession } from "../AudioSessionContext"
+import type { SessionEngine } from "../../types"
 
 describe("AudioSessionContext - Events", () => {
     it("should allow subscribing to events via the session context", async () => {
-        let sessionRef: any = null
+        let sessionRef: SessionEngine | null = null
 
         function TestComponent() {
             const session = useAudioSession()
@@ -26,10 +27,11 @@ describe("AudioSessionContext - Events", () => {
         })
 
         expect(sessionRef).toBeDefined()
-        expect(typeof sessionRef.subscribe).toBe("function")
+        const session = sessionRef as unknown as SessionEngine
+        expect(typeof session.subscribe).toBe("function")
 
         const handler = vi.fn()
-        const unsubscribe = sessionRef.subscribe("track-change", handler)
+        const unsubscribe = session.subscribe("track-change", handler)
 
         expect(typeof unsubscribe).toBe("function")
 

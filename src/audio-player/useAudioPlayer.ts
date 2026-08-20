@@ -670,7 +670,7 @@ export function useAudioPlayer(options: UseAudioPlayerOptions): AudioPlayerEngin
         if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
             try {
                 navigator.vibrate(10)
-            } catch (err) {
+            } catch {
                 // Ignore vibration failures (e.g. blocked by permissions policy)
             }
         }
