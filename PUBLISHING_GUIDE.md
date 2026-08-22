@@ -8,12 +8,38 @@ This document describes the current distribution contract for
 - The package name is `@seihouse/audio-player`.
 - The canonical source repository is
   `https://github.com/SENSEIDUKES/AUDIO-PLAYER.git`.
-- The package is not currently published to the public npm registry.
+- The package is published to the npm registry as a **private** package under
+  the `@seihouse` scope. It is not publicly readable; only members of the
+  `@seihouse` scope can install it.
 - The package is proprietary (`UNLICENSED`), so a registry release requires
   explicit release-owner approval.
+- `publishConfig.access` is pinned to `restricted` in `package.json`, so a
+  publish cannot accidentally make the package public.
 - Consumers may import the package root and
   `@seihouse/audio-player/styles.css`. No source-directory deep import is a
   supported package contract.
+
+## Install from the private npm registry
+
+The package is private, so a consumer must authenticate as a member of the
+`@seihouse` scope before installing:
+
+```bash
+npm install @seihouse/audio-player
+```
+
+Authenticate either interactively with `npm login`, or in CI with a read-only
+automation token supplied through the environment:
+
+```ini
+# .npmrc in the consumer repository — commit this file, it contains no secret
+@seihouse:registry=https://registry.npmjs.org/
+//registry.npmjs.org/:_authToken=${NPM_TOKEN}
+```
+
+Set `NPM_TOKEN` as a CI secret. Never commit a literal token value, and never
+write a resolved token into a checked-in `.npmrc`. This repository's own
+`.gitignore` excludes `.npmrc` for that reason.
 
 ## Install from GitHub
 
@@ -107,8 +133,12 @@ Only a release owner should perform a registry release. Before publishing:
 5. Publish only after the preceding checks and authorization are complete:
 
    ```bash
-   npm publish --access public
+   npm publish
    ```
+
+   `publishConfig.access` is `restricted`, so no `--access` flag is needed and
+   the release stays private. Never pass `--access public` — that would make a
+   proprietary package world-readable and cannot be undone by republishing.
 
 The final command intentionally has no automation wrapper: publishing changes
 external package state and must remain an explicit release-owner action.

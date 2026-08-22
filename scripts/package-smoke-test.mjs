@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process"
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { createRequire } from "node:module"
@@ -137,12 +137,17 @@ try {
     await mkdir(packDir)
     await mkdir(consumerDir)
 
-    const packOutput = runNpm(
-        ["pack", "--json", "--ignore-scripts", "--pack-destination", packDir],
-        projectRoot
-    )
-    const [{ filename }] = JSON.parse(packOutput)
-    const tarballPath = path.join(packDir, filename)
+    // `npm pack` runs the `prepare` lifecycle even with `--ignore-scripts`, so
+    // the build log is interleaved with `--json` on stdout and the result is not
+    // parseable. `packDir` is a fresh directory, so read back what npm wrote.
+    runNpm(["pack", "--ignore-scripts", "--pack-destination", packDir], projectRoot)
+    const packedTarballs = (await readdir(packDir)).filter((entry) => entry.endsWith(".tgz"))
+    if (packedTarballs.length !== 1) {
+        throw new Error(
+            `Expected npm pack to write exactly one tarball, found ${packedTarballs.length}`
+        )
+    }
+    const tarballPath = path.join(packDir, packedTarballs[0])
 
     await writeFile(
         path.join(consumerDir, "package.json"),
