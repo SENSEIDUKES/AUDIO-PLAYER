@@ -20,6 +20,11 @@ function runNpm(args, cwd) {
             ...process.env,
             npm_config_audit: "false",
             npm_config_fund: "false",
+            // `npm publish --dry-run` exports npm_config_dry_run to its
+            // lifecycle scripts. Inheriting it here would turn the pack and the
+            // consumer install into no-ops and the smoke test would verify
+            // nothing, so pin it off for every child npm invocation.
+            npm_config_dry_run: "false",
         },
     })
 
