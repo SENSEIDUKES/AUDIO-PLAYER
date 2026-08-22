@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process"
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { createRequire } from "node:module"
@@ -20,6 +20,11 @@ function runNpm(args, cwd) {
             ...process.env,
             npm_config_audit: "false",
             npm_config_fund: "false",
+            // `npm publish --dry-run` exports npm_config_dry_run to its
+            // lifecycle scripts. Inheriting it here would turn the pack and the
+            // consumer install into no-ops and the smoke test would verify
+            // nothing, so pin it off for every child npm invocation.
+            npm_config_dry_run: "false",
         },
     })
 
@@ -137,12 +142,18 @@ try {
     await mkdir(packDir)
     await mkdir(consumerDir)
 
-    const packOutput = runNpm(
-        ["pack", "--json", "--ignore-scripts", "--pack-destination", packDir],
-        projectRoot
-    )
-    const [{ filename }] = JSON.parse(packOutput)
-    const tarballPath = path.join(packDir, filename)
+    // npm 10.9.7 still runs the `prepare` lifecycle here despite
+    // `--ignore-scripts`, putting the build log on stdout. That rules out
+    // `npm pack --json`, whose output would be interleaved with it and no longer
+    // parseable, so read the tarball back from the fresh `packDir` instead.
+    runNpm(["pack", "--ignore-scripts", "--pack-destination", packDir], projectRoot)
+    const packedTarballs = (await readdir(packDir)).filter((entry) => entry.endsWith(".tgz"))
+    if (packedTarballs.length !== 1) {
+        throw new Error(
+            `Expected npm pack to write exactly one tarball, found ${packedTarballs.length}`
+        )
+    }
+    const tarballPath = path.join(packDir, packedTarballs[0])
 
     await writeFile(
         path.join(consumerDir, "package.json"),

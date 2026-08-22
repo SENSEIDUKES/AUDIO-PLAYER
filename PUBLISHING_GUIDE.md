@@ -8,12 +8,44 @@ This document describes the current distribution contract for
 - The package name is `@seihouse/audio-player`.
 - The canonical source repository is
   `https://github.com/SENSEIDUKES/AUDIO-PLAYER.git`.
-- The package is not currently published to the public npm registry.
+- The package is published to the npm registry as a **private** package under
+  the `@seihouse` scope. It is not publicly readable. `@seihouse` is a scope, not
+  a membership group: install access belongs to the package owner plus any
+  explicit collaborators, or — where the scope is backed by an npm organization —
+  to the teams granted read access on the package.
 - The package is proprietary (`UNLICENSED`), so a registry release requires
   explicit release-owner approval.
+- `publishConfig.access` is set to `restricted` in `package.json`, so a publish
+  defaults to private. A command-line `--access` flag still takes precedence over
+  `publishConfig`, so never pass `--access public` for this package.
 - Consumers may import the package root and
   `@seihouse/audio-player/styles.css`. No source-directory deep import is a
   supported package contract.
+
+## Install from the private npm registry
+
+The package is private, so a consumer must authenticate as a member of the
+`@seihouse` scope before installing:
+
+```bash
+npm install @seihouse/audio-player
+```
+
+Authenticate either interactively with `npm login`, or in CI with a granular
+access token carrying read-only permissions on this package (or the `@seihouse`
+scope), supplied through the environment:
+
+```ini
+# .npmrc in the consumer repository — commit this file, it contains no secret
+@seihouse:registry=https://registry.npmjs.org/
+//registry.npmjs.org/:_authToken=${NPM_TOKEN}
+```
+
+Set `NPM_TOKEN` as a CI secret. npm removed legacy (classic and automation)
+access tokens in November 2025, so a granular access token is the only supported
+credential for installing a private package in CI. Never commit a literal token
+value, and never write a resolved token into a checked-in `.npmrc`. This repository's own
+`.gitignore` excludes `.npmrc` for that reason.
 
 ## Install from GitHub
 
@@ -104,14 +136,66 @@ Only a release owner should perform a registry release. Before publishing:
 
 4. Set the approved semantic version, commit/tag it according to the release
    process, and push the commit and tag.
-5. Publish only after the preceding checks and authorization are complete:
+5. Publish only after the preceding checks and authorization are complete,
+   using the GitHub Actions release below.
 
-   ```bash
-   npm publish --access public
-   ```
+Publishing changes external package state, so it stays an explicit release-owner
+action: the release workflow is `workflow_dispatch`-only and never runs on a
+push, a tag, or a merge.
 
-The final command intentionally has no automation wrapper: publishing changes
-external package state and must remain an explicit release-owner action.
+## Releasing from GitHub Actions (trusted publishing)
+
+`.github/workflows/publish.yml` publishes the package through npm
+[trusted publishing](https://docs.npmjs.com/trusted-publishers). GitHub Actions
+acts as an OIDC identity provider, so the job exchanges a short-lived identity
+token for publish rights. **No npm token or repository secret is involved**, and
+nothing long-lived has to be stored or rotated.
+
+To release: open the repository's **Actions** tab, select **Publish**, and run
+the workflow on the reviewed commit. It installs dependencies with `npm ci`,
+runs the full `npm test` suite, and then publishes.
+
+### One-time npmjs.com setup
+
+Trusted publishing does not work until the package trusts this repository. A
+package owner configures that once, on npmjs.com:
+
+1. Open the package page → **Settings** → **Trusted Publishing**.
+2. Add a publisher with provider **GitHub Actions**, organization
+   `SENSEIDUKES`, repository `AUDIO-PLAYER`, and workflow filename
+   `publish.yml`.
+
+Until that entry exists, the workflow's publish step fails authentication. This
+is configured on an already-published package, which is why the first release
+was made from the CLI.
+
+### Requirements the workflow already encodes
+
+- `id-token: write` permission on the publishing job, so the runner can mint the
+  OIDC token. Without it npm falls back to looking for a token and fails.
+- npm **11.5.1 or later**. Node 22 ships npm 10.x, which predates OIDC support,
+  so the workflow upgrades npm before touching the registry.
+- No `--provenance` flag: trusted publishing attests provenance automatically.
+- No `--access` flag: `publishConfig.access` keeps the release `restricted`.
+
+### Manual fallback
+
+If trusted publishing is unavailable, a release owner can still publish from the
+CLI on a clean, reviewed commit:
+
+```bash
+npm publish
+```
+
+`publishConfig.access` is `restricted`, so no `--access` flag is needed and the
+release stays private. Never pass `--access public` — that would make a
+proprietary package world-readable and cannot be undone by republishing.
+
+Note that npm stopped issuing TOTP (authenticator app) enrollments for accounts
+created after September 2025, and the npm CLI cannot complete a passkey or
+security-key challenge during `npm publish`. On such an account the CLI publish
+fails with `EOTP` unless an account recovery code is supplied via `--otp`.
+Trusted publishing avoids this problem entirely.
 
 ## What ships
 

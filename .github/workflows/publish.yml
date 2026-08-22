@@ -1,0 +1,60 @@
+name: Publish
+
+# Manual-only release of @seihouse/audio-player to the npm registry using npm
+# Trusted Publishing (OIDC). No npm token or repository secret is involved: the
+# job exchanges a short-lived GitHub OIDC token for publish rights, which npm
+# grants only to the trusted publisher configured on the package.
+on:
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+# Never cancel an in-flight publish: a run interrupted between the registry
+# write and its completion is far worse than a queued second run.
+concurrency:
+    group: publish-${{ github.ref }}
+    cancel-in-progress: false
+
+jobs:
+    publish:
+        name: Publish to npm
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+
+        permissions:
+            contents: read
+            # Required for OIDC: lets the runner mint the identity token that npm
+            # exchanges for publish rights. Without this the publish fails auth.
+            id-token: write
+
+        steps:
+            - name: Check out repository
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+            - name: Set up Node.js
+              uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+              with:
+                  node-version: 22
+                  cache: npm
+                  registry-url: https://registry.npmjs.org
+
+            # Node 22 ships npm 10.x, which predates OIDC support entirely and
+            # would fall back to asking for a token. Trusted publishing needs
+            # npm >= 11.5.1, so upgrade before anything reads the registry.
+            - name: Upgrade npm for trusted publishing
+              run: |
+                  npm install --global npm@latest
+                  npm --version
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Run quality gates
+              run: npm test
+
+            # `publishConfig.access` is `restricted`, so this stays private, and
+            # provenance is attested automatically under trusted publishing.
+            # Passing a token here would defeat the point — there is none.
+            - name: Publish package
+              run: npm publish
