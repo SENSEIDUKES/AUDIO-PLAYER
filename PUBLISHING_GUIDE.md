@@ -9,12 +9,15 @@ This document describes the current distribution contract for
 - The canonical source repository is
   `https://github.com/SENSEIDUKES/AUDIO-PLAYER.git`.
 - The package is published to the npm registry as a **private** package under
-  the `@seihouse` scope. It is not publicly readable; only members of the
-  `@seihouse` scope can install it.
+  the `@seihouse` scope. It is not publicly readable. `@seihouse` is a scope, not
+  a membership group: install access belongs to the package owner plus any
+  explicit collaborators, or — where the scope is backed by an npm organization —
+  to the teams granted read access on the package.
 - The package is proprietary (`UNLICENSED`), so a registry release requires
   explicit release-owner approval.
-- `publishConfig.access` is pinned to `restricted` in `package.json`, so a
-  publish cannot accidentally make the package public.
+- `publishConfig.access` is set to `restricted` in `package.json`, so a publish
+  defaults to private. A command-line `--access` flag still takes precedence over
+  `publishConfig`, so never pass `--access public` for this package.
 - Consumers may import the package root and
   `@seihouse/audio-player/styles.css`. No source-directory deep import is a
   supported package contract.
@@ -28,8 +31,9 @@ The package is private, so a consumer must authenticate as a member of the
 npm install @seihouse/audio-player
 ```
 
-Authenticate either interactively with `npm login`, or in CI with a read-only
-automation token supplied through the environment:
+Authenticate either interactively with `npm login`, or in CI with a granular
+access token carrying read-only permissions on this package (or the `@seihouse`
+scope), supplied through the environment:
 
 ```ini
 # .npmrc in the consumer repository — commit this file, it contains no secret
@@ -37,8 +41,10 @@ automation token supplied through the environment:
 //registry.npmjs.org/:_authToken=${NPM_TOKEN}
 ```
 
-Set `NPM_TOKEN` as a CI secret. Never commit a literal token value, and never
-write a resolved token into a checked-in `.npmrc`. This repository's own
+Set `NPM_TOKEN` as a CI secret. npm removed legacy (classic and automation)
+access tokens in November 2025, so a granular access token is the only supported
+credential for installing a private package in CI. Never commit a literal token
+value, and never write a resolved token into a checked-in `.npmrc`. This repository's own
 `.gitignore` excludes `.npmrc` for that reason.
 
 ## Install from GitHub

@@ -142,9 +142,10 @@ try {
     await mkdir(packDir)
     await mkdir(consumerDir)
 
-    // `npm pack` runs the `prepare` lifecycle even with `--ignore-scripts`, so
-    // the build log is interleaved with `--json` on stdout and the result is not
-    // parseable. `packDir` is a fresh directory, so read back what npm wrote.
+    // npm 10.9.7 still runs the `prepare` lifecycle here despite
+    // `--ignore-scripts`, putting the build log on stdout. That rules out
+    // `npm pack --json`, whose output would be interleaved with it and no longer
+    // parseable, so read the tarball back from the fresh `packDir` instead.
     runNpm(["pack", "--ignore-scripts", "--pack-destination", packDir], projectRoot)
     const packedTarballs = (await readdir(packDir)).filter((entry) => entry.endsWith(".tgz"))
     if (packedTarballs.length !== 1) {
