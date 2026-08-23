@@ -81,15 +81,17 @@ describe("PLAYER_FACE_CAPABILITIES", () => {
         expect(getPreferredCanvasPlacement("narrative")).toBe("none")
     })
 
-    it("enables the contextual radial menu only on faces that render it", () => {
-        // fullCard + miniSidebar host PlayerSurfaceButtons; the rest rely on the
-        // SAPController three-dot sheet (or have no menu room) and must opt out.
+    it("enables the radial action menu on every music face, and only there", () => {
+        // The radial menu is the shortcut launcher into the same SAPController
+        // every music face already hosts, so no music face opts out; only the
+        // faceless narrative surface (no music-player zones at all) does.
         expect(faceSupportsContextualActions("fullCard")).toBe(true)
         expect(faceSupportsContextualActions("miniSidebar")).toBe(true)
         expect(faceSupportsContextualActions("portable")).toBe(true)
-        expect(faceSupportsContextualActions("seaCard")).toBe(false)
-        expect(faceSupportsContextualActions("stickyBottom")).toBe(false)
-        expect(faceSupportsContextualActions("vaultRow")).toBe(false)
+        expect(faceSupportsContextualActions("seaCard")).toBe(true)
+        expect(faceSupportsContextualActions("stickyBottom")).toBe(true)
+        expect(faceSupportsContextualActions("vaultRow")).toBe(true)
+        expect(faceSupportsContextualActions("narrative")).toBe(false)
     })
 
     it("declares supportsContextualActions for every face", () => {

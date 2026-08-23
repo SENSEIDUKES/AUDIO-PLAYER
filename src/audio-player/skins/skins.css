@@ -470,6 +470,11 @@
     gap: 10px;
     min-width: 0;
 }
+/* The shared action menu sits inline in the bar's transport row, so it uses the
+   row's own gap rather than the wider dock spacing. */
+.ap-sb__actions {
+    gap: 10px;
+}
 .ap-sb__play {
     width: 40px;
     height: 40px;

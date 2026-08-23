@@ -1,8 +1,7 @@
-import { useState, useCallback } from "react"
+import { useState, useCallback, useMemo } from "react"
 import type { CSSProperties } from "react"
 import type { AudioPlayerTheme } from "../types"
 import { useAudioSession } from "../session/AudioSessionContext"
-import { QueueDrawer } from "../components/QueueDrawer"
 import { WaveformAdapter } from "../components/WaveformAdapter"
 import { VolumeControl } from "../components/VolumeControl"
 import { SAPController } from "../components/SAPController"
@@ -13,7 +12,10 @@ import { AudioTimeText } from "../components/AudioTimeText"
 import { formatSecondaryLine, formatVersionedTitle } from "../utils/formatMetadata"
 import { defaultShowVolume } from "../utils/device"
 import { ScrubberCanvasHost } from "../surfaces/ScrubberCanvasHost"
+import { PlayerSurfaceButtons } from "../surfaces/PlayerSurfaceButtons"
+import { usePlayerSurface } from "../surfaces/usePlayerSurface"
 import { getScrubberDensity } from "../surfaces/faceCapabilities"
+import type { WorkspaceRoute } from "../components/workspace/workspaceRoutes"
 import { buildThemeVars } from "./themeVars"
 import { DotsIcon, NextIcon, PauseIcon, PlayIcon, PrevIcon, SpinnerIcon } from "./icons"
 import "./skins.css"
@@ -39,11 +41,12 @@ export interface StickyBottomPlayerProps extends AudioPlayerTheme {
  * Controller behind the "…" button. Renders nothing when the queue is empty.
  *
  * Capability-driven (`PLAYER_FACE_CAPABILITIES.stickyBottom`): a compact bar
- * with `supportsContextualActions: false` — deep actions and queue access route
- * through its SAPController three-dot sheet instead of a radial menu, so it does
- * not render `PlayerSurfaceButtons`. `supportsSEICanvas: false` (no canvas
- * zone). Phase 3 wires its scrubber through `ScrubberCanvasHost` (compact
- * density) so the timeline becomes a real plugin mount point.
+ * carrying both entry points into the one controller — its "…" button (opening
+ * Options) and the shared radial action menu beside it (opening any workspace
+ * route directly). `supportsSEICanvas: false`, so the canvas zone and the menu's
+ * Canvas leaf are filtered out; that is the only difference from a primary face's
+ * menu. Its scrubber runs through `ScrubberCanvasHost` (compact density) so the
+ * timeline is a real plugin mount point.
  */
 export function StickyBottomPlayer({
     fixed = true,
@@ -53,11 +56,9 @@ export function StickyBottomPlayer({
     ...theme
 }: StickyBottomPlayerProps) {
     const s = useAudioSession()
-    const [queueDrawerOpen, setQueueDrawerOpen] = useState(false)
+    const surface = usePlayerSurface("stickyBottom")
     const [controllerOpen, setControllerOpen] = useState(false)
-
-    const handleOpenQueue = useCallback(() => setQueueDrawerOpen(true), [])
-    const handleCloseQueue = useCallback(() => setQueueDrawerOpen(false), [])
+    const [controllerRoute, setControllerRoute] = useState<WorkspaceRoute>("options")
 
     const {
         share,
@@ -68,6 +69,30 @@ export function StickyBottomPlayer({
         if (nativeShare) setControllerOpen(false)
         share()
     }, [nativeShare, share])
+
+    // Both entry points drive one controller: "…" opens Options, a radial
+    // settings action opens that action's workspace.
+    const handleOpenOptions = useCallback(() => {
+        setControllerRoute("options")
+        setControllerOpen(true)
+    }, [])
+    const handleOpenFocusedController = useCallback((route: WorkspaceRoute) => {
+        setControllerRoute(route)
+        setControllerOpen(true)
+    }, [])
+    const handleCloseController = useCallback(() => {
+        setControllerOpen(false)
+        setControllerRoute("options")
+    }, [])
+
+    const menuCommands = useMemo(
+        () => ({
+            "track.previous": s.previous,
+            "track.next": s.next,
+            "share.url": handleShareClick,
+        }),
+        [s.previous, s.next, handleShareClick]
+    )
 
     // All hooks run before this bail-out so the hook order stays stable when
     // the queue transitions between empty and non-empty.
@@ -85,23 +110,12 @@ export function StickyBottomPlayer({
             role="region"
             aria-label="Playback bar"
         >
-            {/* Queue drawer (Up Next) — reads session queue directly */}
-            <QueueDrawer
-                queue={s.queue}
-                currentIndex={s.currentIndex}
-                isPlaying={s.isPlaying}
-                open={queueDrawerOpen}
-                onClose={handleCloseQueue}
-                onPlayTrack={s.playTrack}
-                onReorder={s.moveQueueItem}
-                onRemove={s.removeFromQueue}
-            />
-
-            {/* SAP Controller: shuffle/repeat/automix, queue, info, share. */}
+            {/* The single controller instance: Options plus every workspace the
+                radial menu beside the "…" button routes into. */}
             <SAPController
                 open={controllerOpen}
-                onClose={() => setControllerOpen(false)}
-                route="options"
+                onClose={handleCloseController}
+                route={controllerRoute}
                 playback={{
                     shuffle,
                     onToggleShuffle: s.toggleShuffle,
@@ -110,7 +124,14 @@ export function StickyBottomPlayer({
                     automix,
                     onToggleAutomix: s.toggleAutomix,
                 }}
-                queue={{ count: s.queue.length, onOpenQueue: handleOpenQueue }}
+                queue={{
+                    count: s.queue.length,
+                    tracks: s.queue,
+                    currentIndex: s.currentIndex,
+                    isPlaying: s.isPlaying,
+                    onPlayTrack: s.playTrack,
+                    onRemove: s.removeFromQueue,
+                }}
                 info={{
                     title: currentTrack.title ?? "",
                     artist: currentTrack.artist ?? "",
@@ -181,13 +202,24 @@ export function StickyBottomPlayer({
                         <button
                             type="button"
                             className="ap-icon-btn ap-tap"
-                            onClick={() => setControllerOpen(true)}
+                            onClick={handleOpenOptions}
                             aria-label="Player options"
                             aria-haspopup="dialog"
                             aria-expanded={controllerOpen}
                         >
                             <DotsIcon />
                         </button>
+                        {/* Same canonical menu as every other music face, placed
+                            inline in the bar instead of a dock. */}
+                        <PlayerSurfaceButtons
+                            surface={surface}
+                            activePluginIds={s.pluginNames}
+                            commands={menuCommands}
+                            canPrevious={s.canPrevious}
+                            canNext={s.canNext}
+                            onOpenFocusedController={handleOpenFocusedController}
+                            className="ap-sb__actions"
+                        />
                     </div>
                     <div className="ap-sb__scrub">
                         <span className="ap-sb__t" aria-hidden="true">

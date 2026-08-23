@@ -68,11 +68,12 @@ export type PlayerFaceCapability = {
      */
     supportsWaveform: boolean
     /**
-     * Renders the contextual action menu (the bottom-arc SEI Canvas Action Menu /
-     * "command wheel") via `PlayerSurfaceButtons`. This is the radial, in-context
-     * affordance — distinct from the `SAPController` three-dot deep-action sheet,
-     * which faces own separately. Compact faces that rely solely on the three-dot
-     * menu (or have no room for a menu at all) declare this `false`.
+     * Renders the radial action menu (the bottom-arc SEI Canvas Action Menu /
+     * "command wheel"). It is the shortcut launcher into the same `SAPController`
+     * the face's "…" button opens — not a second menu system — so every *music*
+     * face declares it `true`. Only a face with no music-player surface at all
+     * (the narrative family) declares `false`: placement and styling may differ
+     * between faces, the available actions may not.
      */
     supportsContextualActions: boolean
     /** Hero can collapse into a compact identity header when a surface opens. */
@@ -94,14 +95,15 @@ export type PlayerFaceCapability = {
  * - `portable`     — standalone player with full surface support: SEICanvas,
  *                    ScrubberCanvas (waveform), and contextual action menu.
  * - `seaCard`      — inline progress + an overlay SEICanvas that shows the
- *                    waveform behind a small trigger (Phase 4).
- * - `stickyBottom` — compact bar; ScrubberCanvas (progress), deep actions in its
- *                    SAPController, so it declares no contextual (radial) menu.
+ *                    waveform behind a small trigger, plus the shared menu.
+ * - `stickyBottom` — compact bar; ScrubberCanvas (progress), plus the same
+ *                    radial menu and SAPController as every other music face.
  * - `vaultRow`     — slim list row; ScrubberCanvas (progress) on the active row.
  *
- * `supportsContextualActions` is the source of truth for the radial command-wheel
- * menu (`PlayerSurfaceButtons` → `SEICanvasActionMenu`). It is independent of the
- * three-dot `SAPController`, which any face may host for deep actions.
+ * `supportsContextualActions` is the source of truth for whether a face renders
+ * the radial command-wheel menu. It is `true` for every music face: the radial
+ * menu and the three-dot `SAPController` are the two halves of one system, and a
+ * face never drops actions it can actually perform.
  *
  * `supportsWaveform` decides whether the scrubber zone draws an interactive
  * waveform (when peaks exist) vs. the plain progress bar. Spacious faces opt in;
@@ -134,7 +136,9 @@ export const FAMILY_DEFAULTS: Record<PlayerFamily, FamilyCapabilityDefaults> = {
         // stickyBottom master owns the shared scrubber for the family.
         supportsScrubberCanvas: false,
         supportsWaveform: false,
-        supportsContextualActions: false,
+        // Compact faces carry the same action menu as the primary family; only
+        // its placement and the SEICanvas leaf differ.
+        supportsContextualActions: true,
         supportsHeroCollapse: false,
         preferredCanvasPlacement: "none",
         scrubberDensity: "compact",
@@ -168,20 +172,13 @@ const FACE_DEFINITIONS: Record<
         scrubberDensity: "expanded",
     },
     seaCard: {
-        // Marketplace variant of the primary family — same rich contract, but
-        // its canvas lives in an overlay and it relies on tap-to-play, not the
-        // radial menu.
+        // Marketplace variant of the primary family — same rich contract and the
+        // same action menu; only its canvas placement differs (overlay).
         family: "primary",
-        supportsContextualActions: false,
         preferredCanvasPlacement: "overlay",
     },
     // ---- CompactPlayer family --------------------------------------------
-    miniSidebar: {
-        family: "compact",
-        // The only compact face with the radial menu — its sole path to
-        // queue/transport actions since it has no three-dot SAPController.
-        supportsContextualActions: true,
-    },
+    miniSidebar: { family: "compact" }, // pure compact defaults
     stickyBottom: {
         family: "compact",
         // The compact family's master transport: it owns the shared scrubber.

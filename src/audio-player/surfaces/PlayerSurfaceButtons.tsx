@@ -1,9 +1,10 @@
-import { useCallback, useMemo } from "react"
+import { useMemo } from "react"
 import { CanvasIcon } from "../skins/icons"
 import { SurfaceButton } from "./SurfaceButton"
-import { SEICanvasActionMenu } from "./SEICanvasActionMenu"
-import { buildMenuTree } from "../menu/menuData"
-import type { ArcMenuEntitlements, MenuNode } from "../menu/menuData"
+import { ArcActionButton } from "./ArcActionButton"
+import { buildCanonicalPlayerActions } from "../menu/canonicalActions"
+import type { ArcMenuEntitlements } from "../menu/canonicalActions"
+import type { ArcCommandHost } from "../menu/arcRouting"
 import type { WorkspaceRoute } from "../components/workspace/workspaceRoutes"
 import type { UsePlayerSurfaceResult } from "./usePlayerSurface"
 
@@ -12,28 +13,11 @@ export interface PlayerSurfaceButtonsProps {
     /** Left (canvas) button. Defaults to the face's declared canvas support. */
     showCanvasButton?: boolean
     /**
-     * Right (action menu) trigger — the contextual radial menu. Defaults to the
-     * face's declared `supportsContextualActions` capability, so it is the model,
-     * not this component, that decides whether the menu appears.
+     * Right (radial action menu) trigger. Defaults to the face's declared
+     * `supportsContextualActions` capability, so it is the model, not this
+     * component, that decides whether the menu appears.
      */
-    showQueueButton?: boolean
-    /**
-     * What the menu's "Up Next" leaf opens. Faces with a full queue drawer pass
-     * their opener here; the default falls back to the in-region queue toggle so
-     * faces without a drawer (e.g. mini sidebar) still reach their queue.
-     */
-    onOpenQueue?: () => void
-    /**
-     * Add Previous/Next leaves to the menu's Playback branch. Compact faces that
-     * drop their inline skip buttons (the mini sidebar) opt in and wire
-     * `onPrevious`/`onNext`, moving transport into the menu so the row has space
-     * for title/artist.
-     */
-    showTransport?: boolean
-    canPrevious?: boolean
-    canNext?: boolean
-    onPrevious?: () => void
-    onNext?: () => void
+    showActionMenu?: boolean
     /**
      * Ids of the plugins currently active on this player — catalog ids
      * ("lyrics") or registry instance names ("registry-lyrics"). Drives the
@@ -41,112 +25,94 @@ export interface PlayerSurfaceButtonsProps {
      * active plugins render.
      */
     activePluginIds?: readonly string[]
-    /** Wires the menu's Share › Link leaf (copy/share the track URL). */
-    onShareLink?: () => void
-    /** Wires the menu's Share › Favorite leaf. */
-    onToggleFavorite?: () => void
+    /**
+     * Immediate command implementations for this face, keyed by command id
+     * (`"track.previous"`, `"share.url"`, `"track.favorite"`, …). Commands the
+     * face doesn't wire prune their leaves away rather than render them dead.
+     */
+    commands?: ArcCommandHost["commands"]
     /** Marks the Favorite leaf active (the track is already a favorite). */
     isFavorite?: boolean
+    /**
+     * Whether skipping is possible right now. The transport leaves always exist
+     * on a face that can skip; these only dim them at the ends of the queue,
+     * matching the face's inline transport buttons.
+     */
+    canPrevious?: boolean
+    canNext?: boolean
     /** Entitlements gating the menu's Agents branch (Scout tier). */
     entitlements?: ArcMenuEntitlements
     /**
-     * Callback when a workspace route is selected from the arc menu. The parent
-     * face should manage a single SAPController instance and update its route.
-     * This component no longer owns/renders a separate SAPController.
+     * Opens a workspace route in the face's single SAPController instance — the
+     * destination of every settings action in the menu. Without it those leaves
+     * are pruned rather than rendered dead.
      */
     onOpenFocusedController?: (route: WorkspaceRoute) => void
     className?: string
 }
 
 /**
- * The shared left/right surface controls. LEFT reveals the SEICanvas (only on
- * faces that support it). RIGHT is the SEI Canvas Action Menu — a bottom-arc
- * command wheel carrying the standardized arc arms (Plugins | Playback | Share
- * | Agents). Queue lives inside it under Playback › Up Next; the canvas under
- * Plugins › Visual › Canvas.
+ * The shared left/right surface controls.
+ *
+ * LEFT is the canvas button: a face-level *command* that shows/hides the
+ * SEICanvas in place. It is deliberately not a menu item — toggling a visual
+ * surface is an immediate command, while *configuring* it is a settings screen
+ * that lives at Plugins › Visual › Canvas inside the controller.
+ *
+ * RIGHT is the radial action menu, carrying the canonical hierarchy
+ * (Plugins | Playback | Queue | Share | Agents | Vault) that every music face
+ * shares. Every settings leaf in it opens inside the same SAPController the
+ * face's "…" button opens, via `onOpenFocusedController`.
  */
 export function PlayerSurfaceButtons({
     surface,
     showCanvasButton = surface.canvasSupported,
-    showQueueButton = surface.contextualSupported,
-    onOpenQueue,
-    showTransport = false,
-    canPrevious = false,
-    canNext = false,
-    onPrevious,
-    onNext,
+    showActionMenu = surface.contextualSupported,
     activePluginIds,
-    onShareLink,
-    onToggleFavorite,
+    commands,
     isFavorite = false,
+    canPrevious = true,
+    canNext = true,
     entitlements,
     onOpenFocusedController,
     className,
 }: PlayerSurfaceButtonsProps) {
-    // Built only when the contextual menu is actually rendered, and memoized so
-    // it isn't rebuilt on every parent playback tick (skins re-render multiple
-    // times per second during active playback). Hooks must run before the early
-    // return below, so this stays unconditional.
-    const menuItems = useMemo<MenuNode[]>(
+    // Built only when the menu is actually rendered, and memoized so it isn't
+    // rebuilt on every parent playback tick (skins re-render multiple times per
+    // second during active playback). Hooks must run before the early return
+    // below, so this stays unconditional.
+    const actions = useMemo(
         () =>
-            showQueueButton
-                ? buildMenuTree({
-                      canvasSupported: surface.canvasSupported,
+            showActionMenu
+                ? buildCanonicalPlayerActions({
+                      activePluginIds,
+                      entitlements,
+                      isFavorite,
                       isCanvasActive: surface.isCanvasOpen,
-                      includeTransport: showTransport,
                       canPrevious,
                       canNext,
-                      // Workspace-only nodes (the Plugins leaves, Controls,
-                      // Debug, Share › Add to, Agents) exist only when the host
-                      // actually routes into the SAP Controller shell —
-                      // otherwise they'd be dead buttons.
-                      canRouteWorkspaces: Boolean(onOpenFocusedController),
-                      activePluginIds,
-                      canShareLink: Boolean(onShareLink),
-                      canFavorite: Boolean(onToggleFavorite),
-                      isFavorite,
-                      entitlements,
                   })
                 : [],
         [
-            showQueueButton,
-            surface.canvasSupported,
+            showActionMenu,
+            activePluginIds,
+            entitlements,
+            isFavorite,
             surface.isCanvasOpen,
-            showTransport,
             canPrevious,
             canNext,
-            onOpenFocusedController,
-            activePluginIds,
-            onShareLink,
-            onToggleFavorite,
-            isFavorite,
-            entitlements,
         ]
     )
 
-    // Resolve the immediate leaves (no workspaceRoute, so they fall through to
-    // the menu's `onSelect`). Other unknown leaves are intentionally ignored.
-    const handleSelect = useCallback(
-        (node: MenuNode) => {
-            if (node.actionId === "previous-track") onPrevious?.()
-            else if (node.actionId === "next-track") onNext?.()
-            else if (node.actionId === "share-link") onShareLink?.()
-            else if (node.actionId === "toggle-favorite") onToggleFavorite?.()
-        },
-        [onNext, onPrevious, onShareLink, onToggleFavorite]
+    // Capability filtering is the *only* reason an action is missing from a
+    // face: the canvas leaf exists where the face can host the canvas, the vault
+    // arm where the surface represents a vault track.
+    const capabilities = useMemo(
+        () => ({ canvas: surface.canvasSupported, vault: false }),
+        [surface.canvasSupported]
     )
 
-    // The radial menu opens focused workspace routes via the parent's callback.
-    // This component no longer owns/renders a separate SAPController — the parent
-    // face manages a single shared instance for both the "..." button and arc menu.
-    const handleOpenWorkspace = useCallback(
-        (route: WorkspaceRoute) => {
-            onOpenFocusedController?.(route)
-        },
-        [onOpenFocusedController]
-    )
-
-    if (!showCanvasButton && !showQueueButton) return null
+    if (!showCanvasButton && !showActionMenu) return null
     return (
         <div
             className={`ap-surface-actions${className ? ` ${className}` : ""}`}
@@ -164,13 +130,12 @@ export function PlayerSurfaceButtons({
                     <CanvasIcon />
                 </SurfaceButton>
             )}
-            {showQueueButton && (
-                <SEICanvasActionMenu
-                    items={menuItems}
-                    onActivateCanvas={surface.toggleCanvas}
-                    onOpenQueue={onOpenQueue ?? surface.toggleQueue}
-                    onOpenWorkspace={handleOpenWorkspace}
-                    onSelect={handleSelect}
+            {showActionMenu && (
+                <ArcActionButton
+                    actions={actions}
+                    commands={commands}
+                    capabilities={capabilities}
+                    onOpenWorkspace={onOpenFocusedController}
                 />
             )}
         </div>

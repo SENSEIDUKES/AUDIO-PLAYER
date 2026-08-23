@@ -2,7 +2,6 @@ import { useState, useCallback, useMemo } from "react"
 import type { CSSProperties } from "react"
 import type { AudioPlayerTheme, BackgroundImage, MediaSource } from "../types"
 import { useAudioSession } from "../session/AudioSessionContext"
-import { QueueDrawer } from "../components/QueueDrawer"
 import { WaveformAdapter } from "../components/WaveformAdapter"
 import { BackgroundMedia, ensureMuted, resolveMedia } from "../components/BackgroundMedia"
 import { VolumeControl } from "../components/VolumeControl"
@@ -24,7 +23,6 @@ import { PlayerHero } from "../surfaces/PlayerHero"
 import { SEICanvasHost } from "../surfaces/SEICanvasHost"
 import { ScrubberCanvasHost } from "../surfaces/ScrubberCanvasHost"
 import { PlayerSurfaceButtons } from "../surfaces/PlayerSurfaceButtons"
-import { QueueSurface } from "../surfaces/QueueSurface"
 import { getScrubberDensity } from "../surfaces/faceCapabilities"
 import { VisualSlotsProvider } from "../visual-slots/VisualSlotsContext"
 import { SEICanvasRenderer } from "../visual-slots/SEICanvasRenderer"
@@ -74,11 +72,13 @@ export interface FullCardPlayerProps extends AudioPlayerTheme {
  *
  * Capability-driven (`PLAYER_FACE_CAPABILITIES.fullCard`): the fully-wired face.
  * It hosts the SEICanvas (`supportsSEICanvas`), the ScrubberCanvas
- * (`supportsScrubberCanvas`), and the contextual radial menu
+ * (`supportsScrubberCanvas`), and the radial action menu
  * (`supportsContextualActions`, rendered via `PlayerSurfaceButtons`) — none of
- * these are hard-coded here; each render zone follows the model. The SAP
- * three-dot controller is always present for deep actions independent of those
- * capabilities.
+ * these are hard-coded here; each render zone follows the model.
+ *
+ * One SAPController instance serves both entry points: the "…" button opens it
+ * on `"options"`, and every settings action in the radial menu opens it on that
+ * action's workspace route. There is no second sheet or drawer.
  */
 export function FullCardPlayer({
     showVolume = defaultShowVolume(),
@@ -96,7 +96,6 @@ export function FullCardPlayer({
 }: FullCardPlayerProps) {
     const s = useAudioSession()
     const surface = usePlayerSurface("fullCard")
-    const [queueDrawerOpen, setQueueDrawerOpen] = useState(false)
     const [controllerOpen, setControllerOpen] = useState(false)
     const [controllerRoute, setControllerRoute] = useState<WorkspaceRoute>("options")
     const {
@@ -185,9 +184,6 @@ export function FullCardPlayer({
         onPrevious: canPrevious ? s.previous : undefined,
     })
 
-    const handleOpenQueue = useCallback(() => setQueueDrawerOpen(true), [])
-    const handleCloseQueue = useCallback(() => setQueueDrawerOpen(false), [])
-
     const {
         share,
         copied: shareCopied,
@@ -218,6 +214,18 @@ export function FullCardPlayer({
         setControllerOpen(true)
     }, [])
 
+    // The immediate commands this face can genuinely run. Everything else in the
+    // canonical menu is a settings screen and opens in the controller above;
+    // commands not listed here prune their leaves rather than render them dead.
+    const menuCommands = useMemo(
+        () => ({
+            "track.previous": s.previous,
+            "track.next": s.next,
+            ...(currentTrack ? { "share.url": handleShareClick } : {}),
+        }),
+        [s.previous, s.next, currentTrack, handleShareClick]
+    )
+
     return (
         <VisualSlotsProvider>
             <div
@@ -236,18 +244,6 @@ export function FullCardPlayer({
                     className="ap-fc__bg"
                 />
 
-                {/* Queue drawer (Up Next) — reads session queue directly */}
-                <QueueDrawer
-                    queue={queue}
-                    currentIndex={currentIndex}
-                    isPlaying={isPlaying}
-                    open={queueDrawerOpen}
-                    onClose={handleCloseQueue}
-                    onPlayTrack={s.playTrack}
-                    onReorder={s.moveQueueItem}
-                    onRemove={s.removeFromQueue}
-                />
-
                 {/* Shared SAP Controller: owns the single instance for both "..." and
                 arc workspace routes. Route determines whether a focused workspace
                 panel renders above the default options. */}
@@ -264,7 +260,16 @@ export function FullCardPlayer({
                         onToggleAutomix: s.toggleAutomix,
                     }}
                     queue={
-                        isEmpty ? undefined : { count: queue.length, onOpenQueue: handleOpenQueue }
+                        isEmpty
+                            ? undefined
+                            : {
+                                  count: queue.length,
+                                  tracks: queue,
+                                  currentIndex,
+                                  isPlaying,
+                                  onPlayTrack: s.playTrack,
+                                  onRemove: s.removeFromQueue,
+                              }
                     }
                     info={
                         currentTrack
@@ -368,24 +373,20 @@ export function FullCardPlayer({
                         artistFont={artistFont}
                     />
 
-                    {/* Main visual surface region. Hidden by default; the left surface
-                    button opens placeholder canvas content, the right opens the
-                    in-region "Up Next" queue. */}
+                    {/* Main visual surface region. Hidden by default; the left
+                    surface button toggles the canvas in place. The queue is not a
+                    surface — it lives in the controller at Queue › Up Next. */}
                     <SEICanvasHost
-                        open={surface.isCanvasOpen || surface.isQueueOpen}
+                        open={surface.isCanvasOpen}
                         face="fullCard"
                         supported={surface.canvasSupported}
                         activeSurfaceId={surface.mode === "default" ? undefined : surface.mode}
                     >
-                        {surface.isQueueOpen ? (
-                            <QueueSurface />
-                        ) : (
-                            <SEICanvasRenderer
-                                currentTime={currentTime}
-                                duration={duration}
-                                lyrics={currentTrack?.lyrics}
-                            />
-                        )}
+                        <SEICanvasRenderer
+                            currentTime={currentTime}
+                            duration={duration}
+                            lyrics={currentTrack?.lyrics}
+                        />
                     </SEICanvasHost>
                 </div>
 
@@ -505,9 +506,10 @@ export function FullCardPlayer({
 
                     <PlayerSurfaceButtons
                         surface={surface}
-                        onOpenQueue={handleOpenQueue}
                         activePluginIds={s.pluginNames}
-                        onShareLink={currentTrack ? handleShareClick : undefined}
+                        commands={menuCommands}
+                        canPrevious={canPrevious}
+                        canNext={canNext}
                         onOpenFocusedController={handleOpenFocusedController}
                     />
                 </div>

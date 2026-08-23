@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import type { ReactNode } from "react"
 import { SectionNav } from "./SectionNav"
 import {
@@ -10,19 +10,10 @@ import {
     MiniSidebarPlayer,
     SeaCardPlayer,
     SAPController,
-    buildVaultTrackArcActions,
-    buildStandardTrackArcActions,
     registerVaultCategory,
     useAudioSession,
 } from "../audio-player"
-import type {
-    ArcAction,
-    ArcCommandHost,
-    Track,
-    VaultCategory,
-    WorkspaceRoute,
-} from "../audio-player"
-import { NextIcon, QueueIcon } from "../audio-player/skins/icons"
+import type { ArcCommandHost, Track, VaultCategory, WorkspaceRoute } from "../audio-player"
 import { noLuckTracks, NO_LUCK_COVER, NO_LUCK_ART, SEA_THEME } from "./data"
 
 /* Demonstrate a host-registered CUSTOM classification (beyond the built-ins) —
@@ -61,19 +52,17 @@ function trackCommands(track: Track): ArcCommandHost["commands"] {
     }
 }
 
-/* The Vault rows with the standardized command wheel — the Vault face swaps
-   the Plugins arm for its dedicated Vault arm (Tag / Rename / Playlist /
-   Radio). Share leaves use the commands above; every workspace leaf routes
-   into the one SAP Controller instance owned here. */
+/* The Vault rows with the canonical action hierarchy. The Vault arm survives
+   capability filtering here because a vault row genuinely is a vault-managed
+   track; everything else is identical to every other face. Share leaves use the
+   commands above; every settings leaf routes into the one SAP Controller
+   instance owned here. */
 function ShowcaseVaultRows() {
     const s = useAudioSession()
     const [route, setRoute] = useState<WorkspaceRoute | null>(null)
     // Studio Scout entitlement is deliberately absent here, so Agents › Scout
     // routes to its free Demo tier.
-    const arcActions = useMemo(
-        () => buildVaultTrackArcActions({ entitlements: { studioScout: false } }),
-        []
-    )
+    const entitlements = useMemo(() => ({ studioScout: false }), [])
     return (
         <div className="showcase-face__vault">
             {vaultShowcaseTracks.map((t, i) => (
@@ -81,7 +70,8 @@ function ShowcaseVaultRows() {
                     key={t.id ?? t.title}
                     track={t}
                     number={i + 1}
-                    actions={arcActions}
+                    entitlements={entitlements}
+                    activePluginIds={s.pluginNames}
                     commands={trackCommands(t)}
                     onOpenWorkspace={setRoute}
                     {...SEA_THEME}
@@ -107,29 +97,22 @@ function ShowcaseVaultRows() {
     )
 }
 
-/* SEA cards carry the standardized wheel (Plugins | Playback | Share | Agents)
-   plus two lean queue immediates wired straight to the shared session, and
-   route workspace leaves into a shared SAP Controller owned here. */
+/* SEA cards carry the same canonical hierarchy as every other face. Play Next /
+   Play Later are the canonical Queue immediates, wired straight to the shared
+   session for this card's track; every settings leaf routes into the shared SAP
+   Controller owned here. */
 function ShowcaseSeaCards() {
     const s = useAudioSession()
     const [route, setRoute] = useState<WorkspaceRoute | null>(null)
-    const cardActions = (track: Track): ArcAction[] => [
-        {
-            id: "play-next",
-            label: "Play Next",
-            icon: NextIcon,
-            target: "immediate-action",
-            onSelect: () => s.playNext(track),
-        },
-        {
-            id: "play-later",
-            label: "Play Later",
-            icon: QueueIcon,
-            target: "immediate-action",
-            onSelect: () => s.enqueue(track),
-        },
-        ...buildStandardTrackArcActions({ activePluginIds: s.pluginNames }),
-    ]
+    const { playNext, enqueue } = s
+    const cardCommands = useCallback(
+        (track: Track) => ({
+            "queue.insertAfterCurrent": () => playNext(track),
+            "queue.append": () => enqueue(track),
+            ...trackCommands(track),
+        }),
+        [playNext, enqueue]
+    )
     return (
         <div className="showcase-face__sea">
             {noLuckTracks.slice(0, 4).map((t) => (
@@ -138,8 +121,8 @@ function ShowcaseSeaCards() {
                     track={t}
                     art={NO_LUCK_ART}
                     tag="SEA"
-                    actions={cardActions(t)}
-                    commands={trackCommands(t)}
+                    activePluginIds={s.pluginNames}
+                    commands={cardCommands(t)}
                     onOpenWorkspace={setRoute}
                     {...SEA_THEME}
                 />

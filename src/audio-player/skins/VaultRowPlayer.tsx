@@ -6,9 +6,11 @@ import { ExplicitBadge } from "../components/TrackMetadata"
 import { AudioTimeText } from "../components/AudioTimeText"
 import { formatSecondaryLine, formatVersionedTitle } from "../utils/formatMetadata"
 import { trackKey } from "../utils/trackKey"
-import { faceSupportsAction } from "../surfaces/faceCapabilities"
+import { faceSupportsAction, faceSupportsSEICanvas } from "../surfaces/faceCapabilities"
 import { ArcActionButton } from "../surfaces/ArcActionButton"
-import type { ArcAction, ArcCommandHost } from "../surfaces/ArcActionButton"
+import type { ArcCommandHost } from "../surfaces/ArcActionButton"
+import { buildCanonicalPlayerActions } from "../menu/canonicalActions"
+import type { ArcMenuEntitlements } from "../menu/canonicalActions"
 import type { WorkspaceRoute } from "../components/workspace/workspaceRoutes"
 import { getVaultCategoryMeta } from "./vaultCategories"
 import { buildThemeVars } from "./themeVars"
@@ -21,11 +23,12 @@ export interface VaultRowPlayerProps extends AudioPlayerTheme {
     /** Optional 1-based number shown at the left of the row. */
     number?: number
     /**
-     * Row actions surfaced through the Arc Action Button (the primary row action
-     * surface). A plain, extensible list — append actions or nest `children`
-     * without touching the row.
+     * Ids of the plugins currently active on this player. Drives the canonical
+     * menu's Plugins branch exactly as it does on every other face.
      */
-    actions?: ArcAction[]
+    activePluginIds?: readonly string[]
+    /** Entitlements gating the menu's Agents branch (Scout tier). */
+    entitlements?: ArcMenuEntitlements
     /**
      * Extra immediate command implementations for this row's arc (e.g.
      * `"share.email"` / `"share.url"`). Merged over the row's built-in queue
@@ -34,9 +37,9 @@ export interface VaultRowPlayerProps extends AudioPlayerTheme {
      */
     commands?: ArcCommandHost["commands"]
     /**
-     * Opens a focused workspace in the SAP Controller shell — the destination
-     * of the arc's `"sap-controller"` leaves (Vault, Agent). Without it those
-     * leaves are pruned from the wheel rather than rendered dead.
+     * Opens a workspace inside the "…" SAP Controller — the destination of every
+     * settings action in the row's menu. The host owns the controller instance
+     * for the list. Without it those leaves are pruned rather than rendered dead.
      */
     onOpenWorkspace?: (route: WorkspaceRoute) => void
     className?: string
@@ -55,17 +58,22 @@ function sameTrack(a: Track, b: Track): boolean {
  * global play state — so it stays in sync with every other skin.
  *
  * Capability-driven (`PLAYER_FACE_CAPABILITIES.vaultRow`, CompactPlayer family):
- * the most compact face. `supportsSEICanvas: false`, `supportsContextualActions:
- * false`, and `supportsScrubberCanvas: false` — a list row mounts **no** scrubber
- * of its own; seeking lives on the shared StickyBottom master scrubber that
- * follows the active song. It keeps `supportsAction: true`, so it renders a row
- * action button. Visual identity comes from the track's `vaultCategory` (accent
- * color + status label), not per-row artwork, keeping long lists fast to render.
+ * the most compact face. `supportsSEICanvas: false` and
+ * `supportsScrubberCanvas: false` — a list row mounts **no** scrubber of its own;
+ * seeking lives on the shared StickyBottom master scrubber that follows the
+ * active song.
+ *
+ * Its action button carries the same canonical hierarchy as every other face,
+ * with one capability difference in each direction: no Canvas leaf (it can't host
+ * the canvas), plus the Vault arm (it genuinely represents a vault-managed
+ * track). Visual identity comes from the track's `vaultCategory` (accent color +
+ * status label), not per-row artwork, keeping long lists fast to render.
  */
 export function VaultRowPlayer({
     track,
     number,
-    actions,
+    activePluginIds,
+    entitlements,
     commands,
     onOpenWorkspace,
     className,
@@ -95,10 +103,18 @@ export function VaultRowPlayer({
         }),
         [playNext, enqueue, track, commands]
     )
-    const resolvedActions = useMemo<ArcAction[]>(() => actions ?? [], [actions])
-    // The capability allows the button, but only render it when there are actions
-    // — otherwise it would be an interactive yet empty control.
-    const showAction = faceSupportsAction("vaultRow") && resolvedActions.length > 0
+    const rowActions = useMemo(
+        () => buildCanonicalPlayerActions({ activePluginIds, entitlements }),
+        [activePluginIds, entitlements]
+    )
+    // A vault row *is* a vault-managed track, so it declares that capability and
+    // the Vault arm survives filtering here (and only here). It cannot host the
+    // canvas, so the Canvas leaf does not.
+    const rowCapabilities = useMemo(
+        () => ({ vault: true, canvas: faceSupportsSEICanvas("vaultRow") }),
+        []
+    )
+    const showAction = faceSupportsAction("vaultRow")
 
     const handleToggle = () => {
         if (isActive) s.toggle()
@@ -165,8 +181,9 @@ export function VaultRowPlayer({
             )}
             {showAction && (
                 <ArcActionButton
-                    actions={resolvedActions}
+                    actions={rowActions}
                     commands={rowCommands}
+                    capabilities={rowCapabilities}
                     onOpenWorkspace={onOpenWorkspace}
                     ariaLabel={`Actions for ${track.title}`}
                     className="ap-vr__action"

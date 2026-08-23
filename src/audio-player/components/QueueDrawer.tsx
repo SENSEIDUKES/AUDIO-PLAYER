@@ -358,6 +358,11 @@ function QueueRow({
  *
  * Designed to work with both the standalone AudioPlayer's local queue and the
  * global session's queue (via useAudioSession).
+ *
+ * The bundled faces do not open this: their queue lives inside the "…"
+ * controller at `library:queue`, so no menu action reaches a separate drawer.
+ * It stays exported for hosts that want the full drag-to-reorder overlay in a
+ * layout of their own.
  */
 export function QueueDrawer({
     queue,

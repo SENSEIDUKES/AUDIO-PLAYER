@@ -7,7 +7,6 @@ import type { PlayerSurfaceMode, SurfaceAction, SurfaceState } from "./surfaceRe
 export interface UsePlayerSurfaceResult {
     mode: PlayerSurfaceMode
     isCanvasOpen: boolean
-    isQueueOpen: boolean
     /** Derived: canvas open on a hero-collapse-capable face. */
     isHeroCollapsed: boolean
     /** Whether this face can host the SEICanvas at all. */
@@ -15,7 +14,6 @@ export interface UsePlayerSurfaceResult {
     /** Whether this face renders the contextual (radial) action menu. */
     contextualSupported: boolean
     toggleCanvas: () => void
-    toggleQueue: () => void
     closeSurface: () => void
 }
 
@@ -30,21 +28,18 @@ export function usePlayerSurface(face: PlayerFace): UsePlayerSurfaceResult {
     )
 
     const toggleCanvas = useCallback(() => dispatch({ type: "toggleCanvas" }), [])
-    const toggleQueue = useCallback(() => dispatch({ type: "toggleQueue" }), [])
     const closeSurface = useCallback(() => dispatch({ type: "close" }), [])
 
     return useMemo<UsePlayerSurfaceResult>(
         () => ({
             mode: state.mode,
             isCanvasOpen: state.mode === "canvas",
-            isQueueOpen: state.mode === "queue",
             isHeroCollapsed: deriveHeroCollapsed(state.mode, face),
             canvasSupported: faceSupportsSEICanvas(face),
             contextualSupported: faceSupportsContextualActions(face),
             toggleCanvas,
-            toggleQueue,
             closeSurface,
         }),
-        [state.mode, face, toggleCanvas, toggleQueue, closeSurface]
+        [state.mode, face, toggleCanvas, closeSurface]
     )
 }

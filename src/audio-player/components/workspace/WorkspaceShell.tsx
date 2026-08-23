@@ -1,9 +1,10 @@
 import type { ReactNode } from "react"
-import { CloseIcon } from "../../skins/icons"
+import { ChevronLeftIcon, CloseIcon } from "../../skins/icons"
 import { parseWorkspaceRoute } from "./workspaceRoutes"
 import type { WorkspaceRoute } from "./workspaceRoutes"
 import { LibraryPlaylistsWorkspace } from "./LibraryPlaylistsWorkspace"
 import { LibraryQueueWorkspace } from "./LibraryQueueWorkspace"
+import type { WorkspaceQueueState } from "./LibraryQueueWorkspace"
 import { PluginSettingsWorkspace } from "./PluginSettingsWorkspace"
 import { PlaybackAutomixWorkspace } from "./PlaybackAutomixWorkspace"
 import { PlaybackControlsWorkspace } from "./PlaybackControlsWorkspace"
@@ -19,10 +20,15 @@ import { VisualSlotPicker } from "../../visual-slots/VisualSlotPicker"
 import { useVisualSlots } from "../../visual-slots/VisualSlotsContext"
 
 /* The body of the SAP Controller when it is in a focused-workspace route rather
-   than the legacy "options" sheet. SAPController still owns the portal, backdrop,
+   than the "options" sheet. SAPController still owns the portal, backdrop,
    focus trap, escape and scroll-lock; this only renders the route-specific header
    and content inside the existing sheet, reusing the sap-ctl__* classes so the
-   shell looks identical regardless of route. */
+   shell looks identical regardless of route.
+
+   This is the single place a workspace renders. Both entry points — the "…"
+   button's own rows and the radial action menu — land here, which is what makes
+   "Playback › Controls opens the Playback Controls workspace inside the
+   controller" true by construction rather than by convention. */
 
 export interface WorkspaceShellProps {
     /** The destination to render. Must not be `"options"` — that path stays on
@@ -30,10 +36,15 @@ export interface WorkspaceShellProps {
     route: WorkspaceRoute
     /** Closes the whole sheet (same handler SAPController uses elsewhere). */
     onClose: () => void
+    /** Returns to the controller's Options root. Omitted when there is nothing
+     *  to go back to (the sheet opened directly on this route). */
+    onBack?: () => void
     /** Optional lyrics snapshot forwarded to the lyrics workspace. */
     lyrics?: string
     /** Optional playback state forwarded to the Controls workspace. */
     playback?: PlaybackControlsState
+    /** Optional queue snapshot forwarded to the Up Next workspace. */
+    queue?: WorkspaceQueueState
 }
 
 /** Human title for the sheet header, keyed by route. */
@@ -46,7 +57,6 @@ function titleForRoute(route: WorkspaceRoute): string {
         case "library:vault":
             return "Add to Vault"
         case "plugin-settings:lyrics":
-        case "visual:lyrics":
             return "Lyrics"
         case "plugin-settings:waveform":
             return "Waveform"
@@ -116,17 +126,17 @@ function VisualCanvasWorkspace({ lyrics }: { lyrics?: string }) {
 function contentForRoute(
     route: WorkspaceRoute,
     lyrics?: string,
-    playback?: PlaybackControlsState
+    playback?: PlaybackControlsState,
+    queue?: WorkspaceQueueState
 ): ReactNode {
     switch (route) {
         case "library:playlists":
             return <LibraryPlaylistsWorkspace />
         case "library:queue":
-            return <LibraryQueueWorkspace />
+            return <LibraryQueueWorkspace queue={queue} />
         case "library:vault":
             return <LibraryVaultWorkspace />
         case "plugin-settings:lyrics":
-        case "visual:lyrics":
             // The lyric display is a seiCanvas visual that declares a settings
             // panel; the lyrics route surfaces that panel through the renderer so
             // edits flow straight back to the live canvas visual.
@@ -164,10 +174,28 @@ function contentForRoute(
     }
 }
 
-export function WorkspaceShell({ route, onClose, lyrics, playback }: WorkspaceShellProps) {
+export function WorkspaceShell({
+    route,
+    onClose,
+    onBack,
+    lyrics,
+    playback,
+    queue,
+}: WorkspaceShellProps) {
     return (
         <>
             <header className="sap-ctl__header">
+                {onBack && (
+                    <button
+                        type="button"
+                        className="sap-ctl__back ap-tap"
+                        onClick={onBack}
+                        aria-label="Back to player options"
+                    >
+                        <ChevronLeftIcon />
+                        Options
+                    </button>
+                )}
                 <h2 className="sap-ctl__title">{titleForRoute(route)}</h2>
                 <button
                     type="button"
@@ -179,7 +207,7 @@ export function WorkspaceShell({ route, onClose, lyrics, playback }: WorkspaceSh
                 </button>
             </header>
             <div className="sap-ctl__workspace" data-route={route}>
-                {contentForRoute(route, lyrics, playback)}
+                {contentForRoute(route, lyrics, playback, queue)}
             </div>
         </>
     )

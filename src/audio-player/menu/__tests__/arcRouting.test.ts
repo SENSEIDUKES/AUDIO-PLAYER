@@ -55,12 +55,18 @@ describe("routeArcAction", () => {
         expect(onSelect).toHaveBeenCalledWith("play-next")
     })
 
-    it("routes sei-canvas leaves to openCanvas", () => {
-        const openCanvas = vi.fn()
-        const action: ArcAction = { id: "c", label: "Canvas", target: "sei-canvas" }
-        expect(routeArcAction(action, { openCanvas })).toBe(true)
-        expect(openCanvas).toHaveBeenCalledTimes(1)
-        expect(routeArcAction(action, NOOP_HOST)).toBe(false)
+    it("refuses to route an action whose required capability is absent", () => {
+        const openWorkspace = vi.fn()
+        const action: ArcAction = {
+            id: "vault-tag",
+            label: "Tag",
+            target: "sap-controller",
+            workspaceRoute: "vault:tag",
+            requires: ["vault"],
+        }
+        expect(routeArcAction(action, { openWorkspace })).toBe(false)
+        expect(routeArcAction(action, { openWorkspace, capabilities: { vault: true } })).toBe(true)
+        expect(openWorkspace).toHaveBeenCalledExactlyOnceWith("vault:tag")
     })
 
     it("routes sap-controller leaves to openWorkspace with their route", () => {
@@ -120,7 +126,13 @@ describe("pruneDeadArcActions", () => {
                 },
             ],
         },
-        { id: "canvas", label: "Canvas", target: "sei-canvas" },
+        {
+            id: "canvas",
+            label: "Canvas",
+            target: "sap-controller",
+            workspaceRoute: "visual:canvas",
+            requires: ["canvas"],
+        },
         { id: "studio", label: "Studio Scout", target: "locked-entitlement" },
         { id: "dead", label: "Dead", target: "immediate-action", action: "no.impl" },
     ]
@@ -132,11 +144,11 @@ describe("pruneDeadArcActions", () => {
         expect(pruned.map((a) => a.id)).toEqual(["add-to-queue", "studio"])
     })
 
-    it("keeps everything when the host wires all destinations", () => {
+    it("keeps everything when the host wires all destinations and capabilities", () => {
         const host: ArcCommandHost = {
             commands: { "queue.insertAfterCurrent": () => {}, "no.impl": () => {} },
-            openCanvas: () => {},
             openWorkspace: () => {},
+            capabilities: { canvas: true },
         }
         const pruned = pruneDeadArcActions(tree, host)
         expect(pruned.map((a) => a.id)).toEqual([

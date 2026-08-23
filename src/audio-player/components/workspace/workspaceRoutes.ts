@@ -1,11 +1,16 @@
 /**
  * Workspace routing model for the SAP Controller shell.
  *
- * The SAP Controller started life as a single "…" options sheet. It is now a
- * reusable workspace *shell*: the same portal, focus trap, escape handling and
- * body-scroll lock host either the legacy options surface (`"options"`) or a
- * focused configuration workspace selected from the radial action menu
- * (e.g. `"plugin-settings:lyrics"`).
+ * The SAP Controller started life as a single "…" options sheet. It is now the
+ * canonical controller and workspace *shell*: the same portal, focus trap,
+ * escape handling and body-scroll lock host either the options surface
+ * (`"options"`) or a focused configuration workspace
+ * (e.g. `"plugin-settings:lyrics"`) — whether that workspace was reached from
+ * the controller's own rows or launched from the radial action menu.
+ *
+ * Every route listed here is reachable from the canonical action hierarchy
+ * (`menu/canonicalActions.ts`). A route nothing can open is a dead destination
+ * and does not belong in this list.
  *
  * A route is a `category:target` string (the bare `"options"` route has no
  * target). Categories group routes by which workspace surface renders them.
@@ -32,7 +37,6 @@ export const WORKSPACE_ROUTES = [
     "agent:studio-scout",
     "agent:memoir",
     "visual:canvas",
-    "visual:lyrics",
     "vault:tag",
     "vault:rename",
     "vault:radio",

@@ -7,10 +7,12 @@ export interface QueueSurfaceProps {
 }
 
 /**
- * In-region "Up Next" surface (Apple-Music style), rendered inside the shared
- * surface region by the right surface button. Reads the shared session queue;
- * tap a row to jump to that track. This is intentionally lightweight — the full
- * drag-to-reorder/remove experience stays in the existing QueueDrawer overlay.
+ * A standalone "Up Next" list (Apple-Music style) for hosts composing their own
+ * layout. Reads the shared session queue; tap a row to jump to that track.
+ *
+ * The bundled faces do not render this: their queue lives inside the "…"
+ * controller at `library:queue`, alongside every other destination. This stays
+ * exported for hosts that want an inline queue somewhere of their own choosing.
  */
 export function QueueSurface({ maxItems, className }: QueueSurfaceProps) {
     const s = useAudioSession()
