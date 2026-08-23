@@ -24,9 +24,9 @@ TypeScript signatures live in
   a shared `AudioSessionProvider`, or the headless `useAudioPlayer` hook.
   Multiple skins belong under one shared session; do not create multiple
   competing engines for the same queue.
-- Treat the package as an actively developed internal component. Keep the
-  package reference pinned to a reviewed Git commit when reproducibility
-  matters, and validate an upgrade before moving that pin.
+- Treat the package as actively developed. Use a reviewed published release,
+  pin an exact version when reproducibility matters, and validate an upgrade
+  before moving that version.
 
 ## Start here
 
