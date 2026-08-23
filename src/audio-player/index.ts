@@ -114,7 +114,8 @@ export {
 export type { TrackMetadataFields, ShouldEnableMarqueeArgs } from "./utils/formatMetadata"
 
 // Action Workspace router: the SAP Controller shell, its route model, and the
-// placeholder workspace surfaces the radial menu opens.
+// workspace surfaces both the "…" controller and the radial menu open. Every
+// route here is reachable from the canonical action hierarchy.
 export {
     WORKSPACE_ROUTES,
     parseWorkspaceRoute,
@@ -129,6 +130,7 @@ export { WorkspaceShell } from "./components/workspace/WorkspaceShell"
 export type { WorkspaceShellProps } from "./components/workspace/WorkspaceShell"
 export { LibraryPlaylistsWorkspace } from "./components/workspace/LibraryPlaylistsWorkspace"
 export { LibraryQueueWorkspace } from "./components/workspace/LibraryQueueWorkspace"
+export type { WorkspaceQueueState } from "./components/workspace/LibraryQueueWorkspace"
 export { PluginSettingsWorkspace } from "./components/workspace/PluginSettingsWorkspace"
 export type { PluginSettingsWorkspaceProps } from "./components/workspace/PluginSettingsWorkspace"
 export { PlaybackAutomixWorkspace } from "./components/workspace/PlaybackAutomixWorkspace"
@@ -142,8 +144,6 @@ export type {
     AgentScoutRequest,
     AgentScoutResponse,
 } from "./components/workspace/agentScoutContract"
-export { VisualLyricsWorkspace } from "./components/workspace/VisualLyricsWorkspace"
-export type { VisualLyricsWorkspaceProps } from "./components/workspace/VisualLyricsWorkspace"
 
 // Visual slot intake layer: a minimal registry + renderers that mount
 // Workshop-Light style React components into the player's three visual slots
@@ -279,15 +279,18 @@ export {
     ArcActionButton,
     resolveArcActionState,
     isArcActionLive,
+    hasRequiredCapabilities,
     pruneDeadArcActions,
+    collectArcLeaves,
+    describeArcRoutes,
     routeArcAction,
-    buildVaultTrackArcActions,
-    buildStandardTrackArcActions,
+    buildCanonicalPlayerActions,
     buildPluginsArcBranch,
     buildPlaybackArcBranch,
+    buildQueueArcBranch,
     buildShareArcBranch,
     buildAgentsArcBranch,
-    buildMenuTree,
+    buildVaultArcBranch,
     isNodeInteractive,
     SEICanvasHost,
     ScrubberCanvasHost,
@@ -313,14 +316,12 @@ export type {
     ArcActionTarget,
     ArcCommandId,
     ArcCommandHost,
-    VaultTrackEntitlements,
-    BuildVaultTrackArcActionsOptions,
-    BuildStandardArcActionsOptions,
+    ArcRouteDescriptor,
+    PlayerActionCapability,
+    ArcMenuEntitlements,
+    BuildCanonicalPlayerActionsOptions,
     MenuNode,
     MenuItemState,
-    MenuActionId,
-    ArcMenuEntitlements,
-    BuildMenuTreeOptions,
     SEICanvasHostProps,
     ScrubberCanvasHostProps,
     PlayerHeroProps,

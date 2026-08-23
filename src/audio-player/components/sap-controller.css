@@ -317,6 +317,95 @@
     flex: none;
 }
 
+/* Up Next list rendered inside the controller (the Library › Queue workspace).
+   Each item is a play row plus an optional remove button, so the row keeps the
+   shared .sap-ctl__row look while the remove control sits alongside it. */
+.sap-ctl__queue {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 46vh;
+    overflow-y: auto;
+}
+.sap-ctl__queue-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.sap-ctl__queue-item .sap-ctl__row {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.sap-ctl__queue-item--current .sap-ctl__row {
+    color: var(--ap-accent, #fff);
+}
+.sap-ctl__queue-index {
+    min-width: 18px;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.55;
+    font-size: 12px;
+}
+.sap-ctl__queue-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+}
+.sap-ctl__queue-title {
+    font-size: 13.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+}
+.sap-ctl__queue-artist {
+    font-size: 11.5px;
+    opacity: 0.6;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+}
+.sap-ctl__queue-remove {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 9px;
+    background: transparent;
+    color: inherit;
+    opacity: 0.55;
+    cursor: pointer;
+}
+.sap-ctl__queue-remove:hover {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* Back-to-Options control in a workspace header. */
+.sap-ctl__back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border: none;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.06);
+    color: inherit;
+    font: inherit;
+    font-size: 12.5px;
+    cursor: pointer;
+}
+.sap-ctl__back:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
 @keyframes sap-sheet-in {
     from {
         transform: translateY(24px);

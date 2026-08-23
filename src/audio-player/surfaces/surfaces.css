@@ -2,8 +2,8 @@
    Tokens (--ap-accent, --ap-text, ...) come from the face root via themeVars. */
 
 /* ----------------------------- Surface buttons ----------------------------- */
-/* One shared shell for the left (canvas) and right (queue) toggles, so both are
-   visually and behaviorally identical. */
+/* One shared shell for the left (canvas) toggle and the right (action menu)
+   trigger, so both are visually and behaviorally identical. */
 .ap-surface-actions {
     display: flex;
     justify-content: center;
@@ -274,8 +274,8 @@
 }
 
 /* ----------------------------- Mini surface region ----------------------------- */
-/* Column shell so the compact scrubber and queue surface stack under the
-   existing single-row mini player without altering that row. */
+/* Column shell so the compact scrubber stacks under the existing single-row mini
+   player without altering that row. */
 .ap-ms-shell {
     box-sizing: border-box;
     width: 100%;
@@ -283,24 +283,6 @@
     flex-direction: column;
     gap: 8px;
 }
-/* Mini has no canvas; its right queue button reveals this small region. */
-.ap-ms__surface {
-    overflow: hidden;
-    max-height: 0;
-    opacity: 0;
-    /* See .ap-sei-canvas-host: keep closed children out of the tab order. */
-    visibility: hidden;
-    transition:
-        max-height 0.25s ease,
-        opacity 0.18s ease,
-        visibility 0.25s;
-}
-.ap-ms__surface[data-open="true"] {
-    max-height: 260px;
-    opacity: 1;
-    visibility: visible;
-}
-
 /* ----------------------------- Narrow / motion ----------------------------- */
 @container ap-fc (max-width: 360px) {
     .ap-sei-canvas-host[data-open="true"] {
@@ -314,8 +296,7 @@
     .ap-hero,
     .ap-hero__title,
     .ap-hero__artist,
-    .ap-queue-surface__row,
-    .ap-ms__surface {
+    .ap-queue-surface__row {
         transition: none;
     }
 }

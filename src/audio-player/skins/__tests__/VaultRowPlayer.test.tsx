@@ -1,8 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import { AudioSessionProvider } from "../../session/AudioSessionContext"
-import { buildVaultTrackArcActions } from "../../menu/vaultTrackMenu"
-import type { ArcAction } from "../../surfaces/ArcActionButton"
 import type { Track } from "../../types"
 import { VaultRowPlayer } from "../VaultRowPlayer"
 
@@ -18,66 +16,36 @@ function render(node: React.ReactElement): string {
     )
 }
 
-const SAMPLE_ACTIONS: ArcAction[] = [
-    { id: "queue", label: "Add to Queue", onSelect: () => {} },
-    { id: "share", label: "Share", onSelect: () => {} },
-]
-
-describe("VaultRowPlayer — Arc actions", () => {
-    it("renders the Arc action button (not the legacy three-dot menu) when actions are given", () => {
-        const html = render(<VaultRowPlayer track={TRACK} actions={SAMPLE_ACTIONS} />)
-        // Arc trigger uses the surface-button shell, scoped with the row class.
+describe("VaultRowPlayer — action surface", () => {
+    it("renders the shared action menu trigger, not a legacy three-dot menu", () => {
+        const html = render(<VaultRowPlayer track={TRACK} onOpenWorkspace={() => {}} />)
+        // The trigger uses the surface-button shell, scoped with the row class.
         expect(html).toContain("ap-surface-btn")
         expect(html).toContain("ap-vr__action")
         // The old dots-only icon button must be gone.
         expect(html).not.toContain("ap-icon-btn ap-vr__action")
     })
 
-    it("renders no action surface when no actions are given", () => {
+    it("keeps the trigger on a host that only wires the row's queue commands", () => {
+        // Play Next / Play Later are wired to the shared session by the row
+        // itself, so the Queue arm survives even with no controller routing.
         const html = render(<VaultRowPlayer track={TRACK} />)
-        expect(html).not.toContain("ap-vr__action")
-        expect(html).not.toContain("ap-surface-btn")
-    })
-
-    it("renders the standardized command wheel when the host routes workspaces", () => {
-        // The standardized wheel's arms (Vault, Playback, Agents and Share ›
-        // Add to) are all SAP Controller destinations, so wiring
-        // onOpenWorkspace keeps the trigger live.
-        const html = render(
-            <VaultRowPlayer
-                track={TRACK}
-                actions={buildVaultTrackArcActions()}
-                onOpenWorkspace={() => {}}
-            />
-        )
         expect(html).toContain("ap-vr__action")
     })
 
-    it("prunes the whole wheel on a host with no workspace routing and no share commands", () => {
-        // Without onOpenWorkspace every sap-controller leaf dies, and the two
-        // immediate Share leaves (Link, Favorite) have no wired commands — the
-        // arc renders no dead buttons, so the trigger disappears entirely.
-        const html = render(<VaultRowPlayer track={TRACK} actions={buildVaultTrackArcActions()} />)
-        expect(html).not.toContain("ap-vr__action")
-    })
-
     it("renders no trigger at all when every leaf is dead on this host", () => {
-        const deadOnly: ArcAction[] = [
-            {
-                id: "vault",
-                label: "Vault",
-                children: [
-                    {
-                        id: "vault-playlist",
-                        label: "Playlist",
-                        target: "sap-controller",
-                        workspaceRoute: "library:playlists",
-                    },
-                ],
-            },
-        ]
-        // No onOpenWorkspace → the only branch prunes away entirely.
-        const html = render(<VaultRowPlayer track={TRACK} actions={deadOnly} />)
+        // Override the row's built-in queue commands with nothing, and wire no
+        // controller: every leaf prunes and the trigger disappears rather than
+        // rendering an empty wheel.
+        const html = render(
+            <VaultRowPlayer
+                track={TRACK}
+                commands={{
+                    "queue.insertAfterCurrent": undefined,
+                    "queue.append": undefined,
+                }}
+            />
+        )
         expect(html).not.toContain("ap-vr__action")
     })
 })

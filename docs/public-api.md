@@ -51,9 +51,64 @@ TypeScript signatures live in
 | Narrative engines | `useNarrativeAudio`, `SceneMixEngine`, `createSceneMixEngine`, `OneShotEngine`, `createOneShotEngine` | Narration, ambience, one-shots, and scene-score transitions independent of a visible player skin. |
 | Automix and analysis | `createAutomixPlugin`, `ensureTrackAnalysis`, `ensureProTrackAnalysis`, `planTransition`, `bpmCompatibility` | Progressive crossfades with a conservative fallback when analysis is unavailable. See [`automix.md`](./automix.md). |
 | Headless, surfaces, and visual slots | `useSAPPropGetters`, `useMediaSessionObserver`, `usePlayerSurface`, `VisualSlotsProvider`, `registerVisualComponent`, `PROPERTY_REGISTRY` | Custom controls, canvas/render zones, visual extensions, and editable surface properties. |
+| Player actions and menus | `buildCanonicalPlayerActions`, `ArcActionButton`, `PlayerSurfaceButtons`, `SAPController`, `routeArcAction`, `pruneDeadArcActions`, `describeArcRoutes` | The one action hierarchy every music face shares, and the two surfaces that present it. See [Menu architecture](#menu-architecture). |
 | Workspaces and Agent Scout contracts | `WorkspaceShell`, `WORKSPACE_ROUTES`, `AgentQueueDirectorWorkspace`, `AgentScoutRequest`, `AgentScoutResponse` | Host-owned workspace routing and typed Agent Scout client contracts. The server endpoint and credentials are not part of the browser package. |
 | Diagnostics | `ActivityLogProvider`, `useActivityLog`, `ActivityLogPanel`, `ActivityLogWorkspace`, `createActivityLogStore` | Bounded playback/activity diagnostics for host applications. |
 | Shared components and utilities | `ProgressBar`, `VolumeControl`, `WaveformProgress`, `TrackMetadata`, `formatTime`, `trackKey`, `getTrackSources` | Compose a custom UI from the same primitives used by the bundled skins. |
+
+## Menu architecture
+
+There are exactly two connected menu surfaces, and they are two halves of one
+system:
+
+1. **`SAPController`** — the three-dot controller and workspace shell. Every
+   settings destination in the player renders inside it, at a `WorkspaceRoute`.
+2. **The radial action menu** (`ArcActionButton`, presented by
+   `SEICanvasActionMenu`) — a shortcut launcher whose settings leaves open their
+   destination *inside that same controller*.
+
+Nothing else is a menu destination. A leaf resolves to a controller workspace, a
+genuinely immediate command (skip, queue, copy link, favorite), or an honest
+entitlement lock — there is no drawer, pop-out, or face-specific menu to reach.
+
+`buildCanonicalPlayerActions()` is the single hierarchy every music face builds:
+
+```
+Plugins  › Audio / Visual / Analytics   (active plugins, + Canvas)
+Playback › Previous / Next / Controls / Debug
+Queue    › Up Next / Play Next / Play Later / Director
+Share    › Link / Add to / Favorite
+Agents   › Scout / Memoir
+Vault    › Tag / Rename / Playlist / Radio     (vault capability)
+```
+
+Faces may place and style the trigger however they like; the actions, their ids,
+and their destinations are identical everywhere. The only thing that varies is
+what survives capability filtering. `pruneDeadArcActions()` drops an action when
+
+- a capability it declares (`requires: ["canvas"]`, `["vault"]`) is not present
+  on the host,
+- the workspace host isn't wired, or
+- the immediate command it names isn't implemented.
+
+Anything else — layout, density, taste — is not a reason to hide an action, so a
+visible node always does something real. Transient unavailability (nothing to
+skip back to) renders the action dimmed rather than removing it.
+
+```tsx
+const actions = buildCanonicalPlayerActions({ activePluginIds })
+
+<ArcActionButton
+    actions={actions}
+    commands={{ "track.next": session.next }}
+    capabilities={{ canvas: true, vault: false }}
+    onOpenWorkspace={setControllerRoute}
+/>
+```
+
+`describeArcRoutes(actions)` returns the route matrix — every leaf paired with
+its destination — which is how the tests audit that nothing is dead and nothing
+escapes the contract.
 
 ## Ownership boundaries
 

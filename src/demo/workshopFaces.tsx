@@ -9,7 +9,6 @@ import {
     SeaCardPlayer,
     NarrativeFace,
     SAPController,
-    buildVaultTrackArcActions,
     useAudioSession,
 } from "../audio-player"
 import type {
@@ -151,18 +150,16 @@ function workshopShareCommands(track: Track): ArcCommandHost["commands"] {
     }
 }
 
-/* The workshop's Vault preview: rows carry the standardized command wheel with
-   the Vault face's dedicated Vault arm (Vault / Playback / Share / Agents) and
-   route workspace leaves into one shared SAP Controller instance owned here. */
+/* The workshop's Vault preview: rows carry the canonical action hierarchy — the
+   same one every face gets — with the Vault arm surviving capability filtering
+   because a vault row genuinely is a vault-managed track. Every settings leaf
+   routes into the one shared SAP Controller instance owned here. */
 function WorkshopVaultRows({ tracks, theme }: { tracks: Track[]; theme: AudioPlayerTheme }) {
     const s = useAudioSession()
     const [route, setRoute] = useState<WorkspaceRoute | null>(null)
     // No Studio Scout entitlement in the workshop — Agents › Scout routes to
     // its free Demo tier.
-    const arcActions = useMemo(
-        () => buildVaultTrackArcActions({ entitlements: { studioScout: false } }),
-        []
-    )
+    const entitlements = useMemo(() => ({ studioScout: false }), [])
     return (
         <div className="workshop__vault">
             {tracks.map((t, i) => {
@@ -177,7 +174,8 @@ function WorkshopVaultRows({ tracks, theme }: { tracks: Track[]; theme: AudioPla
                         key={tagged.id ?? tagged.title}
                         track={tagged}
                         number={i + 1}
-                        actions={arcActions}
+                        entitlements={entitlements}
+                        activePluginIds={s.pluginNames}
                         commands={workshopShareCommands(tagged)}
                         onOpenWorkspace={setRoute}
                         {...theme}

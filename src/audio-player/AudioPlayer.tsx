@@ -15,12 +15,10 @@ import { getScrubberDensity } from "./surfaces/faceCapabilities"
 import { usePlayerSurface } from "./surfaces/usePlayerSurface"
 import { PlayerSurfaceButtons } from "./surfaces/PlayerSurfaceButtons"
 import { SEICanvasHost } from "./surfaces/SEICanvasHost"
-import { QueueSurface } from "./surfaces/QueueSurface"
 import { VisualSlotsProvider } from "./visual-slots/VisualSlotsContext"
 import { SEICanvasRenderer } from "./visual-slots/SEICanvasRenderer"
 import { ScrubberCanvasRenderer } from "./visual-slots/ScrubberCanvasRenderer"
 import { VolumeControl } from "./components/VolumeControl"
-import { QueueDrawer } from "./components/QueueDrawer"
 import { SAPController } from "./components/SAPController"
 import { HoldSkipButton } from "./components/HoldSkipButton"
 import { useShareTrack } from "./components/useShareTrack"
@@ -333,7 +331,7 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
     } = props
 
     const s = useAudioSession()
-    const { playTrack, removeFromQueue, moveQueueItem } = s
+    const { playTrack, removeFromQueue } = s
 
     const [announcement, setAnnouncement] = useState("")
     const [controllerOpen, setControllerOpen] = useState(false)
@@ -341,7 +339,6 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
     // the SAP toggle is kept as local UI state so the control stays available
     // without re-arming playback mid-session.
     const [localAutoPlay, setLocalAutoPlay] = useState(autoPlay)
-    const [queueOpen, setQueueOpen] = useState(false)
 
     // Surface state management for canvas/queue surfaces (mirrors FullCardPlayer).
     const surface = usePlayerSurface("portable")
@@ -450,24 +447,13 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
 
     const handleAutoPlayToggle = useCallback(() => setLocalAutoPlay((v) => !v), [])
 
-    // Queue drawer: play a track then close the drawer (the drawer-specific
-    // affordance the bare session `playTrack` doesn't provide).
-    const handleQueuePlayTrack = useCallback(
-        (index: number) => {
-            playTrack(index)
-            setQueueOpen(false)
-        },
-        [playTrack]
-    )
+    // Up Next lives inside the controller: jumping to a queue position is the
+    // plain session action, no drawer to dismiss.
+    const handleQueuePlayTrack = useCallback((index: number) => playTrack(index), [playTrack])
     const handleQueueRemove = useCallback(
         (index: number) => removeFromQueue(index),
         [removeFromQueue]
     )
-    const handleQueueReorder = useCallback(
-        (fromIndex: number, toIndex: number) => moveQueueItem(fromIndex, toIndex),
-        [moveQueueItem]
-    )
-    const handleQueueClose = useCallback(() => setQueueOpen(false), [])
 
     const {
         share,
@@ -499,6 +485,20 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
         setControllerRoute("options")
         setControllerOpen(true)
     }, [])
+
+    // The immediate commands this player can genuinely run. Skipping is a
+    // capability of playlist mode, so it is wired there and dimmed at the ends
+    // of the queue — not removed as the queue position changes. Everything else
+    // in the canonical menu is a settings screen and opens in the controller
+    // above; commands not listed here prune their leaves rather than render
+    // them dead.
+    const menuCommands = useMemo(
+        () => ({
+            ...(isPlaylistMode ? { "track.previous": s.previous, "track.next": s.next } : {}),
+            "share.url": handleShareClick,
+        }),
+        [isPlaylistMode, s.previous, s.next, handleShareClick]
+    )
 
     // Keyboard shortcuts scoped to the player root (not window) so they never
     // fight focused controls or other parts of the host app. Space/Enter on an
@@ -635,20 +635,6 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
                 aria-label="Audio player"
                 onKeyDown={handleRootKeyDown}
             >
-                {/* Queue drawer (Up Next) */}
-                {isPlaylistMode && (
-                    <QueueDrawer
-                        queue={queue}
-                        currentIndex={currentIndex}
-                        isPlaying={isPlaying}
-                        open={queueOpen}
-                        onClose={handleQueueClose}
-                        onPlayTrack={handleQueuePlayTrack}
-                        onReorder={handleQueueReorder}
-                        onRemove={handleQueueRemove}
-                    />
-                )}
-
                 {/* Shared SAP Controller: single instance serves both the "..." button
                 (default options route) and arc menu workspace selections (lyrics,
                 automix, plugin settings, etc.). Mirrors FullCardPlayer architecture. */}
@@ -674,7 +660,11 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
                         isPlaylistMode
                             ? {
                                   count: queue.length,
-                                  onOpenQueue: () => setQueueOpen(true),
+                                  tracks: queue,
+                                  currentIndex,
+                                  isPlaying,
+                                  onPlayTrack: handleQueuePlayTrack,
+                                  onRemove: handleQueueRemove,
                               }
                             : undefined
                     }
@@ -924,34 +914,31 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
                         />
                     )}
 
-                    {/* SEI Canvas visual surface region — hidden by default, opened via the
-                    left surface button (canvas toggle) or right (Up Next queue in-region).
-                    Mirrors the FullCardPlayer SEICanvasHost pattern. */}
+                    {/* SEI Canvas visual surface region — hidden by default, opened
+                    via the left surface button (canvas toggle). Mirrors the
+                    FullCardPlayer SEICanvasHost pattern. */}
                     <SEICanvasHost
-                        open={surface.isCanvasOpen || surface.isQueueOpen}
+                        open={surface.isCanvasOpen}
                         face="portable"
                         supported={surface.canvasSupported}
                         activeSurfaceId={surface.mode === "default" ? undefined : surface.mode}
                     >
-                        {surface.isQueueOpen ? (
-                            <QueueSurface />
-                        ) : (
-                            <SEICanvasRenderer
-                                currentTime={currentTime}
-                                duration={duration}
-                                lyrics={currentTrack?.lyrics}
-                            />
-                        )}
+                        <SEICanvasRenderer
+                            currentTime={currentTime}
+                            duration={duration}
+                            lyrics={currentTrack?.lyrics}
+                        />
                     </SEICanvasHost>
 
-                    {/* Surface buttons: left = canvas toggle, right = arc action menu
-                    (SEICanvasActionMenu). Gate on contextual support — the
-                    capability model drives this, matching FullCardPlayer. */}
+                    {/* Surface buttons: left = canvas toggle, right = the shared
+                    radial action menu. Every settings action in it opens the same
+                    SAPController the "…" button opens. */}
                     <PlayerSurfaceButtons
                         surface={surface}
-                        onOpenQueue={() => setQueueOpen(true)}
                         activePluginIds={s.pluginNames}
-                        onShareLink={handleShareClick}
+                        commands={menuCommands}
+                        canPrevious={canPreviousTrack}
+                        canNext={canNextTrack}
                         onOpenFocusedController={handleOpenFocusedController}
                     />
 

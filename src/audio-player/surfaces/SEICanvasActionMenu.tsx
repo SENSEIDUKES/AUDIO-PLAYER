@@ -4,7 +4,6 @@ import { createPortal } from "react-dom"
 import { ChevronLeftIcon, CloseIcon, LockIcon } from "../skins/icons"
 import { isNodeInteractive } from "../menu/menuData"
 import type { MenuNode } from "../menu/menuData"
-import type { WorkspaceRoute } from "../components/workspace/workspaceRoutes"
 import "./sei-canvas-action-menu.css"
 
 /** Radius of the half-circle the nodes fan out on, in px. */
@@ -68,20 +67,12 @@ function resolveLevel(items: MenuNode[], path: string[]): ResolvedLevel {
 export interface SEICanvasActionMenuProps {
     /** The menu tree to render. */
     items: MenuNode[]
-    /** Resolves the `open-queue` leaf action. Optional — decoupled callers (e.g.
-        a generic ArcActionButton) render trees with no such leaf. */
-    onOpenQueue?: () => void
-    /** Resolves the `activate-canvas` leaf action. Optional, as above. */
-    onActivateCanvas?: () => void
-    /** Resolves any other leaf action (and `select-lyrics`). */
-    onSelect?: (node: MenuNode) => void
     /**
-     * Opens a focused workspace route in the SAP Controller shell. When provided,
-     * a node's `workspaceRoute` takes precedence over its legacy `actionId`, so
-     * the radial menu drives the workspace router. Omit it to keep the legacy
-     * `onOpenQueue` / `onActivateCanvas` / `onSelect` behavior unchanged.
+     * Called with the selected leaf. This is the menu's *only* output: it owns
+     * no destinations of its own, so a leaf can never reach a surface the action
+     * router didn't send it to.
      */
-    onOpenWorkspace?: (route: WorkspaceRoute) => void
+    onSelect?: (node: MenuNode) => void
     /** Accessible label for the trigger + menu. */
     ariaLabel?: string
     className?: string
@@ -109,9 +100,15 @@ const TriggerIcon = () => (
 )
 
 /**
- * The SEI Canvas Action Menu: a bottom-anchored half-circle command wheel. The
- * closed state is a single round trigger that drops into the queue surface slot.
- * Tapping it opens a dimmed, blurred portal overlay that fans the menu items on
+ * The SEI Canvas Action Menu: a bottom-anchored half-circle command wheel — the
+ * *presentation* half of the radial surface. It renders a `MenuNode` tree and
+ * reports the selected leaf; it resolves nothing itself. Every destination is
+ * decided by the action router in `ArcActionButton`, which is what keeps the
+ * radial menu a shortcut launcher into the "…" controller rather than a second
+ * menu system.
+ *
+ * The closed state is a single round trigger that drops into the face's action
+ * slot. Tapping it opens a dimmed, blurred portal overlay that fans the menu items on
  * an arc, with submenu navigation, a depth-aware Close/Back center button, and a
  * breadcrumb. The arc's open + navigation state is entirely local here — it is an
  * overlay, never a player surface. Kept free of engine/session imports so it can
@@ -119,10 +116,7 @@ const TriggerIcon = () => (
  */
 export function SEICanvasActionMenu({
     items,
-    onOpenQueue,
-    onActivateCanvas,
     onSelect,
-    onOpenWorkspace,
     ariaLabel = "Canvas actions",
     className,
 }: SEICanvasActionMenuProps) {
@@ -211,26 +205,12 @@ export function SEICanvasActionMenu({
                 setPath((p) => [...p, node.id])
                 return
             }
-            // A wired host routes leaf nodes to their workspace; the legacy
-            // actions remain the fallback for hosts that don't (backward compat).
-            if (node.workspaceRoute && onOpenWorkspace) {
-                onOpenWorkspace(node.workspaceRoute)
-                close()
-                return
-            }
-            switch (node.actionId) {
-                case "open-queue":
-                    onOpenQueue?.()
-                    break
-                case "activate-canvas":
-                    onActivateCanvas?.()
-                    break
-                default:
-                    onSelect?.(node)
-            }
+            // Leaves have exactly one exit: report the selection and close. The
+            // action router decides where it goes.
+            onSelect?.(node)
             close()
         },
-        [close, onActivateCanvas, onOpenQueue, onOpenWorkspace, onSelect]
+        [close, onSelect]
     )
 
     const handleCenter = useCallback(() => {
@@ -319,9 +299,6 @@ export function SEICanvasActionMenu({
                                                 {state === "locked" ? <LockIcon /> : <Icon />}
                                             </span>
                                             <span className="sac__node-label">{node.label}</span>
-                                            {state === "coming-soon" && (
-                                                <span className="sac__badge">soon</span>
-                                            )}
                                         </button>
                                     )
                                 })}

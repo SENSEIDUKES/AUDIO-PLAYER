@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from "react"
+import { useCallback, useEffect, useRef, useState, useMemo } from "react"
 import type { KeyboardEvent, ReactNode } from "react"
 import { createPortal } from "react-dom"
 import type { AudioPlayerTheme, RepeatMode } from "../types"
@@ -18,15 +18,25 @@ import {
 } from "../skins/icons"
 import { WorkspaceShell } from "./workspace/WorkspaceShell"
 import type { WorkspaceRoute } from "./workspace/workspaceRoutes"
+import type { WorkspaceQueueState } from "./workspace/LibraryQueueWorkspace"
+import type { Track } from "../types"
 import { useAudioTime } from "../session/AudioSessionContext"
 import { AudioTimeText } from "./AudioTimeText"
 import "./sap-controller.css"
 
-/* The SAP Controller: one shared, screen-level command sheet for the advanced
-   actions that used to be jammed onto every face (shuffle, repeat, automix,
-   autoplay, queue, lyrics/info, share, plugins). Faces keep core transport
-   visible and open this from their "…" button. Rendered through a portal so
-   it can never clip inside a card, sidebar, or sticky bar. */
+/* The SAP Controller: the canonical controller and workspace shell.
+
+   It is one shared, screen-level sheet holding the advanced actions that used to
+   be jammed onto every face (shuffle, repeat, automix, autoplay, queue,
+   lyrics/info, share, plugins) *and* every focused workspace. Faces keep core
+   transport visible and open this from their "…" button; the radial action menu
+   launches straight into one of its workspace routes. Either way the destination
+   renders here — there is no second sheet, drawer or face-specific menu.
+
+   `route` seeds which workspace the sheet opens on; from there the controller
+   navigates internally (Options ⇄ workspace), so a face never has to model
+   controller navigation itself. Rendered through a portal so it can never clip
+   inside a card, sidebar, or sticky bar. */
 
 export interface SAPControllerPlayback {
     shuffle: boolean
@@ -43,8 +53,20 @@ export interface SAPControllerPlayback {
 
 export interface SAPControllerQueue {
     count: number
-    /** Open the queue UI. The controller closes itself before calling this. */
-    onOpenQueue: () => void
+    /**
+     * The queue in play order. Provided so Up Next renders *inside* the
+     * controller (the `library:queue` workspace) instead of handing off to a
+     * separate drawer.
+     */
+    tracks?: readonly Track[]
+    /** Index of the currently playing track. */
+    currentIndex?: number
+    /** Whether the current track is playing (labels the active row). */
+    isPlaying?: boolean
+    /** Jump to a queue position. */
+    onPlayTrack?: (index: number) => void
+    /** Drop a track from the queue. */
+    onRemove?: (index: number) => void
 }
 
 export interface SAPControllerInfo {
@@ -64,9 +86,11 @@ export interface SAPControllerProps extends AudioPlayerTheme {
     open: boolean
     onClose: () => void
     /**
-     * Which workspace the sheet renders. Defaults to `"options"`, the legacy
-     * three-dot content. Any other route renders the matching focused workspace
-     * surface through the same portal/focus-trap shell.
+     * Which workspace the sheet *opens on*. Defaults to `"options"`, the
+     * three-dot root. Any other route opens the matching focused workspace
+     * through the same portal/focus-trap shell, with a Back control returning to
+     * Options. Changing this prop (e.g. a second radial pick while the sheet is
+     * up) navigates the open sheet to the new route.
      */
     route?: WorkspaceRoute
     /** Sections render only when their prop is provided. */
@@ -224,6 +248,12 @@ export function SAPController({
     const sheetRef = useRef<HTMLDivElement>(null)
     const closeRef = useRef<HTMLButtonElement>(null)
     const [lyricsOpen, setLyricsOpen] = useState(false)
+    // The controller navigates internally: `route` seeds where the sheet opens
+    // (the "…" button sends "options", the radial menu sends a workspace), and
+    // from there Options ⇄ workspace navigation happens right here. A face never
+    // has to model controller navigation.
+    const [activeRoute, setActiveRoute] = useState<WorkspaceRoute>(route)
+    const backToOptions = useCallback(() => setActiveRoute("options"), [])
 
     // Faces typically pass an inline onClose; route it through a ref so the
     // open/close effect doesn't re-run (and re-steal focus) on every render.
@@ -269,6 +299,36 @@ export function SAPController({
             if (opener?.isConnected) opener.focus()
         }
     }, [open])
+
+    // Navigating between Options and a workspace swaps the whole sheet body, so
+    // the previously focused row is gone. Pull focus back to the top of the new
+    // destination rather than letting it fall to <body> outside the trap.
+    const navigatedRef = useRef(false)
+    useEffect(() => {
+        if (!open) {
+            navigatedRef.current = false
+            return
+        }
+        if (!navigatedRef.current) {
+            // The first pass is the sheet opening; the effect above owns that.
+            navigatedRef.current = true
+            return
+        }
+        const raf = requestAnimationFrame(() => {
+            sheetRef.current
+                ?.querySelector<HTMLElement>(
+                    "button:not([disabled]), [href], [tabindex]:not([tabindex='-1'])"
+                )
+                ?.focus()
+        })
+        return () => cancelAnimationFrame(raf)
+    }, [open, activeRoute])
+
+    // Follow the requested route: opening the sheet, or picking a second
+    // destination from the radial menu while it is already up, navigates here.
+    useEffect(() => {
+        setActiveRoute(route)
+    }, [route, open])
 
     // Collapse lyrics whenever the sheet closes so it reopens tidy.
     useEffect(() => {
@@ -338,7 +398,17 @@ export function SAPController({
         backgroundColor,
     })
 
-    const isOptions = route === "options"
+    const isOptions = activeRoute === "options"
+    // The Up Next workspace renders the live queue inside the controller.
+    const workspaceQueue: WorkspaceQueueState | undefined = queue?.tracks
+        ? {
+              tracks: queue.tracks,
+              currentIndex: queue.currentIndex ?? 0,
+              isPlaying: queue.isPlaying,
+              onPlayTrack: queue.onPlayTrack,
+              onRemove: queue.onRemove,
+          }
+        : undefined
 
     return createPortal(
         <div className="sap-ctl" style={themeVars}>
@@ -352,176 +422,181 @@ export function SAPController({
                 onKeyDown={handleTrapKeyDown}
             >
                 <div className="sap-ctl__grab" aria-hidden="true" />
-                {/* Focused workspace route: render workspace panel above options */}
-                {!isOptions && (
+                {/* A focused workspace takes over the sheet, with Back returning
+                    to Options. One sheet, one destination at a time — a radial
+                    pick and a "…" tap land in exactly the same place. */}
+                {!isOptions ? (
+                    <WorkspaceShell
+                        route={activeRoute}
+                        onClose={onClose}
+                        onBack={backToOptions}
+                        lyrics={info?.lyrics}
+                        playback={playback}
+                        queue={workspaceQueue}
+                    />
+                ) : (
                     <>
-                        <WorkspaceShell
-                            route={route}
-                            onClose={onClose}
-                            lyrics={info?.lyrics}
-                            playback={playback}
-                        />
-                        <div className="sap-ctl__divider" role="separator" aria-hidden="true" />
-                    </>
-                )}
-                <header className="sap-ctl__header">
-                    <h2 className="sap-ctl__title">{isOptions ? "Options" : "Options"}</h2>
-                    <button
-                        ref={closeRef}
-                        type="button"
-                        className="sap-ctl__close ap-tap"
-                        onClick={onClose}
-                        aria-label={isOptions ? "Close player options" : "Close workspace"}
-                    >
-                        <CloseIcon />
-                    </button>
-                </header>
+                        <header className="sap-ctl__header">
+                            <h2 className="sap-ctl__title">Options</h2>
+                            <button
+                                ref={closeRef}
+                                type="button"
+                                className="sap-ctl__close ap-tap"
+                                onClick={onClose}
+                                aria-label="Close player options"
+                            >
+                                <CloseIcon />
+                            </button>
+                        </header>
 
-                {playback && (
-                    <Section title="Playback">
-                        <SwitchRow
-                            icon={<ShuffleIcon />}
-                            label="Shuffle"
-                            on={playback.shuffle}
-                            onToggle={playback.onToggleShuffle}
-                        />
-                        <button
-                            type="button"
-                            className="sap-ctl__row ap-tap"
-                            onClick={playback.onCycleRepeat}
-                            aria-label={`Repeat: ${playback.repeatMode}. Activate to change.`}
-                        >
-                            <span className="sap-ctl__label">
-                                {playback.repeatMode === "one" ? <RepeatOneIcon /> : <RepeatIcon />}
-                                Repeat
-                            </span>
-                            <span className="sap-ctl__value">{playback.repeatMode}</span>
-                        </button>
-                        {playback.onToggleAutomix && (
-                            <SwitchRow
-                                icon={<AutomixIcon />}
-                                label="Automix"
-                                on={playback.automix ?? false}
-                                onToggle={playback.onToggleAutomix}
-                            />
-                        )}
-                        {playback.onToggleAutoPlay && (
-                            <SwitchRow
-                                icon={<AutoPlayIcon />}
-                                label="Auto Play"
-                                on={playback.autoPlay ?? false}
-                                onToggle={playback.onToggleAutoPlay}
-                            />
-                        )}
-                    </Section>
-                )}
-
-                {queue && (
-                    <Section title="Queue">
-                        <button
-                            type="button"
-                            className="sap-ctl__row ap-tap"
-                            onClick={() => {
-                                onClose()
-                                queue.onOpenQueue()
-                            }}
-                        >
-                            <span className="sap-ctl__label">
-                                <QueueIcon />
-                                Up Next
-                            </span>
-                            <span className="sap-ctl__value">
-                                {queue.count} track{queue.count !== 1 ? "s" : ""}
-                            </span>
-                        </button>
-                    </Section>
-                )}
-
-                {info && (
-                    <Section title="Info">
-                        <div className="sap-ctl__meta">
-                            <div className="sap-ctl__meta-row">
-                                <span className="sap-ctl__meta-key">Track</span>
-                                <span className="sap-ctl__meta-val">{info.title}</span>
-                            </div>
-                            <div className="sap-ctl__meta-row">
-                                <span className="sap-ctl__meta-key">Artist</span>
-                                <span className="sap-ctl__meta-val">{info.artist}</span>
-                            </div>
-                            <div className="sap-ctl__meta-row">
-                                <span className="sap-ctl__meta-key">Length</span>
-                                <span className="sap-ctl__meta-val">
-                                    <AudioTimeText
-                                        value="duration"
-                                        fallback={info.duration}
-                                        placeholder="–:––"
-                                    />
-                                </span>
-                            </div>
-                        </div>
-                        {info.lyrics && (
-                            <>
+                        {playback && (
+                            <Section title="Playback">
+                                <SwitchRow
+                                    icon={<ShuffleIcon />}
+                                    label="Shuffle"
+                                    on={playback.shuffle}
+                                    onToggle={playback.onToggleShuffle}
+                                />
                                 <button
                                     type="button"
                                     className="sap-ctl__row ap-tap"
-                                    onClick={() => setLyricsOpen((v) => !v)}
-                                    aria-expanded={lyricsOpen}
+                                    onClick={playback.onCycleRepeat}
+                                    aria-label={`Repeat: ${playback.repeatMode}. Activate to change.`}
                                 >
                                     <span className="sap-ctl__label">
-                                        <LyricsIcon />
-                                        Lyrics
+                                        {playback.repeatMode === "one" ? (
+                                            <RepeatOneIcon />
+                                        ) : (
+                                            <RepeatIcon />
+                                        )}
+                                        Repeat
+                                    </span>
+                                    <span className="sap-ctl__value">{playback.repeatMode}</span>
+                                </button>
+                                {playback.onToggleAutomix && (
+                                    <SwitchRow
+                                        icon={<AutomixIcon />}
+                                        label="Automix"
+                                        on={playback.automix ?? false}
+                                        onToggle={playback.onToggleAutomix}
+                                    />
+                                )}
+                                {playback.onToggleAutoPlay && (
+                                    <SwitchRow
+                                        icon={<AutoPlayIcon />}
+                                        label="Auto Play"
+                                        on={playback.autoPlay ?? false}
+                                        onToggle={playback.onToggleAutoPlay}
+                                    />
+                                )}
+                            </Section>
+                        )}
+
+                        {queue && (
+                            <Section title="Queue">
+                                <button
+                                    type="button"
+                                    className="sap-ctl__row ap-tap"
+                                    onClick={() => setActiveRoute("library:queue")}
+                                >
+                                    <span className="sap-ctl__label">
+                                        <QueueIcon />
+                                        Up Next
                                     </span>
                                     <span className="sap-ctl__value">
-                                        {lyricsOpen ? "hide" : "show"}
+                                        {queue.count} track{queue.count !== 1 ? "s" : ""}
                                     </span>
                                 </button>
-                                {lyricsOpen && <KaraokeLyrics lyrics={info.lyrics} />}
-                            </>
+                            </Section>
                         )}
-                    </Section>
-                )}
 
-                {share && (
-                    <Section title="Share">
-                        <button
-                            type="button"
-                            className="sap-ctl__row ap-tap"
-                            onClick={share.onShare}
-                        >
-                            <span className="sap-ctl__label">
-                                {share.copied ? <CheckIcon /> : <ShareIcon />}
-                                Share
-                            </span>
-                            {share.copied && <span className="sap-ctl__value">copied</span>}
-                        </button>
-                    </Section>
-                )}
+                        {info && (
+                            <Section title="Info">
+                                <div className="sap-ctl__meta">
+                                    <div className="sap-ctl__meta-row">
+                                        <span className="sap-ctl__meta-key">Track</span>
+                                        <span className="sap-ctl__meta-val">{info.title}</span>
+                                    </div>
+                                    <div className="sap-ctl__meta-row">
+                                        <span className="sap-ctl__meta-key">Artist</span>
+                                        <span className="sap-ctl__meta-val">{info.artist}</span>
+                                    </div>
+                                    <div className="sap-ctl__meta-row">
+                                        <span className="sap-ctl__meta-key">Length</span>
+                                        <span className="sap-ctl__meta-val">
+                                            <AudioTimeText
+                                                value="duration"
+                                                fallback={info.duration}
+                                                placeholder="–:––"
+                                            />
+                                        </span>
+                                    </div>
+                                </div>
+                                {info.lyrics && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            className="sap-ctl__row ap-tap"
+                                            onClick={() => setLyricsOpen((v) => !v)}
+                                            aria-expanded={lyricsOpen}
+                                        >
+                                            <span className="sap-ctl__label">
+                                                <LyricsIcon />
+                                                Lyrics
+                                            </span>
+                                            <span className="sap-ctl__value">
+                                                {lyricsOpen ? "hide" : "show"}
+                                            </span>
+                                        </button>
+                                        {lyricsOpen && <KaraokeLyrics lyrics={info.lyrics} />}
+                                    </>
+                                )}
+                            </Section>
+                        )}
 
-                {waveform && (
-                    <Section title="Visual">
-                        <SwitchRow
-                            icon={<WaveIcon />}
-                            label="Show Waveform"
-                            on={waveform.enabled}
-                            onToggle={waveform.onToggle}
-                        />
-                    </Section>
-                )}
-
-                {pluginNames && pluginNames.length > 0 && (
-                    <Section title="Plugins">
-                        <ul className="sap-ctl__plugins">
-                            {pluginNames.map((name) => (
-                                <li key={name} className="sap-ctl__plugin">
+                        {share && (
+                            <Section title="Share">
+                                <button
+                                    type="button"
+                                    className="sap-ctl__row ap-tap"
+                                    onClick={share.onShare}
+                                >
                                     <span className="sap-ctl__label">
-                                        <PluginIcon />
-                                        {name}
+                                        {share.copied ? <CheckIcon /> : <ShareIcon />}
+                                        Share
                                     </span>
-                                    <span className="sap-ctl__value">active</span>
-                                </li>
-                            ))}
-                        </ul>
-                    </Section>
+                                    {share.copied && <span className="sap-ctl__value">copied</span>}
+                                </button>
+                            </Section>
+                        )}
+
+                        {waveform && (
+                            <Section title="Visual">
+                                <SwitchRow
+                                    icon={<WaveIcon />}
+                                    label="Show Waveform"
+                                    on={waveform.enabled}
+                                    onToggle={waveform.onToggle}
+                                />
+                            </Section>
+                        )}
+
+                        {pluginNames && pluginNames.length > 0 && (
+                            <Section title="Plugins">
+                                <ul className="sap-ctl__plugins">
+                                    {pluginNames.map((name) => (
+                                        <li key={name} className="sap-ctl__plugin">
+                                            <span className="sap-ctl__label">
+                                                <PluginIcon />
+                                                {name}
+                                            </span>
+                                            <span className="sap-ctl__value">active</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </Section>
+                        )}
+                    </>
                 )}
             </div>
         </div>,

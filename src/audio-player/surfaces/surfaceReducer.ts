@@ -2,10 +2,14 @@ import { faceSupportsHeroCollapse, faceSupportsSEICanvas } from "./faceCapabilit
 import type { PlayerFace } from "./faceCapabilities"
 
 /**
- * The three states a player surface region can be in. Only one is ever active —
- * opening one surface closes the other by construction (a single `mode` field).
+ * The states a player surface region can be in.
+ *
+ * There is exactly one optional surface: the SEICanvas. The queue used to be a
+ * second in-region surface; it now lives inside the "…" controller
+ * (`library:queue`) like every other destination, so nothing here competes with
+ * the controller for the same content.
  */
-export type PlayerSurfaceMode = "default" | "canvas" | "queue"
+export type PlayerSurfaceMode = "default" | "canvas"
 
 export interface SurfaceState {
     mode: PlayerSurfaceMode
@@ -13,7 +17,6 @@ export interface SurfaceState {
 
 export type SurfaceAction =
     | { type: "toggleCanvas" }
-    | { type: "toggleQueue" }
     | { type: "open"; mode: Exclude<PlayerSurfaceMode, "default"> }
     | { type: "close" }
 
@@ -37,9 +40,6 @@ export function surfaceReducer(
         case "toggleCanvas":
             if (!canEnterCanvas(face)) return state
             return { mode: state.mode === "canvas" ? "default" : "canvas" }
-        case "toggleQueue":
-            // Queue is available on every face.
-            return { mode: state.mode === "queue" ? "default" : "queue" }
         case "open":
             if (action.mode === "canvas" && !canEnterCanvas(face)) return state
             // Preserve referential equality when nothing changes so consumers

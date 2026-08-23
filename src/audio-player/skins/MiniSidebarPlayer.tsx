@@ -1,3 +1,4 @@
+import { useCallback, useMemo, useState } from "react"
 import type { CSSProperties } from "react"
 import type { AudioPlayerTheme, MediaSource } from "../types"
 import { useAudioSession } from "../session/AudioSessionContext"
@@ -6,7 +7,9 @@ import { buildThemeVars } from "./themeVars"
 import { PauseIcon, PlayIcon, SpinnerIcon } from "./icons"
 import { usePlayerSurface } from "../surfaces/usePlayerSurface"
 import { PlayerSurfaceButtons } from "../surfaces/PlayerSurfaceButtons"
-import { QueueSurface } from "../surfaces/QueueSurface"
+import { SAPController } from "../components/SAPController"
+import { useShareTrack } from "../components/useShareTrack"
+import type { WorkspaceRoute } from "../components/workspace/workspaceRoutes"
 import { ExplicitBadge } from "../components/TrackMetadata"
 import { formatSecondaryLine, formatVersionedTitle } from "../utils/formatMetadata"
 import "./skins.css"
@@ -30,14 +33,14 @@ export interface MiniSidebarPlayerProps extends AudioPlayerTheme {
  * playing.
  *
  * Capability-driven (`PLAYER_FACE_CAPABILITIES.miniSidebar`, CompactPlayer
- * family): a compact face. `supportsSEICanvas: false`, so the canvas zone and its
- * left surface button are auto-hidden. `supportsScrubberCanvas: false` — the mini
- * mounts **no** scrubber; seeking lives on the shared StickyBottom master. It is
- * the only compact face with the contextual radial menu
- * (`supportsContextualActions`), which is also where skip/next now live (via
- * `showTransport`) — freeing the row for title/artist instead of a Next button.
- * `PlayerSurfaceButtons` reads the capability flags from the model, so passing
- * `surface` plus the transport wiring yields the correct menu.
+ * family): a compact face. `supportsSEICanvas: false`, so the canvas zone, its
+ * left surface button, and the menu's Canvas leaf are all filtered out — the one
+ * capability this face genuinely lacks. `supportsScrubberCanvas: false` — the
+ * mini mounts **no** scrubber; seeking lives on the shared StickyBottom master.
+ *
+ * Everything else is the shared contract: the same canonical action menu as every
+ * other music face, opening the same SAPController workspaces. Skip/next live in
+ * that menu (Playback › Previous / Next), freeing the row for title/artist.
  */
 export function MiniSidebarPlayer({
     art = "linear-gradient(135deg,#7C5CFF,#22D3A6)",
@@ -48,9 +51,36 @@ export function MiniSidebarPlayer({
 }: MiniSidebarPlayerProps) {
     const s = useAudioSession()
     const surface = usePlayerSurface("miniSidebar")
+    const [controllerOpen, setControllerOpen] = useState(false)
+    const [controllerRoute, setControllerRoute] = useState<WorkspaceRoute>("options")
     // New media wins; gradient/url `art` remains the fallback.
     const blockArt = resolveMedia({ media: artMedia, legacyCss: art })
     const { currentTrack, isPlaying, isBuffering, hasAudio } = s
+
+    const { share, copied: shareCopied } = useShareTrack(
+        currentTrack?.title ?? "",
+        currentTrack?.artist ?? ""
+    )
+
+    // The radial menu and the controller are one system: a settings action opens
+    // this face's single SAPController on that action's route.
+    const handleOpenFocusedController = useCallback((route: WorkspaceRoute) => {
+        setControllerRoute(route)
+        setControllerOpen(true)
+    }, [])
+    const handleCloseController = useCallback(() => {
+        setControllerOpen(false)
+        setControllerRoute("options")
+    }, [])
+
+    const menuCommands = useMemo(
+        () => ({
+            "track.previous": s.previous,
+            "track.next": s.next,
+            ...(currentTrack ? { "share.url": share } : {}),
+        }),
+        [s.previous, s.next, currentTrack, share]
+    )
     const msTitle = currentTrack
         ? formatVersionedTitle(currentTrack.title, currentTrack.versionLabel)
         : "Nothing playing"
@@ -98,21 +128,52 @@ export function MiniSidebarPlayer({
                     {isBuffering ? <SpinnerIcon /> : isPlaying ? <PauseIcon /> : <PlayIcon />}
                 </button>
                 {/* Canvas button auto-hidden (mini doesn't support SEICanvas).
-                    Skip/next live inside the radial menu (`showTransport`) so the
-                    row keeps room for title/artist instead of an inline Next. */}
+                    Skip/next live inside the radial menu (Playback › Previous /
+                    Next) so the row keeps room for title/artist. */}
                 <PlayerSurfaceButtons
                     surface={surface}
-                    showTransport
+                    activePluginIds={s.pluginNames}
+                    commands={menuCommands}
                     canPrevious={s.canPrevious}
                     canNext={s.canNext}
-                    onPrevious={s.previous}
-                    onNext={s.next}
+                    onOpenFocusedController={handleOpenFocusedController}
                 />
             </div>
 
-            <div className="ap-ms__surface" data-open={surface.isQueueOpen ? "true" : "false"}>
-                {surface.isQueueOpen && <QueueSurface maxItems={6} />}
-            </div>
+            {/* The single controller instance every action on this face opens. */}
+            <SAPController
+                open={controllerOpen}
+                onClose={handleCloseController}
+                route={controllerRoute}
+                playback={{
+                    shuffle: s.shuffle,
+                    onToggleShuffle: s.toggleShuffle,
+                    repeatMode: s.repeatMode,
+                    onCycleRepeat: s.cycleRepeat,
+                    automix: s.automix,
+                    onToggleAutomix: s.toggleAutomix,
+                }}
+                queue={{
+                    count: s.queue.length,
+                    tracks: s.queue,
+                    currentIndex: s.currentIndex,
+                    isPlaying,
+                    onPlayTrack: s.playTrack,
+                    onRemove: s.removeFromQueue,
+                }}
+                info={
+                    currentTrack
+                        ? {
+                              title: currentTrack.title ?? "",
+                              artist: currentTrack.artist ?? "",
+                              duration: s.duration,
+                              lyrics: currentTrack.lyrics,
+                          }
+                        : undefined
+                }
+                share={currentTrack ? { onShare: share, copied: shareCopied } : undefined}
+                {...theme}
+            />
         </div>
     )
 }

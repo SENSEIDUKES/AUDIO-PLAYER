@@ -219,21 +219,6 @@
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-/* "soon" badge for coming-soon nodes. */
-.sac__badge {
-    position: absolute;
-    top: -4px;
-    right: 2px;
-    padding: 1px 6px;
-    border-radius: 999px;
-    font-size: 9px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--ap-bg, #14141c);
-    background-color: color-mix(in srgb, var(--ap-text, #fff) 70%, transparent);
-}
-
 /* ------------------------------- States ------------------------------- */
 .sac__node--active .sac__node-icon {
     background-color: color-mix(in srgb, var(--ap-accent, #fff) 22%, transparent);
@@ -243,10 +228,6 @@
         0 0 0 1px var(--ap-accent, #fff),
         0 0 18px color-mix(in srgb, var(--ap-accent, #fff) 45%, transparent);
 }
-.sac__node--inactive .sac__node-icon {
-    opacity: 0.7;
-    filter: grayscale(0.3);
-}
 .sac__node--disabled .sac__node-icon {
     opacity: 0.4;
     filter: grayscale(0.8);
@@ -255,12 +236,7 @@
     opacity: 0.5;
     border-style: dashed; /* distinct entitlement-gated look */
 }
-.sac__node--coming-soon .sac__node-icon {
-    opacity: 0.5;
-    filter: saturate(0.5);
-}
 .sac__node--disabled,
-.sac__node--coming-soon,
 .sac__node--locked {
     pointer-events: none;
     cursor: default;

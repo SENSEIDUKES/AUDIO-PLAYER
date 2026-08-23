@@ -46,34 +46,36 @@ export type { ArcAction, ArcActionButtonProps } from "./ArcActionButton"
 export {
     resolveArcActionState,
     isArcActionLive,
+    hasRequiredCapabilities,
     pruneDeadArcActions,
+    collectArcLeaves,
+    describeArcRoutes,
     routeArcAction,
 } from "../menu/arcRouting"
-export type { ArcActionTarget, ArcCommandId, ArcCommandHost } from "../menu/arcRouting"
-
-export { buildVaultTrackArcActions } from "../menu/vaultTrackMenu"
 export type {
-    VaultTrackEntitlements,
-    BuildVaultTrackArcActionsOptions,
-} from "../menu/vaultTrackMenu"
+    ArcActionTarget,
+    ArcCommandId,
+    ArcCommandHost,
+    ArcRouteDescriptor,
+    PlayerActionCapability,
+} from "../menu/arcRouting"
 
 export {
-    buildStandardTrackArcActions,
+    buildCanonicalPlayerActions,
     buildPluginsArcBranch,
     buildPlaybackArcBranch,
+    buildQueueArcBranch,
     buildShareArcBranch,
     buildAgentsArcBranch,
-} from "../menu/standardArcActions"
-export type { BuildStandardArcActionsOptions } from "../menu/standardArcActions"
-
-export { buildMenuTree, isNodeInteractive } from "../menu/menuData"
+    buildVaultArcBranch,
+} from "../menu/canonicalActions"
 export type {
-    MenuNode,
-    MenuItemState,
-    MenuActionId,
     ArcMenuEntitlements,
-    BuildMenuTreeOptions,
-} from "../menu/menuData"
+    BuildCanonicalPlayerActionsOptions,
+} from "../menu/canonicalActions"
+
+export { isNodeInteractive } from "../menu/menuData"
+export type { MenuNode, MenuItemState } from "../menu/menuData"
 
 export { SEICanvasHost } from "./SEICanvasHost"
 export type { SEICanvasHostProps } from "./SEICanvasHost"
