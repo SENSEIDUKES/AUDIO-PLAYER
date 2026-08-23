@@ -47,32 +47,44 @@ The player currently supports:
 
 ## Install in another app
 
-The package name is **`@seihouse/audio-player`**, but it is not currently
-published to the public npm registry. Install it from the canonical GitHub
-repository or use a local link while developing.
+**Public npm package:** [@seihouse/audio-player](https://www.npmjs.com/package/@seihouse/audio-player)
 
-### Install from GitHub
+Use the published npm release in every app. It gives each integration a
+versioned dependency and a lockfile-backed upgrade path; do not point a
+production app at the moving `main` branch.
 
-From the consuming app:
+### Install or update
 
 ```bash
-npm install github:SENSEIDUKES/AUDIO-PLAYER#main
+npm install @seihouse/audio-player
 ```
 
-Or declare the dependency explicitly:
+For an existing app, move to the newest published release:
 
-```json
-{
-  "dependencies": {
-    "@seihouse/audio-player": "github:SENSEIDUKES/AUDIO-PLAYER#main"
-  }
-}
+```bash
+npm install @seihouse/audio-player@latest
 ```
 
-Git installations run this repository's `prepare` lifecycle, which builds the
-library before npm installs it. See the
+Commit the resulting `package.json` and lockfile together. To confirm what an
+app resolved:
+
+```bash
+npm ls @seihouse/audio-player
+```
+
+### Pin a release when needed
+
+Use `@latest` for normal upgrades. When an app needs a deliberately reviewed,
+fully reproducible release, pin its published version instead:
+
+```bash
+npm install --save-exact @seihouse/audio-player@<version>
+```
+
+Git and local-link installs are reserved for testing **unreleased** player
+changes. See the
 [distribution and publishing guide](https://github.com/SENSEIDUKES/AUDIO-PLAYER/blob/main/PUBLISHING_GUIDE.md)
-for the supported Git, local-link, and future registry-release workflows.
+for those development workflows and the release-owner process.
 
 ### Use it in React
 
@@ -100,9 +112,6 @@ export function PlayerExample() {
 
 A track needs `title`, `artist`, and either `audioFile` or `sources`. Use a
 stable `id` whenever possible so the player can reliably distinguish tracks.
-
-To pin a Git installation reproducibly, replace `main` with a verified commit
-SHA. Do not reference a version tag until that tag exists in this repository.
 
 ### Managed offline or private sources
 

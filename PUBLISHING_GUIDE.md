@@ -8,55 +8,54 @@ This document describes the current distribution contract for
 - The package name is `@seihouse/audio-player`.
 - The canonical source repository is
   `https://github.com/SENSEIDUKES/AUDIO-PLAYER.git`.
-- The package is published to the npm registry as a **private** package under
-  the `@seihouse` scope. It is not publicly readable. `@seihouse` is a scope, not
-  a membership group: install access belongs to the package owner plus any
-  explicit collaborators, or — where the scope is backed by an npm organization —
-  to the teams granted read access on the package.
+- The package is publicly installable from the npm registry:
+  [@seihouse/audio-player](https://www.npmjs.com/package/@seihouse/audio-player).
+  A scoped package name does not make a package private.
 - The package is proprietary (`UNLICENSED`), so a registry release requires
-  explicit release-owner approval.
-- `publishConfig.access` is set to `restricted` in `package.json`, so a publish
-  defaults to private. A command-line `--access` flag still takes precedence over
-  `publishConfig`, so never pass `--access public` for this package.
+  explicit release-owner approval. Public registry availability does not change
+  the license or grant rights beyond the included `LICENSE`.
+- `publishConfig.access` is set to `public` in `package.json`, keeping future
+  releases aligned with the public package.
 - Consumers may import the package root and
   `@seihouse/audio-player/styles.css`. No source-directory deep import is a
   supported package contract.
 
-## Install from the private npm registry
+## Install from npm
 
-The package is private, so a consumer must authenticate as a member of the
-`@seihouse` scope before installing:
+The public package needs no npm login, access token, or special `.npmrc`
+configuration in a consuming app:
 
 ```bash
 npm install @seihouse/audio-player
 ```
 
-Authenticate either interactively with `npm login`, or in CI with a granular
-access token carrying read-only permissions on this package (or the `@seihouse`
-scope), supplied through the environment:
+## Update an npm consumer
 
-```ini
-# .npmrc in the consumer repository — commit this file, it contains no secret
-@seihouse:registry=https://registry.npmjs.org/
-//registry.npmjs.org/:_authToken=${NPM_TOKEN}
+Install the newest published release:
+
+```bash
+npm install @seihouse/audio-player@latest
 ```
 
-Set `NPM_TOKEN` as a CI secret. npm removed legacy (classic and automation)
-access tokens in November 2025, so a granular access token is the only supported
-credential for installing a private package in CI. Never commit a literal token
-value, and never write a resolved token into a checked-in `.npmrc`. This repository's own
-`.gitignore` excludes `.npmrc` for that reason.
+Review the public API and release changes, then commit the resulting
+`package.json` and lockfile update together. For a deliberately pinned
+release, set an exact published version:
 
-## Install from GitHub
+```bash
+npm install --save-exact @seihouse/audio-player@<version>
+```
 
-For an internal consumer that should follow the current main branch:
+## Install unreleased code from Git
+
+Use a Git dependency only when testing player work that has not been published
+to npm. Normal app integrations should use the npm release above.
 
 ```bash
 npm install github:SENSEIDUKES/AUDIO-PLAYER#main
 ```
 
-For a reproducible consumer, pin a reviewed commit SHA instead of a moving
-branch:
+For an unreleased test that must be reproducible, pin a reviewed commit SHA
+instead of a moving branch:
 
 ```json
 {
@@ -176,7 +175,7 @@ was made from the CLI.
 - npm **11.5.1 or later**. Node 22 ships npm 10.x, which predates OIDC support,
   so the workflow upgrades npm before touching the registry.
 - No `--provenance` flag: trusted publishing attests provenance automatically.
-- No `--access` flag: `publishConfig.access` keeps the release `restricted`.
+- No `--access` flag: `publishConfig.access` keeps the release public.
 
 ### Manual fallback
 
@@ -187,9 +186,9 @@ CLI on a clean, reviewed commit:
 npm publish
 ```
 
-`publishConfig.access` is `restricted`, so no `--access` flag is needed and the
-release stays private. Never pass `--access public` — that would make a
-proprietary package world-readable and cannot be undone by republishing.
+`publishConfig.access` is `public`, so no `--access` flag is needed. Do not
+override it with `--access restricted`; releases should remain aligned with the
+public npm package.
 
 Note that npm stopped issuing TOTP (authenticator app) enrollments for accounts
 created after September 2025, and the npm CLI cannot complete a passkey or
@@ -210,11 +209,11 @@ README and license. Run `npm pack --dry-run` to inspect the exact artifact for
 the current build. Do not assume a fixed asset list or bundle size; code-split
 worker names and their hashes are build outputs.
 
-## Updating a Git consumer
+## Refreshing an unreleased Git consumer
 
-For a branch-tracking consumer, refresh the moving Git reference explicitly
-after the upstream ref changes. This updates the resolved commit in
-`package-lock.json` when the consumer uses one:
+Only a consumer testing unpublished work should track a Git ref. Refresh the
+moving reference explicitly after the upstream ref changes; this updates the
+resolved commit in `package-lock.json` when the consumer uses one:
 
 ```bash
 npm install github:SENSEIDUKES/AUDIO-PLAYER#main
