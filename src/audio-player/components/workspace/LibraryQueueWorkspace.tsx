@@ -24,8 +24,10 @@ export interface WorkspaceQueueState {
 
 export function LibraryQueueWorkspace({ queue }: { queue?: WorkspaceQueueState }) {
     // A host that routes here without wiring the queue gets an honest empty
-    // panel rather than a dead list.
-    if (!queue || queue.tracks.length === 0) {
+    // panel rather than a dead list. This is a public entry point, so a
+    // snapshot missing `tracks` entirely (an untyped plain-JS host) reads as
+    // empty instead of throwing inside the controller sheet.
+    if (!queue?.tracks?.length) {
         return (
             <div className="sap-ctl__workspace-empty">
                 <p className="sap-ctl__workspace-lead">Up Next</p>
@@ -44,7 +46,11 @@ export function LibraryQueueWorkspace({ queue }: { queue?: WorkspaceQueueState }
                     const artist = track.artist ?? "Unknown Artist"
                     return (
                         <li
-                            key={track.id ?? `${title}-${index}`}
+                            // The queue may legitimately hold the same track
+                            // twice (Queue › Play Later on a track already
+                            // queued), so the position is part of the identity —
+                            // an id alone would collide.
+                            key={`${track.id ?? title}-${index}`}
                             className={`sap-ctl__queue-item${
                                 isCurrent ? " sap-ctl__queue-item--current" : ""
                             }`}
