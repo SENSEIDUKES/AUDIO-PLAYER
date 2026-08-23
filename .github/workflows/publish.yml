@@ -53,8 +53,8 @@ jobs:
             - name: Run quality gates
               run: npm test
 
-            # `publishConfig.access` is `restricted`, so this stays private, and
-            # provenance is attested automatically under trusted publishing.
+            # `publishConfig.access` is `public`, and provenance is attested
+            # automatically under trusted publishing.
             # Passing a token here would defeat the point — there is none.
             - name: Publish package
               run: npm publish
