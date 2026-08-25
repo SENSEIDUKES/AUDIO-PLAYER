@@ -101,6 +101,12 @@
     .ap-glass-surface--compact {
         --ap-mat-scrim: rgba(12, 14, 22, 0.48);
     }
+    /* Transport buttons lose the frost too: lift the neutral glass fill so
+       the controls stay legible and separated from a bright surface. */
+    .ap-btn--ghost,
+    .ap-btn--play {
+        --ap-btn-no-blur-lift: 14%;
+    }
 }
 
 .ap-sr-only {
@@ -441,52 +447,123 @@
     cursor: not-allowed;
     opacity: 0.5;
 }
-/* Premium glass treatment: a raised, dimensional control instead of a flat
-   icon printed on the surface color. A tinted glass fill (not transparent)
-   plus an inner highlight + soft outer shadow read as a physical button on
-   any surface color, bright or dark. */
+/* Premium "liquid glass" treatment: a raised, dimensional control instead of
+   a flat icon printed on the surface color. The glass body is near-neutral —
+   a whisper of white, not an accent-dyed disc — so the theme hue is *caught
+   through* the frosted blur (and echoed by the icon/rim tail) rather than
+   painted on. The border itself is a light gradient (bright top-left rim
+   fading to a faint accent edge) painted in the border box; the sheen + fill
+   layers are clipped to the padding box. Inner highlight + bottom shade +
+   soft ambient drop read as a physical lens on any surface, bright or dark.
+   No ::after/::before decorations: coarse-pointer hit area owns ::after. */
 .ap-btn--ghost {
     width: 40px;
     height: 40px;
-    border: 1.5px solid color-mix(in srgb, var(--ap-accent) 50%, transparent);
-    background-color: color-mix(
-        in srgb,
-        var(--ap-accent) calc(18% + var(--ap-btn-opacity-delta, 0%)),
-        transparent
-    );
+    border: 1px solid transparent;
+    background-image:
+        /* Directional sheen — light striking the top of the lens. */
+        linear-gradient(
+            165deg,
+            rgba(255, 255, 255, 0.3),
+            rgba(255, 255, 255, 0.05) 48%,
+            transparent 72%
+        ),
+        /* Neutral glass fill. */
+        linear-gradient(
+                color-mix(
+                    in srgb,
+                    #fff calc(8% + var(--ap-btn-opacity-delta, 0%) + var(--ap-btn-no-blur-lift, 0%)),
+                    transparent
+                ),
+                color-mix(
+                    in srgb,
+                    #fff calc(6% + var(--ap-btn-opacity-delta, 0%) + var(--ap-btn-no-blur-lift, 0%)),
+                    transparent
+                )
+            ),
+        /* Gradient rim: bright top-left, fading to a whisper of accent. */
+        linear-gradient(
+                160deg,
+                rgba(255, 255, 255, 0.55),
+                rgba(255, 255, 255, 0.1) 42%,
+                color-mix(in srgb, var(--ap-accent) 30%, transparent)
+            );
+    background-clip: padding-box, padding-box, border-box;
+    background-origin: padding-box, padding-box, border-box;
     color: var(--ap-accent);
-    /* Top highlight + bottom inner shadow = a bevel; the hairline outer ring
-       separates the control from a same-color surface; the soft drop lifts it. */
+    /* Crisp top highlight + bottom inner shade = a lens bevel; the hairline
+       outer ring separates the control from a same-color surface; the soft
+       ambient drop lifts it. */
     box-shadow:
-        inset 0 1px 0.5px rgba(255, 255, 255, 0.35),
-        inset 0 -2px 3px rgba(0, 0, 0, 0.14),
-        0 0 0 0.5px rgba(0, 0, 0, 0.05),
-        0 3px 8px -2px rgba(0, 0, 0, 0.22);
-    /* Saturate keeps the accent tint vivid through the frosted fill. */
-    -webkit-backdrop-filter: blur(10px) saturate(140%);
-    backdrop-filter: blur(10px) saturate(140%);
+        inset 0 1px 0 rgba(255, 255, 255, 0.45),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.16),
+        0 0 0 0.5px rgba(0, 0, 0, 0.06),
+        0 4px 12px -4px rgba(0, 0, 0, 0.32);
+    /* Deeper frost: the saturate boost keeps the hue caught through the
+       glass vivid instead of muddy. */
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    backdrop-filter: blur(14px) saturate(160%);
 }
 .ap-btn--ghost:hover:not(:disabled) {
-    background-color: color-mix(
-        in srgb,
-        var(--ap-accent) calc(28% + var(--ap-btn-opacity-delta, 0%)),
-        transparent
-    );
-    border-color: color-mix(in srgb, var(--ap-accent) 72%, transparent);
+    background-image:
+        linear-gradient(
+            165deg,
+            rgba(255, 255, 255, 0.38),
+            rgba(255, 255, 255, 0.08) 48%,
+            transparent 72%
+        ),
+        linear-gradient(
+            color-mix(
+                in srgb,
+                #fff calc(14% + var(--ap-btn-opacity-delta, 0%) + var(--ap-btn-no-blur-lift, 0%)),
+                transparent
+            ),
+            color-mix(
+                in srgb,
+                #fff calc(11% + var(--ap-btn-opacity-delta, 0%) + var(--ap-btn-no-blur-lift, 0%)),
+                transparent
+            )
+        ),
+        linear-gradient(
+            160deg,
+            rgba(255, 255, 255, 0.7),
+            rgba(255, 255, 255, 0.14) 42%,
+            color-mix(in srgb, var(--ap-accent) 42%, transparent)
+        );
     box-shadow:
-        inset 0 1px 0.5px rgba(255, 255, 255, 0.42),
-        inset 0 -2px 3px rgba(0, 0, 0, 0.14),
-        0 0 0 0.5px rgba(0, 0, 0, 0.05),
-        0 5px 13px -3px rgba(0, 0, 0, 0.3);
+        inset 0 1px 0 rgba(255, 255, 255, 0.55),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.16),
+        0 0 0 0.5px rgba(0, 0, 0, 0.06),
+        0 6px 16px -5px rgba(0, 0, 0, 0.38);
 }
 .ap-btn--ghost:active:not(:disabled) {
-    background-color: color-mix(
-        in srgb,
-        var(--ap-accent) calc(22% + var(--ap-btn-opacity-delta, 0%)),
-        transparent
-    );
+    background-image:
+        linear-gradient(
+            165deg,
+            rgba(255, 255, 255, 0.18),
+            rgba(255, 255, 255, 0.03) 48%,
+            transparent 72%
+        ),
+        linear-gradient(
+            color-mix(
+                in srgb,
+                #fff calc(6% + var(--ap-btn-opacity-delta, 0%) + var(--ap-btn-no-blur-lift, 0%)),
+                transparent
+            ),
+            color-mix(
+                in srgb,
+                #fff calc(4% + var(--ap-btn-opacity-delta, 0%) + var(--ap-btn-no-blur-lift, 0%)),
+                transparent
+            )
+        ),
+        linear-gradient(
+            160deg,
+            rgba(255, 255, 255, 0.35),
+            rgba(255, 255, 255, 0.06) 42%,
+            color-mix(in srgb, var(--ap-accent) 22%, transparent)
+        );
     box-shadow:
-        inset 0 2px 4px rgba(0, 0, 0, 0.28),
+        inset 0 2px 5px rgba(0, 0, 0, 0.28),
         0 1px 2px rgba(0, 0, 0, 0.12);
 }
 .ap-btn--sm {
@@ -500,58 +577,113 @@
 .ap-btn--play {
     width: 60px;
     height: 60px;
-    /* See-through glass body like the other transport controls — the accent
-       reads through a frosted tint rather than a solid fill, and an accent
-       glow (below) does the work of marking it as the primary control. */
-    border: 1px solid color-mix(in srgb, var(--ap-accent) 60%, transparent);
-    background-color: color-mix(
-        in srgb,
-        var(--ap-accent) calc(24% + var(--ap-btn-opacity-delta, 0%)),
-        transparent
-    );
-    background-image: linear-gradient(
-        165deg,
-        rgba(255, 255, 255, 0.32),
-        rgba(255, 255, 255, 0.04) 52%,
-        transparent 74%
-    );
+    /* Same neutral liquid-glass recipe as the ghost buttons, one notch
+       brighter: the primary control catches more light (stronger sheen +
+       rim) and an accent glow (below, scaled by --ap-glow-intensity) marks
+       it as primary. The gradient rim does the job the old 1px accent ring
+       shadow did, so the ring layer is gone from the shadow stack. */
+    border: 1px solid transparent;
+    background-image:
+        linear-gradient(
+            165deg,
+            rgba(255, 255, 255, 0.34),
+            rgba(255, 255, 255, 0.06) 50%,
+            transparent 74%
+        ),
+        linear-gradient(
+            color-mix(
+                in srgb,
+                #fff calc(12% + var(--ap-btn-opacity-delta, 0%) + var(--ap-btn-no-blur-lift, 0%)),
+                transparent
+            ),
+            color-mix(
+                in srgb,
+                #fff calc(9% + var(--ap-btn-opacity-delta, 0%) + var(--ap-btn-no-blur-lift, 0%)),
+                transparent
+            )
+        ),
+        linear-gradient(
+            160deg,
+            rgba(255, 255, 255, 0.6),
+            rgba(255, 255, 255, 0.12) 42%,
+            color-mix(in srgb, var(--ap-accent) 40%, transparent)
+        );
+    background-clip: padding-box, padding-box, border-box;
+    background-origin: padding-box, padding-box, border-box;
     /* Accent icon (not --ap-play-icon): a dark icon can't be read on a
        translucent body, and this matches the accent icons of the other
        transport buttons. */
     color: var(--ap-accent);
-    -webkit-backdrop-filter: blur(10px) saturate(170%);
-    backdrop-filter: blur(10px) saturate(170%);
+    -webkit-backdrop-filter: blur(16px) saturate(170%);
+    backdrop-filter: blur(16px) saturate(170%);
     box-shadow:
-        inset 0 1px 0.5px rgba(255, 255, 255, 0.4),
-        inset 0 -2px 4px rgba(0, 0, 0, 0.12),
-        0 0 0 1px color-mix(in srgb, var(--ap-accent) 28%, transparent),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.16),
         0 0 calc(12px * var(--ap-glow-intensity, 1)) -2px
             color-mix(in srgb, var(--ap-accent) 40%, transparent),
-        0 6px 16px -6px rgba(0, 0, 0, 0.4);
+        0 6px 18px -6px rgba(0, 0, 0, 0.42);
 }
 .ap-btn--play:hover:not(:disabled) {
-    background-color: color-mix(
-        in srgb,
-        var(--ap-accent) calc(32% + var(--ap-btn-opacity-delta, 0%)),
-        transparent
-    );
-    border-color: color-mix(in srgb, var(--ap-accent) 78%, transparent);
+    background-image:
+        linear-gradient(
+            165deg,
+            rgba(255, 255, 255, 0.42),
+            rgba(255, 255, 255, 0.09) 50%,
+            transparent 74%
+        ),
+        linear-gradient(
+            color-mix(
+                in srgb,
+                #fff calc(18% + var(--ap-btn-opacity-delta, 0%) + var(--ap-btn-no-blur-lift, 0%)),
+                transparent
+            ),
+            color-mix(
+                in srgb,
+                #fff calc(14% + var(--ap-btn-opacity-delta, 0%) + var(--ap-btn-no-blur-lift, 0%)),
+                transparent
+            )
+        ),
+        linear-gradient(
+            160deg,
+            rgba(255, 255, 255, 0.75),
+            rgba(255, 255, 255, 0.16) 42%,
+            color-mix(in srgb, var(--ap-accent) 52%, transparent)
+        );
     box-shadow:
-        inset 0 1px 0.5px rgba(255, 255, 255, 0.48),
-        inset 0 -2px 4px rgba(0, 0, 0, 0.12),
-        0 0 0 1px color-mix(in srgb, var(--ap-accent) 36%, transparent),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.16),
         0 0 calc(20px * var(--ap-glow-intensity, 1)) -1px
             color-mix(in srgb, var(--ap-accent) 50%, transparent),
-        0 9px 22px -6px rgba(0, 0, 0, 0.45);
+        0 9px 24px -6px rgba(0, 0, 0, 0.46);
 }
 .ap-btn--play:active:not(:disabled) {
-    background-color: color-mix(
-        in srgb,
-        var(--ap-accent) calc(28% + var(--ap-btn-opacity-delta, 0%)),
-        transparent
-    );
+    background-image:
+        linear-gradient(
+            165deg,
+            rgba(255, 255, 255, 0.2),
+            rgba(255, 255, 255, 0.04) 50%,
+            transparent 74%
+        ),
+        linear-gradient(
+            color-mix(
+                in srgb,
+                #fff calc(9% + var(--ap-btn-opacity-delta, 0%) + var(--ap-btn-no-blur-lift, 0%)),
+                transparent
+            ),
+            color-mix(
+                in srgb,
+                #fff calc(7% + var(--ap-btn-opacity-delta, 0%) + var(--ap-btn-no-blur-lift, 0%)),
+                transparent
+            )
+        ),
+        linear-gradient(
+            160deg,
+            rgba(255, 255, 255, 0.4),
+            rgba(255, 255, 255, 0.08) 42%,
+            color-mix(in srgb, var(--ap-accent) 30%, transparent)
+        );
     box-shadow:
-        inset 0 2px 5px rgba(0, 0, 0, 0.22),
+        inset 0 2px 5px rgba(0, 0, 0, 0.24),
         0 0 calc(10px * var(--ap-glow-intensity, 1)) -2px
             color-mix(in srgb, var(--ap-accent) 30%, transparent),
         0 2px 6px -2px rgba(0, 0, 0, 0.3);
@@ -564,21 +696,19 @@
     0%,
     100% {
         box-shadow:
-            inset 0 1px 0.5px rgba(255, 255, 255, 0.4),
-            inset 0 -2px 4px rgba(0, 0, 0, 0.12),
-            0 0 0 1px color-mix(in srgb, var(--ap-accent) 28%, transparent),
+            inset 0 1px 0 rgba(255, 255, 255, 0.5),
+            inset 0 -2px 4px rgba(0, 0, 0, 0.16),
             0 0 calc(12px * var(--ap-glow-intensity, 1)) -2px
                 color-mix(in srgb, var(--ap-accent) 40%, transparent),
-            0 6px 16px -6px rgba(0, 0, 0, 0.4);
+            0 6px 18px -6px rgba(0, 0, 0, 0.42);
     }
     50% {
         box-shadow:
-            inset 0 1px 0.5px rgba(255, 255, 255, 0.4),
-            inset 0 -2px 4px rgba(0, 0, 0, 0.12),
-            0 0 0 1px color-mix(in srgb, var(--ap-accent) 32%, transparent),
+            inset 0 1px 0 rgba(255, 255, 255, 0.5),
+            inset 0 -2px 4px rgba(0, 0, 0, 0.16),
             0 0 calc(22px * var(--ap-glow-intensity, 1)) -1px
                 color-mix(in srgb, var(--ap-accent) 55%, transparent),
-            0 6px 16px -6px rgba(0, 0, 0, 0.4);
+            0 6px 18px -6px rgba(0, 0, 0, 0.42);
     }
 }
 
