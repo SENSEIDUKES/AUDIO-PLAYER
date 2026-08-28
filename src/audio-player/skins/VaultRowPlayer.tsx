@@ -157,7 +157,9 @@ export function VaultRowPlayer({
                     className="ap-vr__title"
                     title={formatVersionedTitle(track.title, track.versionLabel)}
                 >
-                    {formatVersionedTitle(track.title, track.versionLabel)}
+                    <span className="ap-vr__title-text">
+                        {formatVersionedTitle(track.title, track.versionLabel)}
+                    </span>
                     {track.explicit && <ExplicitBadge />}
                 </span>
                 <span className="ap-vr__artist" title={formatSecondaryLine(track)}>
@@ -173,7 +175,7 @@ export function VaultRowPlayer({
                 </span>
             )}
             {isPlayingThis && (
-                <span className="ap-eq" aria-hidden="true">
+                <span className="ap-eq ap-vr__eq" aria-hidden="true">
                     <i />
                     <i />
                     <i />

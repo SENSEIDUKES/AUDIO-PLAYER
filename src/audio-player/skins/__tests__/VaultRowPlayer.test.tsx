@@ -80,3 +80,19 @@ describe("VaultRowPlayer — classification color", () => {
         expect(html).toContain("ap-vr__artist-text")
     })
 })
+
+describe("VaultRowPlayer — layout and metadata structure", () => {
+    it("renders title text inside a truncating wrapper span with explicit badge support", () => {
+        const html = render(
+            <VaultRowPlayer
+                track={{ ...TRACK, title: "Forces", versionLabel: "VIP Mix", explicit: true }}
+                number={2}
+            />
+        )
+        expect(html).toContain("ap-vr__title-text")
+        expect(html).toContain("Forces (VIP Mix)")
+        expect(html).toContain("ap-explicit-badge")
+        expect(html).toContain("ap-vr__num")
+        expect(html).toContain("2")
+    })
+})
