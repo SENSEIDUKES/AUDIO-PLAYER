@@ -95,4 +95,18 @@ describe("VaultRowPlayer — layout and metadata structure", () => {
         expect(html).toContain("ap-vr__num")
         expect(html).toContain("2")
     })
+
+    it("applies custom className and style props while preserving theme variables", () => {
+        const html = render(
+            <VaultRowPlayer
+                track={TRACK}
+                className="custom-vault-row"
+                style={{ opacity: 0.9 }}
+                accentColor="#ff0055"
+            />
+        )
+        expect(html).toContain("custom-vault-row")
+        expect(html).toContain("opacity:0.9")
+        expect(html.toLowerCase()).toContain("--ap-accent:#ff0055")
+    })
 })

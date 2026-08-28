@@ -468,6 +468,16 @@
     background-color: color-mix(in srgb, var(--ap-vault-accent, var(--ap-accent)) 22%, transparent);
 }
 
+@media (prefers-reduced-motion: reduce) {
+    .ap-vr,
+    .ap-vr__play,
+    .ap-vr__action,
+    .ap-vr__eq i {
+        transition: none;
+        animation: none;
+    }
+}
+
 /* ----------------------------- Sticky bottom bar ----------------------------- */
 /* The bar is a container; layout lives on __inner (a container can't style
    itself with its own container query). */

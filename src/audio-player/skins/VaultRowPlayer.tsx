@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { memo, useMemo } from "react"
 import type { CSSProperties } from "react"
 import type { AudioPlayerTheme, Track } from "../types"
 import { useAudioSession } from "../session/AudioSessionContext"
@@ -51,6 +51,14 @@ function sameTrack(a: Track, b: Track): boolean {
     return trackKey(a) === trackKey(b)
 }
 
+/** Static capabilities descriptor for VaultRowPlayer to avoid per-render allocations across lists. */
+const VAULT_ROW_CAPABILITIES: ArcCommandHost["capabilities"] = Object.freeze({
+    vault: true,
+    canvas: faceSupportsSEICanvas("vaultRow"),
+})
+
+const SHOW_VAULT_ACTION = faceSupportsAction("vaultRow")
+
 /**
  * A slim Vault list row. Each row controls the shared session: pressing play
  * starts this track in the one global engine (jumping if it's already queued,
@@ -69,7 +77,7 @@ function sameTrack(a: Track, b: Track): boolean {
  * track). Visual identity comes from the track's `vaultCategory` (accent color +
  * status label), not per-row artwork, keeping long lists fast to render.
  */
-export function VaultRowPlayer({
+export const VaultRowPlayer = memo(function VaultRowPlayer({
     track,
     number,
     activePluginIds,
@@ -86,7 +94,11 @@ export function VaultRowPlayer({
     // Engine gates `isBuffering` to active/pending playback; scope it to this
     // row so only the active track's button can spin.
     const isBufferingThis = isActive && s.isBuffering
-    const category = getVaultCategoryMeta(track.vaultCategory)
+    const category = track.vaultCategory ? getVaultCategoryMeta(track.vaultCategory) : undefined
+
+    const versionedTitle = formatVersionedTitle(track.title, track.versionLabel)
+    const secondaryLine = formatSecondaryLine(track)
+
     // The row's built-in immediate commands bind the arc's queue leaves to the
     // shared session for *this* track: Play Next inserts right after the active
     // track, Play Later appends. Host `commands` merge over them, so a host can
@@ -107,25 +119,33 @@ export function VaultRowPlayer({
         () => buildCanonicalPlayerActions({ activePluginIds, entitlements }),
         [activePluginIds, entitlements]
     )
-    // A vault row *is* a vault-managed track, so it declares that capability and
-    // the Vault arm survives filtering here (and only here). It cannot host the
-    // canvas, so the Canvas leaf does not.
-    const rowCapabilities = useMemo(
-        () => ({ vault: true, canvas: faceSupportsSEICanvas("vaultRow") }),
-        []
-    )
-    const showAction = faceSupportsAction("vaultRow")
 
     const handleToggle = () => {
         if (isActive) s.toggle()
         else s.playNow(track)
     }
 
+    const themeVars = useMemo(
+        () => buildThemeVars(theme),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [
+            theme.accentColor,
+            theme.playIconColor,
+            theme.textColor,
+            theme.progressColor,
+            theme.trackColor,
+            theme.backgroundColor,
+            theme.glowColor,
+            theme.glowIntensity,
+            theme.buttonOpacity,
+        ]
+    )
+
     return (
         <div
             className={`ap-vr${isActive ? " ap-vr--active" : ""}${className ? ` ${className}` : ""}`}
             style={{
-                ...buildThemeVars(theme),
+                ...themeVars,
                 ...(category ? ({ "--ap-vault-accent": category.color } as CSSProperties) : {}),
                 ...style,
             }}
@@ -153,20 +173,15 @@ export function VaultRowPlayer({
                 {isBufferingThis ? <SpinnerIcon /> : isPlayingThis ? <PauseIcon /> : <PlayIcon />}
             </button>
             <div className="ap-vr__meta">
-                <span
-                    className="ap-vr__title"
-                    title={formatVersionedTitle(track.title, track.versionLabel)}
-                >
-                    <span className="ap-vr__title-text">
-                        {formatVersionedTitle(track.title, track.versionLabel)}
-                    </span>
+                <span className="ap-vr__title" title={versionedTitle}>
+                    <span className="ap-vr__title-text">{versionedTitle}</span>
                     {track.explicit && <ExplicitBadge />}
                 </span>
-                <span className="ap-vr__artist" title={formatSecondaryLine(track)}>
+                <span className="ap-vr__artist" title={secondaryLine}>
                     {category && (
                         <span className="ap-vr__chip ap-vr__chip--inline">{category.label}</span>
                     )}
-                    <span className="ap-vr__artist-text">{formatSecondaryLine(track)}</span>
+                    <span className="ap-vr__artist-text">{secondaryLine}</span>
                 </span>
             </div>
             {isActive && (
@@ -181,11 +196,11 @@ export function VaultRowPlayer({
                     <i />
                 </span>
             )}
-            {showAction && (
+            {SHOW_VAULT_ACTION && (
                 <ArcActionButton
                     actions={rowActions}
                     commands={rowCommands}
-                    capabilities={rowCapabilities}
+                    capabilities={VAULT_ROW_CAPABILITIES}
                     onOpenWorkspace={onOpenWorkspace}
                     ariaLabel={`Actions for ${track.title}`}
                     className="ap-vr__action"
@@ -193,6 +208,6 @@ export function VaultRowPlayer({
             )}
         </div>
     )
-}
+})
 
 export default VaultRowPlayer
