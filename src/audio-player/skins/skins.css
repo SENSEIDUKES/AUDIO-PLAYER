@@ -261,6 +261,7 @@
     align-items: center;
     gap: 12px;
     width: 100%;
+    min-width: 0;
     padding: 8px 12px;
     border-radius: 10px;
     background-color: var(--ap-bg);
@@ -277,9 +278,8 @@
     transition:
         background-color 0.2s ease,
         border-color 0.2s ease;
-    /* Make the row a query container so its layout adapts to the row's own
-       width (mobile, narrow sidebars), independent of the viewport. */
-    container-type: inline-size;
+    /* Named query container so descendants adapt fluidly to the row's own width. */
+    container: ap-vr / inline-size;
 }
 .ap-vr *,
 .ap-vr *::before,
@@ -303,6 +303,7 @@
     font-size: 13px;
     font-weight: 600;
     opacity: 0.5;
+    flex-shrink: 0;
 }
 .ap-vr__play {
     /* Anchor for the coarse-pointer hit-area pseudo-element. */
@@ -312,15 +313,23 @@
     flex-shrink: 0;
 }
 .ap-vr__meta {
-    flex: 1;
+    flex: 1 1 auto;
     min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 3px;
 }
 .ap-vr__title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
     font-size: 14px;
     font-weight: 600;
+    line-height: 1.3;
+}
+.ap-vr__title-text {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -331,6 +340,7 @@
     gap: 6px;
     min-width: 0;
     font-size: 12px;
+    line-height: 1.3;
 }
 .ap-vr__artist-text {
     min-width: 0;
@@ -344,6 +354,14 @@
     opacity: 0.7;
     font-variant-numeric: tabular-nums;
     flex-shrink: 0;
+}
+.ap-vr__eq {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+.ap-vr__eq i {
+    background-color: var(--ap-vault-accent, var(--ap-accent));
 }
 /* Vault category identity: a labeled pill in the classification color, derived
    from `Track.vaultCategory` (via `--ap-vault-accent`). Replaces the old subtle
@@ -360,6 +378,9 @@
     background-color: color-mix(in srgb, var(--ap-vault-accent, var(--ap-accent)) 16%, transparent);
     border: 1px solid color-mix(in srgb, var(--ap-vault-accent, var(--ap-accent)) 40%, transparent);
 }
+.ap-vr__chip--lead {
+    display: inline-flex;
+}
 /* Two placements for the same chip: a leading pill on wide rows (desktop) and a
    compact inline chip on the artist line for narrow rows (mobile), so the title
    never has to share its line with the chip. Exactly one shows at a time. */
@@ -372,30 +393,85 @@
     flex-shrink: 0;
 }
 
-/* Mobile / narrow rows: give the title + artist the room they need. The leading
-   chip and the row number step aside (the colored rail still signals category,
-   and the chip reappears inline on the artist line); the inline time is dropped
-   since seeking lives on the shared StickyBottom scrubber. */
-@container (max-width: 380px) {
-    .ap-vr {
-        gap: 8px;
-        padding: 8px 10px;
-    }
+/* Tablet / Intermediate widths (400px - 560px): shift the large lead chip
+   inline so title text gets generous breathing room while preserving the
+   track number, play button, and action wheel. */
+@container ap-vr (max-width: 560px) {
     .ap-vr__chip--lead {
         display: none;
     }
     .ap-vr__chip--inline {
         display: inline-flex;
     }
+}
+
+/* Mobile / Narrow containers (max-width: 420px): optimize for compact touch screens.
+   The track number and inline time step aside to maximize title + artist readability;
+   gaps and padding tighten gracefully. Seeking remains on the master transport. */
+@container ap-vr (max-width: 420px) {
+    .ap-vr__chip--inline {
+        font-size: 9.5px;
+        padding: 1px 5px;
+    }
     .ap-vr__num,
     .ap-vr__time {
         display: none;
     }
+    .ap-vr__meta {
+        gap: 2px;
+    }
+    .ap-vr__title {
+        font-size: 13.5px;
+    }
+    .ap-vr__artist {
+        font-size: 11.5px;
+    }
 }
+
+/* Ultra-narrow embeds (sidebars / split-screen < 280px): tighten transport footprint
+   so row fits cleanly down to 220px without overflow. */
+@container ap-vr (max-width: 280px) {
+    .ap-vr__play {
+        width: 32px;
+        height: 32px;
+    }
+    .ap-vr__action.ap-surface-btn {
+        width: 34px;
+        height: 34px;
+    }
+    .ap-vr__title {
+        font-size: 12.5px;
+    }
+    .ap-vr__artist {
+        font-size: 11px;
+    }
+    .ap-vr__eq {
+        display: none;
+    }
+}
+
+/* Viewport-level mobile fallback for narrow screens */
+@media (max-width: 480px) {
+    .ap-vr {
+        gap: 8px;
+        padding: 8px 10px;
+    }
+}
+
 /* The arc trigger adopts the row's classification color when open/active. */
 .ap-vr__action.ap-surface-btn--active {
     border-color: var(--ap-vault-accent, var(--ap-accent));
     background-color: color-mix(in srgb, var(--ap-vault-accent, var(--ap-accent)) 22%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ap-vr,
+    .ap-vr__play,
+    .ap-vr__action,
+    .ap-vr__eq i {
+        transition: none;
+        animation: none;
+    }
 }
 
 /* ----------------------------- Sticky bottom bar ----------------------------- */
@@ -763,10 +839,11 @@
 @media (pointer: coarse) {
     .ap-ms__play::after,
     .ap-vr__play::after,
-    .ap-sea__play::after {
+    .ap-sea__play::after,
+    .ap-vr__action.ap-surface-btn::after {
         content: "";
         position: absolute;
-        inset: -8px;
+        inset: -6px;
     }
 }
 

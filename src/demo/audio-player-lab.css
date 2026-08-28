@@ -2117,7 +2117,7 @@ button#tab-showcase.demo-mode__button--active {
 }
 @media (max-width: 640px) {
     .product-preview {
-        padding: 12px 12px 72px;
+        padding: 12px 12px calc(96px + env(safe-area-inset-bottom, 0px));
     }
     .product-preview__hero {
         padding: 22px 16px;

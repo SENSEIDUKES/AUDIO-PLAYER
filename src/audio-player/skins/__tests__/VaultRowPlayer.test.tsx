@@ -80,3 +80,33 @@ describe("VaultRowPlayer — classification color", () => {
         expect(html).toContain("ap-vr__artist-text")
     })
 })
+
+describe("VaultRowPlayer — layout and metadata structure", () => {
+    it("renders title text inside a truncating wrapper span with explicit badge support", () => {
+        const html = render(
+            <VaultRowPlayer
+                track={{ ...TRACK, title: "Forces", versionLabel: "VIP Mix", explicit: true }}
+                number={2}
+            />
+        )
+        expect(html).toContain("ap-vr__title-text")
+        expect(html).toContain("Forces (VIP Mix)")
+        expect(html).toContain("ap-explicit-badge")
+        expect(html).toContain("ap-vr__num")
+        expect(html).toContain("2")
+    })
+
+    it("applies custom className and style props while preserving theme variables", () => {
+        const html = render(
+            <VaultRowPlayer
+                track={TRACK}
+                className="custom-vault-row"
+                style={{ opacity: 0.9 }}
+                accentColor="#ff0055"
+            />
+        )
+        expect(html).toContain("custom-vault-row")
+        expect(html).toContain("opacity:0.9")
+        expect(html.toLowerCase()).toContain("--ap-accent:#ff0055")
+    })
+})
