@@ -51,7 +51,7 @@ TypeScript signatures live in
 | Narrative engines | `useNarrativeAudio`, `SceneMixEngine`, `createSceneMixEngine`, `OneShotEngine`, `createOneShotEngine` | Narration, ambience, one-shots, and scene-score transitions independent of a visible player skin. |
 | Automix and analysis | `createAutomixPlugin`, `ensureTrackAnalysis`, `ensureProTrackAnalysis`, `planTransition`, `bpmCompatibility` | Progressive crossfades with a conservative fallback when analysis is unavailable. See [`automix.md`](./automix.md). |
 | Headless, surfaces, and visual slots | `useSAPPropGetters`, `useMediaSessionObserver`, `usePlayerSurface`, `VisualSlotsProvider`, `registerVisualComponent`, `PROPERTY_REGISTRY` | Custom controls, canvas/render zones, visual extensions, and editable surface properties. |
-| Player actions and menus | `buildCanonicalPlayerActions`, `ArcActionButton`, `PlayerSurfaceButtons`, `SAPController`, `routeArcAction`, `pruneDeadArcActions`, `describeArcRoutes` | The one action hierarchy every music face shares, and the two surfaces that present it. See [Menu architecture](#menu-architecture). |
+| Player actions and menus | `resolvePlayerMenu`, `PlayerMenuProfile`, `buildVaultTrackArcActions`, `buildStandardTrackArcActions`, `buildCanonicalPlayerActions`, `ArcActionButton`, `SAPController`, `routeArcAction` | Host-owned menu composition over SAP's shared routing. See [Menu architecture](#menu-architecture). |
 | Workspaces and Agent Scout contracts | `WorkspaceShell`, `WORKSPACE_ROUTES`, `AgentQueueDirectorWorkspace`, `AgentScoutRequest`, `AgentScoutResponse` | Host-owned workspace routing and typed Agent Scout client contracts. The server endpoint and credentials are not part of the browser package. |
 | Diagnostics | `ActivityLogProvider`, `useActivityLog`, `ActivityLogPanel`, `ActivityLogWorkspace`, `createActivityLogStore` | Bounded playback/activity diagnostics for host applications. |
 | Shared components and utilities | `ProgressBar`, `VolumeControl`, `WaveformProgress`, `TrackMetadata`, `formatTime`, `trackKey`, `getTrackSources` | Compose a custom UI from the same primitives used by the bundled skins. |
@@ -109,6 +109,52 @@ const actions = buildCanonicalPlayerActions({ activePluginIds })
 `describeArcRoutes(actions)` returns the route matrix — every leaf paired with
 its destination — which is how the tests audit that nothing is dead and nothing
 escapes the contract.
+
+### Who owns what
+
+The routing machinery is SAP's. **What is in the menu is the consuming
+product's.** The canonical hierarchy is the default, not a mandate.
+
+Every face that exposes the radial menu — `FullCardPlayer`, `AudioPlayer`,
+`StickyBottomPlayer`, `MiniSidebarPlayer`, `SeaCardPlayer`, `VaultRowPlayer` —
+takes the same three props:
+
+| Prop | Effect |
+| --- | --- |
+| `actions` | Renders exactly this tree. No canonical category is merged in, appended, or reordered around it. |
+| `menuProfile.categories` | Keeps the canonical arms, but only these, in this order. |
+| `menuProfile.extraActions` | Keeps the canonical arms and adds yours (`placement: "append" \| "prepend"`). |
+
+Omit all three and the face renders SAP's canonical hierarchy, unchanged.
+
+```tsx
+// A product shipping its own categories:
+<VaultRowPlayer track={track} actions={buildVaultTrackArcActions()} … />
+
+// Or keeping SAP's, minus the ones this surface has no use for:
+<FullCardPlayer menuProfile={{ categories: ["playback", "queue", "share"] }} />
+
+// Or SAP's plus your own:
+<SeaCardPlayer
+    track={track}
+    menuProfile={{ extraActions: [buyArm] }}
+    commands={{ "commerce.buy": openCheckout }}
+/>
+```
+
+Host trees are not second-class: they go through the same router, the same
+capability pruning, and open in the same controller. Wire immediate commands
+through `commands` (they merge over the face's own, host winning) and declare
+custom gates with `requires` + `menuCapabilities`.
+
+### Pre-consolidation builders
+
+`buildVaultTrackArcActions()` and `buildStandardTrackArcActions()` return the
+trees they always returned — the Vault menu is still exactly Vault / Playback /
+Share / Agents — so a product that shipped one keeps the menu it shipped.
+`buildLegacyPlaybackArcBranch()` is the Up Next / Controls / Debug arm those
+composites use; the canonical `buildPlaybackArcBranch()` carries transport
+instead, so compose from the legacy one if you want the original leaves.
 
 ## Ownership boundaries
 

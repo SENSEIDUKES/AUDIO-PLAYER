@@ -18,8 +18,9 @@ import {
     faceSupportsSEICanvas,
 } from "../surfaces/faceCapabilities"
 import { ArcActionButton } from "../surfaces/ArcActionButton"
-import type { ArcCommandHost } from "../surfaces/ArcActionButton"
-import { buildCanonicalPlayerActions } from "../menu/canonicalActions"
+import type { ArcAction, ArcCommandHost } from "../surfaces/ArcActionButton"
+import { resolvePlayerMenu } from "../menu/menuProfile"
+import type { PlayerMenuProfile } from "../menu/menuProfile"
 import type { ArcMenuEntitlements } from "../menu/canonicalActions"
 import type { WorkspaceRoute } from "../components/workspace/workspaceRoutes"
 import { buildThemeVars } from "./themeVars"
@@ -39,6 +40,22 @@ export interface SeaCardPlayerProps extends AudioPlayerTheme {
     artMedia?: MediaSource | null
     /** Optional price / tag chip. */
     tag?: string
+    /**
+     * A complete host-provided action menu for this card. When set, the wheel is
+     * exactly this tree — no canonical category is merged in. Omit to get SAP's
+     * canonical hierarchy.
+     */
+    actions?: ArcAction[]
+    /**
+     * Structured control over the canonical hierarchy: choose and order its
+     * categories, or add your own alongside them. Ignored when `actions` is set.
+     */
+    menuProfile?: PlayerMenuProfile
+    /**
+     * Extra capabilities for host actions that declare `requires`, merged over
+     * the ones derived from this face's capability model.
+     */
+    menuCapabilities?: ArcCommandHost["capabilities"]
     /**
      * Ids of the plugins currently active on this player. Drives the canonical
      * menu's Plugins branch exactly as it does on every other face.
@@ -78,8 +95,9 @@ function sameTrack(a: Track, b: Track): boolean {
  * other skin through the shared engine.
  *
  * Capability-driven (`PLAYER_FACE_CAPABILITIES.seaCard`): a marketplace card. It
- * carries the same canonical action hierarchy as every other music face, on a
- * small corner trigger so the card stays clean and tap-to-play; the inline
+ * carries SAP's canonical action hierarchy by default — or whatever the host
+ * passes as `actions` / `menuProfile` — on a small corner trigger so the card
+ * stays clean and tap-to-play; the inline
  * scrubber stays a plain progress bar, and a small wave trigger on the active
  * card opens the overlay `SEICanvasHost`, which shows the hero + the interactive
  * `WaveformAdapter` (`supportsWaveform: true`).
@@ -89,6 +107,9 @@ export function SeaCardPlayer({
     art = "linear-gradient(135deg,#FF7AC6,#7C5CFF)",
     artMedia,
     tag,
+    actions,
+    menuProfile,
+    menuCapabilities,
     activePluginIds,
     entitlements,
     commands,
@@ -111,14 +132,18 @@ export function SeaCardPlayer({
     // card so only the active track's button can spin.
     const isBufferingThis = isActive && s.isBuffering
     const cardActions = useMemo(
-        () => buildCanonicalPlayerActions({ activePluginIds, entitlements }),
-        [activePluginIds, entitlements]
+        () => resolvePlayerMenu({ actions, menuProfile, activePluginIds, entitlements }),
+        [actions, menuProfile, activePluginIds, entitlements]
     )
     // A marketplace card is not a vault-managed track, so the Vault arm filters
     // out; it can host the canvas (in an overlay), so the Canvas leaf stays.
     const cardCapabilities = useMemo(
-        () => ({ canvas: faceSupportsSEICanvas("seaCard"), vault: false }),
-        []
+        () => ({
+            canvas: faceSupportsSEICanvas("seaCard"),
+            vault: false,
+            ...menuCapabilities,
+        }),
+        [menuCapabilities]
     )
     // Unlike the wave trigger this is not gated on `isActive`: card actions (add
     // to queue, share, buy…) are meaningful on any card in a marketplace grid.

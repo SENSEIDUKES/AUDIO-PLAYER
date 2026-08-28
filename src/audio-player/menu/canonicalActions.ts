@@ -102,14 +102,22 @@ function pluginLeafIcon(pluginId: string) {
  * by the face's own canvas button, not from a menu.
  *
  * Returns `null` when no bucket has any leaf.
+ *
+ * Accepts either an options object or a bare list of active plugin ids — the
+ * positional form is the signature hosts composed against before the options
+ * object existed, and both are supported so neither call site has to change.
  */
-export function buildPluginsArcBranch({
-    activePluginIds = [],
-    isCanvasActive = false,
-}: Pick<
+export type BuildPluginsArcBranchOptions = Pick<
     BuildCanonicalPlayerActionsOptions,
     "activePluginIds" | "isCanvasActive"
-> = {}): ArcAction | null {
+>
+
+export function buildPluginsArcBranch(
+    optionsOrActivePluginIds: BuildPluginsArcBranchOptions | readonly string[] = {}
+): ArcAction | null {
+    const { activePluginIds = [], isCanvasActive = false } = Array.isArray(optionsOrActivePluginIds)
+        ? { activePluginIds: optionsOrActivePluginIds as readonly string[] }
+        : (optionsOrActivePluginIds as BuildPluginsArcBranchOptions)
     const buckets: Record<"audio" | "visual" | "analytics", ArcAction[]> = {
         audio: [],
         visual: [],

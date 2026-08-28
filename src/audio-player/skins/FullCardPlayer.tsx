@@ -28,10 +28,34 @@ import { VisualSlotsProvider } from "../visual-slots/VisualSlotsContext"
 import { SEICanvasRenderer } from "../visual-slots/SEICanvasRenderer"
 import { ScrubberCanvasRenderer } from "../visual-slots/ScrubberCanvasRenderer"
 import type { WorkspaceRoute } from "../components/workspace/workspaceRoutes"
+import type { ArcAction, ArcCommandHost } from "../menu/arcRouting"
+import type { PlayerMenuProfile } from "../menu/menuProfile"
 import { DotsIcon, ErrorIcon, NextIcon, PauseIcon, PlayIcon, PrevIcon, SpinnerIcon } from "./icons"
 import "./skins.css"
 
 export interface FullCardPlayerProps extends AudioPlayerTheme {
+    /**
+     * A complete host-provided action menu. When set, the radial menu is
+     * exactly this tree — no canonical category is merged in. Omit to get SAP's
+     * canonical hierarchy.
+     */
+    actions?: ArcAction[]
+    /**
+     * Structured control over the canonical hierarchy: choose and order its
+     * categories, or add your own alongside them. Ignored when `actions` is set.
+     */
+    menuProfile?: PlayerMenuProfile
+    /**
+     * Immediate command implementations for host-provided actions, merged over
+     * the ones this face wires itself. Without a command, a host's immediate
+     * leaf prunes rather than rendering dead.
+     */
+    commands?: ArcCommandHost["commands"]
+    /**
+     * Extra capabilities for host actions that declare `requires`, merged over
+     * the ones derived from this face's capability model.
+     */
+    menuCapabilities?: ArcCommandHost["capabilities"]
     /**
      * Show the volume slider. Defaults to `true` on desktop and `false` on
      * mobile/touch devices (e.g. iOS Safari), where programmatic volume is
@@ -81,6 +105,10 @@ export interface FullCardPlayerProps extends AudioPlayerTheme {
  * action's workspace route. There is no second sheet or drawer.
  */
 export function FullCardPlayer({
+    actions,
+    menuProfile,
+    commands: hostCommands,
+    menuCapabilities,
     showVolume = defaultShowVolume(),
     backgroundMedia,
     backgroundImage,
@@ -222,8 +250,11 @@ export function FullCardPlayer({
             "track.previous": s.previous,
             "track.next": s.next,
             ...(currentTrack ? { "share.url": handleShareClick } : {}),
+            // Host commands win, so a host tree can rebind a leaf this face
+            // also wires without having to replace the whole menu.
+            ...hostCommands,
         }),
-        [s.previous, s.next, currentTrack, handleShareClick]
+        [s.previous, s.next, currentTrack, handleShareClick, hostCommands]
     )
 
     return (
@@ -506,6 +537,9 @@ export function FullCardPlayer({
 
                     <PlayerSurfaceButtons
                         surface={surface}
+                        actions={actions}
+                        menuProfile={menuProfile}
+                        capabilities={menuCapabilities}
                         activePluginIds={s.pluginNames}
                         commands={menuCommands}
                         canPrevious={canPrevious}

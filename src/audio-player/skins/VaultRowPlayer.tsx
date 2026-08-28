@@ -8,8 +8,9 @@ import { formatSecondaryLine, formatVersionedTitle } from "../utils/formatMetada
 import { trackKey } from "../utils/trackKey"
 import { faceSupportsAction, faceSupportsSEICanvas } from "../surfaces/faceCapabilities"
 import { ArcActionButton } from "../surfaces/ArcActionButton"
-import type { ArcCommandHost } from "../surfaces/ArcActionButton"
-import { buildCanonicalPlayerActions } from "../menu/canonicalActions"
+import type { ArcAction, ArcCommandHost } from "../surfaces/ArcActionButton"
+import { resolvePlayerMenu } from "../menu/menuProfile"
+import type { PlayerMenuProfile } from "../menu/menuProfile"
 import type { ArcMenuEntitlements } from "../menu/canonicalActions"
 import type { WorkspaceRoute } from "../components/workspace/workspaceRoutes"
 import { getVaultCategoryMeta } from "./vaultCategories"
@@ -22,6 +23,23 @@ export interface VaultRowPlayerProps extends AudioPlayerTheme {
     track: Track
     /** Optional 1-based number shown at the left of the row. */
     number?: number
+    /**
+     * A complete host-provided action menu for this row. When set, the wheel is
+     * exactly this tree — no canonical category is merged in. This is the
+     * extension point vault apps compose `buildVaultTrackArcActions()` into.
+     * Omit to get SAP's canonical hierarchy.
+     */
+    actions?: ArcAction[]
+    /**
+     * Structured control over the canonical hierarchy: choose and order its
+     * categories, or add your own alongside them. Ignored when `actions` is set.
+     */
+    menuProfile?: PlayerMenuProfile
+    /**
+     * Extra capabilities for host actions that declare `requires`, merged over
+     * this row's own (which already declares `vault`).
+     */
+    menuCapabilities?: ArcCommandHost["capabilities"]
     /**
      * Ids of the plugins currently active on this player. Drives the canonical
      * menu's Plugins branch exactly as it does on every other face.
@@ -71,15 +89,21 @@ const SHOW_VAULT_ACTION = faceSupportsAction("vaultRow")
  * seeking lives on the shared StickyBottom master scrubber that follows the
  * active song.
  *
- * Its action button carries the same canonical hierarchy as every other face,
- * with one capability difference in each direction: no Canvas leaf (it can't host
- * the canvas), plus the Vault arm (it genuinely represents a vault-managed
- * track). Visual identity comes from the track's `vaultCategory` (accent color +
- * status label), not per-row artwork, keeping long lists fast to render.
+ * Its action button carries SAP's canonical hierarchy by default, with one
+ * capability difference in each direction: no Canvas leaf (it can't host the
+ * canvas), plus the Vault arm (it genuinely represents a vault-managed track).
+ * A host owns that composition though — pass `actions` (e.g.
+ * `buildVaultTrackArcActions()`) for its own menu, or `menuProfile` to pick from
+ * the canonical categories. Visual identity comes from the track's
+ * `vaultCategory` (accent color + status label), not per-row artwork, keeping
+ * long lists fast to render.
  */
 export const VaultRowPlayer = memo(function VaultRowPlayer({
     track,
     number,
+    actions,
+    menuProfile,
+    menuCapabilities,
     activePluginIds,
     entitlements,
     commands,
@@ -116,8 +140,17 @@ export const VaultRowPlayer = memo(function VaultRowPlayer({
         [playNext, enqueue, track, commands]
     )
     const rowActions = useMemo(
-        () => buildCanonicalPlayerActions({ activePluginIds, entitlements }),
-        [activePluginIds, entitlements]
+        () => resolvePlayerMenu({ actions, menuProfile, activePluginIds, entitlements }),
+        [actions, menuProfile, activePluginIds, entitlements]
+    )
+    // The frozen module constant covers the common case, so a long list
+    // allocates nothing here; only a host adding its own gates pays for a merge.
+    const rowCapabilities = useMemo(
+        () =>
+            menuCapabilities
+                ? { ...VAULT_ROW_CAPABILITIES, ...menuCapabilities }
+                : VAULT_ROW_CAPABILITIES,
+        [menuCapabilities]
     )
 
     const handleToggle = () => {
@@ -200,7 +233,7 @@ export const VaultRowPlayer = memo(function VaultRowPlayer({
                 <ArcActionButton
                     actions={rowActions}
                     commands={rowCommands}
-                    capabilities={VAULT_ROW_CAPABILITIES}
+                    capabilities={rowCapabilities}
                     onOpenWorkspace={onOpenWorkspace}
                     ariaLabel={`Actions for ${track.title}`}
                     className="ap-vr__action"
