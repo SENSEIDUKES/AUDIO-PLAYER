@@ -409,11 +409,7 @@
    The track number and inline time step aside to maximize title + artist readability;
    gaps and padding tighten gracefully. Seeking remains on the master transport. */
 @container ap-vr (max-width: 420px) {
-    .ap-vr__chip--lead {
-        display: none;
-    }
     .ap-vr__chip--inline {
-        display: inline-flex;
         font-size: 9.5px;
         padding: 1px 5px;
     }
