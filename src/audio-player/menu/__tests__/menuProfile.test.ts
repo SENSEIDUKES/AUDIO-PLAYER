@@ -93,7 +93,35 @@ describe("resolvePlayerMenu — host ownership", () => {
         expect(armLabels(resolved)).toEqual(["Queue", "Buy"])
     })
 
+    it("dedupes repeated category ids rather than rendering an arm twice", () => {
+        const resolved = resolvePlayerMenu({
+            menuProfile: { categories: ["share", "share", "playback", "share"] },
+        })
+        expect(armLabels(resolved)).toEqual(["Share", "Playback"])
+        // Duplicate ids would collide on the id the renderer keys and dispatches on.
+        const ids = resolved.map((a) => a.id)
+        expect(new Set(ids).size).toBe(ids.length)
+    })
+
+    it("survives malformed profile fields from an untyped host", () => {
+        // Casts are the point of these: a plain-JS host has no type checking,
+        // and a public entry point must not throw on its way in.
+        const canonical = resolvePlayerMenu()
+        expect(
+            resolvePlayerMenu({
+                menuProfile: { categories: "share" as unknown as string[] },
+            })
+        ).toEqual(canonical)
+        expect(
+            resolvePlayerMenu({
+                menuProfile: { extraActions: {} as unknown as ArcAction[] },
+            })
+        ).toEqual(canonical)
+    })
+
     it("reports whether the menu is still SAP's canonical one", () => {
+        // Callable with no arguments at all, like its sibling resolver.
+        expect(isCanonicalPlayerMenu()).toBe(true)
         expect(isCanonicalPlayerMenu({})).toBe(true)
         expect(isCanonicalPlayerMenu({ menuProfile: {} })).toBe(true)
         expect(isCanonicalPlayerMenu({ actions: HOST_TREE })).toBe(false)

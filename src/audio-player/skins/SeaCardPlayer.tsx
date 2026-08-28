@@ -132,8 +132,17 @@ export function SeaCardPlayer({
     // card so only the active track's button can spin.
     const isBufferingThis = isActive && s.isBuffering
     const cardActions = useMemo(
-        () => resolvePlayerMenu({ actions, menuProfile, activePluginIds, entitlements }),
-        [actions, menuProfile, activePluginIds, entitlements]
+        () =>
+            resolvePlayerMenu({
+                actions,
+                menuProfile,
+                activePluginIds,
+                entitlements,
+                // The card hosts the canvas in an overlay, so its Canvas leaf
+                // tracks that overlay's state like every other face's does.
+                isCanvasActive: surface.isCanvasOpen,
+            }),
+        [actions, menuProfile, activePluginIds, entitlements, surface.isCanvasOpen]
     )
     // A marketplace card is not a vault-managed track, so the Vault arm filters
     // out; it can host the canvas (in an overlay), so the Canvas leaf stays.

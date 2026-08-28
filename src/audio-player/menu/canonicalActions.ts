@@ -115,9 +115,10 @@ export type BuildPluginsArcBranchOptions = Pick<
 export function buildPluginsArcBranch(
     optionsOrActivePluginIds: BuildPluginsArcBranchOptions | readonly string[] = {}
 ): ArcAction | null {
+    // A default only covers `undefined`; an untyped host can pass `null`.
     const { activePluginIds = [], isCanvasActive = false } = Array.isArray(optionsOrActivePluginIds)
         ? { activePluginIds: optionsOrActivePluginIds as readonly string[] }
-        : (optionsOrActivePluginIds as BuildPluginsArcBranchOptions)
+        : ((optionsOrActivePluginIds as BuildPluginsArcBranchOptions | null) ?? {})
     const buckets: Record<"audio" | "visual" | "analytics", ArcAction[]> = {
         audio: [],
         visual: [],

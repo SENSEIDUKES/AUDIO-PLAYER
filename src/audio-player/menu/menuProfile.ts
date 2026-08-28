@@ -86,20 +86,25 @@ export function resolvePlayerMenu({
     const { categories, extraActions, placement = "append" } = menuProfile
 
     let arms = canonical
-    if (categories) {
-        // Selection *and* order come from the host's list.
+    if (Array.isArray(categories)) {
+        // Selection *and* order come from the host's list. Deduped, because a
+        // repeated id would render the same arm twice — duplicate node ids the
+        // renderer keys on, for no gain.
         const byId = new Map(canonical.map((arm) => [arm.id, arm]))
-        arms = categories
+        arms = Array.from(new Set(categories))
             .map((id) => byId.get(id))
             .filter((arm): arm is ArcAction => arm !== undefined)
     }
 
-    if (!extraActions || extraActions.length === 0) return arms
+    if (!Array.isArray(extraActions) || extraActions.length === 0) return arms
     return placement === "prepend" ? [...extraActions, ...arms] : [...arms, ...extraActions]
 }
 
 /** Whether these options leave the menu on SAP's canonical hierarchy. */
-export function isCanonicalPlayerMenu({ actions, menuProfile }: ResolvePlayerMenuOptions): boolean {
+export function isCanonicalPlayerMenu({
+    actions,
+    menuProfile,
+}: ResolvePlayerMenuOptions = {}): boolean {
     if (actions || menuProfile?.actions) return false
     if (!menuProfile) return true
     return !menuProfile.categories && !menuProfile.extraActions?.length

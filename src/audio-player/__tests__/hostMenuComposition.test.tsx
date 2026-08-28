@@ -322,6 +322,42 @@ describe("menu profiles shape the canonical hierarchy", () => {
     })
 })
 
+describe("the Canvas leaf tracks each face's canvas surface", () => {
+    it("seaCard: marks Canvas active once its overlay canvas is open", () => {
+        // The card hosts the canvas in an overlay behind a wave trigger, which
+        // needs peak data and the card to be the active track.
+        const withPeaks: Track = { ...TRACKS[0], peaks: [[0.1, 0.9, 0.4]] }
+        render(
+            <AudioSessionProvider initialQueue={[withPeaks, TRACKS[1]]} plugins={PLUGINS()}>
+                <HostComposed>
+                    {(open) => (
+                        <SeaCardPlayer
+                            track={withPeaks}
+                            activePluginIds={["lyrics"]}
+                            onOpenWorkspace={open}
+                        />
+                    )}
+                </HostComposed>
+            </AudioSessionProvider>
+        )
+
+        const canvasState = () => {
+            openRadial()
+            fireEvent.click(menuItems().find((el) => labelOf(el) === "Plugins")!)
+            fireEvent.click(menuItems().find((el) => labelOf(el) === "Visual")!)
+            const canvas = menuItems().find((el) => labelOf(el) === "Canvas")!
+            const state = canvas.className
+            // Two levels deep the center button is Back, so close with Escape.
+            fireEvent.keyDown(document, { key: "Escape" })
+            return state
+        }
+
+        expect(canvasState()).toContain("sac__node--available")
+        fireEvent.click(screen.getByRole("button", { name: "Show waveform" }))
+        expect(canvasState()).toContain("sac__node--active")
+    })
+})
+
 describe("existing behavior still works underneath a host menu", () => {
     it("routes a host settings leaf into the controller", () => {
         mount(FACES[0], { actions: hostMenu(), commands: { "commerce.buy": buy } })
