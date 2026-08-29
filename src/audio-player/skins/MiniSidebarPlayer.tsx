@@ -10,11 +10,35 @@ import { PlayerSurfaceButtons } from "../surfaces/PlayerSurfaceButtons"
 import { SAPController } from "../components/SAPController"
 import { useShareTrack } from "../components/useShareTrack"
 import type { WorkspaceRoute } from "../components/workspace/workspaceRoutes"
+import type { ArcAction, ArcCommandHost } from "../menu/arcRouting"
+import type { PlayerMenuProfile } from "../menu/menuProfile"
 import { ExplicitBadge } from "../components/TrackMetadata"
 import { formatSecondaryLine, formatVersionedTitle } from "../utils/formatMetadata"
 import "./skins.css"
 
 export interface MiniSidebarPlayerProps extends AudioPlayerTheme {
+    /**
+     * A complete host-provided action menu. When set, the radial menu is
+     * exactly this tree — no canonical category is merged in. Omit to get SAP's
+     * canonical hierarchy.
+     */
+    actions?: ArcAction[]
+    /**
+     * Structured control over the canonical hierarchy: choose and order its
+     * categories, or add your own alongside them. Ignored when `actions` is set.
+     */
+    menuProfile?: PlayerMenuProfile
+    /**
+     * Immediate command implementations for host-provided actions, merged over
+     * the ones this face wires itself. Without a command, a host's immediate
+     * leaf prunes rather than rendering dead.
+     */
+    commands?: ArcCommandHost["commands"]
+    /**
+     * Extra capabilities for host actions that declare `requires`, merged over
+     * the ones derived from this face's capability model.
+     */
+    menuCapabilities?: ArcCommandHost["capabilities"]
     /** Optional CSS background image for the small art block (gradient or url).
         Applied as background-image so the cover/center sizing rules hold. */
     art?: string
@@ -43,6 +67,10 @@ export interface MiniSidebarPlayerProps extends AudioPlayerTheme {
  * that menu (Playback › Previous / Next), freeing the row for title/artist.
  */
 export function MiniSidebarPlayer({
+    actions,
+    menuProfile,
+    commands: hostCommands,
+    menuCapabilities,
     art = "linear-gradient(135deg,#7C5CFF,#22D3A6)",
     artMedia,
     className,
@@ -78,8 +106,11 @@ export function MiniSidebarPlayer({
             "track.previous": s.previous,
             "track.next": s.next,
             ...(currentTrack ? { "share.url": share } : {}),
+            // Host commands win, so a host tree can rebind a leaf this face
+            // also wires without having to replace the whole menu.
+            ...hostCommands,
         }),
-        [s.previous, s.next, currentTrack, share]
+        [s.previous, s.next, currentTrack, share, hostCommands]
     )
     const msTitle = currentTrack
         ? formatVersionedTitle(currentTrack.title, currentTrack.versionLabel)
@@ -132,6 +163,9 @@ export function MiniSidebarPlayer({
                     Next) so the row keeps room for title/artist. */}
                 <PlayerSurfaceButtons
                     surface={surface}
+                    actions={actions}
+                    menuProfile={menuProfile}
+                    capabilities={menuCapabilities}
                     activePluginIds={s.pluginNames}
                     commands={menuCommands}
                     canPrevious={s.canPrevious}

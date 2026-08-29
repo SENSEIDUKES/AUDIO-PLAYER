@@ -10,6 +10,7 @@ import {
     MiniSidebarPlayer,
     SeaCardPlayer,
     SAPController,
+    buildVaultTrackArcActions,
     registerVaultCategory,
     useAudioSession,
 } from "../audio-player"
@@ -52,17 +53,20 @@ function trackCommands(track: Track): ArcCommandHost["commands"] {
     }
 }
 
-/* The Vault rows with the canonical action hierarchy. The Vault arm survives
-   capability filtering here because a vault row genuinely is a vault-managed
-   track; everything else is identical to every other face. Share leaves use the
-   commands above; every settings leaf routes into the one SAP Controller
-   instance owned here. */
+/* The Vault rows with a *host-owned* menu: the vault app composes its own four
+   categories (Vault / Playback / Share / Agents) and passes them in, rather than
+   taking SAP's canonical hierarchy. Same router, same controller, same pruning —
+   only the composition is the product's. Share leaves use the commands above;
+   every settings leaf routes into the one SAP Controller instance owned here. */
 function ShowcaseVaultRows() {
     const s = useAudioSession()
     const [route, setRoute] = useState<WorkspaceRoute | null>(null)
     // Studio Scout entitlement is deliberately absent here, so Agents › Scout
     // routes to its free Demo tier.
-    const entitlements = useMemo(() => ({ studioScout: false }), [])
+    const vaultActions = useMemo(
+        () => buildVaultTrackArcActions({ entitlements: { studioScout: false } }),
+        []
+    )
     return (
         <div className="showcase-face__vault">
             {vaultShowcaseTracks.map((t, i) => (
@@ -70,8 +74,7 @@ function ShowcaseVaultRows() {
                     key={t.id ?? t.title}
                     track={t}
                     number={i + 1}
-                    entitlements={entitlements}
-                    activePluginIds={s.pluginNames}
+                    actions={vaultActions}
                     commands={trackCommands(t)}
                     onOpenWorkspace={setRoute}
                     {...SEA_THEME}

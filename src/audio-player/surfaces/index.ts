@@ -72,7 +72,30 @@ export {
 export type {
     ArcMenuEntitlements,
     BuildCanonicalPlayerActionsOptions,
+    BuildPluginsArcBranchOptions,
 } from "../menu/canonicalActions"
+
+// Host ownership of menu composition: supply a tree, or shape the canonical one.
+export { resolvePlayerMenu, isCanonicalPlayerMenu } from "../menu/menuProfile"
+export type {
+    PlayerMenuProfile,
+    PlayerMenuCategoryId,
+    PlayerMenuPlacement,
+    ResolvePlayerMenuOptions,
+} from "../menu/menuProfile"
+
+// The pre-consolidation builders, restored for consuming products.
+export {
+    buildVaultTrackArcActions,
+    buildVaultTrackArcBranch,
+    buildStandardTrackArcActions,
+    buildLegacyPlaybackArcBranch,
+} from "../menu/compatActions"
+export type {
+    VaultTrackEntitlements,
+    BuildVaultTrackArcActionsOptions,
+    BuildStandardArcActionsOptions,
+} from "../menu/compatActions"
 
 export { isNodeInteractive } from "../menu/menuData"
 export type { MenuNode, MenuItemState } from "../menu/menuData"

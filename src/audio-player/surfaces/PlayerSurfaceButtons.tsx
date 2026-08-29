@@ -2,14 +2,32 @@ import { useMemo } from "react"
 import { CanvasIcon } from "../skins/icons"
 import { SurfaceButton } from "./SurfaceButton"
 import { ArcActionButton } from "./ArcActionButton"
-import { buildCanonicalPlayerActions } from "../menu/canonicalActions"
+import { resolvePlayerMenu } from "../menu/menuProfile"
+import type { PlayerMenuProfile } from "../menu/menuProfile"
 import type { ArcMenuEntitlements } from "../menu/canonicalActions"
-import type { ArcCommandHost } from "../menu/arcRouting"
+import type { ArcAction, ArcCommandHost } from "../menu/arcRouting"
 import type { WorkspaceRoute } from "../components/workspace/workspaceRoutes"
 import type { UsePlayerSurfaceResult } from "./usePlayerSurface"
 
 export interface PlayerSurfaceButtonsProps {
     surface: UsePlayerSurfaceResult
+    /**
+     * A complete host-provided action tree. When set, the menu is exactly this
+     * — no canonical category is merged in, appended, or reordered around it.
+     * Omit to get SAP's canonical hierarchy.
+     */
+    actions?: ArcAction[]
+    /**
+     * Structured control over the canonical hierarchy: pick and order its
+     * categories, or add your own alongside them. Ignored when `actions` is set.
+     */
+    menuProfile?: PlayerMenuProfile
+    /**
+     * Extra capabilities for the host's own actions, merged over the ones the
+     * face derives from its capability model. Lets a host tree declare
+     * `requires` and have it resolve.
+     */
+    capabilities?: ArcCommandHost["capabilities"]
     /** Left (canvas) button. Defaults to the face's declared canvas support. */
     showCanvasButton?: boolean
     /**
@@ -59,13 +77,18 @@ export interface PlayerSurfaceButtonsProps {
  * surface is an immediate command, while *configuring* it is a settings screen
  * that lives at Plugins › Visual › Canvas inside the controller.
  *
- * RIGHT is the radial action menu, carrying the canonical hierarchy
- * (Plugins | Playback | Queue | Share | Agents | Vault) that every music face
- * shares. Every settings leaf in it opens inside the same SAPController the
- * face's "…" button opens, via `onOpenFocusedController`.
+ * RIGHT is the radial action menu. By default it carries SAP's canonical
+ * hierarchy (Plugins | Playback | Queue | Share | Agents | Vault), but the
+ * composition belongs to the host: pass `actions` for a tree of your own, or
+ * `menuProfile` to pick, order, or extend the canonical categories. Whatever is
+ * rendered goes through the same router, the same capability pruning, and opens
+ * inside the same SAPController the face's "…" button opens.
  */
 export function PlayerSurfaceButtons({
     surface,
+    actions,
+    menuProfile,
+    capabilities: hostCapabilities,
     showCanvasButton = surface.canvasSupported,
     showActionMenu = surface.contextualSupported,
     activePluginIds,
@@ -81,10 +104,12 @@ export function PlayerSurfaceButtons({
     // rebuilt on every parent playback tick (skins re-render multiple times per
     // second during active playback). Hooks must run before the early return
     // below, so this stays unconditional.
-    const actions = useMemo(
+    const resolvedActions = useMemo(
         () =>
             showActionMenu
-                ? buildCanonicalPlayerActions({
+                ? resolvePlayerMenu({
+                      actions,
+                      menuProfile,
                       activePluginIds,
                       entitlements,
                       isFavorite,
@@ -95,6 +120,8 @@ export function PlayerSurfaceButtons({
                 : [],
         [
             showActionMenu,
+            actions,
+            menuProfile,
             activePluginIds,
             entitlements,
             isFavorite,
@@ -106,10 +133,12 @@ export function PlayerSurfaceButtons({
 
     // Capability filtering is the *only* reason an action is missing from a
     // face: the canvas leaf exists where the face can host the canvas, the vault
-    // arm where the surface represents a vault track.
+    // arm where the surface represents a vault track. A host can declare its own
+    // capabilities on top, for actions of its own that gate on something the
+    // face model knows nothing about.
     const capabilities = useMemo(
-        () => ({ canvas: surface.canvasSupported, vault: false }),
-        [surface.canvasSupported]
+        () => ({ canvas: surface.canvasSupported, vault: false, ...hostCapabilities }),
+        [surface.canvasSupported, hostCapabilities]
     )
 
     if (!showCanvasButton && !showActionMenu) return null
@@ -132,7 +161,7 @@ export function PlayerSurfaceButtons({
             )}
             {showActionMenu && (
                 <ArcActionButton
-                    actions={actions}
+                    actions={resolvedActions}
                     commands={commands}
                     capabilities={capabilities}
                     onOpenWorkspace={onOpenFocusedController}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { buildCanonicalPlayerActions } from "../canonicalActions"
+import { buildCanonicalPlayerActions, buildPluginsArcBranch } from "../canonicalActions"
 import {
     collectArcLeaves,
     describeArcRoutes,
@@ -339,5 +339,31 @@ describe("capability filtering", () => {
                 }
             }
         }
+    })
+})
+
+describe("buildPluginsArcBranch — call-signature compatibility", () => {
+    it("accepts a bare list of active plugin ids (the original signature)", () => {
+        const positional = buildPluginsArcBranch(["lyrics"])
+        const options = buildPluginsArcBranch({ activePluginIds: ["lyrics"] })
+        expect(positional).toEqual(options)
+        expect(find([positional!], "plugin-lyrics")).toBeDefined()
+    })
+
+    it("accepts no argument, and a null one from an untyped host", () => {
+        // A default parameter only covers `undefined`; plain-JS callers can and
+        // do pass `null`, and a public entry point must not throw on it.
+        const empty = buildPluginsArcBranch()
+        expect(empty).not.toBeNull()
+        expect(buildPluginsArcBranch(null as unknown as undefined)).toEqual(empty)
+    })
+
+    it("carries the canvas active state through either form", () => {
+        expect(
+            find([buildPluginsArcBranch({ activePluginIds: [], isCanvasActive: true })!], "canvas")
+                ?.state
+        ).toBe("active")
+        // The positional form has no way to say "active", so it stays available.
+        expect(find([buildPluginsArcBranch(["lyrics"])!], "canvas")?.state).toBe("available")
     })
 })

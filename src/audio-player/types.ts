@@ -7,6 +7,8 @@ import type {
     AudioBackendKind,
 } from "./core/audio/AudioBackend"
 import type { CueManifest } from "./cues/cueTypes"
+import type { ArcAction, ArcCommandHost } from "./menu/arcRouting"
+import type { PlayerMenuProfile } from "./menu/menuProfile"
 
 /**
  * Vault identity category. Drives a row's visual identity (accent color + label)
@@ -201,6 +203,28 @@ export interface AudioPlayerProps extends AudioPlayerTheme {
     automix?: boolean
     /** Optional lifecycle plugins. Empty by default. */
     plugins?: readonly AudioPlayerPlugin[]
+    /**
+     * A complete host-provided action menu. When set, the radial menu is
+     * exactly this tree — no canonical category is merged in. Omit to get SAP's
+     * canonical hierarchy.
+     */
+    actions?: ArcAction[]
+    /**
+     * Structured control over the canonical hierarchy: choose and order its
+     * categories, or add your own alongside them. Ignored when `actions` is set.
+     */
+    menuProfile?: PlayerMenuProfile
+    /**
+     * Immediate command implementations for host-provided actions, merged over
+     * the ones this player wires itself. Without a command, a host's immediate
+     * leaf prunes rather than rendering dead.
+     */
+    menuCommands?: ArcCommandHost["commands"]
+    /**
+     * Extra capabilities for host actions that declare `requires`, merged over
+     * the ones derived from this face's capability model.
+     */
+    menuCapabilities?: ArcCommandHost["capabilities"]
     /**
      * Playback backend. `"html5"` (default) streams through an `<audio>`
      * element; `"webaudio"` decodes the full file for sample-accurate timing

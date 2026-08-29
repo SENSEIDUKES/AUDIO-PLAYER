@@ -326,6 +326,10 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
         glowIntensity = 100,
         buttonOpacity = 0,
         plugins: externalPlugins = EMPTY_PLUGINS,
+        actions: menuActions,
+        menuProfile,
+        menuCommands: hostMenuCommands,
+        menuCapabilities,
         className,
         style,
     } = props
@@ -496,8 +500,11 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
         () => ({
             ...(isPlaylistMode ? { "track.previous": s.previous, "track.next": s.next } : {}),
             "share.url": handleShareClick,
+            // Host commands win, so a host tree can rebind a leaf this player
+            // also wires without having to replace the whole menu.
+            ...hostMenuCommands,
         }),
-        [isPlaylistMode, s.previous, s.next, handleShareClick]
+        [isPlaylistMode, s.previous, s.next, handleShareClick, hostMenuCommands]
     )
 
     // Keyboard shortcuts scoped to the player root (not window) so they never
@@ -935,6 +942,9 @@ function AudioPlayerBody(props: AudioPlayerBodyProps) {
                     SAPController the "…" button opens. */}
                     <PlayerSurfaceButtons
                         surface={surface}
+                        actions={menuActions}
+                        menuProfile={menuProfile}
+                        capabilities={menuCapabilities}
                         activePluginIds={s.pluginNames}
                         commands={menuCommands}
                         canPrevious={canPreviousTrack}
