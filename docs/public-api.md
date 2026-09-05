@@ -212,3 +212,7 @@ host needs registry-managed plugins.
 The Wavesurfer planning files and `PACKAGE_SETUP_COMPLETE.md` are historical
 records, not current consumer API references. Use this guide, the README, and
 the focused guides above for new integrations.
+
+### Host-owned Vault workspaces
+
+`SAPController.renderWorkspace(route)` supplies host content inside the existing controller shell. Return `undefined` to use the built-in workspace; `null` intentionally leaves the body empty. Hosts own the selected attachment and asynchronous work outside the sheet lifecycle. Existing consumers are unchanged. The opt-in `vault:details` and `vault:route` destinations can be included in a host-provided `VaultRowPlayer.actions` tree; they are not added to the default menu.

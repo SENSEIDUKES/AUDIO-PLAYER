@@ -34,6 +34,8 @@ export interface WorkspaceShellProps {
     /** The destination to render. Must not be `"options"` — that path stays on
      *  SAPController's original content. */
     route: WorkspaceRoute
+    /** Undefined uses built-in content; null intentionally renders an empty body. */
+    renderWorkspace?: (route: WorkspaceRoute) => ReactNode
     /** Closes the whole sheet (same handler SAPController uses elsewhere). */
     onClose: () => void
     /** Returns to the controller's Options root. Omitted when there is nothing
@@ -70,6 +72,10 @@ function titleForRoute(route: WorkspaceRoute): string {
             return "Automix"
         case "playback:controls":
             return "Controls"
+        case "vault:details":
+            return "Details"
+        case "vault:route":
+            return "Route To"
         case "vault:tag":
             return "Tag"
         case "vault:rename":
@@ -181,7 +187,9 @@ export function WorkspaceShell({
     lyrics,
     playback,
     queue,
+    renderWorkspace,
 }: WorkspaceShellProps) {
+    const hostContent = renderWorkspace?.(route)
     return (
         <>
             <header className="sap-ctl__header">
@@ -207,7 +215,9 @@ export function WorkspaceShell({
                 </button>
             </header>
             <div className="sap-ctl__workspace" data-route={route}>
-                {contentForRoute(route, lyrics, playback, queue)}
+                {hostContent !== undefined
+                    ? hostContent
+                    : contentForRoute(route, lyrics, playback, queue)}
             </div>
         </>
     )

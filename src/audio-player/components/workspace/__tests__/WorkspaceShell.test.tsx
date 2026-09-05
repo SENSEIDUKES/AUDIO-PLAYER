@@ -8,6 +8,31 @@ function render(route: WorkspaceRoute, lyrics?: string): string {
 }
 
 describe("WorkspaceShell", () => {
+    it("hosts attachment content without mounting the built-in agent", () => {
+        const html = renderToStaticMarkup(
+            <WorkspaceShell
+                route="agent:demo-scout"
+                onClose={() => {}}
+                renderWorkspace={() => <button>Analyze selected attachment</button>}
+            />
+        )
+        expect(html).toContain("Analyze selected attachment")
+        expect(html).not.toContain("Analyze Demo Audio")
+        expect(html).toContain('aria-label="Close workspace"')
+    })
+    it("falls back only for undefined host content", () => {
+        const props = { route: "library:playlists" as const, onClose: () => {} }
+        expect(
+            renderToStaticMarkup(<WorkspaceShell {...props} renderWorkspace={() => undefined} />)
+        ).toContain("Playlists coming soon")
+        expect(
+            renderToStaticMarkup(<WorkspaceShell {...props} renderWorkspace={() => null} />)
+        ).not.toContain("Playlists coming soon")
+    })
+    it("titles opt-in host routes", () => {
+        expect(render("vault:details")).toContain("Details")
+        expect(render("vault:route")).toContain("Route To")
+    })
     it("renders a route-specific header title and a close button", () => {
         const html = render("plugin-settings:lyrics")
         expect(html).toContain('class="sap-ctl__title"')

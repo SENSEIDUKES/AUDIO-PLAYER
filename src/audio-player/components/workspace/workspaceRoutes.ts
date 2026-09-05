@@ -37,6 +37,8 @@ export const WORKSPACE_ROUTES = [
     "agent:studio-scout",
     "agent:memoir",
     "visual:canvas",
+    "vault:details",
+    "vault:route",
     "vault:tag",
     "vault:rename",
     "vault:radio",

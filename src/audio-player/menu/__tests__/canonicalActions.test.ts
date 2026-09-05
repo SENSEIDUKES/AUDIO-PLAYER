@@ -107,7 +107,7 @@ describe("the canonical player action hierarchy", () => {
         for (const row of immediates) expect(row.workspaceRoute, row.id).toBeUndefined()
     })
 
-    it("reaches every registered workspace route except the controller root", () => {
+    it("reaches every built-in workspace and leaves host-only routes opt-in", () => {
         // Both Scout tiers count: the entitlement picks which one Scout opens,
         // and every route in the shell must be reachable from some state.
         const reached = new Set(
@@ -124,7 +124,14 @@ describe("the canonical player action hierarchy", () => {
                 .filter((route): route is WorkspaceRoute => Boolean(route))
         )
         // "options" is the controller's own root, opened by the "…" button.
-        const expected = WORKSPACE_ROUTES.filter((route) => route !== "options")
+        const hostRoutes = ["vault:details", "vault:route"] as const
+        for (const route of hostRoutes) {
+            expect(isWorkspaceRoute(route)).toBe(true)
+            expect(reached.has(route)).toBe(false)
+        }
+        const expected = WORKSPACE_ROUTES.filter(
+            (route) => route !== "options" && route !== "vault:details" && route !== "vault:route"
+        )
         for (const route of expected) {
             expect(reached.has(route), `no action opens ${route}`).toBe(true)
         }
