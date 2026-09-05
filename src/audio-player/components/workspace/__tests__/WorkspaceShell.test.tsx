@@ -31,6 +31,16 @@ describe("WorkspaceShell", () => {
     })
     it("titles opt-in host routes", () => {
         expect(render("vault:details")).toContain("Details")
+        expect(render("vault:details")).toContain("Workspace unavailable")
+        expect(
+            renderToStaticMarkup(
+                <WorkspaceShell
+                    route="vault:route"
+                    onClose={() => {}}
+                    renderWorkspace={() => null}
+                />
+            )
+        ).not.toContain("Workspace unavailable")
         expect(render("vault:route")).toContain("Route To")
     })
     it("renders a route-specific header title and a close button", () => {

@@ -136,6 +136,16 @@ function contentForRoute(
     queue?: WorkspaceQueueState
 ): ReactNode {
     switch (route) {
+        case "vault:details":
+        case "vault:route":
+            return (
+                <div className="sap-ctl__workspace-empty">
+                    <p className="sap-ctl__workspace-lead">Workspace unavailable</p>
+                    <p className="sap-ctl__workspace-sub">
+                        This app has not connected this workspace yet.
+                    </p>
+                </div>
+            )
         case "library:playlists":
             return <LibraryPlaylistsWorkspace />
         case "library:queue":
