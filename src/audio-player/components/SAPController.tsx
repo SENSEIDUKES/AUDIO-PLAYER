@@ -92,6 +92,8 @@ export interface SAPControllerProps extends AudioPlayerTheme {
      * Options. Changing this prop (e.g. a second radial pick while the sheet is
      * up) navigates the open sheet to the new route.
      */
+    /** Host content inside the existing workspace shell. Return undefined for built-in content. */
+    renderWorkspace?: (route: WorkspaceRoute) => ReactNode
     route?: WorkspaceRoute
     /** Sections render only when their prop is provided. */
     playback?: SAPControllerPlayback
@@ -232,6 +234,7 @@ export function SAPController({
     open,
     onClose,
     route = "options",
+    renderWorkspace,
     playback,
     queue,
     info,
@@ -433,6 +436,7 @@ export function SAPController({
                         lyrics={info?.lyrics}
                         playback={playback}
                         queue={workspaceQueue}
+                        renderWorkspace={renderWorkspace}
                     />
                 ) : (
                     <>
