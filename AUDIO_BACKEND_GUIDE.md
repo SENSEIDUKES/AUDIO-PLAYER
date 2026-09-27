@@ -196,10 +196,11 @@ implementations.
 
 ## Demo
 
-Section 10 of the lab (`npm run dev`) renders the same playlist player on
-either backend with a toggle, plus a live `getBackendInfo()` readout. The
-playlist includes a broken URL to exercise each backend's error path. To test
-the fallback warning, stub the API in devtools before reload:
+The Workshop's **Audio Engine & Backends** workspace (`npm run dev`, then open
+`?workspace=audio-engine`) runs the same session on either backend with a
+switch, plus a live `getBackendInfo()` readout. Its default playlist includes a
+broken URL to exercise each backend's error path. To test the fallback warning,
+stub the API in devtools before reload:
 
 ```js
 Object.defineProperty(window, "AudioContext", { value: undefined })

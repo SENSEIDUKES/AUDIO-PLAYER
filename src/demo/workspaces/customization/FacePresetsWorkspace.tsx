@@ -4,23 +4,17 @@ import {
     PluginRegistryProvider,
     usePluginRegistry,
     PluginManagerPanel,
-} from "../audio-player"
-import { noLuckTracks } from "./data"
-import { WORKSHOP_FACES, defaultWorkshopSettings } from "./workshopFaces"
-import type { WorkshopFaceId, WorkshopSettings } from "./workshopFaces"
-import { loadPresets, savePreset, deletePreset } from "./workshopPresets"
-import type { WorkshopPreset } from "./workshopPresets"
-import { SchemaPanel } from "./panel/SchemaPanel"
-import { SectionNav } from "./SectionNav"
+} from "../../../audio-player"
+import { noLuckTracks } from "../../data"
+import { WORKSHOP_FACES, defaultWorkshopSettings } from "../../workshopFaces"
+import type { WorkshopFaceId, WorkshopSettings } from "../../workshopFaces"
+import { loadPresets, savePreset, deletePreset } from "../../workshopPresets"
+import type { WorkshopPreset } from "../../workshopPresets"
+import { SchemaPanel } from "../../panel/SchemaPanel"
 
-const WORKSHOP_SECTIONS = [
-    { id: "workshop-header", label: "Overview", number: "01", category: "Intro" },
-    { id: "workshop-face", label: "Face Picker", number: "02", category: "Face" },
-    { id: "workshop-controls", label: "Controls", number: "03", category: "Tuning" },
-    { id: "workshop-plugins", label: "Plugins", number: "04", category: "Addons" },
-    { id: "workshop-preview", label: "Preview", number: "05", category: "Stage" },
-    { id: "workshop-presets", label: "Presets", number: "06", category: "Storage" },
-] as const
+/* Face Presets — the original Workshop tab, now one workspace: pick a face,
+   style it through the shared property registry, toggle its plugins, and save
+   the result as a named preset in this browser. */
 
 /* ----------------------------- Preset bar ----------------------------- */
 function PresetBar({
@@ -176,25 +170,7 @@ function WorkshopInner() {
     }
 
     return (
-        <div className="lab-shell">
-            <SectionNav
-                sections={WORKSHOP_SECTIONS}
-                defaultSectionId="workshop-header"
-                ariaLabel="Workshop quick navigation"
-            />
-
-            <header id="workshop-header" className="lab-header">
-                <div>
-                    <h1 className="lab-header__title">Workshop — customize a face</h1>
-                    <p className="lab-header__sub">
-                        Pick a player face, tune its properties in the panel, toggle plugins, and
-                        save the result as a local preset. Every preview is the real production
-                        component playing the No Luck release.
-                    </p>
-                </div>
-                <div className="lab-header__chip">Face workshop</div>
-            </header>
-
+        <div className="wk-face-presets">
             <div className="workshop">
                 <div className="workshop__panel">
                     <div id="workshop-face" className="framer-panel__row workshop__face-picker">
@@ -266,7 +242,7 @@ function WorkshopInner() {
     )
 }
 
-export function Workshop() {
+export function FacePresetsWorkspace() {
     return (
         <PluginRegistryProvider>
             <WorkshopInner />

@@ -32,7 +32,7 @@ The player currently supports:
 
 - Portable **React + TypeScript** component architecture.
 - Custom, headless audio playback logic instead of relying on native browser controls.
-- Vite-powered demo harness for development, production builds, and preview smoke tests.
+- Vite-powered development Workshop (the demo) for exercising each piece, plus production builds and preview smoke tests.
 - Play / pause, previous / next, seeking, and playlist progression.
 - Sequential playback by default.
 - Shuffle support.
@@ -182,8 +182,11 @@ Primary source locations:
 - Public package entry point: `src/audio-player/index.ts`
 - Standalone component: `src/audio-player/AudioPlayer.tsx`
 - Hook / audio engine: `src/audio-player/useAudioPlayer.ts`
-- Demo harness: `src/demo/main.tsx`
-- Demo styling: `src/demo/audio-player-lab.css`
+- Development Workshop (demo only, never published): `src/demo/main.tsx`, with the
+  home, routing, and card catalog in `src/demo/workshop/` and one workspace per
+  piece in `src/demo/workspaces/`
+- Demo styling: `src/demo/audio-player-lab.css` (faces and fixtures) and
+  `src/demo/workshop/workshop.css` (Workshop chrome)
 
 The intended architecture is:
 
@@ -341,11 +344,26 @@ consumer example.
 
 This project is currently in active internal development. The repository does
 not designate a hosted demo URL; the canonical demonstration surface is the
-local Lab:
+local development Workshop:
 
 ```bash
 npm run dev
 ```
+
+The Workshop home has four categories: **Players** (the individual faces, plus
+**New Face**, a blank surface for assembling your own from the package's pieces),
+**Systems** (playback, sessions, menus, queue, Automix, cues, and other
+underlying behavior), **Customization** (plugins, themes, presets, scrubbers,
+waveforms, visuals, and other interchangeable pieces), and **Testing Lab**.
+Each card opens one workspace with a live view, its controls, and an honest
+list of what works and what is still a placeholder. Every workspace has its own
+link (for example `?workspace=automix`), and leaving a workspace stops its
+audio. The Testing Lab's Mix & Match workspace places players inside an app
+shell, marketplace, reader, and other contexts at real viewport sizes, and runs
+the mobile, error, stress, and playback checks; a New Face composition can be
+placed there too. The earlier Showcase and Surfaces pages remain available
+there as a fixture. The Workshop uses the package only through its public
+entry, so it never changes what is published.
 
 The repository should be treated as an evolving SEIHouse infrastructure
 component, not a finished public package. APIs, file structure, player

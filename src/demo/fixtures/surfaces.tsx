@@ -1,5 +1,5 @@
-import { AudioSessionProvider, FullCardPlayer, MiniSidebarPlayer } from "../audio-player"
-import { noLuckTracks, NO_LUCK_ART, SEA_THEME } from "./data"
+import { AudioSessionProvider, FullCardPlayer, MiniSidebarPlayer } from "../../audio-player"
+import { noLuckTracks, NO_LUCK_ART, SEA_THEME } from "../data"
 
 /* Surfaces — Phase 1 UI infrastructure demo.
    A deliberately simple page that demonstrates the new render zones on real
@@ -8,7 +8,7 @@ import { noLuckTracks, NO_LUCK_ART, SEA_THEME } from "./data"
    canvas). Both share one session so playback stays in sync. */
 export function SurfacesDemo() {
     return (
-        <main className="surfaces-demo" aria-labelledby="surfaces-title">
+        <section className="surfaces-demo" aria-labelledby="surfaces-title">
             <header className="surfaces-demo__head">
                 <p className="surfaces-demo__eyebrow">Phase 1 · Render zones</p>
                 <h1 id="surfaces-title" className="surfaces-demo__title">
@@ -43,7 +43,7 @@ export function SurfacesDemo() {
                     </section>
                 </div>
             </AudioSessionProvider>
-        </main>
+        </section>
     )
 }
 

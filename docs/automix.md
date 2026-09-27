@@ -96,8 +96,9 @@ function PlaylistPlayer() {
 - `onTransitionChange(isTransitioning)` — bridge for React UIs.
 
 It is also available in the plugin registry / Plugin Manager as a single
-**Automix** entry. The Lab demo (`npm run dev`) wires a playlist player with the
-plugin and shows each track's live analysis readout.
+**Automix** entry. The Workshop's **Automix** workspace (`npm run dev`, then open
+`?workspace=automix`) switches between off, Lite, and the Pro plugin on a live
+session, and shows each track's analysis and the planned transition.
 
 ## Where it lives
 
