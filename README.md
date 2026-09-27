@@ -350,7 +350,8 @@ local development Workshop:
 npm run dev
 ```
 
-The Workshop home has four categories: **Players** (the individual faces),
+The Workshop home has four categories: **Players** (the individual faces, plus
+**New Face**, a blank surface for assembling your own from the package's pieces),
 **Systems** (playback, sessions, menus, queue, Automix, cues, and other
 underlying behavior), **Customization** (plugins, themes, presets, scrubbers,
 waveforms, visuals, and other interchangeable pieces), and **Testing Lab**.
@@ -359,9 +360,10 @@ list of what works and what is still a placeholder. Every workspace has its own
 link (for example `?workspace=automix`), and leaving a workspace stops its
 audio. The Testing Lab's Mix & Match workspace places players inside an app
 shell, marketplace, reader, and other contexts at real viewport sizes, and runs
-the mobile, error, stress, and playback checks. The earlier Showcase and
-Surfaces pages remain available there as a fixture. The Workshop uses the
-package only through its public entry, so it never changes what is published.
+the mobile, error, stress, and playback checks; a New Face composition can be
+placed there too. The earlier Showcase and Surfaces pages remain available
+there as a fixture. The Workshop uses the package only through its public
+entry, so it never changes what is published.
 
 The repository should be treated as an evolving SEIHouse infrastructure
 component, not a finished public package. APIs, file structure, player

@@ -9,6 +9,7 @@ import { PARENT_SOURCE, isFrameMessage, isParentMessage } from "../bridge"
 import type { ParentMessage } from "../bridge"
 import { LabContextView } from "../contexts"
 import { LabFrameApp, findOverflow } from "../LabFrameApp"
+import { BLANK_FACE, addPiece, encodeFace } from "../../shared/faceSpec"
 import { CONTEXTS, SCENARIO_PRESETS, normalizeLabConfig } from "../labConfig"
 import type { ContextId, LabConfig } from "../labConfig"
 
@@ -67,6 +68,21 @@ describe("preview contexts", () => {
             screen.getByRole("heading", { level: 1, name: "No Luck — SENSEI" })
         ).toBeInTheDocument()
         expect(screen.getAllByRole("navigation", { name: "App navigation" })).toHaveLength(2)
+    })
+
+    it("places a New Face composition in the app shell's main area", () => {
+        const face = encodeFace(addPiece(addPiece(BLANK_FACE, "title"), "play"))
+        render(<LabContextView config={configFor("shell", { main: "custom", face })} fid="test" />)
+        const composed = screen.getByRole("region", { name: "New Face" })
+        expect(screen.getByRole("main")).toContainElement(composed)
+        expect(composed.querySelectorAll(".nf-piece")).toHaveLength(2)
+    })
+
+    it("explains a blank New Face instead of showing nothing", () => {
+        render(<LabContextView config={configFor("bare", { main: "custom" })} fid="test" />)
+        expect(screen.getByRole("region", { name: "New Face" })).toHaveTextContent(
+            "Build one in Players › New Face"
+        )
     })
 
     it("leaves the sidebar player out when it is switched off", () => {

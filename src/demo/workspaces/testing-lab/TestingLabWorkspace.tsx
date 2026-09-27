@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
 import { ExternalLink, RotateCcw } from "lucide-react"
 import { TRACK_SET_OPTIONS } from "../../data"
-import { navigate } from "../../workshop/routing"
+import { handleLinkClick, navigate, workspaceHref } from "../../workshop/routing"
 import {
     Button,
     ButtonRow,
@@ -382,6 +382,31 @@ function StressResults({ results }: { results: StressResult[] }) {
     )
 }
 
+/** Where the placed New Face came from, and the way back to keep editing it. */
+function NewFaceNote({ config }: { config: LabConfig }) {
+    const href = workspaceHref({
+        workspace: "new-face",
+        params: {
+            ...(config.face ? { face: config.face } : {}),
+            ...(config.tracks !== "no-luck" ? { tracks: config.tracks } : {}),
+        },
+    })
+    return (
+        <Note>
+            {config.face
+                ? "Showing your composition from Players › New Face. "
+                : "There is no composition here yet. Build one in Players › New Face, then place it. "}
+            <a
+                className="wk-note__link"
+                href={href}
+                onClick={(event) => handleLinkClick(event, href)}
+            >
+                {config.face ? "Keep editing in New Face" : "Open New Face"}
+            </a>
+        </Note>
+    )
+}
+
 /* ----------------------------- Workspace ----------------------------- */
 
 /** Gap between matrix previews, in px (matches .wk-lab-frames--matrix). */
@@ -645,6 +670,7 @@ export function TestingLabWorkspace() {
                                     onChange={(value) => update({ main: value })}
                                 />
                             )}
+                            {config.main === "custom" && <NewFaceNote config={config} />}
                             {context.sidebar && (
                                 <Switch
                                     label="MiniSidebarPlayer in the sidebar"

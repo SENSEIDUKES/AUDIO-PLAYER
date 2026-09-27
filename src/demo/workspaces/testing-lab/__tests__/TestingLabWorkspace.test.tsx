@@ -198,6 +198,21 @@ describe("Mix & Match Lab", () => {
         expect(screen.getByText("Seek ×30: consistent")).toBeInTheDocument()
     })
 
+    it("links a placed New Face back to its builder", () => {
+        openLab("&main=custom&face=abc123&tracks=sample")
+        const params = new URLSearchParams(
+            (
+                screen
+                    .getByRole("link", { name: "Keep editing in New Face" })
+                    .getAttribute("href") ?? ""
+            ).slice(1)
+        )
+        expect(params.get("workspace")).toBe("new-face")
+        expect(params.get("face")).toBe("abc123")
+        expect(params.get("tracks")).toBe("sample")
+        expect(previewParams(previews()[0]).get("face")).toBe("abc123")
+    })
+
     it("opens the same preview on its own, for a real phone", () => {
         openLab("&scenario=playback&theme=green")
         const link = screen.getByRole("link", { name: /Open on its own/ })

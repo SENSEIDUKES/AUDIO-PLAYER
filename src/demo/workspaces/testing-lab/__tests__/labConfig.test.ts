@@ -84,6 +84,25 @@ describe("Mix & Match Lab config", () => {
         expect(parse("context=vault&main=portable").main).toBe("vault-list")
     })
 
+    it("carries a New Face composition to the preview page", () => {
+        const config: LabConfig = { ...SCENARIO_PRESETS.free, main: "custom", face: "eyJ2IjoxfQ" }
+        const params = serializeLabConfig(config)
+        expect(params.get("main")).toBe("custom")
+        expect(params.get("face")).toBe("eyJ2IjoxfQ")
+        expect(parseLabConfig(params)).toEqual(config)
+        const src = new URLSearchParams(frameSrc(config, "main").slice(1))
+        expect(src.get("face")).toBe("eyJ2IjoxfQ")
+        expect(src.get("main")).toBe("custom")
+    })
+
+    it("offers New Face where a face can stand on its own", () => {
+        for (const context of ["shell", "phone", "bare"] as const) {
+            expect(CONTEXTS[context].mains).toContain("custom")
+            expect(parse(`context=${context}&main=custom`).main).toBe("custom")
+        }
+        expect(parse("context=marketplace&main=custom").main).toBe("sea-grid")
+    })
+
     it("builds preview page links without the viewport, so resizing never reloads", () => {
         const config: LabConfig = { ...SCENARIO_PRESETS.mobile, viewport: "430", shuffle: true }
         const src = new URLSearchParams(frameSrc(config, "w430").slice(1))

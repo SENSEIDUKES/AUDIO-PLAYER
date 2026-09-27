@@ -38,6 +38,13 @@ describe("Workshop catalog", () => {
         expect(Object.keys(WORKSPACES).sort()).toEqual(entryIds)
     })
 
+    it("leads Players with New Face, a blank surface of its own", () => {
+        const [first] = entriesForCategory("players")
+        expect(first.id).toBe("new-face")
+        expect(entryTarget(first)).toEqual({ workspace: "new-face" })
+        expect(WORKSPACES["new-face"]).toBeDefined()
+    })
+
     it("points scenario cards at the Mix & Match Lab", () => {
         const scenarioCards = WORKSHOP_ENTRIES.filter((e) => e.opens)
         expect(scenarioCards.length).toBeGreaterThan(0)

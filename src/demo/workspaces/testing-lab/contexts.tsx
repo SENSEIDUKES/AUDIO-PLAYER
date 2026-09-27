@@ -39,8 +39,10 @@ import {
     TRACK_SETS,
     playlist,
 } from "../../data"
-import { THEME_PRESETS } from "../../panel/SchemaPanel"
+import { ComposedFace } from "../shared/ComposedFace"
+import { decodeFace } from "../shared/faceSpec"
 import { SessionController } from "../shared/session"
+import { themeFor } from "../shared/themes"
 import { AppHeaderBar, AppShell, BottomNavigation } from "./AppShell"
 import { postToLab } from "./bridge"
 import type { SessionStatus, StressAction } from "./bridge"
@@ -52,15 +54,8 @@ import { runStress } from "./stress"
    the faces inside it share one AudioSessionProvider the way a real app would,
    except the portable player, which always brings its own engine. */
 
-const THEME_BY_ID: Record<LabThemeId, string> = {
-    purple: "SEI Purple",
-    green: "Neon Green",
-    glass: "OG Glass",
-    red: "Error Red",
-}
-
 export function labTheme(id: LabThemeId): AudioPlayerTheme {
-    return THEME_PRESETS.find((preset) => preset.label === THEME_BY_ID[id])?.theme ?? {}
+    return themeFor(id)
 }
 
 const TIMED_LYRICS = [
@@ -325,6 +320,21 @@ function Narrative({ config, embedded }: { config: LabConfig; embedded: boolean 
     )
 }
 
+/** A New Face composition, carried here in the preview's link. */
+function CustomFace({ config, fid }: { config: LabConfig; fid: string }) {
+    const open = useContext(ControllerContext)
+    const spec = useMemo(() => decodeFace(config.face), [config.face])
+    return (
+        <ComposedFace
+            spec={spec}
+            art={config.tracks === "no-luck" ? NO_LUCK_ART : undefined}
+            onOpenController={open}
+            onInteraction={(text) => postToLab(fid, { type: "log", text: `New Face: ${text}` })}
+            emptyMessage="This New Face is blank. Build one in Players › New Face, then place it here."
+        />
+    )
+}
+
 function MainFaceView({
     config,
     fid,
@@ -347,6 +357,8 @@ function MainFaceView({
             return <VaultList config={config} />
         case "narrative":
             return <Narrative config={config} embedded={embeddedNarrative} />
+        case "custom":
+            return <CustomFace config={config} fid={fid} />
         default:
             return null
     }
@@ -609,11 +621,7 @@ function PhoneContext({ config, fid }: { config: LabConfig; fid: string }) {
                     role="img"
                     aria-label="No Luck cover art"
                 />
-                <MainFaceView
-                    config={config}
-                    fid={fid}
-                    face={config.main === "full-card" ? "full-card" : "portable"}
-                />
+                <MainFaceView config={config} fid={fid} />
             </div>
         </div>
     )

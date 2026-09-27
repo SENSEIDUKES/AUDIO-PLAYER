@@ -23,7 +23,7 @@ export const WORKSHOP_CATEGORIES: readonly WorkshopCategory[] = [
         id: "players",
         label: "Players",
         description:
-            "Every player face on its own. Each workspace runs the real component with the shared property controls and a real track set.",
+            "Every player face on its own, plus New Face: a blank surface for building your own. Each workspace runs the real components with a real track set.",
     },
     {
         id: "systems",
@@ -87,6 +87,33 @@ export interface WorkshopEntry {
 
 export const WORKSHOP_ENTRIES: readonly WorkshopEntry[] = [
     /* ------------------------------ Players ------------------------------ */
+    {
+        id: "new-face",
+        category: "players",
+        title: "New Face",
+        summary:
+            "Start from a blank surface. Add, remove, and reorder the package's building blocks, try different gestures, then place the result in the Testing Lab's app shell.",
+        status: "live",
+        tags: ["Blank surface", "Build your own", "Testing Lab"],
+        working: [
+            "Opens blank, with 15 pieces to add, remove, reorder, and adjust",
+            "Stack, row, or grid arrangement, plus spacing, padding, corners, background, and theme",
+            "Tap, double-tap, swipe, long-press, keyboard, and reveal-on-hover interactions, with a live log",
+            "Every piece reads the shared session, so the face plays like a bundled one",
+            "The face lives in the link; one click places it in the Testing Lab's app shell or on a phone screen",
+            "Your last face is kept as a local draft",
+        ],
+        placeholders: [
+            "Pieces follow the arrangement; there is no free-form drag-and-drop placement yet",
+            "A composed face lives in the Workshop and the Testing Lab; exporting it as a package face component is not built",
+            "SEI Canvas visuals and the canvas button are not available as pieces yet",
+        ],
+        sources: [
+            "src/demo/workspaces/players/NewFaceWorkspace.tsx",
+            "src/demo/workspaces/shared/ComposedFace.tsx",
+            "src/demo/workspaces/shared/faceSpec.ts",
+        ],
+    },
     {
         id: "portable-player",
         category: "players",

@@ -1,6 +1,7 @@
 import type { RepeatMode } from "../../../audio-player"
 import { isTrackSetId } from "../../data"
 import type { TrackSetId } from "../../data"
+import type { ThemeId } from "../shared/themes"
 
 /* The Mix & Match Lab's whole state, as one serializable object. It lives in
    the URL (so every combination is a link) and is handed to each preview page
@@ -10,10 +11,11 @@ import type { TrackSetId } from "../../data"
 export type Scenario = "free" | "mobile" | "errors" | "stress" | "playback"
 export type ViewportId = "fill" | "320" | "375" | "390" | "430" | "768" | "1280" | "matrix"
 export type ContextId = "shell" | "marketplace" | "vault" | "reader" | "phone" | "states" | "bare"
-export type MainFace = "full-card" | "portable" | "sea-grid" | "vault-list" | "narrative" | "none"
+export type MainFace =
+    "full-card" | "portable" | "sea-grid" | "vault-list" | "narrative" | "custom" | "none"
 export type LabPluginId =
     "keyboard" | "analytics" | "lyrics" | "sleep" | "theme" | "waveform" | "automix"
-export type LabThemeId = "purple" | "green" | "glass" | "red"
+export type LabThemeId = ThemeId
 export type LabBackend = "html5" | "webaudio"
 export type LabPolicy = "stop" | "skip"
 
@@ -33,6 +35,8 @@ export interface LabConfig {
     backend: LabBackend
     policy: LabPolicy
     theme: LabThemeId
+    /** A New Face composition in its link form (see shared/faceSpec). */
+    face: string
 }
 
 export interface ViewportPreset {
@@ -72,7 +76,7 @@ export const CONTEXTS: Record<ContextId, ContextDefinition> = {
         label: "App shell",
         description:
             "The UI repo's app shell: sticky header, sidebar navigation (bottom navigation on phones), a scrolling main area, and a footer bar.",
-        mains: ["full-card", "portable", "sea-grid", "vault-list", "narrative", "none"],
+        mains: ["full-card", "portable", "sea-grid", "vault-list", "narrative", "custom", "none"],
         sidebar: true,
         bar: true,
     },
@@ -101,7 +105,7 @@ export const CONTEXTS: Record<ContextId, ContextDefinition> = {
     phone: {
         label: "Now playing screen",
         description: "A full-screen phone player over the release art.",
-        mains: ["portable", "full-card"],
+        mains: ["portable", "full-card", "custom"],
         sidebar: false,
         bar: false,
     },
@@ -116,7 +120,7 @@ export const CONTEXTS: Record<ContextId, ContextDefinition> = {
     bare: {
         label: "Bare canvas",
         description: "Just the chosen face, centered, for isolating a problem.",
-        mains: ["full-card", "portable", "sea-grid", "vault-list", "narrative"],
+        mains: ["full-card", "portable", "sea-grid", "vault-list", "narrative", "custom"],
         sidebar: false,
         bar: true,
     },
@@ -128,6 +132,7 @@ export const MAIN_FACE_LABELS: Record<MainFace, string> = {
     "sea-grid": "SeaCardPlayer grid",
     "vault-list": "VaultRowPlayer list",
     narrative: "NarrativeFace",
+    custom: "New Face (your composition)",
     none: "No player",
 }
 
@@ -165,6 +170,7 @@ const BASE: LabConfig = {
     backend: "html5",
     policy: "stop",
     theme: "purple",
+    face: "",
 }
 
 export const SCENARIO_PRESETS: Record<Scenario, LabConfig> = {
@@ -197,6 +203,9 @@ const MAIN_FACES = Object.keys(MAIN_FACE_LABELS) as MainFace[]
 const PLUGIN_IDS = Object.keys(PLUGIN_LABELS) as LabPluginId[]
 const THEMES: readonly LabThemeId[] = ["purple", "green", "glass", "red"]
 const REPEATS: readonly RepeatMode[] = ["off", "all", "one"]
+
+/** New Face links are small; anything longer is not a composition. */
+const MAX_FACE_LENGTH = 4000
 
 function pick<T extends string>(value: string | null, allowed: readonly T[], fallback: T): T {
     return value !== null && (allowed as readonly string[]).includes(value)
@@ -246,6 +255,7 @@ export function parseLabConfig(params: URLSearchParams): LabConfig {
         backend: pick(params.get("backend"), ["html5", "webaudio"] as const, preset.backend),
         policy: pick(params.get("policy"), ["stop", "skip"] as const, preset.policy),
         theme: pick(params.get("theme"), THEMES, preset.theme),
+        face: (params.get("face") ?? preset.face).slice(0, MAX_FACE_LENGTH),
     })
 }
 
@@ -266,6 +276,7 @@ const FIELDS: readonly Field[] = [
     "backend",
     "policy",
     "theme",
+    "face",
 ]
 
 function encode(value: LabConfig[Field]): string {

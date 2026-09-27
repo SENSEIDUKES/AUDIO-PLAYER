@@ -16,6 +16,10 @@ const players = () => import("../workspaces/players/FaceWorkspace")
 
 export const WORKSPACES: Readonly<Record<string, Workspace>> = {
     /* Players */
+    "new-face": load(
+        () => import("../workspaces/players/NewFaceWorkspace"),
+        (m) => m.NewFaceWorkspace
+    ),
     "portable-player": load(players, (m) => m.PortablePlayerWorkspace),
     "full-card": load(players, (m) => m.FullCardWorkspace),
     "sea-card": load(players, (m) => m.SeaCardWorkspace),

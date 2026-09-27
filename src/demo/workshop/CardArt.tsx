@@ -30,6 +30,7 @@ import {
     SlidersHorizontal,
     Smartphone,
     Sparkles,
+    SquarePlus,
     Star,
     TriangleAlert,
     Type,
@@ -42,6 +43,7 @@ import type { WorkshopCategoryId } from "./catalog"
    every card carries its real name and summary as text. */
 
 const ICONS: Record<string, LucideIcon> = {
+    "new-face": SquarePlus,
     "portable-player": Disc3,
     "full-card": LayoutPanelTop,
     "sea-card": GalleryHorizontal,
