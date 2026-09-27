@@ -57,7 +57,11 @@ class WorkspaceErrorBoundary extends Component<
                 <div className="wk-crash" role="alert">
                     <p className="wk-crash__title">This workspace hit an error.</p>
                     <p className="wk-crash__message">{this.state.error.message}</p>
-                    <a className="wk-btn wk-btn--primary" href={this.props.backHref}>
+                    <a
+                        className="wk-btn wk-btn--primary"
+                        href={this.props.backHref}
+                        onClick={(event) => handleLinkClick(event, this.props.backHref)}
+                    >
                         Back to the Workshop
                     </a>
                 </div>

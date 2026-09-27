@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
     AudioPlayer,
     AudioSessionProvider,
@@ -70,13 +70,16 @@ export function ThemesWorkspace() {
         setTheme((prev) => ({ ...prev, [key]: value }))
     }
 
+    useEffect(() => {
+        if (!copied) return
+        const timer = setTimeout(() => setCopied(false), 1500)
+        return () => clearTimeout(timer)
+    }, [copied])
+
     const copy = () => {
         void navigator.clipboard
             ?.writeText(JSON.stringify(theme, null, 4))
-            .then(() => {
-                setCopied(true)
-                setTimeout(() => setCopied(false), 1500)
-            })
+            .then(() => setCopied(true))
             .catch(() => undefined)
     }
 

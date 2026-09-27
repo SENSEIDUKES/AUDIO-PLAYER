@@ -27,7 +27,9 @@ export function findOverflow(
     doc: Document,
     viewportWidth: number
 ): { px: number; target: string } | null {
-    const elements = doc.body.querySelectorAll("*")
+    const body = doc.body
+    if (!body) return null
+    const elements = body.querySelectorAll("*")
     const limit = Math.min(elements.length, 4000)
     for (let i = 0; i < limit; i += 1) {
         const element = elements[i]
@@ -36,7 +38,7 @@ export function findOverflow(
         let clipped = false
         for (
             let parent = element.parentElement;
-            parent && parent !== doc.body;
+            parent && parent !== body;
             parent = parent.parentElement
         ) {
             const style = doc.defaultView?.getComputedStyle(parent)

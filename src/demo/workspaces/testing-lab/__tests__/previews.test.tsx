@@ -114,6 +114,12 @@ describe("overflow detection", () => {
         expect(findOverflow(document, 375)).toBeNull()
     })
 
+    it("copes with a document that has no body yet", () => {
+        const doc = document.implementation.createDocument(null, "root")
+        expect(doc.body).toBeNull()
+        expect(findOverflow(doc, 375)).toBeNull()
+    })
+
     it("finds nothing when everything fits", () => {
         document.body.innerHTML = `<div class="a">a</div>`
         vi.spyOn(document.querySelector(".a") as Element, "getBoundingClientRect").mockReturnValue(

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import type { ReactNode } from "react"
 import type { AudioPlayerTheme, PropertyGroup } from "../../audio-player"
 import {
@@ -116,6 +116,11 @@ export function SchemaPanel({
         advanced: false,
     })
     const [copied, setCopied] = useState(false)
+    useEffect(() => {
+        if (!copied) return
+        const timer = setTimeout(() => setCopied(false), 1500)
+        return () => clearTimeout(timer)
+    }, [copied])
 
     const toggle = (id: string) => setOpen((o) => ({ ...o, [id]: !o[id] }))
 
@@ -172,7 +177,6 @@ export function SchemaPanel({
             if (navigator.clipboard) {
                 await navigator.clipboard.writeText(buildJsx())
                 setCopied(true)
-                setTimeout(() => setCopied(false), 1500)
             }
         } catch {
             /* ignore */
