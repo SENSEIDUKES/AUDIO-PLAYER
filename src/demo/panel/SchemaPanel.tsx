@@ -11,7 +11,7 @@ import {
 import type { WorkshopFaceDefinition, WorkshopSettings } from "../workshopFaces"
 import { PropertyControl } from "./PropertyControl"
 
-const THEME_PRESETS: {
+export const THEME_PRESETS: {
     label: string
     theme: Partial<AudioPlayerTheme>
 }[] = [

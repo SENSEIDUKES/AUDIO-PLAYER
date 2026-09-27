@@ -13,9 +13,9 @@ import {
     buildVaultTrackArcActions,
     registerVaultCategory,
     useAudioSession,
-} from "../audio-player"
-import type { ArcCommandHost, Track, VaultCategory, WorkspaceRoute } from "../audio-player"
-import { noLuckTracks, NO_LUCK_COVER, NO_LUCK_ART, SEA_THEME } from "./data"
+} from "../../audio-player"
+import type { ArcCommandHost, Track, VaultCategory, WorkspaceRoute } from "../../audio-player"
+import { noLuckTracks, NO_LUCK_COVER, NO_LUCK_ART, SEA_THEME } from "../data"
 
 /* Demonstrate a host-registered CUSTOM classification (beyond the built-ins) —
    it picks up the full accent system (rail, chip, hover/active) automatically. */
@@ -284,10 +284,10 @@ const SHOWCASE_SECTIONS = [
 
 /* The clean gallery: the two player families, all playing the "No Luck"
    release. No broken URLs, debug panels, or stress tests here — that material
-   lives in the Lab tab. */
+   lives in the Testing Lab. */
 export function Showcase() {
     return (
-        <main className="product-preview" aria-labelledby="showcase-title">
+        <section className="product-preview" aria-labelledby="showcase-title">
             <SectionNav
                 sections={SHOWCASE_SECTIONS}
                 defaultSectionId="showcase-hero"
@@ -478,6 +478,6 @@ export function Showcase() {
                     </p>
                 </article>
             </section>
-        </main>
+        </section>
     )
 }

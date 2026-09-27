@@ -67,6 +67,26 @@ export interface WorkshopSettings {
     artMedia: MediaSource | null
 }
 
+/** Face-specific test options the per-face workspaces expose beyond the shared
+    property registry. Every field is optional; omitted fields keep the
+    original Face Presets behavior. */
+export interface FaceRenderOptions {
+    /** Portable player: one track through the single-track props instead of a playlist. */
+    single?: boolean
+    /** StickyBottomPlayer: pin to the viewport (production) instead of inline. */
+    stickyFixed?: boolean
+    /** SeaCardPlayer: how many cards to render. */
+    cardCount?: number
+    /** SeaCardPlayer: price / tag chip text. */
+    cardTag?: string
+    /** VaultRowPlayer: the Vault app's own menu, or SAP's canonical menu. */
+    vaultMenu?: "vault" | "canonical"
+    /** VaultRowPlayer: grant the Studio Scout entitlement. */
+    studioScout?: boolean
+    /** VaultRowPlayer: category per row (defaults rotate through the built-ins). */
+    vaultCategories?: readonly string[]
+}
+
 export interface WorkshopFaceDefinition {
     id: WorkshopFaceId
     label: string
@@ -86,6 +106,7 @@ export interface WorkshopFaceDefinition {
         settings: WorkshopSettings
         tracks: Track[]
         plugins: readonly AudioPlayerPlugin[]
+        options?: FaceRenderOptions
     }) => ReactNode
 }
 
@@ -155,30 +176,43 @@ function workshopShareCommands(track: Track): ArcCommandHost["commands"] {
    menu (Vault / Playback / Share / Agents), passed in as `actions` — the host
    owns composition, SAP owns routing. Every settings leaf routes into the one
    shared SAP Controller instance owned here. */
-function WorkshopVaultRows({ tracks, theme }: { tracks: Track[]; theme: AudioPlayerTheme }) {
+function WorkshopVaultRows({
+    tracks,
+    theme,
+    options,
+}: {
+    tracks: Track[]
+    theme: AudioPlayerTheme
+    options?: FaceRenderOptions
+}) {
     const s = useAudioSession()
     const [route, setRoute] = useState<WorkspaceRoute | null>(null)
-    // No Studio Scout entitlement in the workshop — Agents › Scout routes to
-    // its free Demo tier.
+    const studioScout = options?.studioScout ?? false
+    const canonical = options?.vaultMenu === "canonical"
+    // Without the Studio Scout entitlement, Agents › Scout routes to its free
+    // Demo tier.
     const vaultActions = useMemo(
-        () => buildVaultTrackArcActions({ entitlements: { studioScout: false } }),
-        []
+        () => buildVaultTrackArcActions({ entitlements: { studioScout } }),
+        [studioScout]
     )
     return (
         <div className="workshop__vault">
             {tracks.map((t, i) => {
                 // Tag rows with rotating categories so the classification
                 // color system is visible in the workshop preview.
+                const categories = options?.vaultCategories ?? WORKSHOP_VAULT_CATEGORIES
                 const tagged: Track = {
                     ...t,
-                    vaultCategory: WORKSHOP_VAULT_CATEGORIES[i % WORKSHOP_VAULT_CATEGORIES.length],
+                    vaultCategory: categories[i % categories.length],
                 }
                 return (
                     <VaultRowPlayer
                         key={tagged.id ?? tagged.title}
                         track={tagged}
                         number={i + 1}
-                        actions={vaultActions}
+                        actions={canonical ? undefined : vaultActions}
+                        entitlements={{ studioScout }}
+                        activePluginIds={s.pluginNames}
                         commands={workshopShareCommands(tagged)}
                         onOpenWorkspace={setRoute}
                         {...theme}
@@ -214,9 +248,16 @@ export const WORKSHOP_FACES: readonly WorkshopFaceDefinition[] = [
         playerFace: "portable",
         sessionBased: false,
         controls: ["theme", "background", "typography", "behavior", "display"],
-        render: ({ settings, tracks, plugins }) => (
+        render: ({ settings, tracks, plugins, options }) => (
             <AudioPlayer
-                tracks={tracks}
+                {...(options?.single
+                    ? {
+                          title: tracks[0]?.title,
+                          artist: tracks[0]?.artist,
+                          audioFile: tracks[0]?.audioFile,
+                          lyrics: tracks[0]?.lyrics,
+                      }
+                    : { tracks })}
                 plugins={plugins}
                 {...settings.theme}
                 backgroundImage={{ src: settings.backgroundImageSrc }}
@@ -263,9 +304,9 @@ export const WORKSHOP_FACES: readonly WorkshopFaceDefinition[] = [
         playerFace: "stickyBottom",
         sessionBased: true,
         controls: ["theme", "display"],
-        render: ({ settings }) => (
+        render: ({ settings, options }) => (
             <StickyBottomPlayer
-                fixed={false}
+                fixed={options?.stickyFixed ?? false}
                 showVolume={settings.showVolume}
                 {...settings.theme}
             />
@@ -294,8 +335,8 @@ export const WORKSHOP_FACES: readonly WorkshopFaceDefinition[] = [
         playerFace: "vaultRow",
         sessionBased: true,
         controls: ["theme"],
-        render: ({ settings, tracks }) => (
-            <WorkshopVaultRows tracks={tracks} theme={settings.theme} />
+        render: ({ settings, tracks, options }) => (
+            <WorkshopVaultRows tracks={tracks} theme={settings.theme} options={options} />
         ),
     },
     {
@@ -305,15 +346,15 @@ export const WORKSHOP_FACES: readonly WorkshopFaceDefinition[] = [
         playerFace: "seaCard",
         sessionBased: true,
         controls: ["theme", "art"],
-        render: ({ settings, tracks }) => (
+        render: ({ settings, tracks, options }) => (
             <div className="workshop__sea">
-                {tracks.slice(0, 4).map((t) => (
+                {tracks.slice(0, options?.cardCount ?? 4).map((t) => (
                     <SeaCardPlayer
                         key={t.id ?? t.title}
                         track={t}
                         art={settings.art}
                         artMedia={settings.artMedia}
-                        tag="SEA"
+                        tag={options?.cardTag ?? "SEA"}
                         titleFont={settings.titleFont}
                         artistFont={settings.artistFont}
                         {...settings.theme}

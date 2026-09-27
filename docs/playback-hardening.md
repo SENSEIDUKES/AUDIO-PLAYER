@@ -72,8 +72,12 @@ memoization. Legitimate plugin-set changes still replace normally. Docs updated 
 - `plugins/__tests__/AutomixPlugin.test.ts` — `handleTrackEnded` does not suppress
   the host advance while idle (single advance); disabled/cancel stays idle.
 
-## Manual QA checklist (Showcase "No Luck", mobile-sized viewport)
-DOM-event cases not covered by unit tests:
+## Manual QA checklist ("No Luck", mobile-sized viewport)
+DOM-event cases not covered by unit tests. Run them in the Workshop's Testing
+Lab: the **Playback checks** card (`?workspace=testing-lab&scenario=playback`)
+opens a preset with these checks beside the preview; switch the device width
+to a phone size. The Showcase fixture (`?workspace=showcase-fixture`) still
+plays the same release.
 1. Initial page load — no spinner on the play button while idle.
 2. Tap play/pause repeatedly — spinner only appears during genuine load *while
    playing*; pausing clears it immediately.
