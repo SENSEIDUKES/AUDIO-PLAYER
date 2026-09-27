@@ -147,16 +147,23 @@ function SessionProbe({ fid }: { fid: string }) {
     })
 
     useEffect(() => {
+        let active = true
         const onStress = (event: Event) => {
             const action = (event as CustomEvent<StressAction>).detail
             postToLab(fid, { type: "log", text: `Stress: running ${action}…` })
             void runStress(action, {
                 session: () => latest.current,
                 time: () => timeRef.current,
-            }).then((result) => postToLab(fid, { type: "stress-result", result }))
+            }).then((result) => {
+                // The preview may have reloaded while the routine ran.
+                if (active) postToLab(fid, { type: "stress-result", result })
+            })
         }
         window.addEventListener("sap-lab:stress", onStress)
-        return () => window.removeEventListener("sap-lab:stress", onStress)
+        return () => {
+            active = false
+            window.removeEventListener("sap-lab:stress", onStress)
+        }
     }, [fid])
 
     return null

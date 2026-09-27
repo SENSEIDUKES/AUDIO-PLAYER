@@ -88,6 +88,8 @@ function OwnTransport({
     )
 }
 
+const NO_LUCK_ARTWORK: MediaImage[] = [{ src: NO_LUCK_COVER, sizes: "512x512", type: "image/jpeg" }]
+
 function MediaSessionBridge() {
     const s = useAudioSession()
     const track = s.currentTrack
@@ -95,7 +97,7 @@ function MediaSessionBridge() {
         title: track?.title ?? "SEIHouse",
         artist: track?.artist,
         album: "No Luck",
-        artwork: [{ src: NO_LUCK_COVER, sizes: "512x512", type: "image/jpeg" }],
+        artwork: NO_LUCK_ARTWORK,
         onNext: s.next,
         onPrevious: s.previous,
         sourceKey: track?.id ?? track?.title,

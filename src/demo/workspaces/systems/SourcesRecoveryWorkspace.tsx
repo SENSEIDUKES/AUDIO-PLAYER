@@ -150,16 +150,22 @@ export function SourcesRecoveryWorkspace() {
         if (!useResolver) return undefined
         return (source, signal) =>
             new Promise((resolve, reject) => {
+                if (signal.aborted) {
+                    reject(new DOMException("Aborted", "AbortError"))
+                    return
+                }
                 const timer = setTimeout(() => {
+                    signal.removeEventListener("abort", onAbort)
                     const joiner = source.url.includes("?") ? "&" : "?"
                     append(`resolver: signed ${source.url.split("/").pop()}`, "ok")
                     resolve(`${source.url}${joiner}workshop-signed=1`)
                 }, 700)
-                signal.addEventListener("abort", () => {
+                function onAbort() {
                     clearTimeout(timer)
                     append("resolver: request cancelled (track changed)", "warn")
                     reject(new DOMException("Aborted", "AbortError"))
-                })
+                }
+                signal.addEventListener("abort", onAbort, { once: true })
             })
     }, [useResolver, append])
 

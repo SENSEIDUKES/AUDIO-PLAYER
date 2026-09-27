@@ -153,10 +153,12 @@ describe("preview page", () => {
 
     it("renders the context from its URL and marks itself as a preview", () => {
         window.history.replaceState(null, "", "/?frame=lab&fid=solo&scenario=errors")
-        render(<LabFrameApp />)
+        const { unmount } = render(<LabFrameApp />)
         expect(document.title).toBe("Testing Lab preview")
         expect(document.body).toHaveClass("lab-frame-body")
         expect(screen.getByRole("region", { name: "Fallback recovery" })).toBeInTheDocument()
+        unmount()
+        expect(document.body).not.toHaveClass("lab-frame-body")
     })
 
     it("pauses its players when the lab says another preview started", () => {

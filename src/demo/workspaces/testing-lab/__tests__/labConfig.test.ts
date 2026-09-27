@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { isTrackSetId } from "../../../data"
 import {
     CONTEXTS,
     SCENARIO_PRESETS,
@@ -66,6 +67,14 @@ describe("Mix & Match Lab config", () => {
         expect(config.plugins).toEqual(["keyboard"])
         expect(config.bar).toBe(SCENARIO_PRESETS.stress.bar)
         expect(parse("scenario=nope").scenario).toBe("free")
+    })
+
+    it("only accepts real track sets, never inherited object keys", () => {
+        expect(isTrackSetId("narration")).toBe(true)
+        for (const key of ["constructor", "toString", "__proto__", "hasOwnProperty"]) {
+            expect(isTrackSetId(key)).toBe(false)
+            expect(parse(`tracks=${key}`).tracks).toBe(SCENARIO_PRESETS.free.tracks)
+        }
     })
 
     it("keeps the main face valid for the chosen context", () => {

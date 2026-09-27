@@ -473,8 +473,8 @@ export function Showcase() {
                     <span>03</span>
                     <h2>Test &amp; customize</h2>
                     <p>
-                        Switch to Lab for QA, broken states, backends, and plugins — or Workshop to
-                        customize faces and presets.
+                        Use the Testing Lab for QA, broken states, backends, and plugins — or Face
+                        Presets to customize faces and presets.
                     </p>
                 </article>
             </section>

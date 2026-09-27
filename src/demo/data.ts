@@ -242,5 +242,5 @@ export const TRACK_SET_OPTIONS = (Object.keys(TRACK_SETS) as TrackSetId[]).map((
 }))
 
 export function isTrackSetId(value: string): value is TrackSetId {
-    return value in TRACK_SETS
+    return Object.prototype.hasOwnProperty.call(TRACK_SETS, value)
 }

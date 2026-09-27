@@ -83,6 +83,7 @@ export function LabFrameApp() {
     useEffect(() => {
         document.title = "Testing Lab preview"
         document.body.classList.add("lab-frame-body")
+        return () => document.body.classList.remove("lab-frame-body")
     }, [])
 
     // One engine at a time inside this page; tell the lab so it can pause the
