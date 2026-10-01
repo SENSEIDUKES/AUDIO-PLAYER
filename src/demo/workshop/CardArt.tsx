@@ -29,6 +29,7 @@ import {
     Shuffle,
     SlidersHorizontal,
     Smartphone,
+    SlidersVertical,
     Sparkles,
     SquarePlus,
     Star,
@@ -78,6 +79,7 @@ const ICONS: Record<string, LucideIcon> = {
     "lab-stress": Zap,
     "lab-playback": CirclePlay,
     "showcase-fixture": Star,
+    "reader-mixer": SlidersVertical,
 }
 
 export function CardArt({ id, category }: { id: string; category: WorkshopCategoryId }) {

@@ -40,12 +40,12 @@ afterEach(() => {
 })
 
 describe("Workshop home", () => {
-    it("is the entry point, with the four categories as tabs", () => {
+    it("is the entry point, with the five categories as tabs", () => {
         openAt("")
         const tabs = within(screen.getByRole("tablist", { name: "Workshop categories" }))
             .getAllByRole("tab")
             .map((tab) => tab.firstChild?.textContent)
-        expect(tabs).toEqual(["Players", "Systems", "Customization", "Testing Lab"])
+        expect(tabs).toEqual(["Players", "Systems", "Customization", "Testing Lab", "SEN"])
         expect(screen.getByRole("heading", { level: 1, name: "Players" })).toBeInTheDocument()
         expect(screen.getByRole("tab", { selected: true })).toHaveTextContent("Players")
     })
@@ -63,6 +63,14 @@ describe("Workshop home", () => {
         fireEvent.keyDown(screen.getByRole("tab", { selected: true }), { key: "ArrowRight" })
         expect(window.location.search).toBe("?category=testing-lab")
         expect(screen.getByRole("tab", { selected: true })).toHaveTextContent("Testing Lab")
+    })
+
+    it("opens the SEN tab and its Reader Mixer card", () => {
+        openAt("?category=testing-lab")
+        fireEvent.keyDown(screen.getByRole("tab", { selected: true }), { key: "ArrowRight" })
+        expect(window.location.search).toBe("?category=sen")
+        expect(screen.getByRole("heading", { level: 1, name: "SEN" })).toBeInTheDocument()
+        expect(cardFor("Reader Mixer")).toHaveAttribute("href", "?workspace=reader-mixer")
     })
 
     it("shows roadmap pieces honestly, as records that open nothing", () => {

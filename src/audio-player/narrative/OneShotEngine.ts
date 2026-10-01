@@ -1,3 +1,6 @@
+import { UnlockedAudioPool } from "./mediaRouting"
+import type { MediaGainSink, MediaGainSinkFactory } from "./mediaRouting"
+
 function clamp01(value: number): number {
     if (!Number.isFinite(value)) return 0
     return Math.max(0, Math.min(1, value))
@@ -11,6 +14,8 @@ function positiveInteger(value: number | undefined, fallback: number): number {
 
 type PoolEntry = {
     el: HTMLAudioElement
+    /** Web Audio gain for this element, when the host routes it; else null. */
+    sink: MediaGainSink | null
     active: boolean
     generation: number
     needsLoad: boolean
@@ -41,6 +46,28 @@ export interface OneShotEngineOptions {
      * unset by default so ordinary media hosts do not require CORS headers.
      */
     crossOrigin?: "anonymous" | "use-credentials"
+    /**
+     * Route each element's gain somewhere other than
+     * `HTMLMediaElement.volume`, typically a Web Audio `GainNode`. Called once
+     * per pooled element before its `src` is set.
+     */
+    createGainSink?: MediaGainSinkFactory
+    /** Spare elements {@link OneShotEngine.unlock} prepares. Defaults to 4. */
+    unlockPoolSize?: number
+    /** Reports a cue the browser refused to play. */
+    onPlaybackError?: (event: OneShotPlaybackErrorEvent) => void
+    /** Reports the number of cues playing whenever it changes. */
+    onActiveCountChange?: (count: number) => void
+}
+
+/** Why a one-shot did not play. */
+export interface OneShotPlaybackErrorEvent {
+    readonly url: string
+    /**
+     * `"autoplay-blocked"`: the browser wants a user gesture first; the cue is
+     * skipped. `"failed"`: network, decode or format failure.
+     */
+    readonly reason: "autoplay-blocked" | "failed"
 }
 
 export interface PlayOneShotOptions {
@@ -69,6 +96,11 @@ export class OneShotEngine {
     private volumeWritesUnsupported = false
     private disposed = false
     private useCounter = 0
+    private readonly createGainSink?: MediaGainSinkFactory
+    private readonly unlockPool: UnlockedAudioPool
+    private readonly onPlaybackError?: (event: OneShotPlaybackErrorEvent) => void
+    private readonly onActiveCountChange?: (count: number) => void
+    private reportedActiveCount = 0
 
     constructor(options: OneShotEngineOptions = {}) {
         this.level = clamp01(options.level ?? 1)
@@ -77,6 +109,22 @@ export class OneShotEngine {
         this.maxPoolSizePerUrl = positiveInteger(options.maxPoolSizePerUrl, 4)
         this.maxConcurrent = positiveInteger(options.maxConcurrent, 32)
         this.crossOrigin = options.crossOrigin
+        this.createGainSink = options.createGainSink
+        this.unlockPool = new UnlockedAudioPool(
+            Math.max(0, Math.floor(options.unlockPoolSize ?? 4))
+        )
+        this.onPlaybackError = options.onPlaybackError
+        this.onActiveCountChange = options.onActiveCountChange
+    }
+
+    /**
+     * Prepare spare elements for later cues. Call from inside a user-gesture
+     * handler: on browsers that unlock audio per element (iOS Safari), a cue
+     * reached later without a tap can then play.
+     */
+    unlock(): void {
+        if (this.disposed) return
+        this.unlockPool.prime()
     }
 
     setLevel(value: number): void {
@@ -179,6 +227,7 @@ export class OneShotEngine {
             playPromise = entry.el.play()
         } catch {
             this.evict(key, entry)
+            this.reportPlaybackError(key, "failed")
             return null
         }
 
@@ -186,8 +235,10 @@ export class OneShotEngine {
             if (!this.isCurrent(entry, generation)) return
             if ((error as { name?: string } | null)?.name === "NotAllowedError") {
                 this.release(key, entry)
+                this.reportPlaybackError(key, "autoplay-blocked")
             } else {
                 this.evict(key, entry)
+                this.reportPlaybackError(key, "failed")
             }
         })
 
@@ -198,6 +249,7 @@ export class OneShotEngine {
     dispose(): void {
         if (this.disposed) return
         this.disposed = true
+        this.unlockPool.clear()
         for (const [url, pool] of [...this.pools]) {
             for (const entry of [...pool.entries]) this.evict(url, entry)
         }
@@ -217,12 +269,13 @@ export class OneShotEngine {
         let entry = pool.entries.find((candidate) => !candidate.active)
         if (!entry) {
             try {
-                const el = new Audio()
+                const el = this.unlockPool.take()
                 el.preload = "auto"
                 if (this.crossOrigin) el.crossOrigin = this.crossOrigin
                 el.muted = this.muted
                 const created: PoolEntry = {
                     el,
+                    sink: this.makeGainSink(el),
                     active: false,
                     generation: 0,
                     needsLoad: true,
@@ -251,6 +304,7 @@ export class OneShotEngine {
         entry.generation += 1
         entry.lastUsed = ++this.useCounter
         this.pruneUrlPools()
+        this.reportActiveCount()
         return entry
     }
 
@@ -268,6 +322,7 @@ export class OneShotEngine {
         }
 
         const pool = this.pools.get(url)
+        this.reportActiveCount()
         if (!pool || !pool.entries.includes(entry)) return
         this.touch(pool)
         this.trimPool(url, pool)
@@ -294,6 +349,16 @@ export class OneShotEngine {
         } catch {
             // Best-effort teardown; removing our reference still evicts it.
         }
+        if (entry.sink) {
+            const sink = entry.sink
+            entry.sink = null
+            try {
+                sink.dispose()
+            } catch {
+                // Host cleanup failures cannot block eviction.
+            }
+        }
+        this.reportActiveCount()
     }
 
     private trimPool(url: string, pool: UrlPool): void {
@@ -329,7 +394,8 @@ export class OneShotEngine {
         return entry.active && entry.generation === generation
     }
 
-    private getActiveCount(): number {
+    /** Number of one-shots currently playing. */
+    getActiveCount(): number {
         let count = 0
         for (const pool of this.pools.values()) {
             for (const entry of pool.entries) {
@@ -345,8 +411,16 @@ export class OneShotEngine {
      * instead of repeatedly throwing and corrupting pool state.
      */
     private applyVolume(entry: PoolEntry): void {
-        if (this.volumeWritesUnsupported) return
         const target = clamp01(this.level * entry.playbackGain)
+        if (entry.sink) {
+            try {
+                entry.sink.setGain(target)
+            } catch {
+                // A host sink failure cannot break cue playback.
+            }
+            return
+        }
+        if (this.volumeWritesUnsupported) return
         try {
             entry.el.volume = target
             if (target > 0.1 && Math.abs(entry.el.volume - target) > 0.05) {
@@ -354,6 +428,36 @@ export class OneShotEngine {
             }
         } catch {
             this.volumeWritesUnsupported = true
+        }
+    }
+
+    private makeGainSink(el: HTMLAudioElement): MediaGainSink | null {
+        if (!this.createGainSink) return null
+        try {
+            return this.createGainSink(el) ?? null
+        } catch {
+            return null
+        }
+    }
+
+    private reportPlaybackError(url: string, reason: OneShotPlaybackErrorEvent["reason"]): void {
+        if (this.disposed) return
+        try {
+            this.onPlaybackError?.(Object.freeze({ url, reason }))
+        } catch {
+            // Host callbacks cannot break pool state.
+        }
+    }
+
+    private reportActiveCount(): void {
+        if (!this.onActiveCountChange) return
+        const count = this.getActiveCount()
+        if (count === this.reportedActiveCount) return
+        this.reportedActiveCount = count
+        try {
+            this.onActiveCountChange(count)
+        } catch {
+            // Host callbacks cannot break pool state.
         }
     }
 }

@@ -1,4 +1,4 @@
-/* The Workshop catalog: every card on the home screen, grouped into four
+/* The Workshop catalog: every card on the home screen, grouped into five
    navigation categories.
 
    Categories are navigation only. Nothing here is a package, and nothing here
@@ -10,7 +10,7 @@
    (`?workspace=<id>`). Testing Lab scenario cards open the Mix & Match Lab with
    a preset. Roadmap records are listed honestly but have nothing to open. */
 
-export type WorkshopCategoryId = "players" | "systems" | "customization" | "testing-lab"
+export type WorkshopCategoryId = "players" | "systems" | "customization" | "testing-lab" | "sen"
 
 export interface WorkshopCategory {
     id: WorkshopCategoryId
@@ -42,6 +42,12 @@ export const WORKSHOP_CATEGORIES: readonly WorkshopCategory[] = [
         label: "Testing Lab",
         description:
             "Mix and match players inside a realistic app shell at real device sizes, then run the mobile, error, stress, and playback checks.",
+    },
+    {
+        id: "sen",
+        label: "SEN",
+        description:
+            "SEIHouse Expanded Novels: the pieces the NovelExpanded reader uses, built and pressure-tested here before they reach SEA.",
     },
 ]
 
@@ -751,6 +757,34 @@ export const WORKSHOP_ENTRIES: readonly WorkshopEntry[] = [
             "The original render-zones demo: SEI Canvas and queue surfaces on two faces",
         ],
         sources: ["src/demo/fixtures/showcase.tsx", "src/demo/fixtures/surfaces.tsx"],
+    },
+    /* -------------------------------- SEN -------------------------------- */
+    {
+        id: "reader-mixer",
+        category: "sen",
+        title: "Reader Mixer",
+        summary:
+            "Music, atmosphere and sound cues playing together, each with its own switch and volume, plus the inline mixer view for the reader's Settings › Audio.",
+        status: "live",
+        tags: ["ReaderMixer", "ReaderMixerPanel", "Three layers"],
+        working: [
+            "Soundscapes crossfade per chapter and mid-chapter, and repeat requests do nothing",
+            "A reader-chosen atmosphere loops under everything; Off fades it out",
+            "Sound cues overlap over both loops without pausing them",
+            "Master, per-layer switches and sliders, with settings saved in this browser",
+            "Element or Web Audio routing, with the iPhone on/off fallback shown in the view",
+            "Both loops pause while the page is hidden",
+        ],
+        placeholders: [
+            "SEIHouse audio hosts send no CORS headers yet, so the Web Audio route only plays the CORS sample",
+            "iPhone behavior (silent switch, per-element unlock) needs a real device; this page cannot prove it",
+        ],
+        sources: [
+            "src/audio-player/narrative/ReaderMixer.ts",
+            "src/audio-player/narrative/ReaderMixerContext.tsx",
+            "src/audio-player/components/ReaderMixerPanel.tsx",
+            "src/demo/workspaces/sen/ReaderMixerWorkspace.tsx",
+        ],
     },
 ]
 

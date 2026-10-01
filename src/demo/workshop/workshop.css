@@ -9,6 +9,7 @@
     --wk-systems: #22d3a6;
     --wk-customization: #f4b860;
     --wk-testing-lab: #38bdf8;
+    --wk-sen: #f472b6;
     --wk-live: #22d3a6;
     --wk-partial: #f4b860;
     --wk-placeholder: #a3a3b2;
@@ -236,6 +237,18 @@ a.wk-card:hover {
 }
 .wk-card-art--testing-lab {
     --wk-tint: var(--wk-testing-lab);
+}
+.wk-card-art--sen {
+    --wk-tint: var(--wk-sen);
+}
+
+/* SEN: a stand-in for the reader's Settings menu around the mixer view. */
+.wk-sen-settings {
+    padding: 16px;
+    border: 1px solid var(--lab-border);
+    border-radius: var(--wk-radius);
+    background: var(--wk-surface-strong);
+    color: var(--lab-text);
 }
 .wk-card-art__ring {
     position: absolute;

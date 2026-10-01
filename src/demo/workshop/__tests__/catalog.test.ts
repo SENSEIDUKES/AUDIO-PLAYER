@@ -9,13 +9,21 @@ import {
 import { WORKSPACES } from "../registry"
 
 describe("Workshop catalog", () => {
-    it("has exactly the four navigation categories, in order", () => {
+    it("has exactly the five navigation categories, in order", () => {
         expect(WORKSHOP_CATEGORIES.map((c) => c.label)).toEqual([
             "Players",
             "Systems",
             "Customization",
             "Testing Lab",
+            "SEN",
         ])
+    })
+
+    it("opens the Reader Mixer from the SEN tab", () => {
+        const [first] = entriesForCategory("sen")
+        expect(first.id).toBe("reader-mixer")
+        expect(entryTarget(first)).toEqual({ workspace: "reader-mixer" })
+        expect(WORKSPACES["reader-mixer"]).toBeDefined()
     })
 
     it("gives every entry a unique id and a real category", () => {
