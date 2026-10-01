@@ -116,6 +116,21 @@ describe("ReaderMixerPanel", () => {
         expect(mixer!.getPreferences().atmosphereId).toBeNull()
     })
 
+    it("tolerates a non-string group from untyped host data", () => {
+        mixer = createReaderMixer({
+            atmospheres: [
+                {
+                    id: "odd",
+                    label: "Odd",
+                    group: 7 as unknown as string,
+                    sources: [{ url: "https://a.test/odd.mp3" }],
+                },
+            ],
+        })
+        render(<ReaderMixerPanel mixer={mixer} />)
+        expect(screen.getByRole("radio", { name: "Odd" })).toBeInTheDocument()
+    })
+
     it("accepts every label from the host", () => {
         renderPanel({
             labels: {

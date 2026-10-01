@@ -108,7 +108,8 @@ type AtmosphereGroup = { name: string | null; options: ReaderAtmosphereOption[] 
 function groupAtmospheres(options: readonly ReaderAtmosphereOption[]): AtmosphereGroup[] {
     const groups: AtmosphereGroup[] = []
     for (const option of options) {
-        const name = option.group?.trim() || null
+        // Host catalogs may come from untyped data; ignore a non-string group.
+        const name = typeof option.group === "string" ? option.group.trim() || null : null
         let group = groups.find((candidate) => candidate.name === name)
         if (!group) {
             group = { name, options: [] }

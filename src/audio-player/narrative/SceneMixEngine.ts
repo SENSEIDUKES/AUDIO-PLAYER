@@ -188,6 +188,11 @@ export class SceneMixEngine {
     private pendingTransition: PendingTransition | null = null
     /** Removes the armed unlock-gesture listeners, when armed. */
     private disarmGestureRetry: (() => void) | null = null
+    /** Removes the armed resume() retry after an autoplay rejection, when armed. */
+    private disarmResumeRetry: (() => void) | null = null
+    /** Every retry waiting for the next user gesture; one gesture runs them all. */
+    private readonly gestureActions = new Set<() => void>()
+    private removeGestureListeners: (() => void) | null = null
     private statusSnapshot = INITIAL_STATUS
     private statusListeners = new Set<SceneMixStatusListener>()
     private createGainSink?: MediaGainSinkFactory
@@ -477,6 +482,7 @@ export class SceneMixEngine {
             this.rollbackTransition(pending)
         }
         this.disarmGestureRetry?.()
+        this.disarmResumeRetry?.()
         for (const deck of [...this.decks]) {
             if (deck.retiring) {
                 this.releaseDeck(deck)
@@ -516,6 +522,9 @@ export class SceneMixEngine {
         this.unlockPool.clear()
         this.stopTicking()
         this.disarmGestureRetry?.()
+        this.disarmResumeRetry?.()
+        this.gestureActions.clear()
+        this.removeGestureListeners?.()
         this.pendingTransition = null
         for (const deck of [...this.decks]) this.releaseDeck(deck)
         this.active = null
@@ -556,7 +565,7 @@ export class SceneMixEngine {
                     this.pendingTransition?.request.key ?? deck.key,
                     deck.key
                 )
-                this.armGesture(() => this.resumeDeck(deck))
+                this.armResumeRetry(deck)
             }
         )
     }
@@ -920,30 +929,62 @@ export class SceneMixEngine {
      * change, chapter load) would stay silent forever.
      */
     private armGestureRetry(transition: PendingTransition, deck: Deck): void {
+        if (this.disarmGestureRetry) return
         if (!this.isCurrentCandidate(transition, deck)) return
-        this.armGesture(() => this.attemptPlayback(transition, deck, false))
+        const remove = this.armGesture(() => {
+            this.disarmGestureRetry = null
+            this.attemptPlayback(transition, deck, false)
+        })
+        this.disarmGestureRetry = () => {
+            this.disarmGestureRetry = null
+            remove()
+        }
     }
 
-    /** Run `action` once on the next user gesture (one armed action at a time). */
-    private armGesture(action: () => void): void {
-        if (this.disarmGestureRetry || this.disposed) return
-        if (typeof document === "undefined") return
-        const retry = () => {
-            disarm()
-            action()
+    /** Retry a blocked resume() of the audible deck on the next user gesture. */
+    private armResumeRetry(deck: Deck): void {
+        if (this.disarmResumeRetry) return
+        const remove = this.armGesture(() => {
+            this.disarmResumeRetry = null
+            this.resumeDeck(deck)
+        })
+        this.disarmResumeRetry = () => {
+            this.disarmResumeRetry = null
+            remove()
         }
-        const disarm = () => {
-            this.disarmGestureRetry = null
+    }
+
+    /**
+     * Run `action` once on the next user gesture, alongside every other armed
+     * retry, so one tap restarts a blocked resume and a blocked switch
+     * together. Returns a function that cancels this action only.
+     */
+    private armGesture(action: () => void): () => void {
+        if (this.disposed || typeof document === "undefined") return () => {}
+        this.gestureActions.add(action)
+        if (!this.removeGestureListeners) {
+            const onGesture = () => {
+                const actions = [...this.gestureActions]
+                this.gestureActions.clear()
+                this.removeGestureListeners?.()
+                for (const pending of actions) pending()
+            }
             for (const type of UNLOCK_GESTURES) {
-                document.removeEventListener(type, retry, true)
+                document.addEventListener(type, onGesture, {
+                    capture: true,
+                    passive: true,
+                })
+            }
+            this.removeGestureListeners = () => {
+                this.removeGestureListeners = null
+                for (const type of UNLOCK_GESTURES) {
+                    document.removeEventListener(type, onGesture, true)
+                }
             }
         }
-        this.disarmGestureRetry = disarm
-        for (const type of UNLOCK_GESTURES) {
-            document.addEventListener(type, retry, {
-                capture: true,
-                passive: true,
-            })
+        return () => {
+            this.gestureActions.delete(action)
+            if (this.gestureActions.size === 0) this.removeGestureListeners?.()
         }
     }
 

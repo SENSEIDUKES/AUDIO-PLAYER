@@ -139,6 +139,35 @@ describe("narrative engine routing hooks", () => {
             mix.dispose()
         })
 
+        it("retries a blocked resume and a blocked deferred switch on one gesture", async () => {
+            const mix = createSceneMixEngine({ analysisPolicy: "off" })
+            mix.crossfadeTo(A, { fadeMs: 0 })
+            await flushMicrotasks()
+            vi.advanceTimersByTime(40)
+            mix.pause()
+            mix.crossfadeTo(B, { fadeMs: 0 })
+
+            FakeAudio.playBehavior = "not-allowed"
+            mix.resume()
+            await flushMicrotasks()
+            const deckA = FakeAudio.withSrc("https://a.test/a.mp3")[0]
+            const deckB = FakeAudio.withSrc("https://a.test/b.mp3")[0]
+            expect(deckA.paused).toBe(true)
+            expect(deckB.paused).toBe(true)
+            expect(mix.getStatusSnapshot().state).toBe("autoplay-blocked")
+
+            FakeAudio.playBehavior = "resolve"
+            document.dispatchEvent(new Event("pointerdown"))
+            await flushMicrotasks()
+            expect(deckA.paused).toBe(false)
+            expect(deckB.paused).toBe(false)
+            expect(mix.getStatusSnapshot()).toMatchObject({
+                state: "playing",
+                audibleTrackKey: "id:b",
+            })
+            mix.dispose()
+        })
+
         it("stops immediately while paused", () => {
             const mix = createSceneMixEngine({ analysisPolicy: "off" })
             mix.pause()
