@@ -768,7 +768,7 @@ export const WORKSHOP_ENTRIES: readonly WorkshopEntry[] = [
         status: "live",
         tags: ["ReaderMixer", "ReaderMixerPanel", "Three layers"],
         working: [
-            "Soundscapes crossfade per chapter and mid-chapter, and repeat requests do nothing",
+            "All 43 SEN Soundscapes (Volume 1) by category; any score crossfades in per chapter or mid-chapter, and repeat requests do nothing",
             "A reader-chosen atmosphere loops under everything; Off fades it out",
             "Sound cues overlap over both loops without pausing them",
             "Master, per-layer switches and sliders, with settings saved in this browser",
@@ -783,6 +783,7 @@ export const WORKSHOP_ENTRIES: readonly WorkshopEntry[] = [
             "src/audio-player/narrative/ReaderMixerContext.tsx",
             "src/audio-player/components/ReaderMixerPanel.tsx",
             "src/demo/workspaces/sen/ReaderMixerWorkspace.tsx",
+            "src/demo/senSoundscapes.ts",
         ],
     },
 ]
