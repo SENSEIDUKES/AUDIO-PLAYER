@@ -261,6 +261,11 @@ export function useNarrativeAudio(
         // Leaving (or swapping mixers) must never strand the reader's music ducked.
         return () => mixer.setDuck(0)
     }, [mixer])
+    // Mirror the mixer's Atmosphere level locally so disconnecting keeps it.
+    const mixerAtmosphereLevel = mixerState?.preferences.layers.atmosphere.level
+    useEffect(() => {
+        if (mixerAtmosphereLevel !== undefined) setAmbienceVolumeState(mixerAtmosphereLevel)
+    }, [mixerAtmosphereLevel])
 
     // ---- Narration volume passthrough -------------------------------------
     useEffect(() => {

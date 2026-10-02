@@ -95,6 +95,15 @@ describe("NarrativeFace with a reader mixer", () => {
         expect(mood()).toBe("Rain")
     })
 
+    it("keeps the reader's Atmosphere level when the mixer is disconnected", () => {
+        const { rerender } = render(<Reader narrationState="paused" />)
+        fireEvent.change(screen.getByRole("slider", { name: "Ambience volume" }), {
+            target: { value: "25" },
+        })
+        rerender(<Reader narrationState="paused" connected={false} />)
+        expect(screen.getByRole("slider", { name: "Ambience volume" })).toHaveValue("25")
+    })
+
     it("stays stand-alone with mixer={null}", () => {
         render(<Reader narrationState="playing" connected={false} />)
         expect(screen.getByRole("region", { name: "Narration audio" })).not.toHaveAttribute(

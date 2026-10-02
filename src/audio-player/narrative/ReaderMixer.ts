@@ -607,7 +607,7 @@ export class ReaderMixer {
         } else {
             const startedAt = Date.now()
             this.duckTimer = setInterval(() => {
-                const t = Math.min(1, (Date.now() - startedAt) / fadeMs)
+                const t = Math.max(0, Math.min(1, (Date.now() - startedAt) / fadeMs))
                 this.duckLevel = from + (target - from) * t
                 this.applyLevels()
                 if (t >= 1) this.stopDuckRamp()
