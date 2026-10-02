@@ -217,9 +217,11 @@ describe("ReaderMixer production recovery", () => {
                 instance.playSoundscape(SCORE)
                 await settle()
                 ctx.suspendBehavior = () => {
-                    ctx.setState("suspended")
                     return new Promise<void>((resolve) => {
-                        finish = resolve
+                        finish = () => {
+                            ctx.setState("suspended")
+                            resolve()
+                        }
                     })
                 }
                 instance.setMasterEnabled(false)

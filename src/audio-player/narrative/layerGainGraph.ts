@@ -155,7 +155,12 @@ export class LayerGainGraph<Layer extends string> {
     private syncState(fromActivation = false): void {
         if (this.closed || (this.changingState && !(fromActivation && this.desiredRunning))) return
         const running = this.desiredRunning
-        if (this.state === (running ? "running" : "suspended") || this.state === "closed") return
+        if (
+            this.state === "closed" ||
+            (this.state === (running ? "running" : "suspended") &&
+                !(fromActivation && this.changingState && running))
+        )
+            return
         this.changingState = true
         const token = ++this.changeToken
         let operation: Promise<void>
@@ -168,7 +173,10 @@ export class LayerGainGraph<Layer extends string> {
         void Promise.resolve(operation)
             .catch(() => {})
             .then(() => {
-                if (token !== this.changeToken) return
+                if (token !== this.changeToken) {
+                    this.syncState()
+                    return
+                }
                 this.changingState = false
                 // Serialize opposite requests: a late resume must not wake an idle page.
                 if (running !== this.desiredRunning) this.syncState()
