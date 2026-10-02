@@ -14,7 +14,8 @@ import type {
     ReaderMixerOptions,
     Track,
 } from "../../../audio-player"
-import { SAMPLE, noLuckTracks } from "../../data"
+import { SAMPLE } from "../../data"
+import { SEN_SOUNDSCAPES_VOLUME_1, SEN_SOUNDSCAPE_CATEGORIES } from "../../senSoundscapes"
 import {
     Button,
     ButtonRow,
@@ -41,9 +42,19 @@ const CELESTIAL = "https://celestialaudio.seihouse.org/DEFAULT"
 type Host = "seihouse" | "cors-sample"
 type Routing = NonNullable<ReaderMixerOptions["routing"]>
 
+interface ScoreOption {
+    track: Track
+    category: string
+    /** Mood and length, shown under the title. */
+    detail: string
+}
+
 interface SceneSet {
-    chapter: Track
-    battle: Track
+    /** Every score the reader can play, in display order. */
+    scores: ScoreOption[]
+    categories: readonly string[]
+    /** Category "Battle starts" cycles through. */
+    battleCategory: string
     atmospheres: ReaderAtmosphereOption[]
     cues: { id: string; label: string; url: string; volume?: number }[]
 }
@@ -60,10 +71,25 @@ const atmosphere = (
     sources: [{ url: `${CELESTIAL}/atmosphere/${path}` }],
 })
 
+const formatLength = (seconds: number) =>
+    `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`
+
+const SEN_SCORES: ScoreOption[] = SEN_SOUNDSCAPES_VOLUME_1.map((score) => ({
+    track: {
+        id: score.id,
+        title: `${score.category} ${score.number} · ${score.title}`,
+        artist: "SEN Soundscapes · Volume 1",
+        audioFile: score.url,
+    },
+    category: score.category,
+    detail: `${score.mood} · ${formatLength(score.durationSeconds)}`,
+}))
+
 const SETS: Record<Host, SceneSet> = {
     seihouse: {
-        chapter: { ...noLuckTracks[0], id: "sen-chapter-1", title: "Chapter 1 score" },
-        battle: { ...noLuckTracks[2], id: "sen-battle", title: "Battle score" },
+        scores: SEN_SCORES,
+        categories: SEN_SOUNDSCAPE_CATEGORIES,
+        battleCategory: "Fighting",
         atmospheres: [
             atmosphere("gentle-rain", "Gentle rain", "Weather", "Rain/Gentle_Rain_1.mp3"),
             atmosphere("heavy-rain", "Heavy rain", "Weather", "Rain/Heavy_Rain_1.mp3"),
@@ -108,18 +134,30 @@ const SETS: Record<Host, SceneSet> = {
     // One third-party CORS file stands in for every layer, as a control for
     // the Web Audio route independent of the SEIHouse hosts.
     "cors-sample": {
-        chapter: {
-            id: "sample-chapter",
-            title: "Chapter score (sample)",
-            artist: "",
-            audioFile: SAMPLE,
-        },
-        battle: {
-            id: "sample-battle",
-            title: "Battle score (sample)",
-            artist: "",
-            sources: [{ url: `${SAMPLE}#battle` }],
-        },
+        scores: [
+            {
+                track: {
+                    id: "sample-chapter",
+                    title: "Chapter score (sample)",
+                    artist: "",
+                    audioFile: SAMPLE,
+                },
+                category: "Chapter",
+                detail: "third-party CORS file",
+            },
+            {
+                track: {
+                    id: "sample-battle",
+                    title: "Battle score (sample)",
+                    artist: "",
+                    sources: [{ url: `${SAMPLE}#battle` }],
+                },
+                category: "Battle",
+                detail: "the same file, as a second score",
+            },
+        ],
+        categories: ["Chapter", "Battle"],
+        battleCategory: "Battle",
         atmospheres: [
             {
                 id: "sample-bed",
@@ -160,6 +198,11 @@ function ReaderSimulation({
     const mixer = useReaderMixer()
     const state = useReaderMixerState()
     const previous = useRef(state)
+    const [category, setCategory] = useState(set.categories[0])
+    const [chapterScore, setChapterScore] = useState(set.scores[0])
+    const battleTurn = useRef(0)
+    const titleFor = (key: string | null) =>
+        set.scores.find((score) => `id:${score.track.id}` === key)?.track.title ?? key
 
     // Log every layer status change, like a host's diagnostics would.
     useEffect(() => {
@@ -181,10 +224,16 @@ function ReaderSimulation({
     if (!state) return null
     const row = (layer: ReaderMixerLayer) => {
         const layerState = state.layers[layer]
+        const current = layer === "soundscapes" ? titleFor(layerState.current) : layerState.current
         return `${layerState.status} · ${Math.round(layerState.effectiveLevel * 100)}%${
-            layerState.current ? ` · ${layerState.current}` : ""
+            current ? ` · ${current}` : ""
         }`
     }
+    const playScore = (score: ScoreOption, reason: string) => {
+        mixer.playSoundscape(score.track)
+        append(`${reason} → playSoundscape(“${score.track.title}”)`)
+    }
+    const audibleKey = state.layers.soundscapes.current
 
     return (
         <>
@@ -195,17 +244,22 @@ function ReaderSimulation({
                 <ButtonRow>
                     <Button
                         onClick={() => {
-                            mixer.playSoundscape(set.chapter)
+                            playScore(chapterScore, "chapter opens")
                             mixer.startAtmosphere()
-                            append("chapter opens → playSoundscape(chapter) + startAtmosphere()")
+                            append("chapter opens → startAtmosphere()")
                         }}
                     >
                         Open chapter
                     </Button>
                     <Button
                         onClick={() => {
-                            mixer.playSoundscape(set.battle)
-                            append("battle starts → playSoundscape(battle)")
+                            const battles = set.scores.filter(
+                                (score) => score.category === set.battleCategory
+                            )
+                            if (battles.length === 0) return
+                            const score = battles[battleTurn.current % battles.length]
+                            battleTurn.current += 1
+                            playScore(score, "battle starts")
                         }}
                     >
                         Battle starts
@@ -251,6 +305,54 @@ function ReaderSimulation({
                         ["Needs a tap", state.needsGesture ? "yes" : "no"],
                     ]}
                 />
+            </Panel>
+            <Panel
+                title={`Soundscapes · ${set.scores.length} scores`}
+                hint="The chapter score. Play switches the music now (a crossfade); the chosen score is also what Open chapter plays. Battle starts cycles through the Fighting scores."
+            >
+                {set.categories.length > 1 && (
+                    <Segmented
+                        label="Category"
+                        value={category}
+                        options={set.categories.map((name) => ({ value: name, label: name }))}
+                        onChange={setCategory}
+                    />
+                )}
+                <ul className="wk-inline-list">
+                    {set.scores
+                        .filter((score) => score.category === category)
+                        .map((score) => {
+                            const audible = audibleKey === `id:${score.track.id}`
+                            const chosen = chapterScore.track.id === score.track.id
+                            return (
+                                <li
+                                    key={score.track.id}
+                                    className={`wk-inline-list__row${audible ? " wk-inline-list__row--active" : ""}`}
+                                >
+                                    <span className="wk-inline-list__main">
+                                        <span className="wk-inline-list__title">
+                                            {score.track.title}
+                                        </span>
+                                        <span className="wk-inline-list__sub">
+                                            {audible ? "Playing now · " : ""}
+                                            {chosen ? "Chapter score · " : ""}
+                                            {score.detail}
+                                        </span>
+                                    </span>
+                                    <span className="wk-inline-list__actions">
+                                        <Button
+                                            onClick={() => {
+                                                setChapterScore(score)
+                                                playScore(score, "score chosen")
+                                            }}
+                                        >
+                                            Play
+                                        </Button>
+                                    </span>
+                                </li>
+                            )
+                        })}
+                </ul>
             </Panel>
             <Panel
                 title="Settings › Audio · the mixer view"
