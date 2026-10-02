@@ -6,7 +6,7 @@ import type { WorkshopCategoryId, WorkshopEntry } from "./catalog"
 import { handleLinkClick, homeHref, navigate, workspaceHref } from "./routing"
 import { StatusBadge } from "./ui"
 
-/* The Workshop entry point: four navigation categories, each a grid of cards.
+/* The Workshop entry point: five navigation categories, each a grid of cards.
    A card opens one dedicated workspace; roadmap records stay visible but open
    nothing. Tabs write `?category=` so every category is linkable. */
 

@@ -16,6 +16,7 @@ const currentConsumerDocs = [
     "docs/automix.md",
     "docs/playback-hardening.md",
     "docs/public-api.md",
+    "docs/reader-mixer.md",
 ]
 
 const requiredApiSections = [

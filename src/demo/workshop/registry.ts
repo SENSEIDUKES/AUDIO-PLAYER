@@ -114,6 +114,12 @@ export const WORKSPACES: Readonly<Record<string, Workspace>> = {
         (m) => m.TypographyWorkspace
     ),
 
+    /* SEN */
+    "reader-mixer": load(
+        () => import("../workspaces/sen/ReaderMixerWorkspace"),
+        (m) => m.ReaderMixerWorkspace
+    ),
+
     /* Testing Lab */
     "testing-lab": load(
         () => import("../workspaces/testing-lab/TestingLabWorkspace"),

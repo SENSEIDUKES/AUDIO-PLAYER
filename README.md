@@ -42,6 +42,7 @@ The player currently supports:
 - Browser and mobile quality checks documented in the repo.
 - Opt-in **Automix Lite** transitions with conservative silence trimming.
 - Multiple player surfaces, including standalone/full-card and sticky bottom player contexts.
+- A three-layer **reader mixer** (music score, ambient atmosphere, sound cues) with per-layer switches and volume and an inline mixer view.
 
 ---
 

@@ -240,7 +240,56 @@ export type {
 } from "./narrative/SceneMixEngine"
 // Cached detached-element pool for standalone narrative cues and sound FX.
 export { OneShotEngine, createOneShotEngine } from "./narrative/OneShotEngine"
-export type { OneShotEngineOptions, PlayOneShotOptions } from "./narrative/OneShotEngine"
+export type {
+    OneShotEngineOptions,
+    PlayOneShotOptions,
+    OneShotPlaybackErrorEvent,
+} from "./narrative/OneShotEngine"
+// Optional Web Audio gain routing shared by the narrative engines.
+export type { MediaGainSink, MediaGainSinkFactory } from "./narrative/mediaRouting"
+// Three-layer reader mixer (Soundscapes, Atmosphere, Sound Cues) built on the
+// engines above, its React provider/hooks, and the inline mixer view.
+export {
+    ReaderMixer,
+    createReaderMixer,
+    READER_MIXER_LAYERS,
+    DEFAULT_READER_MIXER_PREFERENCES,
+    normalizeReaderMixerPreferences,
+    computeReaderMixerGain,
+    loadReaderMixerPreferences,
+    saveReaderMixerPreferences,
+} from "./narrative/ReaderMixer"
+export type {
+    ReaderMixerLayer,
+    ReaderMixerLayerPreference,
+    ReaderMixerPreferences,
+    ReaderMixerPreferencesInput,
+    ReaderAtmosphereOption,
+    ReaderMixerLayerStatus,
+    ReaderMixerLayerState,
+    ReaderMixerVolumeControl,
+    ReaderMixerRouting,
+    ReaderMixerState,
+    ReaderMixerStateListener,
+    ReaderMixerPreferencesListener,
+    ReaderMixerOptions,
+    PlaySoundscapeOptions,
+    PlayCueOptions,
+    ReaderMixerFadeOptions,
+} from "./narrative/ReaderMixer"
+export {
+    ReaderMixerProvider,
+    useReaderMixer,
+    useOptionalReaderMixer,
+    useReaderMixerState,
+} from "./narrative/ReaderMixerContext"
+export type { ReaderMixerProviderProps } from "./narrative/ReaderMixerContext"
+export { ReaderMixerPanel, DEFAULT_READER_MIXER_LABELS } from "./components/ReaderMixerPanel"
+export type {
+    ReaderMixerPanelProps,
+    ReaderMixerLabels,
+    ReaderMixerLabelOverrides,
+} from "./components/ReaderMixerPanel"
 export {
     VAULT_CATEGORY_META,
     getVaultCategoryMeta,

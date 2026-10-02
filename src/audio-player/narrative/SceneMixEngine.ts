@@ -2,6 +2,8 @@ import type { FallbackSourceEvent, Track, TrackSource, TrackTrims } from "../typ
 import { trackKey } from "../utils/trackKey"
 import { getTrackSources } from "../utils/sources"
 import { ensureSourceAnalysis } from "../automix/silenceAnalysis"
+import { UnlockedAudioPool } from "./mediaRouting"
+import type { MediaGainSink, MediaGainSinkFactory } from "./mediaRouting"
 
 /**
  * Default crossfade length for scene switches. Shorter than the music-player
@@ -20,6 +22,8 @@ function clamp01(value: number): number {
 
 type Deck = {
     el: HTMLAudioElement
+    /** Web Audio gain for this element, when the host routes it; else null. */
+    sink: MediaGainSink | null
     key: string
     request: SceneRequest
     source: TrackSource
@@ -47,6 +51,9 @@ type PendingTransition = {
 
 type SceneRequest = {
     key: string
+    /** The original call, replayed when a request is deferred by pause(). */
+    track: Track
+    options: SceneCrossfadeOptions
     sources: readonly TrackSource[]
     fadeMs: number
     analysisPolicy: SceneMixAnalysisPolicy
@@ -78,6 +85,18 @@ export interface SceneMixEngineOptions {
     analysisPolicy?: SceneMixAnalysisPolicy
     /** Fired once whenever a failed source advances to the next candidate. */
     onFallbackSource?: (event: FallbackSourceEvent) => void
+    /**
+     * Route each deck's gain somewhere other than `HTMLMediaElement.volume`,
+     * typically a Web Audio `GainNode`. Called once per deck element before
+     * its `src` is set. Routing a cross-origin element through Web Audio needs
+     * CORS (set `crossOrigin` too), or the browser plays silence.
+     */
+    createGainSink?: MediaGainSinkFactory
+    /**
+     * Spare elements {@link SceneMixEngine.unlock} prepares for later
+     * non-gesture scene switches. Defaults to 2.
+     */
+    unlockPoolSize?: number
 }
 
 /** User gestures that can unlock media playback after an autoplay rejection. */
@@ -169,8 +188,18 @@ export class SceneMixEngine {
     private pendingTransition: PendingTransition | null = null
     /** Removes the armed unlock-gesture listeners, when armed. */
     private disarmGestureRetry: (() => void) | null = null
+    /** Removes the armed resume() retry after an autoplay rejection, when armed. */
+    private disarmResumeRetry: (() => void) | null = null
+    /** Every retry waiting for the next user gesture; one gesture runs them all. */
+    private readonly gestureActions = new Set<() => void>()
+    private removeGestureListeners: (() => void) | null = null
     private statusSnapshot = INITIAL_STATUS
     private statusListeners = new Set<SceneMixStatusListener>()
+    private createGainSink?: MediaGainSinkFactory
+    private unlockPool: UnlockedAudioPool
+    private paused = false
+    /** Newest crossfadeTo() received or interrupted while paused. */
+    private deferredRequest: { track: Track; options: SceneCrossfadeOptions } | null = null
 
     constructor(options: SceneMixEngineOptions = {}) {
         this.loop = options.loop ?? true
@@ -178,6 +207,10 @@ export class SceneMixEngine {
         this.crossOrigin = options.crossOrigin
         this.analysisPolicy = options.analysisPolicy ?? "automatic"
         this.onFallbackSource = options.onFallbackSource
+        this.createGainSink = options.createGainSink
+        this.unlockPool = new UnlockedAudioPool(
+            Math.max(0, Math.floor(options.unlockPoolSize ?? 2))
+        )
     }
 
     /**
@@ -258,6 +291,10 @@ export class SceneMixEngine {
         const sources = getTrackSources(track)
         if (sources.length === 0) return
         const key = trackKey(track)
+        if (this.paused) {
+            this.deferWhilePaused(track, options, key)
+            return
+        }
         if (this.pendingTransition?.request.key === key) return
         if (this.active && this.active.key === key && !this.active.retiring) {
             if (this.pendingTransition) {
@@ -274,6 +311,8 @@ export class SceneMixEngine {
         const fadeMs = Math.max(0, options.fadeMs ?? this.defaultFadeMs)
         const request: SceneRequest = {
             key,
+            track,
+            options,
             sources,
             fadeMs,
             analysisPolicy: this.analysisPolicy,
@@ -296,7 +335,7 @@ export class SceneMixEngine {
         const source = transition.request.sources[sourceIndex]
         if (!source) return
 
-        const el = new Audio()
+        const el = this.unlockPool.take()
         el.loop = this.loop
         el.preload = "auto"
         // Only tag the request as CORS when the host asked for it: a forced
@@ -304,10 +343,14 @@ export class SceneMixEngine {
         // error, silencing scores a bare <audio> would play.
         if (this.crossOrigin) el.crossOrigin = this.crossOrigin
         el.muted = this.muted
+        const sink = this.makeGainSink(el)
         // On volume-locked browsers the fade degrades to a hard swap that
         // relies on the element keeping its default full volume — so the
         // fade-in's zero start must not be written once the latch is known.
-        if (!this.volumeWritesUnsupported) {
+        // A routed deck never touches element volume: its sink fades instead.
+        if (sink) {
+            this.writeSinkGain(sink, 0)
+        } else if (!this.volumeWritesUnsupported) {
             try {
                 el.volume = 0
             } catch {
@@ -318,6 +361,7 @@ export class SceneMixEngine {
         const abort = new AbortController()
         const deck: Deck = {
             el,
+            sink,
             key: transition.request.key,
             request: transition.request,
             source,
@@ -326,7 +370,7 @@ export class SceneMixEngine {
             rampT0: performance.now(),
             rampFromGain: 0,
             rampToGain: 1,
-            rampMs: this.volumeWritesUnsupported ? 0 : transition.request.fadeMs,
+            rampMs: this.rampLength(sink, transition.request.fadeMs),
             retiring: false,
             abort,
             waitForMetadataBeforePlay:
@@ -386,8 +430,16 @@ export class SceneMixEngine {
 
     /** Fade the whole scene layer to silence and release every deck. */
     stop(fadeMs: number = this.defaultFadeMs): void {
+        this.deferredRequest = null
         if (this.pendingTransition) {
             this.rollbackTransition(this.pendingTransition)
+        }
+        if (this.paused) {
+            // Nothing is audible while paused, so there is no fade to run.
+            for (const deck of [...this.decks]) this.releaseDeck(deck)
+            this.active = null
+            this.publishStatus("stopped", null, null)
+            return
         }
         for (const deck of this.decks) this.retire(deck, fadeMs)
         this.active = null
@@ -395,15 +447,127 @@ export class SceneMixEngine {
         this.publishStatus("stopped", null, null)
     }
 
+    /**
+     * Prepare spare deck elements for later scene switches. Call from inside
+     * a user-gesture handler: on browsers that unlock audio per element (iOS
+     * Safari), a switch that happens later without a tap — a battle starting
+     * mid-chapter — can then start immediately instead of waiting for one.
+     */
+    unlock(): void {
+        if (this.disposed) return
+        this.unlockPool.prime()
+    }
+
+    /** Whether {@link pause} is in effect. */
+    isPaused(): boolean {
+        return this.paused
+    }
+
+    /**
+     * Pause the scene layer in place (for example while the page is hidden).
+     * Any fade in flight completes instantly, the audible deck keeps its
+     * position, and a switch requested while paused waits for
+     * {@link resume}. Status snapshots are unchanged.
+     */
+    pause(): void {
+        if (this.disposed || this.paused) return
+        this.paused = true
+        this.stopTicking()
+        const pending = this.pendingTransition
+        if (pending) {
+            this.deferredRequest = {
+                track: pending.request.track,
+                options: pending.request.options,
+            }
+            this.rollbackTransition(pending)
+        }
+        this.disarmGestureRetry?.()
+        this.disarmResumeRetry?.()
+        for (const deck of [...this.decks]) {
+            if (deck.retiring) {
+                this.releaseDeck(deck)
+                continue
+            }
+            deck.curveGain = deck.rampToGain
+            deck.rampFromGain = deck.rampToGain
+            deck.rampMs = 0
+            this.applyDeckGain(deck)
+            try {
+                deck.el.pause()
+            } catch {
+                // Best effort: an element that cannot pause is released later.
+            }
+        }
+    }
+
+    /**
+     * Resume after {@link pause}: the audible deck continues where it was and
+     * the newest deferred switch, if any, starts. When the browser blocks the
+     * resume, the status reports `autoplay-blocked` and the next user gesture
+     * retries it.
+     */
+    resume(): void {
+        if (this.disposed || !this.paused) return
+        this.paused = false
+        const deferred = this.deferredRequest
+        this.deferredRequest = null
+        const active = this.active
+        if (active) this.resumeDeck(active)
+        if (deferred) this.crossfadeTo(deferred.track, deferred.options)
+    }
+
     dispose(): void {
         this.disposed = true
+        this.deferredRequest = null
+        this.unlockPool.clear()
         this.stopTicking()
         this.disarmGestureRetry?.()
+        this.disarmResumeRetry?.()
+        this.gestureActions.clear()
+        this.removeGestureListeners?.()
         this.pendingTransition = null
         for (const deck of [...this.decks]) this.releaseDeck(deck)
         this.active = null
         this.publishStatus("stopped", null, null)
         this.statusListeners.clear()
+    }
+
+    /** Record the newest switch requested while paused, or drop a no-op. */
+    private deferWhilePaused(track: Track, options: SceneCrossfadeOptions, key: string): void {
+        if (this.active && this.active.key === key && !this.active.retiring) {
+            this.deferredRequest = null
+            return
+        }
+        this.deferredRequest = { track, options }
+        this.publishStatus("loading", key, this.active?.key ?? null)
+    }
+
+    private resumeDeck(deck: Deck): void {
+        let playPromise: Promise<void>
+        try {
+            playPromise = deck.el.play()
+        } catch {
+            // A media error event, if any, drives the normal recovery path.
+            return
+        }
+        Promise.resolve(playPromise).then(
+            () => {
+                if (this.disposed || this.paused || this.active !== deck) return
+                if (this.statusSnapshot.state === "autoplay-blocked" && !this.pendingTransition) {
+                    this.publishStatus("playing", deck.key, deck.key)
+                }
+            },
+            (error: unknown) => {
+                if (this.disposed || this.paused || this.active !== deck) return
+                if (!this.isAutoplayPolicyError(error)) return
+                this.publishStatus(
+                    "autoplay-blocked",
+                    this.pendingTransition?.request.key ?? deck.key,
+                    deck.key
+                )
+                this.armResumeRetry(deck)
+            }
+        )
     }
 
     private handleCandidateMetadata(transition: PendingTransition, deck: Deck): void {
@@ -440,6 +604,15 @@ export class SceneMixEngine {
     /** Attempt or retry playback without changing ownership of the current mix. */
     private attemptPlayback(transition: PendingTransition, deck: Deck, shouldLoad: boolean): void {
         if (!this.isCurrentCandidate(transition, deck)) return
+        if (this.paused) {
+            // A source fallback reached while paused waits for resume().
+            this.deferredRequest = {
+                track: transition.request.track,
+                options: transition.request.options,
+            }
+            this.rollbackTransition(transition)
+            return
+        }
 
         let playPromise: Promise<void>
         try {
@@ -477,7 +650,7 @@ export class SceneMixEngine {
         incoming.rampT0 = performance.now()
         incoming.rampFromGain = incoming.curveGain
         incoming.rampToGain = 1
-        incoming.rampMs = this.volumeWritesUnsupported ? 0 : transition.request.fadeMs
+        incoming.rampMs = this.rampLength(incoming.sink, transition.request.fadeMs)
         this.active = incoming
         this.publishStatus("playing", incoming.key, incoming.key)
         this.applyGains()
@@ -756,25 +929,62 @@ export class SceneMixEngine {
      * change, chapter load) would stay silent forever.
      */
     private armGestureRetry(transition: PendingTransition, deck: Deck): void {
-        if (this.disarmGestureRetry || this.disposed) return
+        if (this.disarmGestureRetry) return
         if (!this.isCurrentCandidate(transition, deck)) return
-        if (typeof document === "undefined") return
-        const retry = () => {
-            disarm()
-            this.attemptPlayback(transition, deck, false)
-        }
-        const disarm = () => {
+        const remove = this.armGesture(() => {
             this.disarmGestureRetry = null
+            this.attemptPlayback(transition, deck, false)
+        })
+        this.disarmGestureRetry = () => {
+            this.disarmGestureRetry = null
+            remove()
+        }
+    }
+
+    /** Retry a blocked resume() of the audible deck on the next user gesture. */
+    private armResumeRetry(deck: Deck): void {
+        if (this.disarmResumeRetry) return
+        const remove = this.armGesture(() => {
+            this.disarmResumeRetry = null
+            this.resumeDeck(deck)
+        })
+        this.disarmResumeRetry = () => {
+            this.disarmResumeRetry = null
+            remove()
+        }
+    }
+
+    /**
+     * Run `action` once on the next user gesture, alongside every other armed
+     * retry, so one tap restarts a blocked resume and a blocked switch
+     * together. Returns a function that cancels this action only.
+     */
+    private armGesture(action: () => void): () => void {
+        if (this.disposed || typeof document === "undefined") return () => {}
+        this.gestureActions.add(action)
+        if (!this.removeGestureListeners) {
+            const onGesture = () => {
+                const actions = [...this.gestureActions]
+                this.gestureActions.clear()
+                this.removeGestureListeners?.()
+                for (const pending of actions) pending()
+            }
             for (const type of UNLOCK_GESTURES) {
-                document.removeEventListener(type, retry, true)
+                document.addEventListener(type, onGesture, {
+                    capture: true,
+                    passive: true,
+                })
+            }
+            this.removeGestureListeners = () => {
+                this.removeGestureListeners = null
+                for (const type of UNLOCK_GESTURES) {
+                    document.removeEventListener(type, onGesture, true)
+                }
             }
         }
-        this.disarmGestureRetry = disarm
-        for (const type of UNLOCK_GESTURES) {
-            document.addEventListener(type, retry, {
-                capture: true,
-                passive: true,
-            })
+        return () => {
+            this.gestureActions.delete(action)
+            if (this.gestureActions.size === 0) this.removeGestureListeners?.()
         }
     }
 
@@ -784,7 +994,7 @@ export class SceneMixEngine {
         deck.rampT0 = performance.now()
         deck.rampFromGain = deck.curveGain
         deck.rampToGain = 0
-        deck.rampMs = this.volumeWritesUnsupported ? 0 : fadeMs
+        deck.rampMs = this.rampLength(deck.sink, fadeMs)
         if (this.active === deck) this.active = null
     }
 
@@ -794,7 +1004,7 @@ export class SceneMixEngine {
         deck.rampT0 = performance.now()
         deck.rampFromGain = deck.curveGain
         deck.rampToGain = 1
-        deck.rampMs = this.volumeWritesUnsupported ? 0 : fadeMs
+        deck.rampMs = this.rampLength(deck.sink, fadeMs)
         this.startTicking()
     }
 
@@ -837,6 +1047,10 @@ export class SceneMixEngine {
     }
 
     private applyDeckGain(deck: Deck): void {
+        if (deck.sink) {
+            this.writeSinkGain(deck.sink, deck.curveGain * this.level)
+            return
+        }
         if (this.volumeWritesUnsupported) return
         const target = clamp01(deck.curveGain * this.level)
         try {
@@ -857,7 +1071,31 @@ export class SceneMixEngine {
     private markVolumeWritesUnsupported(): void {
         if (this.volumeWritesUnsupported) return
         this.volumeWritesUnsupported = true
-        for (const deck of this.decks) deck.rampMs = 0
+        for (const deck of this.decks) {
+            if (!deck.sink) deck.rampMs = 0
+        }
+    }
+
+    /** Routed decks always fade; element decks hard-swap once volume is locked. */
+    private rampLength(sink: MediaGainSink | null, fadeMs: number): number {
+        return !sink && this.volumeWritesUnsupported ? 0 : fadeMs
+    }
+
+    private makeGainSink(el: HTMLAudioElement): MediaGainSink | null {
+        if (!this.createGainSink) return null
+        try {
+            return this.createGainSink(el) ?? null
+        } catch {
+            return null
+        }
+    }
+
+    private writeSinkGain(sink: MediaGainSink, value: number): void {
+        try {
+            sink.setGain(clamp01(value))
+        } catch {
+            // A host sink failure cannot break the fade loop.
+        }
     }
 
     private startTicking(): void {
@@ -876,6 +1114,15 @@ export class SceneMixEngine {
         deck.abort.abort()
         this.decks = this.decks.filter((d) => d !== deck)
         if (this.active === deck) this.active = null
+        if (deck.sink) {
+            const sink = deck.sink
+            deck.sink = null
+            try {
+                sink.dispose()
+            } catch {
+                // Host cleanup failures cannot block deck release.
+            }
+        }
         try {
             deck.el.pause()
             deck.el.removeAttribute("src")
