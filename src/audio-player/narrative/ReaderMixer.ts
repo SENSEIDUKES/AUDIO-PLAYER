@@ -209,6 +209,11 @@ export interface ReaderMixerState {
     readonly pageHidden: boolean
     /** True when audio is waiting for a user gesture to start. */
     readonly needsGesture: boolean
+    /**
+     * How far Soundscapes and Atmosphere are ducked right now, 0..1 (see
+     * {@link ReaderMixer.setDuck}). Already included in `effectiveLevel`.
+     */
+    readonly duck: number
 }
 
 export type ReaderMixerStateListener = (state: ReaderMixerState) => void
@@ -289,6 +294,16 @@ export interface ReaderMixerFadeOptions {
     fadeMs?: number
 }
 
+export interface ReaderMixerDuckOptions {
+    /** Ramp length for this change. Defaults to 350 ms. */
+    fadeMs?: number
+}
+
+/** Layers a duck lowers. Cues are short moments and are never ducked. */
+const DUCKED_LAYERS: ReadonlySet<ReaderMixerLayer> = new Set(["soundscapes", "atmosphere"])
+const DUCK_FADE_MS = 350
+const DUCK_TICK_MS = 33
+
 const UNLOCK_GESTURES = ["pointerdown", "keydown", "touchend"] as const
 
 type LoopLayer = "soundscapes" | "atmosphere"
@@ -342,6 +357,10 @@ export class ReaderMixer {
     private lastCue: string | null = null
     private activeCues = 0
     private pageHidden = false
+    /** Duck applied to the engines right now (ramps toward duckTarget). */
+    private duckLevel = 0
+    private duckTarget = 0
+    private duckTimer: ReturnType<typeof setInterval> | null = null
     private state: ReaderMixerState
     private readonly stateListeners = new Set<ReaderMixerStateListener>()
     private readonly preferenceListeners = new Set<ReaderMixerPreferencesListener>()
@@ -562,6 +581,46 @@ export class ReaderMixer {
 
     /* ----------------------------- Preferences -------------------------- */
 
+    /* -------------------------------- Duck ------------------------------ */
+
+    /**
+     * Temporarily lower Soundscapes and Atmosphere, for example under
+     * narration: each plays at its normal level × (1 − amount). Cues are not
+     * ducked, and the reader's preferences never change. `setDuck(0)` restores
+     * the full levels. Ramps over `fadeMs` (default 350 ms).
+     *
+     * Ducking needs real volume control: on the element route where the
+     * browser ignores element volume (`volumeControl: "on-off"`), only a full
+     * duck (1) has an audible effect.
+     */
+    setDuck(amount: number, options: ReaderMixerDuckOptions = {}): void {
+        if (this.disposed) return
+        const target = clamp01(amount)
+        if (target === this.duckTarget) return
+        this.duckTarget = target
+        this.stopDuckRamp()
+        const fadeMs = Math.max(0, options.fadeMs ?? DUCK_FADE_MS)
+        const from = this.duckLevel
+        if (fadeMs === 0 || typeof setInterval === "undefined") {
+            this.duckLevel = target
+            this.applyLevels()
+        } else {
+            const startedAt = Date.now()
+            this.duckTimer = setInterval(() => {
+                const t = Math.min(1, (Date.now() - startedAt) / fadeMs)
+                this.duckLevel = from + (target - from) * t
+                this.applyLevels()
+                if (t >= 1) this.stopDuckRamp()
+            }, DUCK_TICK_MS)
+        }
+        this.refresh()
+    }
+
+    /** The duck the mixer is heading to (see {@link setDuck}). */
+    getDuck(): number {
+        return this.duckTarget
+    }
+
     getPreferences(): ReaderMixerPreferences {
         return this.prefs
     }
@@ -636,6 +695,7 @@ export class ReaderMixer {
     dispose(): void {
         if (this.disposed) return
         this.disposed = true
+        this.stopDuckRamp()
         for (const cleanup of this.cleanups.splice(0)) {
             try {
                 cleanup()
@@ -725,9 +785,21 @@ export class ReaderMixer {
     }
 
     /** Push each layer's effective gain into its engine (or its Web Audio bus). */
+    private stopDuckRamp(): void {
+        if (this.duckTimer === null) return
+        clearInterval(this.duckTimer)
+        this.duckTimer = null
+    }
+
+    /** A layer's gain including a duck (the ramping one, or the target for state). */
+    private layerGain(layer: ReaderMixerLayer, duck = this.duckLevel): number {
+        const gain = computeReaderMixerGain(this.prefs, layer)
+        return DUCKED_LAYERS.has(layer) ? gain * (1 - duck) : gain
+    }
+
     private applyLevels(): void {
         for (const layer of READER_MIXER_LAYERS) {
-            const gain = computeReaderMixerGain(this.prefs, layer)
+            const gain = this.layerGain(layer)
             const engine = this.engineFor(layer)
             if (this.graph) {
                 this.graph.setLayerGain(layer, gain)
@@ -803,7 +875,7 @@ export class ReaderMixer {
             current: snapshot.audibleTrackKey,
             requested: snapshot.requestedTrackKey,
             failure: snapshot.failure?.message ?? null,
-            effectiveLevel: computeReaderMixerGain(this.prefs, layer),
+            effectiveLevel: this.layerGain(layer, this.duckTarget),
         })
     }
 
@@ -837,6 +909,7 @@ export class ReaderMixer {
             volumeControl: this.volumeControl(),
             pageHidden: this.pageHidden,
             needsGesture,
+            duck: this.duckTarget,
         })
     }
 

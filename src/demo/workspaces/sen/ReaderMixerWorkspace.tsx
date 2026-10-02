@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import type { CSSProperties } from "react"
 import {
+    AudioSessionProvider,
+    NarrativeFace,
     ReaderMixerPanel,
     ReaderMixerProvider,
     loadReaderMixerPreferences,
@@ -14,7 +16,7 @@ import type {
     ReaderMixerOptions,
     Track,
 } from "../../../audio-player"
-import { SAMPLE } from "../../data"
+import { SAMPLE, SEA_THEME, narrationTracks } from "../../data"
 import { SEN_SOUNDSCAPES_VOLUME_1, SEN_SOUNDSCAPE_CATEGORIES } from "../../senSoundscapes"
 import {
     Button,
@@ -22,6 +24,7 @@ import {
     EventLog,
     Note,
     Panel,
+    RangeField,
     Readout,
     Segmented,
     SplitLayout,
@@ -186,13 +189,17 @@ const LAYER_NAMES: Record<ReaderMixerLayer, string> = {
     cues: "Sound Cues",
 }
 
+const MIXER_VIEW_ID = "sen-reader-mixer-view"
+
 function ReaderSimulation({
     set,
     width,
+    duckAmount,
     append,
 }: {
     set: SceneSet
     width: number | "auto"
+    duckAmount: number
     append: (text: string, tone?: LogLine["tone"]) => void
 }) {
     const mixer = useReaderMixer()
@@ -237,6 +244,28 @@ function ReaderSimulation({
 
     return (
         <>
+            <article className="wk-stage-card wk-reader" aria-label="Reader preview">
+                <p className="wk-stage-card__title">Chapter · NarrativeFace + Reader Mixer</p>
+                <p className="wk-reader__text">
+                    The NarrativeFace carries the narration. Inside the same ReaderMixerProvider it
+                    becomes the mixer&apos;s companion: its Ambience slider is the reader&apos;s
+                    Atmosphere level, its mood shows the chosen atmosphere, and while the voice
+                    plays the music and atmosphere step back under it. Cues stay at full level.
+                </p>
+                <NarrativeFace
+                    duckAmount={duckAmount}
+                    showExpand
+                    onExpand={() => {
+                        const view = document.getElementById(MIXER_VIEW_ID)
+                        view?.scrollIntoView({ behavior: "smooth", block: "start" })
+                        view?.querySelector<HTMLElement>('[role="switch"]')?.focus({
+                            preventScroll: true,
+                        })
+                        append("face → open Settings › Audio (the mixer view)")
+                    }}
+                    {...SEA_THEME}
+                />
+            </article>
             <Panel
                 title="Reader · what the app does"
                 hint="These buttons stand in for NovelExpanded: it picks the score, places cues in the text, and calls the mixer."
@@ -303,6 +332,7 @@ function ReaderSimulation({
                         ["Routing", state.routing],
                         ["Sliders", state.volumeControl === "level" ? "set loudness" : "on/off"],
                         ["Needs a tap", state.needsGesture ? "yes" : "no"],
+                        ["Ducked under narration", `${Math.round(state.duck * 100)}%`],
                     ]}
                 />
             </Panel>
@@ -359,7 +389,7 @@ function ReaderSimulation({
                 hint="ReaderMixerPanel, rendered inline the way the reader's Settings menu will place it."
             >
                 <WidthFrame width={width}>
-                    <div className="wk-sen-settings">
+                    <div className="wk-sen-settings" id={MIXER_VIEW_ID}>
                         <ReaderMixerPanel style={MIXER_THEME} />
                     </div>
                 </WidthFrame>
@@ -374,6 +404,7 @@ export function ReaderMixerWorkspace() {
     const [host, setHost] = useState<Host>("seihouse")
     const [stageWidth, setStageWidth] = useState("390")
     const [generation, setGeneration] = useState(0)
+    const [duckAmount, setDuckAmount] = useState(0.6)
     const set = SETS[host]
 
     // A new routing or catalog means a new mixer; the old one is disposed.
@@ -394,13 +425,19 @@ export function ReaderMixerWorkspace() {
         <SplitLayout
             stage={
                 <>
-                    <ReaderMixerProvider key={`${routing}:${host}:${generation}`} options={options}>
-                        <ReaderSimulation
-                            set={set}
-                            width={parseStageWidth(stageWidth)}
-                            append={append}
-                        />
-                    </ReaderMixerProvider>
+                    <AudioSessionProvider initialQueue={narrationTracks}>
+                        <ReaderMixerProvider
+                            key={`${routing}:${host}:${generation}`}
+                            options={options}
+                        >
+                            <ReaderSimulation
+                                set={set}
+                                width={parseStageWidth(stageWidth)}
+                                duckAmount={duckAmount}
+                                append={append}
+                            />
+                        </ReaderMixerProvider>
+                    </AudioSessionProvider>
                     <Panel
                         title="Events"
                         actions={
@@ -465,6 +502,15 @@ export function ReaderMixerWorkspace() {
                                 Reset saved settings
                             </Button>
                         </ButtonRow>
+                        <RangeField
+                            label="Duck under narration"
+                            value={duckAmount}
+                            min={0}
+                            max={1}
+                            step={0.05}
+                            format={(value) => `${Math.round(value * 100)}%`}
+                            onChange={setDuckAmount}
+                        />
                     </Panel>
                     <Note>
                         Auto (the default) uses Web Audio only where the browser ignores element

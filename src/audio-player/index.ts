@@ -276,6 +276,7 @@ export type {
     PlaySoundscapeOptions,
     PlayCueOptions,
     ReaderMixerFadeOptions,
+    ReaderMixerDuckOptions,
 } from "./narrative/ReaderMixer"
 export {
     ReaderMixerProvider,

@@ -1,0 +1,106 @@
+// @vitest-environment jsdom
+import "@testing-library/jest-dom/vitest"
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { NarrativeFace } from "../NarrativeFace"
+import { AudioSessionProvider } from "../../session/AudioSessionContext"
+import { ReaderMixerProvider } from "../../narrative/ReaderMixerContext"
+import { createReaderMixer } from "../../narrative/ReaderMixer"
+import type { ReaderMixer } from "../../narrative/ReaderMixer"
+import type { NarrationState } from "../../narrative/useNarrativeAudio"
+
+vi.mock("../../automix/silenceAnalysis", () => ({
+    ensureSourceAnalysis: vi.fn(() => Promise.resolve(null)),
+    ensureTrackAnalysis: vi.fn(() => Promise.resolve(null)),
+    getTrackTrims: vi.fn(() => null),
+}))
+
+const NARRATION = [{ id: "line-1", title: "Line 1", artist: "Narrator", audioFile: "line.mp3" }]
+
+let mixer: ReaderMixer
+
+function Reader({
+    narrationState,
+    connected = true,
+}: {
+    narrationState?: NarrationState
+    connected?: boolean
+}) {
+    return (
+        <AudioSessionProvider initialQueue={NARRATION}>
+            <ReaderMixerProvider mixer={mixer}>
+                <NarrativeFace
+                    narrationState={narrationState}
+                    duckAmount={0.6}
+                    intensity={1}
+                    mixer={connected ? undefined : null}
+                />
+            </ReaderMixerProvider>
+        </AudioSessionProvider>
+    )
+}
+
+describe("NarrativeFace with a reader mixer", () => {
+    beforeEach(() => {
+        mixer = createReaderMixer({
+            atmospheres: [{ id: "rain", label: "Rain", sources: [{ url: "rain.mp3" }] }],
+        })
+    })
+
+    afterEach(() => {
+        cleanup()
+        mixer.dispose()
+    })
+
+    it("connects through the provider and ducks the mixer while narrating", () => {
+        const { rerender, unmount } = render(<Reader narrationState="paused" />)
+        expect(screen.getByRole("region", { name: "Narration audio" })).toHaveAttribute(
+            "data-reader-mixer",
+            "connected"
+        )
+        expect(mixer.getDuck()).toBe(0)
+
+        rerender(<Reader narrationState="playing" />)
+        expect(mixer.getDuck()).toBeCloseTo(0.6)
+
+        rerender(<Reader narrationState="paused" />)
+        expect(mixer.getDuck()).toBe(0)
+
+        rerender(<Reader narrationState="playing" />)
+        unmount()
+        // Leaving the reader never strands the music ducked.
+        expect(mixer.getDuck()).toBe(0)
+    })
+
+    it("drives the mixer's Atmosphere level from its Ambience slider", () => {
+        render(<Reader narrationState="paused" />)
+        const slider = screen.getByRole("slider", { name: "Ambience volume" })
+        expect(slider).toBeEnabled()
+        expect(slider).toHaveValue(
+            String(Math.round(mixer.getPreferences().layers.atmosphere.level * 100))
+        )
+
+        fireEvent.change(slider, { target: { value: "25" } })
+        expect(mixer.getPreferences().layers.atmosphere.level).toBe(0.25)
+
+        act(() => mixer.setLayerLevel("atmosphere", 0.7))
+        expect(slider).toHaveValue("70")
+    })
+
+    it("shows the reader's atmosphere as its mood", () => {
+        const { container } = render(<Reader narrationState="paused" />)
+        const mood = () => container.querySelector(".ap-nf__mood")?.textContent
+        expect(mood()).toBe("Ambience")
+        act(() => mixer.setAtmosphere("rain"))
+        expect(mood()).toBe("Rain")
+    })
+
+    it("stays stand-alone with mixer={null}", () => {
+        render(<Reader narrationState="playing" connected={false} />)
+        expect(screen.getByRole("region", { name: "Narration audio" })).not.toHaveAttribute(
+            "data-reader-mixer"
+        )
+        expect(mixer.getDuck()).toBe(0)
+        expect(screen.getByRole("slider", { name: "Ambience volume" })).toBeDisabled()
+    })
+})

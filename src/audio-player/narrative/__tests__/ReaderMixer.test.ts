@@ -566,6 +566,47 @@ describe("ReaderMixer", () => {
         })
     })
 
+    describe("duck", () => {
+        it("lowers the loops but not cues, without touching preferences", async () => {
+            const mixer = makeMixer()
+            mixer.playSoundscape(CHAPTER, { fadeMs: 0 })
+            mixer.setAtmosphere(RAIN, { fadeMs: 0 })
+            await settle()
+            const prefs = mixer.getPreferences()
+
+            mixer.setDuck(0.5, { fadeMs: 0 })
+            expect(only("https://a.test/ch1.mp3").volume).toBeCloseTo(0.25)
+            expect(only("https://a.test/rain.mp3").volume).toBeCloseTo(0.2)
+            mixer.playCue(GROWL)
+            expect(only(GROWL).volume).toBeCloseTo(0.8)
+            expect(mixer.getState()).toMatchObject({ duck: 0.5 })
+            expect(mixer.getState().layers.soundscapes.effectiveLevel).toBeCloseTo(0.25)
+            expect(mixer.getState().layers.cues.effectiveLevel).toBeCloseTo(0.8)
+            expect(mixer.getPreferences()).toBe(prefs)
+
+            mixer.setDuck(0, { fadeMs: 0 })
+            expect(only("https://a.test/ch1.mp3").volume).toBeCloseTo(0.5)
+        })
+
+        it("ramps toward the target", async () => {
+            const mixer = makeMixer()
+            mixer.playSoundscape(CHAPTER, { fadeMs: 0 })
+            await settle()
+            const score = only("https://a.test/ch1.mp3")
+            mixer.setDuck(1, { fadeMs: 400 })
+            vi.advanceTimersByTime(200)
+            expect(score.volume).toBeGreaterThan(0.1)
+            expect(score.volume).toBeLessThan(0.4)
+            vi.advanceTimersByTime(250)
+            expect(score.volume).toBeCloseTo(0)
+            expect(score.muted).toBe(true)
+            mixer.setDuck(0, { fadeMs: 400 })
+            vi.advanceTimersByTime(450)
+            expect(score.volume).toBeCloseTo(0.5)
+            expect(score.muted).toBe(false)
+        })
+    })
+
     it("releases everything on dispose()", async () => {
         const mixer = makeMixer()
         mixer.playSoundscape(CHAPTER, { fadeMs: 0 })

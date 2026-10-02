@@ -5,6 +5,8 @@ import type { AudioSpriteManifest } from "../core/audio/AudioSpriteEngine"
 import { useAudioSession } from "../session/AudioSessionContext"
 import { VolumeControl } from "../components/VolumeControl"
 import { useNarrativeAudio, type NarrationState } from "../narrative/useNarrativeAudio"
+import type { ReaderMixer } from "../narrative/ReaderMixer"
+import { useOptionalReaderMixer } from "../narrative/ReaderMixerContext"
 import { buildThemeVars } from "./themeVars"
 import { PauseIcon, PlayIcon, SpinnerIcon, DotsIcon } from "./icons"
 import "./skins.css"
@@ -36,6 +38,14 @@ export interface NarrativeFaceProps extends AudioPlayerTheme {
     duckAmount?: number
     /** Crossfade duration on mood/profile change, ms. */
     crossfadeMs?: number
+    /**
+     * The reader mixer this face works with. Defaults to the one from a
+     * surrounding `ReaderMixerProvider`; pass `null` to stay stand-alone.
+     * Connected, the Ambience slider sets the mixer's Atmosphere level, the
+     * mood shows the reader's atmosphere, and narration ducks the mixer's
+     * Soundscapes and Atmosphere while it plays.
+     */
+    mixer?: ReaderMixer | null
     /** Render as a tiny fixed bottom overlay instead of an inline block. */
     embedded?: boolean
     /** Show the expand/settings affordance. */
@@ -73,6 +83,7 @@ export function NarrativeFace({
     narrationVolume,
     duckAmount,
     crossfadeMs,
+    mixer: mixerProp,
     embedded = false,
     showExpand = false,
     onExpand,
@@ -81,6 +92,8 @@ export function NarrativeFace({
     ...theme
 }: NarrativeFaceProps) {
     const session = useAudioSession()
+    const contextMixer = useOptionalReaderMixer()
+    const mixer = mixerProp === undefined ? contextMixer : mixerProp
     const narrative = useNarrativeAudio({
         chapterId,
         sceneMood,
@@ -94,6 +107,7 @@ export function NarrativeFace({
         narrationVolume,
         duckAmount,
         crossfadeMs,
+        mixer,
     })
 
     const handleAmbienceChange = useCallback(
@@ -113,6 +127,7 @@ export function NarrativeFace({
             role="region"
             aria-label="Narration audio"
             data-chapter-id={chapterId}
+            data-reader-mixer={narrative.mixer ? "connected" : undefined}
         >
             {/* Soundscape indicator — a quiet mood dot + label, not a track. */}
             <div className="ap-nf__scape" title={`Soundscape: ${moodLabel}`}>
