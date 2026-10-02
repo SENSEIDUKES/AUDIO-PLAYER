@@ -99,6 +99,7 @@ mixer.dispose()                    // release everything
 | `stopAll({ fadeMs? })` | Fade both loops out; preferences are untouched. |
 | `setDuck(0..1, { fadeMs? })`, `getDuck()` | Temporarily lower Soundscapes and Atmosphere (for example under narration) without touching preferences. Cues are never ducked. `NarrativeFace` drives this for you. |
 | `setLayerLevel(layer, 0..1)`, `setLayerEnabled(layer, on)`, `setMasterEnabled(on)` | The reader's controls. Changes apply live, including mid-crossfade. |
+| `applyPreset(preset \| id)`, `getPresets()`, `resetPreferences()` | Pick a named mix in one tap, or return to the defaults (see Presets). |
 | `getPreferences()`, `setPreferences(input)`, `subscribePreferences(fn)` | The reader's settings as one plain object (see below). |
 | `getState()`, `subscribe(fn)` | Snapshot for UI: preferences, each layer's status and effective level, active cues, routing, volume control, page visibility, `needsGesture`. |
 | `unlock()` | Unlock audio from a gesture handler (see Mobile). |
@@ -163,11 +164,11 @@ avoids that on iPhone.
     "version": 1,
     "masterEnabled": true,
     "layers": {
-        "soundscapes": { "enabled": true, "level": 0.6 },
-        "atmosphere": { "enabled": true, "level": 0.4 },
-        "cues": { "enabled": true, "level": 0.8 }
+        "soundscapes": { "enabled": true, "level": 0.25 },
+        "atmosphere": { "enabled": true, "level": 0.3 },
+        "cues": { "enabled": true, "level": 0.75 }
     },
-    "atmosphereId": "rain"
+    "atmosphereId": "gentle-rain"
 }
 ```
 
@@ -181,6 +182,30 @@ writing to a server.
 For a browser-only save, `loadReaderMixerPreferences(key)` and
 `saveReaderMixerPreferences(key, preferences)` wrap `localStorage` under a key
 the host chooses. The package hardcodes no key.
+
+## Defaults and presets
+
+A new reader starts on the **default mix**: everything on, Soundscapes 25%,
+Atmosphere 30% on the catalog option with id `"gentle-rain"`, and Sound Cues
+75% (`DEFAULT_READER_MIXER_PREFERENCES`). A host whose catalog uses different
+ids, or that wants another starting mix, passes `defaultPreferences`; saved
+`initialPreferences` fill in on top of it.
+
+Presets switch the whole mix in one tap. The built-in `READER_MIXER_PRESETS` are:
+
+| Preset | Soundscapes | Atmosphere | Sound Cues | Atmosphere choice |
+| --- | --- | --- | --- | --- |
+| Default | 25% | 30% | 75% | resets to the default (gentle rain) |
+| Cinematic | 60% | 35% | 90% | kept |
+| Calm | 15% | 40% | 40% | kept |
+| Focus | off | 30% | off | kept |
+
+Every preset turns the master on. A preset's `preferences` may be partial:
+fields it leaves out keep the reader's current choice. `state.activePresetId`
+names the preset the current mix matches, or `null` for a custom mix, and
+`ReaderMixerPanel` shows the presets as a chip row above the master switch
+(`showPresets={false}` hides it; `labels.presets` names it). Pass `presets` to
+offer your own list and labels, for example translated ones.
 
 ## Routing and iPhone volume
 

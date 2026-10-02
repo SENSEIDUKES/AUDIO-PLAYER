@@ -27,7 +27,10 @@ function MixerProbe({ onMixer }: { onMixer: (mixer: ReaderMixer) => void }) {
 }
 
 function renderPanel(props: Parameters<typeof ReaderMixerPanel>[0] = {}) {
-    mixer = createReaderMixer({ atmospheres: ATMOSPHERES })
+    mixer = createReaderMixer({
+        atmospheres: ATMOSPHERES,
+        initialPreferences: { atmosphereId: null },
+    })
     return render(
         <ReaderMixerProvider mixer={mixer}>
             <ReaderMixerPanel {...props} />
@@ -64,8 +67,8 @@ describe("ReaderMixerPanel", () => {
             "Atmosphere volume",
             "Sound Cues volume",
         ])
-        expect(sliders[0]).toHaveAttribute("aria-valuetext", "60%")
-        expect(screen.getByText("60%")).toBeInTheDocument()
+        expect(sliders[0]).toHaveAttribute("aria-valuetext", "25%")
+        expect(screen.getByText("25%")).toBeInTheDocument()
     })
 
     it("drives the mixer from its switches and sliders", () => {
@@ -131,6 +134,27 @@ describe("ReaderMixerPanel", () => {
         expect(screen.getByRole("radio", { name: "Odd" })).toBeInTheDocument()
     })
 
+    it("offers presets and marks the one in effect", () => {
+        renderPanel()
+        const presets = screen.getByRole("group", { name: "Presets" })
+        expect(
+            within(presets)
+                .getAllByRole("radio")
+                .map((radio) => radio.closest("label")?.textContent)
+        ).toEqual(["Default", "Cinematic", "Calm", "Focus"])
+        // Atmosphere Off differs from the default (gentle rain): a custom mix.
+        expect(within(presets).queryByRole("radio", { checked: true })).toBeNull()
+
+        fireEvent.click(within(presets).getByRole("radio", { name: "Cinematic" }))
+        expect(mixer!.getPreferences().layers.soundscapes.level).toBe(0.6)
+        expect(within(presets).getByRole("radio", { name: "Cinematic" })).toBeChecked()
+
+        fireEvent.change(screen.getByRole("slider", { name: "Soundscapes volume" }), {
+            target: { value: "33" },
+        })
+        expect(within(presets).queryByRole("radio", { checked: true })).toBeNull()
+    })
+
     it("accepts every label from the host", () => {
         renderPanel({
             labels: {
@@ -141,6 +165,7 @@ describe("ReaderMixerPanel", () => {
                 formatPercent: (value) => `${value} %`,
                 atmosphereOff: "Apagado",
                 atmospherePicker: "Ambiente",
+                presets: "Mezclas",
             },
         })
         expect(screen.getByRole("region", { name: "Sonido" })).toBeInTheDocument()
@@ -149,10 +174,11 @@ describe("ReaderMixerPanel", () => {
         expect(screen.getByRole("switch", { name: "Atmosphere" })).toBeInTheDocument()
         expect(screen.getByRole("slider", { name: "Volumen de Efectos" })).toHaveAttribute(
             "aria-valuetext",
-            "80 %"
+            "75 %"
         )
         expect(screen.getByRole("radio", { name: "Apagado" })).toBeChecked()
         expect(screen.getByRole("group", { name: "Ambiente" })).toBeInTheDocument()
+        expect(screen.getByRole("group", { name: "Mezclas" })).toBeInTheDocument()
     })
 
     it("says when the device sets the volume", () => {

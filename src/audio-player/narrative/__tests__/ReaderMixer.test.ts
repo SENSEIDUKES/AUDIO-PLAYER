@@ -224,9 +224,65 @@ describe("ReaderMixer", () => {
             })
             expect(prefs.masterEnabled).toBe(true)
             expect(prefs.layers.soundscapes).toEqual({ enabled: true, level: 1 })
-            expect(prefs.layers.cues).toEqual({ enabled: false, level: 0.8 })
-            expect(prefs.atmosphereId).toBeNull()
+            expect(prefs.layers.cues).toEqual({ enabled: false, level: 0.75 })
+            expect(prefs.atmosphereId).toBe("gentle-rain")
             expect(Object.isFrozen(prefs)).toBe(true)
+        })
+
+        it("starts a new reader on the default mix: 25 / 30 / 75 with gentle rain", () => {
+            const mixer = createReaderMixer()
+            mixers.push(mixer)
+            expect(mixer.getPreferences()).toEqual({
+                version: 1,
+                masterEnabled: true,
+                layers: {
+                    soundscapes: { enabled: true, level: 0.25 },
+                    atmosphere: { enabled: true, level: 0.3 },
+                    cues: { enabled: true, level: 0.75 },
+                },
+                atmosphereId: "gentle-rain",
+            })
+            expect(mixer.getState().activePresetId).toBe("default")
+        })
+
+        it("lets the host choose its own defaults", () => {
+            const mixer = makeMixer({
+                initialPreferences: { layers: { cues: { level: 0.1 } } },
+                defaultPreferences: {
+                    atmosphereId: "rain",
+                    layers: { soundscapes: { level: 0.5 } },
+                },
+            })
+            expect(mixer.getPreferences().atmosphereId).toBe("rain")
+            expect(mixer.getPreferences().layers.soundscapes.level).toBe(0.5)
+            expect(mixer.getPreferences().layers.cues.level).toBe(0.1)
+            mixer.resetPreferences()
+            expect(mixer.getPreferences().layers.cues.level).toBe(0.75)
+            expect(mixer.getState().activePresetId).toBe("default")
+        })
+
+        it("applies presets, keeping the atmosphere a preset leaves out", async () => {
+            const mixer = makeMixer()
+            mixer.setAtmosphere(RAIN, { fadeMs: 0 })
+            await settle()
+            expect(mixer.getState().activePresetId).toBeNull()
+
+            mixer.applyPreset("calm")
+            expect(mixer.getPreferences().layers).toEqual({
+                soundscapes: { enabled: true, level: 0.15 },
+                atmosphere: { enabled: true, level: 0.4 },
+                cues: { enabled: true, level: 0.4 },
+            })
+            expect(mixer.getPreferences().atmosphereId).toBe("rain")
+            expect(mixer.getState().activePresetId).toBe("calm")
+
+            mixer.applyPreset("focus")
+            expect(mixer.getPreferences().layers.soundscapes.enabled).toBe(false)
+            expect(mixer.getPreferences().layers.cues.enabled).toBe(false)
+            expect(mixer.getState().activePresetId).toBe("focus")
+
+            mixer.applyPreset("nope")
+            expect(mixer.getState().activePresetId).toBe("focus")
         })
 
         it("saves and loads under a host-chosen storage key", () => {

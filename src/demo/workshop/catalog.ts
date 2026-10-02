@@ -773,6 +773,7 @@ export const WORKSHOP_ENTRIES: readonly WorkshopEntry[] = [
             "A reader-chosen atmosphere loops under everything; Off fades it out",
             "Sound cues overlap over both loops without pausing them",
             "Master, per-layer switches and sliders, with settings saved in this browser",
+            "Presets (Default, Cinematic, Calm, Focus); new readers start on Default: 25 / 30 / 75 with gentle rain",
             "Auto, Element or Web Audio routing; SEIHouse files play on all three, and the iPhone on/off fallback is shown in the view",
             "Both loops pause while the page is hidden",
             "NarrativeFace as companion: narration ducks the music and atmosphere, its Ambience slider is the Atmosphere level, and its … button opens the mixer view",

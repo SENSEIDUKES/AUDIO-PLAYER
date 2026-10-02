@@ -57,16 +57,72 @@ export interface ReaderMixerPreferencesInput {
     atmosphereId?: string | null
 }
 
+/**
+ * What a new reader starts with: everything on, the score at 25%, the
+ * atmosphere at 30% on gentle rain, and cues at 75%. `atmosphereId` names a
+ * catalog option; a host whose catalog has no `"gentle-rain"` passes its own
+ * `defaultPreferences`.
+ */
 export const DEFAULT_READER_MIXER_PREFERENCES: ReaderMixerPreferences = Object.freeze({
     version: 1,
     masterEnabled: true,
     layers: Object.freeze({
-        soundscapes: Object.freeze({ enabled: true, level: 0.6 }),
-        atmosphere: Object.freeze({ enabled: true, level: 0.4 }),
-        cues: Object.freeze({ enabled: true, level: 0.8 }),
+        soundscapes: Object.freeze({ enabled: true, level: 0.25 }),
+        atmosphere: Object.freeze({ enabled: true, level: 0.3 }),
+        cues: Object.freeze({ enabled: true, level: 0.75 }),
     }),
-    atmosphereId: null,
+    atmosphereId: "gentle-rain",
 })
+
+/**
+ * A named mix the reader can pick in one tap. `preferences` may be partial:
+ * fields it leaves out (typically the atmosphere) keep the reader's current
+ * choice.
+ */
+export interface ReaderMixerPreset {
+    id: string
+    label: string
+    preferences: ReaderMixerPreferencesInput
+}
+
+/** Id of the preset that applies the mixer's default preferences. */
+export const READER_MIXER_DEFAULT_PRESET_ID = "default"
+
+const allOn = (soundscapes: number, atmosphere: number, cues: number) => ({
+    masterEnabled: true,
+    layers: {
+        soundscapes: { enabled: true, level: soundscapes },
+        atmosphere: { enabled: true, level: atmosphere },
+        cues: { enabled: true, level: cues },
+    },
+})
+
+/**
+ * The built-in presets. "Default" restores the mixer's default preferences
+ * (including the default atmosphere); the others change only the switches and
+ * levels and keep the reader's atmosphere.
+ */
+export const READER_MIXER_PRESETS: readonly ReaderMixerPreset[] = Object.freeze([
+    Object.freeze({
+        id: READER_MIXER_DEFAULT_PRESET_ID,
+        label: "Default",
+        preferences: DEFAULT_READER_MIXER_PREFERENCES,
+    }),
+    Object.freeze({ id: "cinematic", label: "Cinematic", preferences: allOn(0.6, 0.35, 0.9) }),
+    Object.freeze({ id: "calm", label: "Calm", preferences: allOn(0.15, 0.4, 0.4) }),
+    Object.freeze({
+        id: "focus",
+        label: "Focus",
+        preferences: {
+            masterEnabled: true,
+            layers: {
+                soundscapes: { enabled: false },
+                atmosphere: { enabled: true, level: 0.3 },
+                cues: { enabled: false },
+            },
+        },
+    }),
+])
 
 function clamp01(value: number): number {
     if (!Number.isFinite(value)) return 0
@@ -199,6 +255,10 @@ export interface ReaderMixerState {
     readonly layers: Readonly<Record<ReaderMixerLayer, ReaderMixerLayerState>>
     /** The atmosphere catalog the mixer resolves ids against. */
     readonly atmosphereOptions: readonly ReaderAtmosphereOption[]
+    /** The presets the reader can pick (see {@link ReaderMixer.applyPreset}). */
+    readonly presets: readonly ReaderMixerPreset[]
+    /** The preset the current preferences match, or `null` for a custom mix. */
+    readonly activePresetId: string | null
     /** Whether the atmosphere layer is meant to be sounding (started and not stopped). */
     readonly atmosphereActive: boolean
     /** Cues playing right now. */
@@ -224,8 +284,19 @@ export type ReaderMixerPreferencesListener = (preferences: ReaderMixerPreference
 /* ------------------------------------------------------------------ */
 
 export interface ReaderMixerOptions {
-    /** Saved preferences to start from. Partial or invalid input is filled with defaults. */
+    /** Saved preferences to start from. Missing or invalid fields use `defaultPreferences`. */
     initialPreferences?: ReaderMixerPreferencesInput | ReaderMixerPreferences | null
+    /**
+     * What a new reader starts with and what the "Default" preset and
+     * `resetPreferences()` restore. Missing fields use
+     * {@link DEFAULT_READER_MIXER_PREFERENCES}.
+     */
+    defaultPreferences?: ReaderMixerPreferencesInput | ReaderMixerPreferences | null
+    /**
+     * Presets offered to the reader. Defaults to {@link READER_MIXER_PRESETS},
+     * with "Default" following `defaultPreferences`.
+     */
+    presets?: readonly ReaderMixerPreset[]
     /** Called after every preference change; the host decides where to save. */
     onPreferencesChange?: ReaderMixerPreferencesListener
     /** The host's atmosphere catalog, used to resolve saved ids. */
@@ -361,6 +432,8 @@ export class ReaderMixer {
     private duckLevel = 0
     private duckTarget = 0
     private duckTimer: ReturnType<typeof setInterval> | null = null
+    private readonly defaults: ReaderMixerPreferences
+    private readonly presets: readonly ReaderMixerPreset[]
     private state: ReaderMixerState
     private readonly stateListeners = new Set<ReaderMixerStateListener>()
     private readonly preferenceListeners = new Set<ReaderMixerPreferencesListener>()
@@ -369,7 +442,15 @@ export class ReaderMixer {
     private disposed = false
 
     constructor(options: ReaderMixerOptions = {}) {
-        this.prefs = normalizeReaderMixerPreferences(options.initialPreferences)
+        this.defaults = normalizeReaderMixerPreferences(options.defaultPreferences)
+        this.prefs = normalizeReaderMixerPreferences(options.initialPreferences, this.defaults)
+        this.presets = Object.freeze(
+            (options.presets ?? READER_MIXER_PRESETS).map((preset) =>
+                preset.id === READER_MIXER_DEFAULT_PRESET_ID && !options.presets
+                    ? Object.freeze({ ...preset, preferences: this.defaults })
+                    : preset
+            )
+        )
         this.onPreferencesChange = options.onPreferencesChange
         this.atmosphereOptions = Object.freeze([...(options.atmospheres ?? [])])
         this.fadeMs = Math.max(0, options.fadeMs ?? SCENE_FADE_MS)
@@ -639,6 +720,28 @@ export class ReaderMixer {
         else this.startAtmosphere()
     }
 
+    /** The presets the reader can pick. */
+    getPresets(): readonly ReaderMixerPreset[] {
+        return this.presets
+    }
+
+    /**
+     * Apply a preset (or its id). Fields the preset leaves out keep the
+     * reader's current choice. Unknown ids do nothing.
+     */
+    applyPreset(preset: ReaderMixerPreset | string): void {
+        if (this.disposed) return
+        const resolved =
+            typeof preset === "string" ? this.presets.find((p) => p.id === preset) : preset
+        if (!resolved) return
+        this.setPreferences(resolved.preferences)
+    }
+
+    /** Restore the default preferences (what a new reader starts with). */
+    resetPreferences(): void {
+        this.setPreferences(this.defaults)
+    }
+
     /** Subscribe to preference changes. Returns an unsubscribe function. */
     subscribePreferences(listener: ReaderMixerPreferencesListener): () => void {
         if (this.disposed) return () => {}
@@ -903,6 +1006,8 @@ export class ReaderMixer {
             preferences: this.prefs,
             layers,
             atmosphereOptions: this.atmosphereOptions,
+            presets: this.presets,
+            activePresetId: this.matchPreset(),
             atmosphereActive: this.atmosphereActive,
             activeCues: this.activeCues,
             routing: this.graph ? "web-audio" : "element",
@@ -911,6 +1016,16 @@ export class ReaderMixer {
             needsGesture,
             duck: this.duckTarget,
         })
+    }
+
+    private matchPreset(): string | null {
+        const match = this.presets.find((preset) =>
+            samePreferences(
+                normalizeReaderMixerPreferences(preset.preferences, this.prefs),
+                this.prefs
+            )
+        )
+        return match?.id ?? null
     }
 
     private refresh(): void {
@@ -929,9 +1044,15 @@ export class ReaderMixer {
 }
 
 function sameState(a: ReaderMixerState, b: ReaderMixerState): boolean {
-    if (a.preferences !== b.preferences || a.atmosphereOptions !== b.atmosphereOptions) return false
+    if (
+        a.preferences !== b.preferences ||
+        a.atmosphereOptions !== b.atmosphereOptions ||
+        a.presets !== b.presets
+    ) {
+        return false
+    }
     const rest = (state: ReaderMixerState) =>
-        JSON.stringify({ ...state, preferences: null, atmosphereOptions: null })
+        JSON.stringify({ ...state, preferences: null, atmosphereOptions: null, presets: null })
     return rest(a) === rest(b)
 }
 

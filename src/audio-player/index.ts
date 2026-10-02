@@ -254,6 +254,8 @@ export {
     createReaderMixer,
     READER_MIXER_LAYERS,
     DEFAULT_READER_MIXER_PREFERENCES,
+    READER_MIXER_PRESETS,
+    READER_MIXER_DEFAULT_PRESET_ID,
     normalizeReaderMixerPreferences,
     computeReaderMixerGain,
     loadReaderMixerPreferences,
@@ -277,6 +279,7 @@ export type {
     PlayCueOptions,
     ReaderMixerFadeOptions,
     ReaderMixerDuckOptions,
+    ReaderMixerPreset,
 } from "./narrative/ReaderMixer"
 export {
     ReaderMixerProvider,
