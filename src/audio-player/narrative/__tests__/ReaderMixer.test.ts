@@ -200,7 +200,7 @@ describe("ReaderMixer", () => {
 
         it("reports every change, and only real changes", () => {
             const onPreferencesChange = vi.fn()
-            const mixer = makeMixer({ onPreferencesChange })
+            const mixer = makeMixer({ onPreferencesChange, preferencesDebounceMs: 0 })
             const listener = vi.fn()
             mixer.subscribePreferences(listener)
 
@@ -359,7 +359,7 @@ describe("ReaderMixer", () => {
             mixer.setAtmosphere(RAIN, { fadeMs: 0 })
             await settle()
             const bed = only("https://a.test/rain.mp3")
-            expect(bed.loop).toBe(true)
+            expect(bed.loop).toBe(false)
 
             mixer.setAtmosphere(null)
             expect(mixer.getPreferences().atmosphereId).toBeNull()

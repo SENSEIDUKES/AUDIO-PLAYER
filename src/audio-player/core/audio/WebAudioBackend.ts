@@ -8,6 +8,7 @@ import type {
 } from "./AudioBackend"
 import { DEFAULT_PLAYBACK_RATE, sanitizePlaybackRate } from "./AudioBackend"
 import { sharedAudioBufferCache, sharedAudioStorageCache } from "./audioCaches"
+import { retainAudioContext, type AudioContextLease } from "./sharedAudioContext"
 
 export const WEBAUDIO_CAPABILITIES = {
     streaming: false,
@@ -51,39 +52,6 @@ function getAudioContextCtor(): typeof AudioContext | undefined {
 }
 
 /**
- * One AudioContext shared by every WebAudioBackend instance on the page.
- * Browsers cap (and charge resources for) concurrent contexts, so each
- * backend gets its own GainNode into the shared context instead. Reference
- * counted: closed when the last backend releases it, recreated on demand.
- */
-let sharedContext: AudioContext | null = null
-let sharedContextUsers = 0
-
-function retainSharedContext(): AudioContext {
-    if (!sharedContext || sharedContext.state === "closed") {
-        const Ctor = getAudioContextCtor()
-        if (!Ctor) {
-            throw namedError("NotSupportedError", "Web Audio API unavailable.")
-        }
-        sharedContext = new Ctor()
-        sharedContextUsers = 0
-    }
-    sharedContextUsers += 1
-    return sharedContext
-}
-
-function releaseSharedContext(ctx: AudioContext): void {
-    if (ctx !== sharedContext) return
-    sharedContextUsers = Math.max(0, sharedContextUsers - 1)
-    if (sharedContextUsers === 0) {
-        if (sharedContext.state !== "closed") {
-            void sharedContext.close().catch(() => {})
-        }
-        sharedContext = null
-    }
-}
-
-/**
  * Web Audio playback backend: fetch + decodeAudioData into an AudioBuffer,
  * played through AudioBufferSourceNode → [PannerNode] → StereoPannerNode → GainNode → destination.
  *
@@ -113,6 +81,7 @@ export class WebAudioBackend implements AudioBackend {
 
     private info: AudioBackendInfo
     private ctx: AudioContext | null = null
+    private contextLease: AudioContextLease | null = null
     private gain: GainNode | null = null
     private panner: PannerNode | null = null
     private stereoPanner: StereoPannerNode | null = null
@@ -163,7 +132,10 @@ export class WebAudioBackend implements AudioBackend {
 
     private ensureContext(): AudioContext {
         if (this.ctx && this.ctx.state !== "closed") return this.ctx
-        this.ctx = retainSharedContext()
+        const Ctor = getAudioContextCtor()
+        if (!Ctor) throw namedError("NotSupportedError", "Web Audio API unavailable.")
+        this.contextLease = retainAudioContext(Ctor)
+        this.ctx = this.contextLease.context
 
         // Create spatial audio nodes: PannerNode → StereoPannerNode → GainNode
         this.panner = this.ctx.createPanner()
@@ -207,8 +179,9 @@ export class WebAudioBackend implements AudioBackend {
     }
 
     /** Stop the current source node without emitting any events. */
-    private stopSourceNode(): void {
+    private stopSourceNode(preserveDemand = false): void {
         this.sourceToken += 1
+        if (!preserveDemand) void this.contextLease?.setActive(false).catch(() => {})
         const source = this.source
         if (!source) return
         this.source = null
@@ -353,7 +326,7 @@ export class WebAudioBackend implements AudioBackend {
         const ctx = this.ensureContext()
         const buffer = this.buffer
         if (!buffer || !this.gain) return
-        this.stopSourceNode()
+        this.stopSourceNode(true)
         const source = ctx.createBufferSource()
         source.buffer = buffer
         source.loop = this.loopFlag
@@ -365,6 +338,7 @@ export class WebAudioBackend implements AudioBackend {
             // Only natural completion reaches here; manual stops bump the token.
             if (token !== this.sourceToken) return
             this.source = null
+            void this.contextLease?.setActive(false).catch(() => {})
             this.offset = buffer.duration
             this.state = "ended"
             this.emit("ended")
@@ -372,6 +346,7 @@ export class WebAudioBackend implements AudioBackend {
         const clamped = Math.max(0, Math.min(offset, buffer.duration))
         source.start(0, clamped)
         this.source = source
+        void this.contextLease?.setActive(true).catch(() => {})
         this.offset = clamped
         this.startedAtCtxTime = ctx.currentTime
         this.state = "playing"
@@ -391,7 +366,7 @@ export class WebAudioBackend implements AudioBackend {
 
         let resumed = false
         try {
-            await ctx.resume()
+            await this.contextLease!.setActive(true, true)
             resumed = true
         } catch {
             resumed = false
@@ -399,6 +374,7 @@ export class WebAudioBackend implements AudioBackend {
         // resume() can resolve while the context stays suspended (no gesture);
         // treat that as autoplay-blocked so the hook's affordance shows.
         if (!resumed || ctx.state !== "running") {
+            void this.contextLease?.setActive(false).catch(() => {})
             throw namedError("NotAllowedError", "AudioContext requires a user gesture to start.")
         }
         if (gen !== this.generation) {
@@ -412,6 +388,7 @@ export class WebAudioBackend implements AudioBackend {
                 throw namedError("AbortError", "Source changed during play().")
             }
             if (!this.buffer) {
+                void this.contextLease?.setActive(false).catch(() => {})
                 throw namedError("NotSupportedError", "Audio failed to load or decode.")
             }
         }
@@ -681,9 +658,8 @@ export class WebAudioBackend implements AudioBackend {
             }
             this.gain = null
         }
-        if (this.ctx) {
-            releaseSharedContext(this.ctx)
-        }
+        this.contextLease?.release()
+        this.contextLease = null
         this.ctx = null
         // Revivable by design: the next load()/play() lazily recreates the
         // context (required for React StrictMode unmount/remount cycles).

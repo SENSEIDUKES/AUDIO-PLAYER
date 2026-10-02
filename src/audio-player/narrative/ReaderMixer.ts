@@ -332,6 +332,13 @@ export interface ReaderMixerOptions {
     analysisPolicy?: SceneMixAnalysisPolicy
     /** Maximum overlapping cues. Defaults to 6. */
     maxConcurrentCues?: number
+    /** Idle cue cache limits. Defaults to 8 URLs, 2 elements each. */
+    maxCachedCueUrls?: number
+    maxCuePoolSizePerUrl?: number
+    /** Short overlap at each bed boundary. Default 250 ms; 0 selects native looping. */
+    loopCrossfadeMs?: number
+    /** Coalesce persistence callbacks. Default 300 ms; 0 delivers each change immediately. */
+    preferencesDebounceMs?: number
     /**
      * Pause both loops while the page is hidden and resume when it returns.
      * Defaults to true. Active cues are dropped; new cues are skipped while hidden.
@@ -430,6 +437,9 @@ export class ReaderMixer {
     private readonly atmosphereFadeMs: number
     private readonly elementVolumeWorks: boolean
     private readonly onPreferencesChange?: ReaderMixerPreferencesListener
+    private readonly preferencesDebounceMs: number
+    private preferencesTimer: ReturnType<typeof setTimeout> | null = null
+    private pendingPreferences: ReaderMixerPreferences | null = null
     private atmosphereOptions: readonly ReaderAtmosphereOption[]
     private atmosphereActive = false
     private loopStatus: Record<LoopLayer, SceneMixStatusSnapshot>
@@ -465,6 +475,7 @@ export class ReaderMixer {
             )
         )
         this.onPreferencesChange = options.onPreferencesChange
+        this.preferencesDebounceMs = Math.max(0, options.preferencesDebounceMs ?? 300)
         this.atmosphereOptions = Object.freeze([...(options.atmospheres ?? [])])
         this.fadeMs = Math.max(0, options.fadeMs ?? SCENE_FADE_MS)
         this.atmosphereFadeMs = Math.max(0, options.atmosphereFadeMs ?? SCENE_FADE_MS)
@@ -491,6 +502,7 @@ export class ReaderMixer {
         }
 
         const recovery = {
+            loopCrossfadeMs: options.loopCrossfadeMs ?? 250,
             attemptTimeoutMs: options.loopAttemptTimeoutMs ?? 12000,
             maxRetries: options.loopMaxRetries ?? 2,
             retryDelayMs: options.loopRetryDelayMs ?? 500,
@@ -530,6 +542,9 @@ export class ReaderMixer {
         this.cues = new OneShotEngine({
             crossOrigin,
             maxConcurrent: options.maxConcurrentCues ?? 6,
+            maxCachedUrls: options.maxCachedCueUrls ?? 8,
+            maxPoolSizePerUrl: options.maxCuePoolSizePerUrl ?? 2,
+            disconnectIdleSinks: true,
             createGainSink: this.graph?.sinkFactory("cues"),
             startTimeoutMs: options.cueStartTimeoutMs ?? 1500,
             outputReady: () => !this.graph || this.graph.state === "running",
@@ -566,6 +581,9 @@ export class ReaderMixer {
             }
             window.addEventListener("online", online)
             this.cleanups.push(() => window.removeEventListener("online", online))
+            const pagehide = () => this.flushPreferences()
+            window.addEventListener("pagehide", pagehide)
+            this.cleanups.push(() => window.removeEventListener("pagehide", pagehide))
         }
 
         this.ready = true
@@ -853,6 +871,7 @@ export class ReaderMixer {
     /** Stop everything and release every element, listener and audio node. */
     dispose(): void {
         if (this.disposed) return
+        this.flushPreferences()
         this.disposed = true
         this.stopDuckRamp()
         for (const cleanup of this.cleanups.splice(0)) {
@@ -935,7 +954,15 @@ export class ReaderMixer {
         if (samePreferences(normalized, this.prefs)) return
         this.prefs = normalized
         this.applyLevels()
-        for (const listener of [this.onPreferencesChange, ...this.preferenceListeners]) {
+        this.pendingPreferences = normalized
+        if (this.preferencesTimer !== null) clearTimeout(this.preferencesTimer)
+        if (this.preferencesDebounceMs === 0) this.flushPreferences()
+        else
+            this.preferencesTimer = setTimeout(
+                () => this.flushPreferences(),
+                this.preferencesDebounceMs
+            )
+        for (const listener of this.preferenceListeners) {
             try {
                 listener?.(normalized)
             } catch {
@@ -943,6 +970,26 @@ export class ReaderMixer {
             }
         }
         this.refresh()
+    }
+
+    /** Persist the latest settings immediately (also called on pagehide and dispose). */
+    flushPreferences(): void {
+        if (this.preferencesTimer !== null) clearTimeout(this.preferencesTimer)
+        this.preferencesTimer = null
+        const preferences = this.pendingPreferences
+        this.pendingPreferences = null
+        if (preferences) {
+            try {
+                this.onPreferencesChange?.(preferences)
+            } catch {
+                /* Persistence cannot break playback. */
+            }
+        }
+    }
+
+    /** Warm the chapter's bounded cue cache without starting playback or owning the audio session. */
+    preloadCues(urls: readonly string[]): void {
+        if (!this.disposed) this.cues.preload(urls)
     }
 
     /** Push each layer's effective gain into its engine (or its Web Audio bus). */

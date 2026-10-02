@@ -368,10 +368,11 @@ describe("ReaderMixer production recovery", () => {
         await vi.advanceTimersByTimeAsync(1010)
         expect(deck.src).toBe("")
         expect(latest(SCORE)).not.toBe(deck)
-        latest(SCORE).duration = 100
-        latest(SCORE).dispatch("loadedmetadata")
+        const recovered = latest(SCORE)
+        recovered.duration = 100
+        recovered.dispatch("loadedmetadata")
         await settle()
-        expect(latest(SCORE).currentTime).toBe(4)
+        expect(recovered.currentTime).toBe(4)
     })
 
     it("frees all six stalled cue slots at 1.5 seconds and stops late play resolutions", async () => {

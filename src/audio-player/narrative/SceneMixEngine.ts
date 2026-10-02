@@ -46,6 +46,7 @@ type Deck = {
     resumeTime: number | null
     resuming: boolean
     resumeToken: number
+    recycleAfterFade: boolean
 }
 
 type PendingTransition = {
@@ -54,6 +55,8 @@ type PendingTransition = {
     retries: number
     retryTimer: ReturnType<typeof setTimeout> | null
     resumeTime: number | null
+    /** A self-loop has separate ownership from a requested score switch. */
+    loopOwner?: Deck
 }
 
 type SceneRequest = {
@@ -74,6 +77,8 @@ export type SceneMixAnalysisPolicy = "automatic" | "off"
 export interface SceneMixEngineOptions {
     /** Loop every scene track. Defaults to true — scores are beds, not songs. */
     loop?: boolean
+    /** Overlap each finite loop boundary; 0 retains native looping (standalone default). */
+    loopCrossfadeMs?: number
     /** Default crossfade length in ms. Defaults to {@link SCENE_FADE_MS}. */
     fadeMs?: number
     /**
@@ -194,6 +199,10 @@ export class SceneMixEngine {
     /** Latched per engine so independent narrative layers cannot poison each other. */
     private volumeWritesUnsupported = false
     private loop: boolean
+    private readonly loopCrossfadeMs: number
+    private loopTransition: PendingTransition | null = null
+    private loopTimer: ReturnType<typeof setTimeout> | null = null
+    private parkedLoopDeck: Deck | null = null
     private defaultFadeMs: number
     private crossOrigin?: "anonymous" | "use-credentials" | null
     private analysisPolicy: SceneMixAnalysisPolicy
@@ -228,6 +237,7 @@ export class SceneMixEngine {
 
     constructor(options: SceneMixEngineOptions = {}) {
         this.loop = options.loop ?? true
+        this.loopCrossfadeMs = Math.max(0, options.loopCrossfadeMs ?? 0)
         this.defaultFadeMs = Math.max(0, options.fadeMs ?? SCENE_FADE_MS)
         this.crossOrigin = options.crossOrigin
         this.analysisPolicy = options.analysisPolicy ?? "automatic"
@@ -368,18 +378,20 @@ export class SceneMixEngine {
 
     /** Install and start one concrete source candidate for a logical request. */
     private startSourceAttempt(transition: PendingTransition, sourceIndex: number): void {
-        if (this.disposed || this.pendingTransition !== transition) return
+        if (this.disposed || !this.ownsTransition(transition)) return
         const source = transition.request.sources[sourceIndex]
         if (!source) return
 
-        const el = this.unlockPool.take()
-        el.loop = this.loop
+        const parked = transition.loopOwner ? this.parkedLoopDeck : null
+        if (parked) this.parkedLoopDeck = null
+        const el = parked?.el ?? this.unlockPool.take()
+        el.loop = this.loop && this.loopCrossfadeMs === 0
         el.preload = "auto"
         // Standalone requests retain their opt-in CORS policy. ReaderMixer
         // supplies a consistent anonymous mode; its emergency fallback opts out.
         if (!this.elementFallback && this.crossOrigin) el.crossOrigin = this.crossOrigin
         el.muted = this.muted
-        const sink = this.makeGainSink(el)
+        const sink = parked?.sink ?? this.makeGainSink(el)
         // On volume-locked browsers the fade degrades to a hard swap that
         // relies on the element keeping its default full volume — so the
         // fade-in's zero start must not be written once the latch is known.
@@ -410,6 +422,7 @@ export class SceneMixEngine {
             retiring: false,
             abort,
             waitForMetadataBeforePlay:
+                !!transition.loopOwner ||
                 (transition.request.trimStartMs !== null && transition.request.trimStartMs > 0) ||
                 (transition.resumeTime !== null && transition.resumeTime > 0),
             playStarted: false,
@@ -418,6 +431,7 @@ export class SceneMixEngine {
             resumeTime: transition.resumeTime,
             resuming: false,
             resumeToken: 0,
+            recycleAfterFade: false,
         }
 
         transition.incoming = deck
@@ -433,13 +447,43 @@ export class SceneMixEngine {
 
         el.addEventListener(
             "loadedmetadata",
-            () => this.handleCandidateMetadata(transition, deck),
+            () => {
+                if (this.active === deck) this.prepareLoop(deck)
+                else this.handleCandidateMetadata(transition, deck)
+            },
+            { signal: abort.signal }
+        )
+        const retimeLoop = () => {
+            if (
+                this.loopTransition?.loopOwner === deck &&
+                this.loopTransition.incoming?.el.readyState
+            ) {
+                this.scheduleLoop(this.loopTransition)
+            }
+        }
+        el.addEventListener("timeupdate", retimeLoop, { signal: abort.signal })
+        el.addEventListener("seeked", retimeLoop, { signal: abort.signal })
+        el.addEventListener(
+            "ended",
+            () => {
+                if (!this.loop || !this.loopCrossfadeMs || this.active !== deck || this.paused)
+                    return
+                // A stalled standby must not end the bed; every restart honors its trim.
+                this.cancelLoop()
+                try {
+                    deck.el.currentTime = deck.trimStartMs / 1000
+                } catch {
+                    /* Best effort seek. */
+                }
+                this.resumeDeck(deck)
+            },
             { signal: abort.signal }
         )
         el.addEventListener(
             "pause",
             () => {
                 if (this.active !== deck || this.paused || deck.retiring) return
+                this.cancelLoop()
                 this.clearDeadline(deck)
                 if (!this.pendingTransition) this.publishStatus("paused", deck.key, null)
                 this.playbackChanged()
@@ -455,6 +499,7 @@ export class SceneMixEngine {
                     this.publishStatus("playing", deck.key, deck.key)
                 }
                 this.playbackChanged()
+                this.prepareLoop(deck)
             },
             { signal: abort.signal }
         )
@@ -488,14 +533,14 @@ export class SceneMixEngine {
 
         // Src is assigned after the listeners and ownership record so
         // cache-instant metadata/error events cannot slip past either.
-        el.src = source.url
+        if (!parked) el.src = source.url
         if (!this.isCurrentCandidate(transition, deck)) return
         // Verify the silent preparation write now. If element-volume writes
         // are locked, the engine latches its hard-swap fallback before commit.
         this.applyDeckGain(deck)
         if (deck.waitForMetadataBeforePlay) {
             try {
-                el.load()
+                if (!parked) el.load()
             } catch (error) {
                 this.advanceSourceOrFail(transition, deck, "media-error", error)
                 return
@@ -509,6 +554,7 @@ export class SceneMixEngine {
 
     /** Fade the whole scene layer to silence and release every deck. */
     stop(fadeMs: number = this.defaultFadeMs): void {
+        this.cancelLoop()
         this.failedRequest = null
         this.deferredRequest = null
         if (this.pendingTransition) {
@@ -552,6 +598,7 @@ export class SceneMixEngine {
     pause(): void {
         if (this.disposed || this.paused) return
         this.paused = true
+        this.cancelLoop()
         this.stopTicking()
         const pending = this.pendingTransition
         if (pending) {
@@ -645,6 +692,7 @@ export class SceneMixEngine {
 
     dispose(): void {
         this.disposed = true
+        this.cancelLoop()
         this.deferredRequest = null
         this.unlockPool.clear()
         this.stopTicking()
@@ -699,6 +747,7 @@ export class SceneMixEngine {
                     this.publishStatus("playing", deck.key, deck.key)
                 }
                 this.playbackChanged()
+                this.prepareLoop(deck)
             },
             (error: unknown) => {
                 if (
@@ -732,6 +781,11 @@ export class SceneMixEngine {
     private handleCandidateMetadata(transition: PendingTransition, deck: Deck): void {
         if (!this.isCurrentCandidate(transition, deck)) return
         this.applyCandidateTrim(deck)
+        if (transition.loopOwner) {
+            this.clearDeadline(deck)
+            this.scheduleLoop(transition)
+            return
+        }
         if (deck.waitForMetadataBeforePlay && !deck.playStarted) {
             this.attemptPlayback(transition, deck, false)
         }
@@ -810,6 +864,28 @@ export class SceneMixEngine {
 
         this.clearDeadline(deck)
 
+        if (transition.loopOwner) {
+            const outgoing = transition.loopOwner
+            this.loopTransition = null
+            this.clearLoopTimer()
+            outgoing.recycleAfterFade = true
+            this.retire(outgoing, transition.request.fadeMs)
+            deck.rampT0 = performance.now()
+            deck.rampFromGain = 0
+            deck.rampToGain = 1
+            deck.rampMs = this.rampLength(deck.sink, transition.request.fadeMs)
+            this.active = deck
+            if (!this.pendingTransition && this.statusSnapshot.state !== "failed") {
+                this.publishStatus("playing", deck.key, deck.key)
+            }
+            this.applyGains()
+            this.startTicking()
+            this.playbackChanged()
+            return
+        }
+
+        this.cancelLoop()
+
         this.pendingTransition = null
         this.disarmGestureRetry?.()
         for (const otherDeck of this.decks) {
@@ -829,13 +905,20 @@ export class SceneMixEngine {
         this.applyGains()
         this.startTicking()
         this.playbackChanged()
+        this.prepareLoop(incoming)
     }
 
     private handlePlaybackFailure(transition: PendingTransition, deck: Deck, error: unknown): void {
         if (!this.isCurrentCandidate(transition, deck)) return
         if (this.isAutoplayPolicyError(error)) {
             this.clearDeadline(deck)
-            this.publishStatus("autoplay-blocked", transition.request.key, this.active?.key ?? null)
+            if (!transition.loopOwner || !this.pendingTransition) {
+                this.publishStatus(
+                    "autoplay-blocked",
+                    transition.request.key,
+                    this.active?.key ?? null
+                )
+            }
             if (!this.isCurrentCandidate(transition, deck)) return
             this.armGestureRetry(transition, deck)
             return
@@ -892,6 +975,7 @@ export class SceneMixEngine {
             this.releaseDeck(deck)
             return
         }
+        this.cancelLoop()
 
         // A post-commit media failure can still recover the newest outgoing
         // deck while it exists. A stale retiring deck can never displace a
@@ -944,6 +1028,22 @@ export class SceneMixEngine {
         error: unknown
     ): void {
         if (!this.isCurrentCandidate(transition, deck)) return
+
+        if (transition.loopOwner) {
+            transition.incoming = null
+            this.releaseDeck(deck)
+            this.clearLoopTimer()
+            if (transition.retries++ < this.maxRetries) {
+                transition.retryTimer = setTimeout(
+                    () => {
+                        transition.retryTimer = null
+                        this.startSourceAttempt(transition, deck.sourceIndex)
+                    },
+                    this.retryDelayMs * 2 ** (transition.retries - 1)
+                )
+            } else this.cancelLoop()
+            return
+        }
 
         const failedSource = deck.source
         const wasRouted = deck.sink !== null
@@ -1005,7 +1105,7 @@ export class SceneMixEngine {
     private isCurrentCandidate(transition: PendingTransition, deck: Deck): boolean {
         return (
             !this.disposed &&
-            this.pendingTransition === transition &&
+            this.ownsTransition(transition) &&
             transition.incoming === deck &&
             !deck.abort.signal.aborted &&
             this.decks.includes(deck)
@@ -1234,7 +1334,10 @@ export class SceneMixEngine {
         const now = performance.now()
         let anyRamping = false
         for (const deck of [...this.decks]) {
-            if (this.pendingTransition?.incoming === deck) {
+            if (
+                this.pendingTransition?.incoming === deck ||
+                this.loopTransition?.incoming === deck
+            ) {
                 this.applyDeckGain(deck)
                 continue
             }
@@ -1249,7 +1352,16 @@ export class SceneMixEngine {
             }
             if (t < 1) anyRamping = true
             else if (deck.retiring) {
-                this.releaseDeck(deck)
+                if (deck.recycleAfterFade && this.active?.key === deck.key) {
+                    this.clearDeadline(deck)
+                    deck.abort.abort()
+                    deck.curveGain = 0
+                    this.applyDeckGain(deck)
+                    deck.el.pause()
+                    this.decks = this.decks.filter((candidate) => candidate !== deck)
+                    this.parkedLoopDeck = deck
+                    this.prepareLoop(this.active)
+                } else this.releaseDeck(deck)
                 continue
             }
             this.applyDeckGain(deck)
@@ -1260,6 +1372,90 @@ export class SceneMixEngine {
 
     private applyGains(): void {
         for (const deck of this.decks) this.applyDeckGain(deck)
+    }
+
+    private ownsTransition(transition: PendingTransition): boolean {
+        return this.pendingTransition === transition || this.loopTransition === transition
+    }
+
+    /** Prepare the other unlocked deck ahead of the next finite boundary. */
+    private prepareLoop(deck: Deck): void {
+        if (
+            !this.loop ||
+            !this.loopCrossfadeMs ||
+            this.paused ||
+            this.disposed ||
+            this.active !== deck ||
+            deck.el.paused ||
+            this.loopTransition ||
+            this.decks.some((candidate) => candidate.recycleAfterFade && candidate.retiring)
+        )
+            return
+        const playableMs = deck.el.duration * 1000 - deck.trimStartMs
+        if (!Number.isFinite(playableMs) || playableMs <= 0) return
+        const request: SceneRequest = {
+            ...deck.request,
+            trimStartMs: deck.trimStartMs,
+            analysisPolicy: "off",
+            fadeMs: Math.min(this.loopCrossfadeMs, playableMs / 2),
+        }
+        const transition: PendingTransition = {
+            request,
+            incoming: null,
+            retries: 0,
+            retryTimer: null,
+            resumeTime: null,
+            loopOwner: deck,
+        }
+        this.loopTransition = transition
+        this.startSourceAttempt(transition, deck.sourceIndex)
+    }
+
+    /** One boundary timer; fades still use the existing timer only while ramping. */
+    private scheduleLoop(transition: PendingTransition): void {
+        const owner = transition.loopOwner
+        const incoming = transition.incoming
+        if (
+            this.loopTransition !== transition ||
+            this.active !== owner ||
+            !incoming ||
+            incoming.playStarted ||
+            !owner ||
+            owner.el.paused ||
+            this.paused
+        )
+            return
+        this.clearLoopTimer()
+        const remaining =
+            (owner.el.duration - owner.el.currentTime) * 1000 - transition.request.fadeMs
+        if (!Number.isFinite(remaining)) return
+        this.loopTimer = setTimeout(
+            () => {
+                this.loopTimer = null
+                this.attemptPlayback(transition, incoming, false)
+            },
+            Math.max(0, remaining)
+        )
+    }
+
+    private clearLoopTimer(): void {
+        if (this.loopTimer !== null) clearTimeout(this.loopTimer)
+        this.loopTimer = null
+    }
+
+    private cancelLoop(): void {
+        this.clearLoopTimer()
+        const transition = this.loopTransition
+        this.loopTransition = null
+        if (transition?.retryTimer !== null && transition?.retryTimer !== undefined)
+            clearTimeout(transition.retryTimer)
+        if (transition?.incoming) this.releaseDeck(transition.incoming)
+        if (this.parkedLoopDeck) {
+            const parked = this.parkedLoopDeck
+            this.parkedLoopDeck = null
+            this.releaseDeck(parked)
+        }
+        for (const deck of this.decks) deck.recycleAfterFade = false
     }
 
     private applyDeckGain(deck: Deck): void {

@@ -15,7 +15,9 @@ export interface MediaGainSink {
 /**
  * Builds a gain sink for an element an engine has just created, before its
  * `src` is assigned. Return `null` to keep the plain element-volume path for
- * that element (for example when the AudioContext cannot route it).
+ * that element (for example when the AudioContext cannot route it). An engine
+ * configured to disconnect idle sinks can also reconnect the same captured,
+ * already-loaded element; its factory must reuse that source node.
  */
 export type MediaGainSinkFactory = (element: HTMLAudioElement) => MediaGainSink | null
 
@@ -26,7 +28,7 @@ export function isActivationEvent(event: Event): boolean {
     return event.type !== "keydown" || (event as KeyboardEvent).key !== "Escape"
 }
 
-function canPrime(): boolean {
+export function canPrimeMedia(): boolean {
     return typeof navigator === "undefined" || navigator.userActivation?.isActive !== false
 }
 
@@ -47,7 +49,7 @@ export class UnlockedAudioPool {
 
     /** Top the pool up. Call only from inside a user-gesture handler. */
     prime(): void {
-        if (typeof Audio === "undefined" || !canPrime()) return
+        if (typeof Audio === "undefined" || !canPrimeMedia()) return
         while (this.spares.length < this.size) {
             let el: HTMLAudioElement
             try {

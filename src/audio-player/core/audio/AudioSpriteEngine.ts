@@ -1,3 +1,6 @@
+import { retainAudioContext, type AudioContextLease } from "./sharedAudioContext"
+import { ACTIVATION_EVENTS, isActivationEvent } from "../../narrative/mediaRouting"
+
 function getAudioContextCtor(): typeof AudioContext | undefined {
     if (typeof window === "undefined") return undefined
     return (
@@ -71,6 +74,7 @@ function createInstanceId(): AudioSpriteInstanceId {
  */
 export class AudioSpriteEngine {
     private ctx: AudioContext | null = null
+    private contextLease: AudioContextLease | null = null
     private output: GainNode | null = null
     private manifest: AudioSpriteManifest | null = null
     private buffer: AudioBuffer | null = null
@@ -91,7 +95,8 @@ export class AudioSpriteEngine {
         if (this.ctx && this.ctx.state !== "closed") return this.ctx
         const Ctor = getAudioContextCtor()
         if (!Ctor) throw new Error("Web Audio API unavailable for SAP sprites.")
-        this.ctx = new Ctor()
+        this.contextLease = retainAudioContext(Ctor)
+        this.ctx = this.contextLease.context
         this.output = this.ctx.createGain()
         this.output.gain.value = this.masterVolume
         this.output.connect(this.ctx.destination)
@@ -111,12 +116,13 @@ export class AudioSpriteEngine {
         if (typeof document === "undefined") return
         // Disposed or closed engines must not (re)attach document listeners.
         if (!this.ctx || this.ctx.state === "closed") return
-        const gestures = ["pointerdown", "keydown", "touchend"] as const
-        const resume = () => {
+        const gestures = ACTIVATION_EVENTS
+        const resume = (event: Event) => {
+            if (!isActivationEvent(event)) return
             disarm()
             const ctx = this.ctx
-            if (!ctx || ctx.state !== "suspended") return
-            void ctx.resume().then(
+            if (!ctx || !this.instances.size) return
+            void this.contextLease!.setActive(true, true).then(
                 () => {
                     // A stale callback from a replaced/disposed context must
                     // not re-arm against the live engine.
@@ -221,7 +227,15 @@ export class AudioSpriteEngine {
         if (!clip) return null
 
         const ctx = this.ensureContext()
-        void ctx.resume().then(
+        const output = this.output
+        if (!output) return null
+        const offset = Math.min(positiveSeconds(clip.offset), buffer.duration)
+        const duration = Math.min(
+            positiveSeconds(clip.duration),
+            Math.max(0, buffer.duration - offset)
+        )
+        if (duration <= 0) return null
+        void this.contextLease!.setActive(true, true).then(
             () => {
                 // Ignore stale callbacks from a replaced/disposed context.
                 if (ctx !== this.ctx) return
@@ -235,16 +249,6 @@ export class AudioSpriteEngine {
                 this.armGestureResume()
             }
         )
-        const output = this.output
-        if (!output) return null
-
-        const offset = Math.min(positiveSeconds(clip.offset), buffer.duration)
-        const duration = Math.min(
-            positiveSeconds(clip.duration),
-            Math.max(0, buffer.duration - offset)
-        )
-        if (duration <= 0) return null
-
         const loop = options.loop ?? clip.loop ?? false
         const volume = clamp01(options.volume ?? clip.volume ?? 1)
         const id = createInstanceId()
@@ -352,9 +356,8 @@ export class AudioSpriteEngine {
         this.output = null
         this.buffer = null
         this.manifest = null
-        if (this.ctx && this.ctx.state !== "closed") {
-            void this.ctx.close().catch(() => {})
-        }
+        this.contextLease?.release()
+        this.contextLease = null
         this.ctx = null
     }
 
@@ -363,6 +366,10 @@ export class AudioSpriteEngine {
         if (!instance) return
         this.clearFadeStop(instance)
         this.instances.delete(id)
+        if (!this.instances.size) {
+            this.disarmGestureResume?.()
+            void this.contextLease?.setActive(false).catch(() => {})
+        }
         try {
             instance.source.disconnect()
         } catch {}

@@ -34,26 +34,21 @@ export interface ReaderMixerProviderProps {
  */
 export function ReaderMixerProvider({ mixer, options, children }: ReaderMixerProviderProps) {
     const optionsRef = useRef(options)
-    const [owned, setOwned] = useState<ReaderMixer | null>(() =>
-        mixer ? null : createReaderMixer(options)
-    )
+    const [owned, setOwned] = useState<ReaderMixer | null>(null)
 
     useEffect(() => {
         if (mixer) return
-        let current = owned
-        // React StrictMode disposes on its simulated unmount; recreate then.
-        if (!current || current.isDisposed()) {
-            current = createReaderMixer(optionsRef.current)
-            setOwned(current)
-        }
-        const created = current
+        const created = createReaderMixer(optionsRef.current)
+        setOwned(created)
         return () => created.dispose()
-        // The owned mixer is created once per provider mount.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [mixer])
 
     const value = mixer ?? owned
-    return <ReaderMixerContext.Provider value={value}>{children}</ReaderMixerContext.Provider>
+    return (
+        <ReaderMixerContext.Provider value={value}>
+            {value ? children : null}
+        </ReaderMixerContext.Provider>
+    )
 }
 
 /** The shared mixer. Throws outside a `ReaderMixerProvider`. */
