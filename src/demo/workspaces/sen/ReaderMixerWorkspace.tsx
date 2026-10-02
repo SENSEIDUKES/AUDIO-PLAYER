@@ -256,6 +256,7 @@ function ReaderSimulation({
                             const battles = set.scores.filter(
                                 (score) => score.category === set.battleCategory
                             )
+                            if (battles.length === 0) return
                             const score = battles[battleTurn.current % battles.length]
                             battleTurn.current += 1
                             playScore(score, "battle starts")
