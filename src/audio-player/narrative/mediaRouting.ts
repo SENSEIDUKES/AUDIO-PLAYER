@@ -19,6 +19,17 @@ export interface MediaGainSink {
  */
 export type MediaGainSinkFactory = (element: HTMLAudioElement) => MediaGainSink | null
 
+/** Touch pointerdown is not activation; touchend/pointerup and clicks are. */
+export const ACTIVATION_EVENTS = ["touchend", "pointerup", "click", "keydown"] as const
+
+export function isActivationEvent(event: Event): boolean {
+    return event.type !== "keydown" || (event as KeyboardEvent).key !== "Escape"
+}
+
+function canPrime(): boolean {
+    return typeof navigator === "undefined" || navigator.userActivation?.isActive !== false
+}
+
 /**
  * Spare `Audio` elements prepared inside a user gesture.
  *
@@ -36,7 +47,7 @@ export class UnlockedAudioPool {
 
     /** Top the pool up. Call only from inside a user-gesture handler. */
     prime(): void {
-        if (typeof Audio === "undefined") return
+        if (typeof Audio === "undefined" || !canPrime()) return
         while (this.spares.length < this.size) {
             let el: HTMLAudioElement
             try {

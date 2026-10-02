@@ -95,7 +95,7 @@ mixer.dispose()                    // release everything
 | `setAtmosphere(option \| id \| track \| null, { fadeMs? })` | Choose and play the reader's atmosphere and save it in the preferences. `null` saves Off and fades it out. |
 | `startAtmosphere()` / `stopAtmosphere()` | Start the saved atmosphere (entering the reader) or fade it out without changing the choice (leaving). |
 | `setAtmosphereOptions(options)` | Replace the catalog. A saved choice waiting for its option starts when it arrives. |
-| `playCue(url, { volume?, startTime? })` | Play a one-shot over the loops. Returns `false` when skipped: cues or master off, the concurrency cap (`maxConcurrentCues`, default 6), or no audio. |
+| `playCue(url, { volume?, startTime? })` | Play a one-shot over the loops. Returns `false` when skipped: cues or master off, zero per-cue volume, a hidden page, the concurrency cap (`maxConcurrentCues`, default 6), or no audio. |
 | `stopAll({ fadeMs? })` | Fade both loops out; preferences are untouched. |
 | `setDuck(0..1, { fadeMs? })`, `getDuck()` | Temporarily lower Soundscapes and Atmosphere (for example under narration) without touching preferences. Cues are never ducked. `NarrativeFace` drives this for you. |
 | `setLayerLevel(layer, 0..1)`, `setLayerEnabled(layer, on)`, `setMasterEnabled(on)` | The reader's controls. Changes apply live, including mid-crossfade. |
@@ -121,7 +121,7 @@ are never changed by the master.
 
 Each layer reports `idle`, `loading`, `playing`, `blocked` (the browser wants a
 tap; the next one retries), `failed` (with a `failure` message) or `paused`
-(the page is hidden). A loop that is silent only because its switch, level or
+(the page is hidden or the system paused its media element). A loop that is silent only because its switch, level or
 the master is off still reports `playing`.
 
 ## NarrativeFace as a companion
@@ -214,31 +214,41 @@ routes, chosen with `routing`:
 
 | `routing` | How audio plays | Sliders on iPhone | File host needs CORS |
 | --- | --- | --- | --- |
-| `"auto"` (default) | Web Audio only where element volume is ignored (iOS), plain elements elsewhere | Real loudness | Yes, on those browsers |
-| `"element"` | Plain media elements everywhere | On/off: above 0 plays at the device volume, 0 silences | No |
+| `"auto"` (default) | Web Audio only where element volume is ignored (iOS), plain elements elsewhere | Real loudness; on/off for a layer that falls back | Yes, by default |
+| `"element"` | Plain media elements everywhere | On/off: above 0 plays at the device volume, 0 silences | Yes by default; opt out with `crossOrigin: null` |
 | `"web-audio"` | Web Audio everywhere | Real loudness | Yes, everywhere |
 
 The Web Audio route sends each element through `MediaElementAudioSourceNode →
 element gain → layer GainNode → destination`. Crossfades and per-cue volume use
-the element gain; the layer GainNode carries the reader's layer level. That
-route loads audio with `crossOrigin="anonymous"`, because a cross-origin
-element routed into Web Audio without CORS plays silence. With CORS missing the
-files instead fail to load and the layer reports `failed`, so pass
-`routing: "element"` for a file host without CORS headers.
+the element gain; the layer GainNode carries the reader's layer level.
+All mixer media, including plain elements and cues, now load with
+`crossOrigin="anonymous"`. Consistent request modes prevent a plain mixer request
+from caching a response that later breaks the iPhone route. For non-CORS hosts,
+pass `crossOrigin: null`; this also selects element routing because Web Audio
+cannot read those responses. Stand-alone `SceneMixEngine` and `OneShotEngine`
+keep their existing opt-in CORS defaults.
+
+Under `"auto"`, a Web Audio layer with a media or CORS failure retries once using
+a fresh element without CORS or a connected source node. That layer stays on the
+element route for the mixer's lifetime; other layers keep their route. On iPhone
+this emergency fallback provides on/off volume. `state.layers[layer].routing`
+reports it and `state.volumeControl` becomes `"on-off"`. Explicit `"web-audio"`
+does not downgrade. A failed replacement still leaves the previous mix playing.
 
 `state.volumeControl` is `"on-off"` when sliders cannot set loudness, and
 `ReaderMixerPanel` then shows "Volume is set by your device on this browser".
 
 ### CORS on the SEIHouse audio hosts
 
-On 2026-10-01 neither audio host sent `Access-Control-Allow-Origin`. CORS was
-enabled on 2026-10-02 and verified with curl and in Chromium (real signal
-measured through Web Audio from both hosts):
+The three hosts send `Access-Control-Allow-Origin: *` when the request carries
+an `Origin` header. Responses to ordinary requests lack that header and
+`Vary: Origin`, so another player can still poison the browser's HTTP cache:
 
 | Hostname | Served by |
 | --- | --- |
 | `celestialaudio.seihouse.org` | R2 bucket `library` |
 | `audio.seihouse.org` | R2 bucket `sea-audio` |
+| `media.seihouse.org` | SEN soundscapes |
 
 Both buckets carry this policy (Cloudflare dashboard → R2 → bucket → Settings →
 CORS Policy):
@@ -255,10 +265,14 @@ CORS Policy):
 ]
 ```
 
-Plain and ranged `GET`s return `access-control-allow-origin: *`, and an
-`OPTIONS` preflight returns `204`. A new audio host needs the same policy, then a
-cache purge for its hostname, before it can use the Web Audio route. Check it
-with `curl -sI -H "Origin: https://example.com" <file url>`.
+**Required owner action (separate infrastructure change):** create a Cloudflare
+[Response Header Transform Rule](https://developers.cloudflare.com/rules/transform/response-header-modification/)
+matching these three hostnames, set `Access-Control-Allow-Origin: *` on every
+response, and add `Origin` to `Vary` (preserving existing tokens). Then purge the
+cache for all three hostnames. Verify ordinary and Origin-bearing GET/HEAD
+requests, including ranged responses. The engine PR does not apply this rule.
+Existing non-CORS cache entries from narration, previews or other players make
+this step necessary even with the mixer's consistent CORS mode.
 
 Silence-trim analysis stays off by default (`analysisPolicy: "off"`). It
 downloads and decodes each score a second time, which is a lot of data for long
@@ -268,20 +282,29 @@ WAV scores. Pass `analysisPolicy: "automatic"` to trim leading silence, or
 ### The ring/silent switch
 
 On iPhone, Web Audio follows the ring/silent switch (it is muted on silent) while
-plain media elements keep playing. When the Web Audio route is active, the mixer
+plain media elements keep playing. While Web Audio output is audible, the mixer
 sets Safari's Audio Session API, `navigator.audioSession.type = "playback"`
 (where the browser has it), so the reader's audio keeps playing on silent like other media.
-Pass `audioSessionType: null` to leave the page's session untouched. The
-element route needs nothing.
+The context suspends when no enabled loop is wanted and no enabled cue is active,
+when the master is off, and while hidden under the default visibility policy.
+An idle tap primes spares without resuming the context or claiming the session.
+The previous session type is restored when output becomes idle or hidden and on
+disposal. The mixer does not force an idle type: a host using mixable `"ambient"`
+gets it back, and a host using `"auto"` gets that back. Pass `audioSessionType: null`
+to leave the page's session untouched. The element route needs nothing.
 
 This behavior is not verifiable from automated tests. See
 [Manual verification](#manual-verification).
 
 ## Mobile unlock
 
-One tap, click or key press unlocks all three layers. On every such gesture the mixer:
+Touchend, pointerup, click and non-Escape keydown unlock all three layers.
+Touch pointerdown does not activate playback under the
+[HTML user-activation rules](https://html.spec.whatwg.org/multipage/interaction.html#activation-triggering-input-event).
+The spare pool also checks `navigator.userActivation.isActive` when available.
+On an activation event the mixer:
 
-- resumes its `AudioContext` (Web Audio route);
+- resumes its `AudioContext` only when enabled playback is wanted (Web Audio route);
 - retries any loop that the browser blocked (`blocked` → `playing`);
 - prepares a few spare media elements inside the gesture for each engine.
 
@@ -293,11 +316,40 @@ turns audio on.
 A cue that the browser still refuses is skipped (cues are moments, not loops),
 and the Sound Cues layer reports `blocked` until the next gesture.
 
+## Network and interruption recovery
+
+Mixer loop attempts have a 12-second load/start deadline, including metadata
+waits for positive trims. Each source gets two retries with 500 ms then 1 s
+backoff before advancing to the next source or reporting `failed`. A persistent
+`waiting`/`stalled` event has the same deadline; `playing` clears it. A failure
+mid-loop restarts the same source at its previous `currentTime`. An `online`
+event re-requests a failed score or active atmosphere that is still wanted.
+Stop, pause, superseding requests and disposal cancel obsolete attempts.
+The old mix keeps playing until the newest candidate actually starts.
+
+`loopAttemptTimeoutMs`, `loopMaxRetries` and `loopRetryDelayMs` configure these
+bounds. Stand-alone engines keep their prior no-deadline/no-retry defaults;
+their equivalent options are additive.
+
+Cues have a 1.5-second start deadline (`cueStartTimeoutMs`), measured from the
+original trigger, including any route fallback or suspended output context. A
+cue that misses it is dropped and frees its concurrency slot. It is never
+queued for a later gesture or network recovery. A cue that stalls during
+playback is also dropped after 1.5 seconds without `playing`.
+
+WebKit's `"interrupted"` context state is treated like `"suspended"` for
+`needsGesture`. The mixer attempts resume on context state changes, returning
+to visible, and activation events when playback is wanted. A system media pause
+reports `paused`; `playing` restores the status. Non-autoplay resume errors use
+the same bounded recovery and eventual `failed` state as load errors.
+Phone calls, Siri and session ownership still **need physical iPhone verification**.
+
 ## Page visibility
 
 **Decision:** while the page is hidden, the two loops pause in place; when it
 returns they resume where they were. A switch requested while hidden, such as
-the next chapter's score, starts on return. Cues already playing finish.
+the next chapter's score, starts on return. Active cues are dropped and new cues
+are skipped while hidden, so none resume late with the context.
 Layers report `paused`, and `state.pageHidden` is true. A reader cannot read a
 hidden page, and this saves battery and data. Pass `pauseWhenHidden: false` to
 keep playing in the background. If the browser refuses the resume (iOS after a
@@ -361,5 +413,18 @@ mixer view. Before shipping a change to this path:
    loudness, with the ring switch on and on silent.
 5. iPhone: trigger "Battle starts" and a cue without tapping first (after the
    first unlock tap) and confirm both start.
+6. Start Spotify or a podcast before opening the reader. With the master off
+   or no audio requested, tap and scroll; the other app must keep playing. Start
+   reader audio, stop it, and confirm the session releases. Repeat with the
+   ring switch on and silent.
+7. Take a phone call (and try Siri) mid-chapter. Return to the visible reader;
+   confirm the layer status reflects any system pause and playback resumes or
+   asks for a tap. Confirm no old cue fires on return.
+8. Toggle airplane mode during a chapter and during a score switch. The old
+   score must survive the failed switch; on reconnect, the wanted score and
+   atmosphere recover. Missed cues stay dropped and later cues still work.
+9. Listen across several boundaries of a rain bed for loop seams (repeat after
+   the follow-up loop-crossfade PR). Record a listening result separately from
+   automated/browser checks.
 
 Record browser and OS versions in the pull request.

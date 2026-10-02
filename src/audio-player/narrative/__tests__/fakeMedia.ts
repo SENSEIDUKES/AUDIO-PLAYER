@@ -3,7 +3,8 @@
  * play() and volume locking, and an `AudioContext` that records its graph.
  */
 
-export type FakePlayBehavior = "resolve" | "not-allowed" | "reject"
+export type FakePlayBehavior =
+    "resolve" | "not-allowed" | "reject" | "pending" | ((audio: FakeAudio) => Promise<void>)
 
 export class FakeAudio {
     static created: FakeAudio[] = []
@@ -24,6 +25,7 @@ export class FakeAudio {
     playCalls = 0
     pauseCalls = 0
     loadCalls = 0
+    loadActivations: boolean[] = []
 
     private volumeValue = 1
     private listeners = new Map<string, Set<EventListener>>()
@@ -76,6 +78,7 @@ export class FakeAudio {
 
     load(): void {
         this.loadCalls += 1
+        this.loadActivations.push(navigator.userActivation?.isActive ?? false)
     }
 
     pause(): void {
@@ -95,12 +98,21 @@ export class FakeAudio {
         if (FakeAudio.playBehavior === "reject") {
             return Promise.reject(new Error("decode failure"))
         }
-        return Promise.resolve().then(() => {
+        const behavior = FakeAudio.playBehavior
+        const result =
+            typeof behavior === "function"
+                ? behavior(this)
+                : behavior === "pending"
+                  ? new Promise<void>(() => {})
+                  : Promise.resolve()
+        return result.then(() => {
             this.paused = false
+            this.dispatch("playing")
         })
     }
 
     dispatch(type: string): void {
+        if (type === "loadedmetadata") this.readyState = 1
         const event = new Event(type)
         for (const listener of [...(this.listeners.get(type) ?? [])]) listener(event)
     }
@@ -128,12 +140,14 @@ export class FakeGainNode {
 export class FakeAudioContext {
     static instances: FakeAudioContext[] = []
 
-    state: "suspended" | "running" | "closed" = "suspended"
+    state: "suspended" | "running" | "closed" | "interrupted" = "suspended"
     currentTime = 0
     readonly destination = { name: "destination" }
     readonly gains: FakeGainNode[] = []
     readonly routedElements: unknown[] = []
     resumeCalls = 0
+    suspendCalls = 0
+    resumeBehavior: "resolve" | "reject" | "interrupted" = "resolve"
     private listeners = new Set<() => void>()
 
     constructor() {
@@ -153,9 +167,21 @@ export class FakeAudioContext {
 
     resume(): Promise<void> {
         this.resumeCalls += 1
-        this.state = "running"
-        for (const listener of this.listeners) listener()
+        if (this.resumeBehavior === "reject") return Promise.reject(new Error("resume blocked"))
+        this.setState(this.resumeBehavior === "interrupted" ? "interrupted" : "running")
         return Promise.resolve()
+    }
+
+    suspend(): Promise<void> {
+        this.suspendCalls += 1
+        this.setState("suspended")
+        return Promise.resolve()
+    }
+
+    setState(state: FakeAudioContext["state"]): void {
+        if (state === this.state) return
+        this.state = state
+        for (const listener of [...this.listeners]) listener()
     }
 
     close(): Promise<void> {
@@ -191,4 +217,16 @@ export function setVisibility(state: DocumentVisibilityState): void {
         get: () => visibility,
     })
     document.dispatchEvent(new Event("visibilitychange"))
+}
+
+export function setUserActivation(active: boolean): void {
+    Object.defineProperty(navigator, "userActivation", {
+        configurable: true,
+        value: { isActive: active, hasBeenActive: active },
+    })
+}
+
+export function setOnline(online: boolean): void {
+    Object.defineProperty(navigator, "onLine", { configurable: true, value: online })
+    window.dispatchEvent(new Event(online ? "online" : "offline"))
 }
