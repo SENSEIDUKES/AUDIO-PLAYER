@@ -44,7 +44,8 @@ function synchronize(record: SharedContext, fromActivation = false): Promise<voi
                 return
             }
             record.changing = false
-            if (running !== record.active.size > 0) void synchronize(record).catch(() => {})
+            const stillWanted = record.active.size > 0
+            if (running !== stillWanted) void synchronize(record).catch(() => {})
         })
     return operation
 }

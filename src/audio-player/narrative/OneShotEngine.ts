@@ -55,9 +55,9 @@ export interface OneShotEngineOptions {
     /**
      * Route each element's gain somewhere other than
      * `HTMLMediaElement.volume`, typically a Web Audio `GainNode`. Called once
-     * per pooled element before its `src` is set by default. With
-     * `disconnectIdleSinks`, called on acquisition and again when a captured
-     * idle element is reused, including elements loaded by `preload()`.
+     * per pooled element before its `src` is set by default. Preloading defers
+     * this until playback acquisition. With `disconnectIdleSinks`, also called
+     * again when a captured idle element is reused.
      */
     createGainSink?: MediaGainSinkFactory
     /** Spare elements {@link OneShotEngine.unlock} prepares. Defaults to 4. */
@@ -473,7 +473,7 @@ export class OneShotEngine {
                 el.muted = this.muted
                 const created: PoolEntry = {
                     el,
-                    sink: this.disconnectIdleSinks ? null : this.makeGainSink(el),
+                    sink: !activate || this.disconnectIdleSinks ? null : this.makeGainSink(el),
                     routed: false,
                     active: false,
                     generation: 0,

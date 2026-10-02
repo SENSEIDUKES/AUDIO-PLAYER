@@ -4,6 +4,7 @@ import { cleanup, render } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { createReaderMixer, type ReaderMixer } from "../ReaderMixer"
 import { ReaderMixerProvider, useReaderMixer } from "../ReaderMixerContext"
+import { createOneShotEngine } from "../OneShotEngine"
 import { AudioSpriteEngine } from "../../core/audio/AudioSpriteEngine"
 import { WebAudioBackend, WEBAUDIO_CAPABILITIES } from "../../core/audio/WebAudioBackend"
 import {
@@ -175,6 +176,22 @@ describe("ReaderMixer resources", () => {
         instance.playCue(`${CUE}?cold`)
         await vi.advanceTimersByTimeAsync(1500)
         expect(FakeAudio.withSrc(`${CUE}?cold`)).toHaveLength(0)
+    })
+
+    it("also defers standalone preload sink creation until playback, keeping its default cache behavior", async () => {
+        const factory = vi.fn(() => ({ setGain: vi.fn(), dispose: vi.fn() }))
+        const instance = createOneShotEngine({ createGainSink: factory })
+        try {
+            instance.preload([CUE])
+            expect(factory).not.toHaveBeenCalled()
+            instance.playOneShot(CUE)
+            await flushMicrotasks()
+            expect(factory).toHaveBeenCalledTimes(1)
+            FakeAudio.withSrc(CUE)[0].dispatch("ended")
+            expect(factory.mock.results[0].value.dispose).not.toHaveBeenCalled()
+        } finally {
+            instance.dispose()
+        }
     })
 
     it("primes preloaded cue elements on touchend so a later trigger needs no new tap", async () => {

@@ -150,6 +150,27 @@ describe("SceneMixEngine loop boundaries", () => {
         expect(retry.paused).toBe(false)
     })
 
+    it("does not park or revive a loop deck when a host gain callback stops the engine during retirement", async () => {
+        let stopOnZero = false
+        let retiring: unknown
+        const instance = engine({
+            createGainSink: (element) => ({
+                setGain: (gain) => {
+                    if (stopOnZero && element === retiring && gain === 0) instance.stop(0)
+                },
+                dispose: () => {},
+            }),
+        })
+        const { first } = await start(instance)
+        retiring = first
+        await settle(2750)
+        stopOnZero = true
+        await settle(300)
+        expect(FakeAudio.withSrc(RAIN.audioFile)).toHaveLength(0)
+        expect(vi.getTimerCount()).toBe(0)
+        expect(instance.getStatusSnapshot().state).toBe("stopped")
+    })
+
     it("retains the standalone native-loop default", async () => {
         const instance = engine({ loopCrossfadeMs: 0 })
         const { first } = await start(instance)

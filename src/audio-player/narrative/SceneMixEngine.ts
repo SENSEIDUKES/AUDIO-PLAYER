@@ -1352,15 +1352,26 @@ export class SceneMixEngine {
             }
             if (t < 1) anyRamping = true
             else if (deck.retiring) {
-                if (deck.recycleAfterFade && this.active?.key === deck.key) {
+                const active = this.active
+                if (deck.recycleAfterFade && active && active.key === deck.key) {
                     this.clearDeadline(deck)
                     deck.abort.abort()
                     deck.curveGain = 0
                     this.applyDeckGain(deck)
                     deck.el.pause()
+                    // A host sink or pause listener can stop/replace the engine synchronously.
+                    if (
+                        this.disposed ||
+                        this.paused ||
+                        this.active !== active ||
+                        !this.decks.includes(deck)
+                    ) {
+                        this.releaseDeck(deck)
+                        continue
+                    }
                     this.decks = this.decks.filter((candidate) => candidate !== deck)
                     this.parkedLoopDeck = deck
-                    this.prepareLoop(this.active)
+                    this.prepareLoop(active)
                 } else this.releaseDeck(deck)
                 continue
             }
