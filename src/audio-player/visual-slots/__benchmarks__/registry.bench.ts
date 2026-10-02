@@ -1,4 +1,4 @@
-import { bench, describe } from "vitest"
+import { describe, test } from "vitest"
 import {
     registerVisualComponent,
     getVisualComponent,
@@ -28,18 +28,17 @@ for (let i = 0; i < COMPONENT_COUNT; i++) {
 }
 
 describe("Visual Registry Performance", () => {
-    // getVisualComponent uses Map.get(id), which is O(1)
-    bench("getVisualComponent (O(1) Map lookup)", () => {
-        getVisualComponent("comp-500")
-    })
-
-    // getVisualComponentsForSlot now uses BY_SLOT Map index (O(1))
-    bench("getVisualComponentsForSlot (Optimized O(1) lookup)", () => {
-        getVisualComponentsForSlot("controllerPanel")
-    })
-
-    // getDefaultComponentForSlot now uses BY_SLOT Map index (O(1))
-    bench("getDefaultComponentForSlot (Optimized O(1) lookup)", () => {
-        getDefaultComponentForSlot("controllerPanel")
+    test("benchmarks", async ({ bench }) => {
+        await bench.compare(
+            bench("getVisualComponent (O(1) Map lookup)", () => {
+                getVisualComponent("comp-500")
+            }),
+            bench("getVisualComponentsForSlot (Optimized O(1) lookup)", () => {
+                getVisualComponentsForSlot("controllerPanel")
+            }),
+            bench("getDefaultComponentForSlot (Optimized O(1) lookup)", () => {
+                getDefaultComponentForSlot("controllerPanel")
+            })
+        )
     })
 })
