@@ -239,8 +239,8 @@ The reader's settings are one plain `ReaderMixerPreferences` object that the
 host saves per user. `ReaderMixerProvider` shares one mixer across a React app,
 and `ReaderMixerPanel` is the inline view for a settings menu (master, three
 rows, an atmosphere picker; labels and `--sap-reader-mixer-*` theme variables are
-host-overridable). Audio plays through plain media elements by default;
-`routing: "auto"` adds per-layer Web Audio gain on browsers that ignore element
-volume (iOS Safari) once the audio host sends CORS headers. See
-[`reader-mixer.md`](./reader-mixer.md) for the full contract, the iPhone notes
-and the CORS status of the SEIHouse audio hosts.
+host-overridable). By default (`routing: "auto"`) audio plays through plain
+media elements, adding per-layer Web Audio gain only on browsers that ignore
+element volume (iOS Safari); that route needs CORS headers on the audio host,
+which the SEIHouse hosts send. See [`reader-mixer.md`](./reader-mixer.md) for the
+full contract, the iPhone notes and the CORS setup.

@@ -105,8 +105,8 @@ const SETS: Record<Host, SceneSet> = {
             },
         ],
     },
-    // One CORS-enabled file stands in for every layer, so the Web Audio route
-    // can be heard end to end before the SEIHouse hosts send CORS headers.
+    // One third-party CORS file stands in for every layer, as a control for
+    // the Web Audio route independent of the SEIHouse hosts.
     "cors-sample": {
         chapter: {
             id: "sample-chapter",
@@ -268,7 +268,7 @@ function ReaderSimulation({
 
 export function ReaderMixerWorkspace() {
     const { lines, append, clear } = useEventLog(60)
-    const [routing, setRouting] = useState<Routing>("element")
+    const [routing, setRouting] = useState<Routing>("auto")
     const [host, setHost] = useState<Host>("seihouse")
     const [stageWidth, setStageWidth] = useState("390")
     const [generation, setGeneration] = useState(0)
@@ -364,16 +364,16 @@ export function ReaderMixerWorkspace() {
                             </Button>
                         </ButtonRow>
                     </Panel>
-                    <Note tone="warn">
-                        celestialaudio.seihouse.org and audio.seihouse.org send no
-                        Access-Control-Allow-Origin header, so their files fail to load on the Auto
-                        (on iPhone) and Web Audio routes. Use Element for SEIHouse files, or switch
-                        Audio files to the CORS sample to hear the Web Audio route.
+                    <Note>
+                        Auto (the default) uses Web Audio only where the browser ignores element
+                        volume, as iPhone Safari does, so every slider sets real loudness there.
+                        Element forces plain media elements: on iPhone the sliders then work as
+                        on/off and the view says so. Web Audio routes every layer through its own
+                        GainNode on every browser.
                     </Note>
                     <Note>
-                        Element routing plays through plain media elements. On iPhone Safari the
-                        sliders then work as on/off and the view says so. Web Audio routing gives
-                        every layer its own GainNode, so all three sliders set real loudness.
+                        celestialaudio.seihouse.org and audio.seihouse.org send CORS headers
+                        (enabled 2026-10-02), so SEIHouse files play on every route.
                     </Note>
                     <Note>
                         Hide this tab to see both loops pause; they resume when it returns. Your

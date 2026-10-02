@@ -226,16 +226,19 @@ export interface ReaderMixerOptions {
     /** The host's atmosphere catalog, used to resolve saved ids. */
     atmospheres?: readonly ReaderAtmosphereOption[]
     /**
-     * How audio reaches the speakers. Defaults to `"element"`.
+     * How audio reaches the speakers. Defaults to `"auto"`.
      *
-     * - `"element"`: plain media elements. Works with any file host. On
-     *   browsers that ignore element volume (iOS Safari), sliders act as on/off.
-     * - `"auto"`: Web Audio gain only where element volume is ignored.
+     * - `"auto"`: Web Audio gain only where element volume is ignored (iOS
+     *   Safari), so every slider sets real loudness; plain media elements
+     *   everywhere else.
+     * - `"element"`: plain media elements everywhere. Works with any file
+     *   host; where element volume is ignored, sliders act as on/off.
      * - `"web-audio"`: Web Audio gain everywhere.
      *
-     * Both Web Audio modes load audio with `crossOrigin="anonymous"`, so the
-     * file host must send `Access-Control-Allow-Origin`; without it files fail
-     * to load (and would otherwise play silence).
+     * The Web Audio route loads audio with `crossOrigin="anonymous"`, so the
+     * file host must send `Access-Control-Allow-Origin` (the SEIHouse audio
+     * hosts do); without it files fail to load. Pass `"element"` for a host
+     * without CORS headers.
      */
     routing?: "element" | "auto" | "web-audio"
     /** Soundscape crossfade length. Defaults to {@link SCENE_FADE_MS}. */
@@ -244,10 +247,9 @@ export interface ReaderMixerOptions {
     atmosphereFadeMs?: number
     /**
      * Silence-trim analysis for soundscapes. Defaults to `"off"`: analysis
-     * fetches each score a second time and needs CORS, so on a host without
-     * CORS headers it only adds a failed request per chapter. Use
-     * `"automatic"` once the host sends CORS, or pass `trimStartMs` per
-     * track. The atmosphere never analyses.
+     * downloads and decodes each score a second time (and needs CORS), which
+     * is a lot of data for long scores. Pass `"automatic"` to trim leading
+     * silence, or `trimStartMs` per track. The atmosphere never analyses.
      */
     analysisPolicy?: SceneMixAnalysisPolicy
     /** Maximum overlapping cues. Defaults to 6. */
@@ -355,7 +357,7 @@ export class ReaderMixer {
         this.atmosphereFadeMs = Math.max(0, options.atmosphereFadeMs ?? SCENE_FADE_MS)
         this.elementVolumeWorks = probeElementVolumeWrites()
 
-        this.graph = this.createGraph(options.routing ?? "element")
+        this.graph = this.createGraph(options.routing ?? "auto")
         const crossOrigin = this.graph ? "anonymous" : options.crossOrigin
         if (this.graph) {
             this.cleanups.push(applyAudioSessionType(options.audioSessionType ?? "playback"))

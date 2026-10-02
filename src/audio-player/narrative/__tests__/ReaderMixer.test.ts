@@ -420,8 +420,9 @@ describe("ReaderMixer", () => {
             FakeAudio.volumeLocked = true
         })
 
-        it("keeps playback working and turns sliders into on/off", async () => {
-            const mixer = makeMixer()
+        it("keeps playback working and turns sliders into on/off on the element route", async () => {
+            vi.stubGlobal("AudioContext", FakeAudioContext)
+            const mixer = makeMixer({ routing: "element" })
             expect(mixer.getState()).toMatchObject({
                 routing: "element",
                 volumeControl: "on-off",
@@ -443,9 +444,9 @@ describe("ReaderMixer", () => {
             expect(only(GROWL).muted).toBe(false)
         })
 
-        it("routes through Web Audio gain when asked to (auto)", async () => {
+        it("routes through Web Audio gain by default (auto)", async () => {
             vi.stubGlobal("AudioContext", FakeAudioContext)
-            const mixer = makeMixer({ routing: "auto" })
+            const mixer = makeMixer()
             expect(mixer.getState()).toMatchObject({
                 routing: "web-audio",
                 volumeControl: "level",
@@ -473,9 +474,10 @@ describe("ReaderMixer", () => {
             vi.stubGlobal("AudioContext", FakeAudioContext)
         })
 
-        it("stays on media elements by default and with auto where volume works", () => {
+        it("stays on media elements where element volume works, by default", () => {
             expect(makeMixer().getState().routing).toBe("element")
             expect(makeMixer({ routing: "auto" }).getState().routing).toBe("element")
+            expect(makeMixer({ routing: "element" }).getState().routing).toBe("element")
             expect(FakeAudioContext.instances).toHaveLength(0)
         })
 

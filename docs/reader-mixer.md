@@ -155,54 +155,56 @@ routes, chosen with `routing`:
 
 | `routing` | How audio plays | Sliders on iPhone | File host needs CORS |
 | --- | --- | --- | --- |
-| `"element"` (default) | Plain media elements | On/off: above 0 plays at the device volume, 0 silences | No |
-| `"auto"` | Web Audio only where element volume is ignored (iOS), elements elsewhere | Real loudness | Yes, on those browsers |
+| `"auto"` (default) | Web Audio only where element volume is ignored (iOS), plain elements elsewhere | Real loudness | Yes, on those browsers |
+| `"element"` | Plain media elements everywhere | On/off: above 0 plays at the device volume, 0 silences | No |
 | `"web-audio"` | Web Audio everywhere | Real loudness | Yes, everywhere |
 
 The Web Audio route sends each element through `MediaElementAudioSourceNode →
 element gain → layer GainNode → destination`. Crossfades and per-cue volume use
-the element gain; the layer GainNode carries the reader's layer level. Both
-routes load audio with `crossOrigin="anonymous"`, because a cross-origin
+the element gain; the layer GainNode carries the reader's layer level. That
+route loads audio with `crossOrigin="anonymous"`, because a cross-origin
 element routed into Web Audio without CORS plays silence. With CORS missing the
-files instead fail to load, and the layer reports `failed`.
+files instead fail to load and the layer reports `failed`, so pass
+`routing: "element"` for a file host without CORS headers.
 
 `state.volumeControl` is `"on-off"` when sliders cannot set loudness, and
 `ReaderMixerPanel` then shows "Volume is set by your device on this browser".
 
-### CORS status of the SEIHouse audio hosts
+### CORS on the SEIHouse audio hosts
 
-Checked on 2026-10-01 with `curl -H "Origin: …"` against
-`https://celestialaudio.seihouse.org/DEFAULT/Beasts/Growl/Tiger_Growl_1.mp3`
-(and `https://audio.seihouse.org/SEA-NL/SEA-NL-0101.wav`):
+On 2026-10-01 neither audio host sent `Access-Control-Allow-Origin`. CORS was
+enabled on 2026-10-02 and verified with curl and in Chromium (real signal
+measured through Web Audio from both hosts):
 
-- `GET` returns `200`/`206` with **no `Access-Control-Allow-Origin`** for any origin tried.
-- An `OPTIONS` preflight returns `403`.
+| Hostname | Served by |
+| --- | --- |
+| `celestialaudio.seihouse.org` | R2 bucket `library` |
+| `audio.seihouse.org` | R2 bucket `sea-audio` |
 
-So the default stays `"element"`: playback works everywhere, and on iPhone the
-sliders act as on/off. To get real sliders on iPhone:
+Both buckets carry this policy (Cloudflare dashboard → R2 → bucket → Settings →
+CORS Policy):
 
-1. Add a CORS policy to the R2 bucket behind `celestialaudio.seihouse.org`
-   (Cloudflare dashboard → R2 → the bucket → Settings → CORS Policy):
+```json
+[
+    {
+        "AllowedOrigins": ["*"],
+        "AllowedMethods": ["GET", "HEAD"],
+        "AllowedHeaders": ["Range"],
+        "ExposeHeaders": ["Content-Length", "Content-Range", "Accept-Ranges"],
+        "MaxAgeSeconds": 86400
+    }
+]
+```
 
-    ```json
-    [
-        {
-            "AllowedOrigins": ["*"],
-            "AllowedMethods": ["GET", "HEAD"],
-            "AllowedHeaders": ["Range"],
-            "ExposeHeaders": ["Content-Length", "Content-Range", "Accept-Ranges"],
-            "MaxAgeSeconds": 86400
-        }
-    ]
-    ```
+Plain and ranged `GET`s return `access-control-allow-origin: *`, and an
+`OPTIONS` preflight returns `204`. A new audio host needs the same policy, then a
+cache purge for its hostname, before it can use the Web Audio route. Check it
+with `curl -sI -H "Origin: https://example.com" <file url>`.
 
-    Replace `"*"` with the reader's own origins if the files should not be
-    readable by other sites' scripts. The files stay public either way.
-2. Purge the Cloudflare cache for that hostname, since cached responses lack the header.
-3. Confirm: `curl -sI -H "Origin: https://example.com" <file url>` shows `access-control-allow-origin`.
-4. Switch the host to `routing: "auto"`. Optionally also pass
-   `analysisPolicy: "automatic"` so scores skip leading silence; the mixer leaves
-   that analysis off by default because it re-fetches each score and needs CORS.
+Silence-trim analysis stays off by default (`analysisPolicy: "off"`). It
+downloads and decodes each score a second time, which is a lot of data for long
+WAV scores. Pass `analysisPolicy: "automatic"` to trim leading silence, or
+`trimStartMs` per track.
 
 ### The ring/silent switch
 
@@ -293,11 +295,11 @@ mixer view. Before shipping a change to this path:
    switch the score mid-chapter, move each slider and switch, toggle the master,
    reload and confirm the settings return, then hide the tab and come back.
 2. iPhone Safari, ring switch **on**, Element route: all three layers play
-   together after one tap; sliders act as on/off and the view says so.
+   together after one tap; sliders act as on/off and the view says so (the
+   fallback for hosts without CORS).
 3. iPhone Safari, ring switch **silent**, Element route: audio keeps playing.
-4. iPhone Safari, Web Audio route with the CORS sample (and, once CORS is
-   enabled, with SEIHouse files): sliders set loudness, with the ring switch on
-   and on silent.
+4. iPhone Safari, Auto route (the default) with SEIHouse files: sliders set
+   loudness, with the ring switch on and on silent.
 5. iPhone: trigger "Battle starts" and a cue without tapping first (after the
    first unlock tap) and confirm both start.
 

@@ -772,11 +772,10 @@ export const WORKSHOP_ENTRIES: readonly WorkshopEntry[] = [
             "A reader-chosen atmosphere loops under everything; Off fades it out",
             "Sound cues overlap over both loops without pausing them",
             "Master, per-layer switches and sliders, with settings saved in this browser",
-            "Element or Web Audio routing, with the iPhone on/off fallback shown in the view",
+            "Auto, Element or Web Audio routing; SEIHouse files play on all three, and the iPhone on/off fallback is shown in the view",
             "Both loops pause while the page is hidden",
         ],
         placeholders: [
-            "SEIHouse audio hosts send no CORS headers yet, so the Web Audio route only plays the CORS sample",
             "iPhone behavior (silent switch, per-element unlock) needs a real device; this page cannot prove it",
         ],
         sources: [
