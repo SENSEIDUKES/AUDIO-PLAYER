@@ -113,6 +113,7 @@ export class FakeAudio {
 
     dispatch(type: string): void {
         if (type === "loadedmetadata") this.readyState = 1
+        if (type === "ended") this.paused = true
         const event = new Event(type)
         for (const listener of [...(this.listeners.get(type) ?? [])]) listener(event)
     }
@@ -122,6 +123,12 @@ export class FakeAudioParam {
     value = 1
     cancelScheduledValues(): void {}
     setTargetAtTime(value: number): void {
+        this.value = value
+    }
+    setValueAtTime(value: number): void {
+        this.value = value
+    }
+    linearRampToValueAtTime(value: number): void {
         this.value = value
     }
 }
@@ -137,6 +144,17 @@ export class FakeGainNode {
     }
 }
 
+export class FakeBufferSource extends FakeGainNode {
+    buffer: AudioBuffer | null = null
+    loop = false
+    loopStart = 0
+    loopEnd = 0
+    playbackRate = new FakeAudioParam()
+    onended: (() => void) | null = null
+    start(): void {}
+    stop(): void {}
+}
+
 export class FakeAudioContext {
     static instances: FakeAudioContext[] = []
 
@@ -145,6 +163,8 @@ export class FakeAudioContext {
     readonly destination = { name: "destination" }
     readonly gains: FakeGainNode[] = []
     readonly routedElements: unknown[] = []
+    readonly mediaSources: FakeGainNode[] = []
+    readonly sources: FakeBufferSource[] = []
     resumeCalls = 0
     suspendCalls = 0
     resumeActivations: boolean[] = []
@@ -163,8 +183,34 @@ export class FakeAudioContext {
     }
 
     createMediaElementSource(element: unknown): FakeGainNode {
+        if (this.routedElements.includes(element))
+            throw new DOMException("Already captured", "InvalidStateError")
         this.routedElements.push(element)
-        return new FakeGainNode()
+        const node = new FakeGainNode()
+        this.mediaSources.push(node)
+        return node
+    }
+
+    createBufferSource(): FakeBufferSource {
+        const source = new FakeBufferSource()
+        this.sources.push(source)
+        return source
+    }
+    decodeAudioData(): Promise<AudioBuffer> {
+        return Promise.resolve({ duration: 4 } as AudioBuffer)
+    }
+    createPanner() {
+        return Object.assign(new FakeGainNode(), {
+            positionX: new FakeAudioParam(),
+            positionY: new FakeAudioParam(),
+            positionZ: new FakeAudioParam(),
+            orientationX: new FakeAudioParam(),
+            orientationY: new FakeAudioParam(),
+            orientationZ: new FakeAudioParam(),
+        })
+    }
+    createStereoPanner() {
+        return Object.assign(new FakeGainNode(), { pan: new FakeAudioParam() })
     }
 
     resume(): Promise<void> {

@@ -1,4 +1,4 @@
-import { UnlockedAudioPool } from "./mediaRouting"
+import { canPrimeMedia, UnlockedAudioPool } from "./mediaRouting"
 import type { MediaGainSink, MediaGainSinkFactory } from "./mediaRouting"
 
 function clamp01(value: number): number {
@@ -16,9 +16,12 @@ type PoolEntry = {
     el: HTMLAudioElement
     /** Web Audio gain for this element, when the host routes it; else null. */
     sink: MediaGainSink | null
+    /** Captured media elements stay captured after their sink disconnects. */
+    routed: boolean
     active: boolean
     generation: number
     needsLoad: boolean
+    needsGesturePrime: boolean
     playbackGain: number
     lastUsed: number
     removeElementListeners: (() => void) | null
@@ -52,7 +55,9 @@ export interface OneShotEngineOptions {
     /**
      * Route each element's gain somewhere other than
      * `HTMLMediaElement.volume`, typically a Web Audio `GainNode`. Called once
-     * per pooled element before its `src` is set.
+     * per pooled element before its `src` is set by default. Preloading defers
+     * this until playback acquisition. With `disconnectIdleSinks`, also called
+     * again when a captured idle element is reused.
      */
     createGainSink?: MediaGainSinkFactory
     /** Spare elements {@link OneShotEngine.unlock} prepares. Defaults to 4. */
@@ -70,6 +75,8 @@ export interface OneShotEngineOptions {
     onPlaybackChange?: () => void
     /** A host with a suspended output graph can keep the start deadline armed. */
     outputReady?: () => boolean
+    /** Disconnect pooled idle sinks; the factory must reconnect previously captured elements. Default false. */
+    disconnectIdleSinks?: boolean
 }
 
 /** Why a one-shot did not play. */
@@ -119,6 +126,7 @@ export class OneShotEngine {
     private readonly onPlaybackChange?: () => void
     private elementFallback = false
     private readonly outputReady?: () => boolean
+    private readonly disconnectIdleSinks: boolean
 
     constructor(options: OneShotEngineOptions = {}) {
         this.level = clamp01(options.level ?? 1)
@@ -138,6 +146,7 @@ export class OneShotEngine {
         this.onRoutingFallback = options.onRoutingFallback
         this.onPlaybackChange = options.onPlaybackChange
         this.outputReady = options.outputReady
+        this.disconnectIdleSinks = options.disconnectIdleSinks ?? false
     }
 
     /**
@@ -146,7 +155,18 @@ export class OneShotEngine {
      * reached later without a tap can then play.
      */
     unlock(): void {
-        if (this.disposed) return
+        if (this.disposed || !canPrimeMedia()) return
+        for (const [url, pool] of this.pools) {
+            for (const entry of [...pool.entries]) {
+                if (entry.active || !entry.needsGesturePrime) continue
+                entry.needsGesturePrime = false
+                try {
+                    entry.el.load()
+                } catch {
+                    this.evict(url, entry)
+                }
+            }
+        }
         this.unlockPool.prime()
     }
 
@@ -287,7 +307,7 @@ export class OneShotEngine {
                 // Disconnecting it cannot turn that element into a plain player.
                 for (const [pooledUrl, pool] of [...this.pools]) {
                     for (const idle of [...pool.entries]) {
-                        if (!idle.active && idle.sink) this.evict(pooledUrl, idle)
+                        if (!idle.active && idle.routed) this.evict(pooledUrl, idle)
                     }
                 }
                 this.onRoutingFallback?.()
@@ -408,8 +428,34 @@ export class OneShotEngine {
         this.pools.clear()
     }
 
-    private acquire(url: string): PoolEntry | null {
-        if (this.getActiveCount() >= this.maxConcurrent) return null
+    /** Load up to the cache limit of chapter cues, without consuming playback slots. */
+    preload(urls: readonly string[]): void {
+        if (this.disposed || typeof Audio === "undefined") return
+        const keys = [...new Set(urls.map((url) => url.trim()).filter(Boolean))].slice(
+            0,
+            this.maxCachedUrls
+        )
+        for (const url of keys) {
+            const entry = this.acquire(url, false)
+            if (!entry) continue
+            if (entry.needsLoad) {
+                try {
+                    entry.needsLoad = false
+                    entry.needsGesturePrime = true
+                    entry.el.src = url
+                    entry.el.load()
+                } catch {
+                    this.evict(url, entry)
+                }
+            }
+            const pool = this.pools.get(url)
+            if (pool) this.trimPool(url, pool)
+            this.pruneUrlPools()
+        }
+    }
+
+    private acquire(url: string, activate = true): PoolEntry | null {
+        if (activate && this.getActiveCount() >= this.maxConcurrent) return null
 
         let pool = this.pools.get(url)
         if (!pool) {
@@ -427,10 +473,12 @@ export class OneShotEngine {
                 el.muted = this.muted
                 const created: PoolEntry = {
                     el,
-                    sink: this.makeGainSink(el),
+                    sink: !activate || this.disconnectIdleSinks ? null : this.makeGainSink(el),
+                    routed: false,
                     active: false,
                     generation: 0,
                     needsLoad: true,
+                    needsGesturePrime: false,
                     playbackGain: 1,
                     lastUsed: 0,
                     removeElementListeners: null,
@@ -458,7 +506,10 @@ export class OneShotEngine {
             }
         }
 
-        entry.active = true
+        if (activate && !entry.sink && !this.elementFallback)
+            entry.sink = this.makeGainSink(entry.el)
+        entry.routed ||= entry.sink !== null
+        entry.active = activate
         entry.generation += 1
         entry.lastUsed = ++this.useCounter
         this.pruneUrlPools()
@@ -467,13 +518,22 @@ export class OneShotEngine {
     }
 
     private release(url: string, entry: PoolEntry): void {
-        if (this.elementFallback && entry.sink) {
+        if (this.elementFallback && entry.routed) {
             this.evict(url, entry)
             return
         }
         entry.removePlaybackListeners?.()
         entry.removePlaybackListeners = null
         entry.active = false
+        if (this.disconnectIdleSinks && entry.sink) {
+            const sink = entry.sink
+            entry.sink = null
+            try {
+                sink.dispose()
+            } catch {
+                /* Pool cleanup is best effort. */
+            }
+        }
         entry.lastUsed = ++this.useCounter
         try {
             entry.el.pause()

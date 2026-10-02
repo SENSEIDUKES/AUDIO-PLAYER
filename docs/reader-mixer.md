@@ -40,7 +40,7 @@ function App({ savedAudio }: { savedAudio: ReaderMixerPreferences | null }) {
             options={{
                 atmospheres: ATMOSPHERES,
                 initialPreferences: savedAudio, // loaded per user, not per story
-                onPreferencesChange: saveAudioPreferencesForUser, // debounce if you write to a server
+                onPreferencesChange: saveAudioPreferencesForUser, // coalesced by the mixer (300 ms)
             }}
         >
             <Reader />
@@ -56,6 +56,11 @@ function ChapterView({ chapter }: { chapter: Chapter }) {
         mixer.playSoundscape(chapter.score)
         mixer.startAtmosphere()
     }, [mixer, chapter.score])
+
+    // Warm the chapter's short cues before their words are reached.
+    useEffect(() => {
+        mixer.preloadCues(chapter.cues.map((cue) => cue.url))
+    }, [mixer, chapter.cues])
 
     // Leaving the reader → fade both loops out; the reader's choices are kept.
     useEffect(() => () => mixer.stopAll(), [mixer])
@@ -82,6 +87,7 @@ Without React:
 const mixer = createReaderMixer({ atmospheres: ATMOSPHERES, initialPreferences: saved })
 mixer.playSoundscape(chapterScore) // a chapter opens
 mixer.setAtmosphere("rain")        // the reader picks rain (an option, its id, or a Track)
+mixer.preloadCues(chapterCueUrls)   // warm the bounded chapter cache ahead of the words
 mixer.playCue(growlUrl)            // a cue is reached
 mixer.dispose()                    // release everything
 ```
@@ -96,11 +102,13 @@ mixer.dispose()                    // release everything
 | `startAtmosphere()` / `stopAtmosphere()` | Start the saved atmosphere (entering the reader) or fade it out without changing the choice (leaving). |
 | `setAtmosphereOptions(options)` | Replace the catalog. A saved choice waiting for its option starts when it arrives. |
 | `playCue(url, { volume?, startTime? })` | Play a one-shot over the loops. Returns `false` when skipped: cues or master off, zero per-cue volume, a hidden page, the concurrency cap (`maxConcurrentCues`, default 6), or no audio. |
+| `preloadCues(urls)` | Warm up to `maxCachedCueUrls` unique chapter cue URLs (default 8). No playback, active slot, gain sink or audio-session demand. Later triggers reuse loaded elements and keep their original 1.5 s start deadline. |
 | `stopAll({ fadeMs? })` | Fade both loops out; preferences are untouched. |
 | `setDuck(0..1, { fadeMs? })`, `getDuck()` | Temporarily lower Soundscapes and Atmosphere (for example under narration) without touching preferences. Cues are never ducked. `NarrativeFace` drives this for you. |
 | `setLayerLevel(layer, 0..1)`, `setLayerEnabled(layer, on)`, `setMasterEnabled(on)` | The reader's controls. Changes apply live, including mid-crossfade. |
 | `applyPreset(preset \| id)`, `getPresets()`, `resetPreferences()` | Pick a named mix in one tap, or return to the defaults (see Presets). |
 | `getPreferences()`, `setPreferences(input)`, `subscribePreferences(fn)` | The reader's settings as one plain object (see below). |
+| `flushPreferences()` | Deliver the latest pending persistence callback immediately; also runs on pagehide and dispose. |
 | `getState()`, `subscribe(fn)` | Snapshot for UI: preferences, each layer's status and effective level, active cues, routing, volume control, page visibility, `needsGesture`. |
 | `unlock()` | Unlock audio from a gesture handler (see Mobile). |
 | `dispose()`, `isDisposed()` | Release every element, listener and audio node. |
@@ -108,6 +116,10 @@ mixer.dispose()                    // release everything
 React: `ReaderMixerProvider` (`mixer` to share an existing instance, or
 `options` to create and own one), `useReaderMixer()`,
 `useOptionalReaderMixer()` and `useReaderMixerState(mixer?)`.
+An owned provider creates its mixer in an effect after the first committed render
+and renders its children once it exists. Discarded renders create no listeners or
+contexts; StrictMode disposes its first effect instance before replacing it.
+A supplied `mixer` is available immediately and remains caller-owned.
 
 ### Level math
 
@@ -173,11 +185,54 @@ avoids that on iPhone.
 ```
 
 The snapshot is plain JSON. The host decides where it lives (per user, not per
-story), gets every change through `onPreferencesChange` or
+story), gets changes through `onPreferencesChange` or
 `subscribePreferences`, and passes it back as `initialPreferences`. Missing or
 invalid fields fall back to defaults (`normalizeReaderMixerPreferences`), so an
-old or partial save is safe. Slider drags report many changes; debounce before
-writing to a server.
+old or partial save is safe. Audio, state and `subscribePreferences` update
+immediately on every slider change. `onPreferencesChange` receives the latest
+snapshot after 300 ms without another preference change, coalescing a drag into
+one persistence callback. Set `preferencesDebounceMs: 0` for the previous
+immediate callback timing, or call `flushPreferences()` on an explicit commit.
+Pagehide and dispose flush pending changes once. Asynchronous server writes still
+belong to the host; flushing invokes the callback and cannot await a network save.
+
+## Loop boundaries and cue resources
+
+ReaderMixer overlaps two media decks for the last 250 ms of a finite looping bed.
+It preloads the silent standby, starts it at the selected `trimStartMs` on every
+repeat, and fades before the outgoing asset ends to cover encoder padding and
+restart gaps. The two unlocked elements are reused on successive repeats. Scene
+switches stay transactional: an old bed can keep repeating while its requested
+replacement loads. Pause, stop and dispose cancel boundary work. A failed standby
+uses bounded retries; if it still misses the boundary, the current element
+restarts at its trim rather than ending the bed. That recovery can have a gap.
+
+`loopCrossfadeMs` defaults to 250 in the mixer, is capped to half the playable bed
+length, and can be set to 0 to restore native looping. Standalone SceneMixEngine
+keeps native looping by default; opt in with its additive `loopCrossfadeMs`
+option. Browser timers and seek precision can affect boundaries. On an iPhone
+element fallback that ignores volume, the overlap becomes a hard swap. **Listening
+for rain-bed seams on a physical device remains required.**
+
+The mixer retains about 8 idle cue URLs with at most 2 elements each; active cues
+can temporarily exceed these cache limits up to the separate concurrency cap.
+Use `maxCachedCueUrls` and `maxCuePoolSizePerUrl` to tune the cache. Idle cue sinks
+disconnect from the Web Audio graph and reconnect the same captured source when
+reused. Standalone OneShotEngine retains its prior 32 × 4 limits and connected
+idle sinks unless configured otherwise. Its additive `preload(urls)` supports
+the same bounded warm-up; `disconnectIdleSinks` requires a sink factory that can
+reconnect a previously captured element.
+Preloaded idle cues receive one gesture-time `load()` on the first subsequent
+activation, so WebKit can unlock those existing elements too. Later taps do not
+reload them. Hosts should still preload early enough for slow connections;
+unready or blocked cues are dropped at their deadline.
+
+The reader graph, WebAudioBackend narration and AudioSpriteEngine ambience share
+one reference-counted AudioContext with separate output gains. An idle or hidden
+mixer releases its own activity demand; another active consumer keeps the shared
+context running. The last idle consumer suspends the render thread and the last
+disposed consumer closes it. Merely loading a sprite pack or preloading cues does
+not request playback. Each engine retains its own pause and disposal behavior.
 
 For a browser-only save, `loadReaderMixerPreferences(key)` and
 `saveReaderMixerPreferences(key, preferences)` wrap `localStorage` under a key

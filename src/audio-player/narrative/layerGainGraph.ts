@@ -1,4 +1,5 @@
 import type { MediaGainSink, MediaGainSinkFactory } from "./mediaRouting"
+import { retainAudioContext, type AudioContextLease } from "../core/audio/sharedAudioContext"
 
 /** Short smoothing so slider moves and fade ticks never click. */
 const SMOOTHING_SECONDS = 0.015
@@ -72,13 +73,16 @@ export function applyAudioSessionType(type: string | null | undefined): () => vo
 export class LayerGainGraph<Layer extends string> {
     private readonly ctx: AudioContext
     private readonly buses = new Map<Layer, GainNode>()
+    private readonly lease: AudioContextLease
+    private readonly routes = new WeakMap<
+        HTMLAudioElement,
+        { source: MediaElementAudioSourceNode; gain: GainNode }
+    >()
     private closed = false
-    private desiredRunning = false
-    private changingState = false
-    private changeToken = 0
 
     constructor(Ctor: typeof AudioContext, layers: readonly Layer[]) {
-        this.ctx = new Ctor()
+        this.lease = retainAudioContext(Ctor)
+        this.ctx = this.lease.context
         for (const layer of layers) {
             const bus = this.ctx.createGain()
             bus.connect(this.ctx.destination)
@@ -111,8 +115,16 @@ export class LayerGainGraph<Layer extends string> {
         return (element) => {
             const bus = this.buses.get(layer)
             if (!bus || this.closed) return null
-            const source = this.ctx.createMediaElementSource(element)
-            const gain = this.ctx.createGain()
+            // Media elements can be captured once only, even after disconnect.
+            let route = this.routes.get(element)
+            if (!route) {
+                route = {
+                    source: this.ctx.createMediaElementSource(element),
+                    gain: this.ctx.createGain(),
+                }
+                this.routes.set(element, route)
+            }
+            const { source, gain } = route
             gain.gain.value = 0
             source.connect(gain)
             gain.connect(bus)
@@ -142,45 +154,12 @@ export class LayerGainGraph<Layer extends string> {
 
     /** Start (or restart) the context. Call from a user gesture on iOS. */
     resume(fromActivation = false): void {
-        this.desiredRunning = true
-        this.syncState(fromActivation)
+        void this.lease.setActive(true, fromActivation).catch(() => {})
     }
 
     /** Stop the render thread while idle or hidden. */
     suspend(): void {
-        this.desiredRunning = false
-        this.syncState()
-    }
-
-    private syncState(fromActivation = false): void {
-        if (this.closed || (this.changingState && !(fromActivation && this.desiredRunning))) return
-        const running = this.desiredRunning
-        if (
-            this.state === "closed" ||
-            (this.state === (running ? "running" : "suspended") &&
-                !(fromActivation && this.changingState && running))
-        )
-            return
-        this.changingState = true
-        const token = ++this.changeToken
-        let operation: Promise<void>
-        try {
-            operation = running ? this.ctx.resume() : this.ctx.suspend()
-        } catch {
-            if (token === this.changeToken) this.changingState = false
-            return
-        }
-        void Promise.resolve(operation)
-            .catch(() => {})
-            .then(() => {
-                if (token !== this.changeToken) {
-                    this.syncState()
-                    return
-                }
-                this.changingState = false
-                // Serialize opposite requests: a late resume must not wake an idle page.
-                if (running !== this.desiredRunning) this.syncState()
-            })
+        void this.lease.setActive(false).catch(() => {})
     }
 
     close(): void {
@@ -193,11 +172,7 @@ export class LayerGainGraph<Layer extends string> {
                 // Already disconnected.
             }
         }
-        try {
-            void Promise.resolve(this.ctx.close()).catch(() => {})
-        } catch {
-            // Closing is best effort.
-        }
+        this.lease.release()
     }
 
     private setParam(param: AudioParam, value: number): void {
