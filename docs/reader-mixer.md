@@ -97,7 +97,9 @@ mixer.dispose()                    // release everything
 | `setAtmosphereOptions(options)` | Replace the catalog. A saved choice waiting for its option starts when it arrives. |
 | `playCue(url, { volume?, startTime? })` | Play a one-shot over the loops. Returns `false` when skipped: cues or master off, the concurrency cap (`maxConcurrentCues`, default 6), or no audio. |
 | `stopAll({ fadeMs? })` | Fade both loops out; preferences are untouched. |
+| `setDuck(0..1, { fadeMs? })`, `getDuck()` | Temporarily lower Soundscapes and Atmosphere (for example under narration) without touching preferences. Cues are never ducked. `NarrativeFace` drives this for you. |
 | `setLayerLevel(layer, 0..1)`, `setLayerEnabled(layer, on)`, `setMasterEnabled(on)` | The reader's controls. Changes apply live, including mid-crossfade. |
+| `applyPreset(preset \| id)`, `getPresets()`, `resetPreferences()` | Pick a named mix in one tap, or return to the defaults (see Presets). |
 | `getPreferences()`, `setPreferences(input)`, `subscribePreferences(fn)` | The reader's settings as one plain object (see below). |
 | `getState()`, `subscribe(fn)` | Snapshot for UI: preferences, each layer's status and effective level, active cues, routing, volume control, page visibility, `needsGesture`. |
 | `unlock()` | Unlock audio from a gesture handler (see Mobile). |
@@ -122,6 +124,39 @@ tap; the next one retries), `failed` (with a `failure` message) or `paused`
 (the page is hidden). A loop that is silent only because its switch, level or
 the master is off still reports `playing`.
 
+## NarrativeFace as a companion
+
+`NarrativeFace` (narration on the shared `AudioSessionProvider` session) pairs
+with the mixer. Render it inside the same `ReaderMixerProvider`, or pass
+`mixer={...}`, and:
+
+- **Narration ducks the reader's music and atmosphere.** While the voice plays, the
+  mixer's Soundscapes and Atmosphere drop by `duckAmount × intensity` (defaults
+  0.6 × 1), with a short ramp, and return when it pauses or the face unmounts. Sound Cues
+  keep their level.
+- **One atmosphere control.** The face's Ambience slider reads and writes the
+  mixer's Atmosphere level (the reader's saved setting), so it always agrees with
+  `ReaderMixerPanel`.
+- **One mood label.** Without a `sceneMood`, the face shows the reader's chosen
+  atmosphere ("Rain").
+- The face's `…` button (`showExpand` + `onExpand`) is the natural place to open
+  the Settings › Audio view that holds `ReaderMixerPanel`.
+
+```tsx
+<AudioSessionProvider initialQueue={chapterNarration}>
+    <ReaderMixerProvider options={mixerOptions}>
+        <ChapterView />
+        <NarrativeFace embedded showExpand onExpand={openAudioSettings} />
+    </ReaderMixerProvider>
+</AudioSessionProvider>
+```
+
+Pass `mixer={null}` to keep a face stand-alone inside a provider. A face with
+its own `ambienceManifest` keeps that sprite ambience too, and it ducks as before.
+On the element route where the browser ignores volume (`volumeControl:
+"on-off"`), ducking cannot lower a layer partway; the default `"auto"` routing
+avoids that on iPhone.
+
 ## Preferences
 
 ```json
@@ -129,11 +164,11 @@ the master is off still reports `playing`.
     "version": 1,
     "masterEnabled": true,
     "layers": {
-        "soundscapes": { "enabled": true, "level": 0.6 },
-        "atmosphere": { "enabled": true, "level": 0.4 },
-        "cues": { "enabled": true, "level": 0.8 }
+        "soundscapes": { "enabled": true, "level": 0.25 },
+        "atmosphere": { "enabled": true, "level": 0.3 },
+        "cues": { "enabled": true, "level": 0.75 }
     },
-    "atmosphereId": "rain"
+    "atmosphereId": "gentle-rain"
 }
 ```
 
@@ -147,6 +182,30 @@ writing to a server.
 For a browser-only save, `loadReaderMixerPreferences(key)` and
 `saveReaderMixerPreferences(key, preferences)` wrap `localStorage` under a key
 the host chooses. The package hardcodes no key.
+
+## Defaults and presets
+
+A new reader starts on the **default mix**: everything on, Soundscapes 25%,
+Atmosphere 30% on the catalog option with id `"gentle-rain"`, and Sound Cues
+75% (`DEFAULT_READER_MIXER_PREFERENCES`). A host whose catalog uses different
+ids, or that wants another starting mix, passes `defaultPreferences`; saved
+`initialPreferences` fill in on top of it.
+
+Presets switch the whole mix in one tap. The built-in `READER_MIXER_PRESETS` are:
+
+| Preset | Soundscapes | Atmosphere | Sound Cues | Atmosphere choice |
+| --- | --- | --- | --- | --- |
+| Default | 25% | 30% | 75% | resets to the default (gentle rain) |
+| Cinematic | 60% | 35% | 90% | kept |
+| Calm | 15% | 40% | 40% | kept |
+| Focus | off | 30% | off | kept |
+
+Every preset turns the master on. A preset's `preferences` may be partial:
+fields it leaves out keep the reader's current choice. `state.activePresetId`
+names the preset the current mix matches, or `null` for a custom mix, and
+`ReaderMixerPanel` shows the presets as a chip row above the master switch
+(`showPresets={false}` hides it; `labels.presets` names it). Pass `presets` to
+offer your own list and labels, for example translated ones.
 
 ## Routing and iPhone volume
 

@@ -13,6 +13,8 @@ import "./reader-mixer.css"
 /** Every piece of text the mixer view shows, for wording and translation. */
 export interface ReaderMixerLabels {
     title: string
+    /** Legend of the preset picker. Preset names come from each preset's `label`. */
+    presets: string
     master: string
     layers: Readonly<Record<ReaderMixerLayer, string>>
     /** Accessible name of a layer's slider. */
@@ -34,6 +36,7 @@ export type ReaderMixerLabelOverrides = Partial<Omit<ReaderMixerLabels, "layers"
 
 export const DEFAULT_READER_MIXER_LABELS: ReaderMixerLabels = Object.freeze({
     title: "Audio",
+    presets: "Presets",
     master: "Master",
     layers: Object.freeze({
         soundscapes: "Soundscapes",
@@ -65,6 +68,8 @@ export interface ReaderMixerPanelProps {
     titleAs?: "h2" | "h3" | "h4" | "p"
     /** Show the atmosphere picker under the Atmosphere row. Defaults to true. */
     showAtmospherePicker?: boolean
+    /** Show the preset picker above the master switch. Defaults to true. */
+    showPresets?: boolean
     className?: string
     /** Theme overrides, typically `--sap-reader-mixer-*` custom properties. */
     style?: CSSProperties
@@ -162,6 +167,7 @@ export function ReaderMixerPanel({
     showTitle = true,
     titleAs: Title = "h3",
     showAtmospherePicker = true,
+    showPresets = true,
     className,
     style,
 }: ReaderMixerPanelProps) {
@@ -181,6 +187,7 @@ export function ReaderMixerPanel({
         master: `${baseId}-master`,
         layer: (layer: ReaderMixerLayer) => `${baseId}-${layer}`,
         picker: `${baseId}-atmosphere`,
+        presets: `${baseId}-presets`,
         group: (index: number) => `${baseId}-group-${index}`,
     }
 
@@ -251,6 +258,22 @@ export function ReaderMixerPanel({
                 <Title className="sap-reader-mixer__title" id={ids.title}>
                     {labels.title}
                 </Title>
+            )}
+            {showPresets && state.presets.length > 0 && (
+                <fieldset className="sap-reader-mixer__picker sap-reader-mixer__presets">
+                    <legend className="sap-reader-mixer__picker-legend">{labels.presets}</legend>
+                    <div className="sap-reader-mixer__chips">
+                        {state.presets.map((preset) => (
+                            <AtmosphereChip
+                                key={preset.id}
+                                name={ids.presets}
+                                checked={state.activePresetId === preset.id}
+                                label={preset.label}
+                                onSelect={() => mixer.applyPreset(preset)}
+                            />
+                        ))}
+                    </div>
+                </fieldset>
             )}
             <div className="sap-reader-mixer__row sap-reader-mixer__row--master">
                 <span className="sap-reader-mixer__name" id={ids.master}>

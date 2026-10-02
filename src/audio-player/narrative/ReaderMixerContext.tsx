@@ -69,12 +69,12 @@ export function useOptionalReaderMixer(): ReaderMixer | null {
 }
 
 /**
- * Live mixer state for UI. Uses the provider's mixer unless one is passed.
- * Returns `null` when there is no mixer.
+ * Live mixer state for UI. Uses the provider's mixer when `mixer` is omitted;
+ * pass `null` to read no mixer. Returns `null` when there is no mixer.
  */
 export function useReaderMixerState(mixer?: ReaderMixer | null): ReaderMixerState | null {
     const contextMixer = useContext(ReaderMixerContext)
-    const target = mixer ?? contextMixer
+    const target = mixer === undefined ? contextMixer : mixer
     const subscribe = useCallback(
         (listener: () => void) => (target ? target.subscribe(listener) : () => {}),
         [target]

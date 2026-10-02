@@ -57,16 +57,72 @@ export interface ReaderMixerPreferencesInput {
     atmosphereId?: string | null
 }
 
+/**
+ * What a new reader starts with: everything on, the score at 25%, the
+ * atmosphere at 30% on gentle rain, and cues at 75%. `atmosphereId` names a
+ * catalog option; a host whose catalog has no `"gentle-rain"` passes its own
+ * `defaultPreferences`.
+ */
 export const DEFAULT_READER_MIXER_PREFERENCES: ReaderMixerPreferences = Object.freeze({
     version: 1,
     masterEnabled: true,
     layers: Object.freeze({
-        soundscapes: Object.freeze({ enabled: true, level: 0.6 }),
-        atmosphere: Object.freeze({ enabled: true, level: 0.4 }),
-        cues: Object.freeze({ enabled: true, level: 0.8 }),
+        soundscapes: Object.freeze({ enabled: true, level: 0.25 }),
+        atmosphere: Object.freeze({ enabled: true, level: 0.3 }),
+        cues: Object.freeze({ enabled: true, level: 0.75 }),
     }),
-    atmosphereId: null,
+    atmosphereId: "gentle-rain",
 })
+
+/**
+ * A named mix the reader can pick in one tap. `preferences` may be partial:
+ * fields it leaves out (typically the atmosphere) keep the reader's current
+ * choice.
+ */
+export interface ReaderMixerPreset {
+    id: string
+    label: string
+    preferences: ReaderMixerPreferencesInput
+}
+
+/** Id of the preset that applies the mixer's default preferences. */
+export const READER_MIXER_DEFAULT_PRESET_ID = "default"
+
+const allOn = (soundscapes: number, atmosphere: number, cues: number) => ({
+    masterEnabled: true,
+    layers: {
+        soundscapes: { enabled: true, level: soundscapes },
+        atmosphere: { enabled: true, level: atmosphere },
+        cues: { enabled: true, level: cues },
+    },
+})
+
+/**
+ * The built-in presets. "Default" restores the mixer's default preferences
+ * (including the default atmosphere); the others change only the switches and
+ * levels and keep the reader's atmosphere.
+ */
+export const READER_MIXER_PRESETS: readonly ReaderMixerPreset[] = Object.freeze([
+    Object.freeze({
+        id: READER_MIXER_DEFAULT_PRESET_ID,
+        label: "Default",
+        preferences: DEFAULT_READER_MIXER_PREFERENCES,
+    }),
+    Object.freeze({ id: "cinematic", label: "Cinematic", preferences: allOn(0.6, 0.35, 0.9) }),
+    Object.freeze({ id: "calm", label: "Calm", preferences: allOn(0.15, 0.4, 0.4) }),
+    Object.freeze({
+        id: "focus",
+        label: "Focus",
+        preferences: {
+            masterEnabled: true,
+            layers: {
+                soundscapes: { enabled: false },
+                atmosphere: { enabled: true, level: 0.3 },
+                cues: { enabled: false },
+            },
+        },
+    }),
+])
 
 function clamp01(value: number): number {
     if (!Number.isFinite(value)) return 0
@@ -199,6 +255,10 @@ export interface ReaderMixerState {
     readonly layers: Readonly<Record<ReaderMixerLayer, ReaderMixerLayerState>>
     /** The atmosphere catalog the mixer resolves ids against. */
     readonly atmosphereOptions: readonly ReaderAtmosphereOption[]
+    /** The presets the reader can pick (see {@link ReaderMixer.applyPreset}). */
+    readonly presets: readonly ReaderMixerPreset[]
+    /** The preset the current preferences match, or `null` for a custom mix. */
+    readonly activePresetId: string | null
     /** Whether the atmosphere layer is meant to be sounding (started and not stopped). */
     readonly atmosphereActive: boolean
     /** Cues playing right now. */
@@ -209,6 +269,11 @@ export interface ReaderMixerState {
     readonly pageHidden: boolean
     /** True when audio is waiting for a user gesture to start. */
     readonly needsGesture: boolean
+    /**
+     * How far Soundscapes and Atmosphere are ducked right now, 0..1 (see
+     * {@link ReaderMixer.setDuck}). Already included in `effectiveLevel`.
+     */
+    readonly duck: number
 }
 
 export type ReaderMixerStateListener = (state: ReaderMixerState) => void
@@ -219,8 +284,19 @@ export type ReaderMixerPreferencesListener = (preferences: ReaderMixerPreference
 /* ------------------------------------------------------------------ */
 
 export interface ReaderMixerOptions {
-    /** Saved preferences to start from. Partial or invalid input is filled with defaults. */
+    /** Saved preferences to start from. Missing or invalid fields use `defaultPreferences`. */
     initialPreferences?: ReaderMixerPreferencesInput | ReaderMixerPreferences | null
+    /**
+     * What a new reader starts with and what the "Default" preset and
+     * `resetPreferences()` restore. Missing fields use
+     * {@link DEFAULT_READER_MIXER_PREFERENCES}.
+     */
+    defaultPreferences?: ReaderMixerPreferencesInput | ReaderMixerPreferences | null
+    /**
+     * Presets offered to the reader. Defaults to {@link READER_MIXER_PRESETS},
+     * with "Default" following `defaultPreferences`.
+     */
+    presets?: readonly ReaderMixerPreset[]
     /** Called after every preference change; the host decides where to save. */
     onPreferencesChange?: ReaderMixerPreferencesListener
     /** The host's atmosphere catalog, used to resolve saved ids. */
@@ -289,6 +365,16 @@ export interface ReaderMixerFadeOptions {
     fadeMs?: number
 }
 
+export interface ReaderMixerDuckOptions {
+    /** Ramp length for this change. Defaults to 350 ms. */
+    fadeMs?: number
+}
+
+/** Layers a duck lowers. Cues are short moments and are never ducked. */
+const DUCKED_LAYERS: ReadonlySet<ReaderMixerLayer> = new Set(["soundscapes", "atmosphere"])
+const DUCK_FADE_MS = 350
+const DUCK_TICK_MS = 33
+
 const UNLOCK_GESTURES = ["pointerdown", "keydown", "touchend"] as const
 
 type LoopLayer = "soundscapes" | "atmosphere"
@@ -342,6 +428,12 @@ export class ReaderMixer {
     private lastCue: string | null = null
     private activeCues = 0
     private pageHidden = false
+    /** Duck applied to the engines right now (ramps toward duckTarget). */
+    private duckLevel = 0
+    private duckTarget = 0
+    private duckTimer: ReturnType<typeof setInterval> | null = null
+    private readonly defaults: ReaderMixerPreferences
+    private readonly presets: readonly ReaderMixerPreset[]
     private state: ReaderMixerState
     private readonly stateListeners = new Set<ReaderMixerStateListener>()
     private readonly preferenceListeners = new Set<ReaderMixerPreferencesListener>()
@@ -350,7 +442,15 @@ export class ReaderMixer {
     private disposed = false
 
     constructor(options: ReaderMixerOptions = {}) {
-        this.prefs = normalizeReaderMixerPreferences(options.initialPreferences)
+        this.defaults = normalizeReaderMixerPreferences(options.defaultPreferences)
+        this.prefs = normalizeReaderMixerPreferences(options.initialPreferences, this.defaults)
+        this.presets = Object.freeze(
+            (options.presets ?? READER_MIXER_PRESETS).map((preset) =>
+                preset.id === READER_MIXER_DEFAULT_PRESET_ID && !options.presets
+                    ? Object.freeze({ ...preset, preferences: this.defaults })
+                    : preset
+            )
+        )
         this.onPreferencesChange = options.onPreferencesChange
         this.atmosphereOptions = Object.freeze([...(options.atmospheres ?? [])])
         this.fadeMs = Math.max(0, options.fadeMs ?? SCENE_FADE_MS)
@@ -562,6 +662,46 @@ export class ReaderMixer {
 
     /* ----------------------------- Preferences -------------------------- */
 
+    /* -------------------------------- Duck ------------------------------ */
+
+    /**
+     * Temporarily lower Soundscapes and Atmosphere, for example under
+     * narration: each plays at its normal level × (1 − amount). Cues are not
+     * ducked, and the reader's preferences never change. `setDuck(0)` restores
+     * the full levels. Ramps over `fadeMs` (default 350 ms).
+     *
+     * Ducking needs real volume control: on the element route where the
+     * browser ignores element volume (`volumeControl: "on-off"`), only a full
+     * duck (1) has an audible effect.
+     */
+    setDuck(amount: number, options: ReaderMixerDuckOptions = {}): void {
+        if (this.disposed) return
+        const target = clamp01(amount)
+        if (target === this.duckTarget) return
+        this.duckTarget = target
+        this.stopDuckRamp()
+        const fadeMs = Math.max(0, options.fadeMs ?? DUCK_FADE_MS)
+        const from = this.duckLevel
+        if (fadeMs === 0 || typeof setInterval === "undefined") {
+            this.duckLevel = target
+            this.applyLevels()
+        } else {
+            const startedAt = Date.now()
+            this.duckTimer = setInterval(() => {
+                const t = Math.max(0, Math.min(1, (Date.now() - startedAt) / fadeMs))
+                this.duckLevel = from + (target - from) * t
+                this.applyLevels()
+                if (t >= 1) this.stopDuckRamp()
+            }, DUCK_TICK_MS)
+        }
+        this.refresh()
+    }
+
+    /** The duck the mixer is heading to (see {@link setDuck}). */
+    getDuck(): number {
+        return this.duckTarget
+    }
+
     getPreferences(): ReaderMixerPreferences {
         return this.prefs
     }
@@ -578,6 +718,28 @@ export class ReaderMixer {
         if (nextId === previousId || !this.atmosphereActive) return
         if (nextId === null) this.atmosphere.stop(this.atmosphereFadeMs)
         else this.startAtmosphere()
+    }
+
+    /** The presets the reader can pick. */
+    getPresets(): readonly ReaderMixerPreset[] {
+        return this.presets
+    }
+
+    /**
+     * Apply a preset (or its id). Fields the preset leaves out keep the
+     * reader's current choice. Unknown ids do nothing.
+     */
+    applyPreset(preset: ReaderMixerPreset | string): void {
+        if (this.disposed) return
+        const resolved =
+            typeof preset === "string" ? this.presets.find((p) => p.id === preset) : preset
+        if (!resolved) return
+        this.setPreferences(resolved.preferences)
+    }
+
+    /** Restore the default preferences (what a new reader starts with). */
+    resetPreferences(): void {
+        this.setPreferences(this.defaults)
     }
 
     /** Subscribe to preference changes. Returns an unsubscribe function. */
@@ -636,6 +798,7 @@ export class ReaderMixer {
     dispose(): void {
         if (this.disposed) return
         this.disposed = true
+        this.stopDuckRamp()
         for (const cleanup of this.cleanups.splice(0)) {
             try {
                 cleanup()
@@ -725,9 +888,21 @@ export class ReaderMixer {
     }
 
     /** Push each layer's effective gain into its engine (or its Web Audio bus). */
+    private stopDuckRamp(): void {
+        if (this.duckTimer === null) return
+        clearInterval(this.duckTimer)
+        this.duckTimer = null
+    }
+
+    /** A layer's gain including a duck (the ramping one, or the target for state). */
+    private layerGain(layer: ReaderMixerLayer, duck = this.duckLevel): number {
+        const gain = computeReaderMixerGain(this.prefs, layer)
+        return DUCKED_LAYERS.has(layer) ? gain * (1 - duck) : gain
+    }
+
     private applyLevels(): void {
         for (const layer of READER_MIXER_LAYERS) {
-            const gain = computeReaderMixerGain(this.prefs, layer)
+            const gain = this.layerGain(layer)
             const engine = this.engineFor(layer)
             if (this.graph) {
                 this.graph.setLayerGain(layer, gain)
@@ -803,7 +978,7 @@ export class ReaderMixer {
             current: snapshot.audibleTrackKey,
             requested: snapshot.requestedTrackKey,
             failure: snapshot.failure?.message ?? null,
-            effectiveLevel: computeReaderMixerGain(this.prefs, layer),
+            effectiveLevel: this.layerGain(layer, this.duckTarget),
         })
     }
 
@@ -831,13 +1006,26 @@ export class ReaderMixer {
             preferences: this.prefs,
             layers,
             atmosphereOptions: this.atmosphereOptions,
+            presets: this.presets,
+            activePresetId: this.matchPreset(),
             atmosphereActive: this.atmosphereActive,
             activeCues: this.activeCues,
             routing: this.graph ? "web-audio" : "element",
             volumeControl: this.volumeControl(),
             pageHidden: this.pageHidden,
             needsGesture,
+            duck: this.duckTarget,
         })
+    }
+
+    private matchPreset(): string | null {
+        const match = this.presets.find((preset) =>
+            samePreferences(
+                normalizeReaderMixerPreferences(preset.preferences, this.prefs),
+                this.prefs
+            )
+        )
+        return match?.id ?? null
     }
 
     private refresh(): void {
@@ -856,9 +1044,15 @@ export class ReaderMixer {
 }
 
 function sameState(a: ReaderMixerState, b: ReaderMixerState): boolean {
-    if (a.preferences !== b.preferences || a.atmosphereOptions !== b.atmosphereOptions) return false
+    if (
+        a.preferences !== b.preferences ||
+        a.atmosphereOptions !== b.atmosphereOptions ||
+        a.presets !== b.presets
+    ) {
+        return false
+    }
     const rest = (state: ReaderMixerState) =>
-        JSON.stringify({ ...state, preferences: null, atmosphereOptions: null })
+        JSON.stringify({ ...state, preferences: null, atmosphereOptions: null, presets: null })
     return rest(a) === rest(b)
 }
 
