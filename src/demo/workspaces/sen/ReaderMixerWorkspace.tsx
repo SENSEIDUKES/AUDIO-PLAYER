@@ -142,7 +142,7 @@ const SETS: Record<Host, SceneSet> = {
                     artist: "",
                     audioFile: SAMPLE,
                 },
-                category: "Sample",
+                category: "Chapter",
                 detail: "third-party CORS file",
             },
             {
@@ -152,12 +152,12 @@ const SETS: Record<Host, SceneSet> = {
                     artist: "",
                     sources: [{ url: `${SAMPLE}#battle` }],
                 },
-                category: "Sample",
+                category: "Battle",
                 detail: "the same file, as a second score",
             },
         ],
-        categories: ["Sample"],
-        battleCategory: "Sample",
+        categories: ["Chapter", "Battle"],
+        battleCategory: "Battle",
         atmospheres: [
             {
                 id: "sample-bed",
