@@ -154,6 +154,90 @@ describe("ReaderMixer production recovery", () => {
         expect(fallback.src).toBe("")
     })
 
+    it("returns a successfully retried cue after a synchronous CORS exception", async () => {
+        FakeAudio.volumeLocked = true
+        FakeAudio.playBehavior = (audio) => {
+            if (audio.crossOrigin) throw new DOMException("CORS denied", "SecurityError")
+            return Promise.resolve()
+        }
+        const instance = mixer()
+        expect(instance.playCue(CUE)).toBe(true)
+        await settle()
+        expect(instance.getState().layers.cues).toMatchObject({
+            routing: "element",
+            status: "playing",
+        })
+        expect(FakeAudio.withSrc(CUE)[0].paused).toBe(false)
+    })
+
+    it("evicts idle routed cues on fallback and keeps active routed cues rendering until they end", async () => {
+        FakeAudio.volumeLocked = true
+        const instance = mixer()
+        instance.playCue(CUE)
+        await settle()
+        const idle = FakeAudio.withSrc(CUE)[0]
+        idle.dispatch("ended")
+        instance.playCue(`${CUE}?active`)
+        await settle()
+        const active = FakeAudio.withSrc(`${CUE}?active`)[0]
+        FakeAudio.playBehavior = "pending"
+        instance.playCue(`${CUE}?fallback`)
+        FakeAudio.withSrc(`${CUE}?fallback`)[0].dispatch("error")
+        await flushMicrotasks()
+        const ctx = FakeAudioContext.instances[0]
+        expect(idle.src).toBe("")
+        expect(active.paused).toBe(false)
+        expect(ctx.state).toBe("running")
+        FakeAudio.playBehavior = "resolve"
+        expect(instance.playCue(CUE)).toBe(true)
+        await settle()
+        const plain = FakeAudio.withSrc(CUE)[0]
+        expect(plain).not.toBe(idle)
+        expect(ctx.routedElements).not.toContain(plain)
+        active.dispatch("ended")
+        await flushMicrotasks()
+        expect(ctx.state).toBe("suspended")
+        expect(plain.paused).toBe(false)
+    })
+
+    it.each(["resume", "suspend"] as const)(
+        "resumes synchronously on touchend despite a pending %s",
+        async (pending) => {
+            const instance = mixer({ routing: "web-audio" })
+            const ctx = FakeAudioContext.instances[0]
+            let finish: (() => void) | undefined
+            setUserActivation(false)
+            if (pending === "resume") {
+                ctx.resumeBehavior = () =>
+                    new Promise<void>((resolve) => {
+                        finish = resolve
+                    })
+                instance.playSoundscape(SCORE)
+            } else {
+                instance.playSoundscape(SCORE)
+                await settle()
+                ctx.suspendBehavior = () => {
+                    ctx.setState("suspended")
+                    return new Promise<void>((resolve) => {
+                        finish = resolve
+                    })
+                }
+                instance.setMasterEnabled(false)
+                instance.setMasterEnabled(true)
+            }
+            await flushMicrotasks()
+            const calls = ctx.resumeCalls
+            ctx.resumeBehavior = "resolve"
+            setUserActivation(true)
+            document.dispatchEvent(new Event("touchend"))
+            expect(ctx.resumeCalls).toBe(calls + 1)
+            expect(ctx.resumeActivations[ctx.resumeActivations.length - 1]).toBe(true)
+            finish!()
+            await settle()
+            expect(ctx.state).toBe("running")
+        }
+    )
+
     it("primes touch spares and retries loops on touchend, never pointerdown or Escape", async () => {
         FakeAudio.playBehavior = "not-allowed"
         const instance = mixer()

@@ -147,7 +147,9 @@ export class FakeAudioContext {
     readonly routedElements: unknown[] = []
     resumeCalls = 0
     suspendCalls = 0
-    resumeBehavior: "resolve" | "reject" | "interrupted" = "resolve"
+    resumeActivations: boolean[] = []
+    resumeBehavior: "resolve" | "reject" | "interrupted" | (() => Promise<void>) = "resolve"
+    suspendBehavior: (() => Promise<void>) | null = null
     private listeners = new Set<() => void>()
 
     constructor() {
@@ -167,6 +169,8 @@ export class FakeAudioContext {
 
     resume(): Promise<void> {
         this.resumeCalls += 1
+        this.resumeActivations.push(navigator.userActivation?.isActive ?? false)
+        if (typeof this.resumeBehavior === "function") return this.resumeBehavior()
         if (this.resumeBehavior === "reject") return Promise.reject(new Error("resume blocked"))
         this.setState(this.resumeBehavior === "interrupted" ? "interrupted" : "running")
         return Promise.resolve()
@@ -174,6 +178,7 @@ export class FakeAudioContext {
 
     suspend(): Promise<void> {
         this.suspendCalls += 1
+        if (this.suspendBehavior) return this.suspendBehavior()
         this.setState("suspended")
         return Promise.resolve()
     }

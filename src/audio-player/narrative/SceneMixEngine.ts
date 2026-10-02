@@ -633,6 +633,16 @@ export class SceneMixEngine {
         )
     }
 
+    /** Includes routed outgoing decks until their fade completes. */
+    hasRoutedDemand(): boolean {
+        return (
+            !this.paused &&
+            !this.muted &&
+            this.level > 0 &&
+            this.decks.some((deck) => deck.sink && deck.curveGain > 0 && !deck.el.paused)
+        )
+    }
+
     dispose(): void {
         this.disposed = true
         this.deferredRequest = null

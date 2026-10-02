@@ -265,12 +265,13 @@ export class OneShotEngine {
                 )
             }
         }
-        const fail = (error: unknown, mediaError = false) => {
-            if (!this.isCurrent(entry, generation)) return
+        let replacement: HTMLAudioElement | null = null
+        const fail = (error: unknown, mediaError = false): HTMLAudioElement | null => {
+            if (!this.isCurrent(entry, generation)) return null
             if ((error as { name?: string } | null)?.name === "NotAllowedError") {
                 this.release(key, entry)
                 this.reportPlaybackError(key, "autoplay-blocked")
-                return
+                return null
             }
             const fallback =
                 !entry.started &&
@@ -282,10 +283,18 @@ export class OneShotEngine {
             this.evict(key, entry)
             if (fallback && !this.disposed) {
                 this.elementFallback = true
+                // A MediaElementAudioSourceNode captures its element permanently.
+                // Disconnecting it cannot turn that element into a plain player.
+                for (const [pooledUrl, pool] of [...this.pools]) {
+                    for (const idle of [...pool.entries]) {
+                        if (!idle.active && idle.sink) this.evict(pooledUrl, idle)
+                    }
+                }
                 this.onRoutingFallback?.()
-                this.playAttempt(key, options, deadline)
+                return (replacement = this.playAttempt(key, options, deadline))
             } else {
                 this.reportPlaybackError(key, "failed")
+                return null
             }
         }
         entry.onFailure = () => fail(entry.el.error, true)
@@ -317,7 +326,7 @@ export class OneShotEngine {
             if (needsLoad) {
                 entry.el.src = key
                 entry.needsLoad = false
-                if (!this.isCurrent(entry, generation)) return null
+                if (!this.isCurrent(entry, generation)) return replacement
             }
             try {
                 entry.el.currentTime = startTime
@@ -326,11 +335,10 @@ export class OneShotEngine {
                 // valid if that later seek is rejected too.
             }
             if (needsLoad) entry.el.load()
-            if (!this.isCurrent(entry, generation)) return null
+            if (!this.isCurrent(entry, generation)) return replacement
             playPromise = entry.el.play()
         } catch (error) {
-            fail(error)
-            return null
+            return fail(error)
         }
 
         void playPromise?.then(
@@ -358,6 +366,23 @@ export class OneShotEngine {
             [...this.pools.values()].some((pool) =>
                 pool.entries.some(
                     (entry) => entry.active && entry.started && entry.playbackGain > 0
+                )
+            )
+        )
+    }
+
+    /** Routed cues already in flight still need their context after a downgrade. */
+    hasRoutedDemand(audibleOnly = false): boolean {
+        return (
+            !this.muted &&
+            this.level > 0 &&
+            [...this.pools.values()].some((pool) =>
+                pool.entries.some(
+                    (entry) =>
+                        entry.active &&
+                        entry.sink &&
+                        entry.playbackGain > 0 &&
+                        (!audibleOnly || entry.started)
                 )
             )
         )
@@ -442,6 +467,10 @@ export class OneShotEngine {
     }
 
     private release(url: string, entry: PoolEntry): void {
+        if (this.elementFallback && entry.sink) {
+            this.evict(url, entry)
+            return
+        }
         entry.removePlaybackListeners?.()
         entry.removePlaybackListeners = null
         entry.active = false

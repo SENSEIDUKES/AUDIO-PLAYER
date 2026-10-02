@@ -75,6 +75,7 @@ export class LayerGainGraph<Layer extends string> {
     private closed = false
     private desiredRunning = false
     private changingState = false
+    private changeToken = 0
 
     constructor(Ctor: typeof AudioContext, layers: readonly Layer[]) {
         this.ctx = new Ctor()
@@ -140,9 +141,9 @@ export class LayerGainGraph<Layer extends string> {
     }
 
     /** Start (or restart) the context. Call from a user gesture on iOS. */
-    resume(): void {
+    resume(fromActivation = false): void {
         this.desiredRunning = true
-        this.syncState()
+        this.syncState(fromActivation)
     }
 
     /** Stop the render thread while idle or hidden. */
@@ -151,21 +152,23 @@ export class LayerGainGraph<Layer extends string> {
         this.syncState()
     }
 
-    private syncState(): void {
-        if (this.closed || this.changingState) return
+    private syncState(fromActivation = false): void {
+        if (this.closed || (this.changingState && !(fromActivation && this.desiredRunning))) return
         const running = this.desiredRunning
         if (this.state === (running ? "running" : "suspended") || this.state === "closed") return
         this.changingState = true
+        const token = ++this.changeToken
         let operation: Promise<void>
         try {
             operation = running ? this.ctx.resume() : this.ctx.suspend()
         } catch {
-            this.changingState = false
+            if (token === this.changeToken) this.changingState = false
             return
         }
         void Promise.resolve(operation)
             .catch(() => {})
             .then(() => {
+                if (token !== this.changeToken) return
                 this.changingState = false
                 // Serialize opposite requests: a late resume must not wake an idle page.
                 if (running !== this.desiredRunning) this.syncState()

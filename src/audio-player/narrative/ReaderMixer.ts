@@ -831,6 +831,7 @@ export class ReaderMixer {
      */
     unlock(): void {
         if (this.disposed) return
+        if (!this.pageHidden && this.graphWanted()) this.graph?.resume(true)
         this.soundscapes.unlock()
         this.atmosphere.unlock()
         this.cues.unlock()
@@ -983,17 +984,7 @@ export class ReaderMixer {
     /** A context is useful only while there is enabled playback demand. */
     private syncRuntime(): void {
         if (!this.ready || this.disposed || !this.graph) return
-        const loopWanted = (["soundscapes", "atmosphere"] as const).some(
-            (layer) =>
-                !this.elementFallbacks.has(layer) &&
-                this.layerGain(layer) > 0 &&
-                ((this.loopStatus[layer].requestedTrackKey !== null &&
-                    this.loopStatus[layer].state !== "failed") ||
-                    this[layer].hasAudibleOutput())
-        )
-        const cuesWanted =
-            !this.elementFallbacks.has("cues") && this.layerGain("cues") > 0 && this.activeCues > 0
-        if (!this.pageHidden && (loopWanted || cuesWanted)) this.graph.resume()
+        if (!this.pageHidden && this.graphWanted()) this.graph.resume()
         else this.graph.suspend()
 
         const audible =
@@ -1001,9 +992,10 @@ export class ReaderMixer {
             this.graph.state === "running" &&
             READER_MIXER_LAYERS.some(
                 (layer) =>
-                    !this.elementFallbacks.has(layer) &&
                     this.layerGain(layer) > 0 &&
-                    this.engineFor(layer).hasAudibleOutput()
+                    (layer === "cues"
+                        ? this.cues.hasRoutedDemand(true)
+                        : this[layer].hasRoutedDemand())
             )
         if (audible && !this.restoreAudioSession) {
             this.restoreAudioSession = applyAudioSessionType(this.audioSessionType)
@@ -1011,6 +1003,18 @@ export class ReaderMixer {
             this.restoreAudioSession()
             this.restoreAudioSession = null
         }
+    }
+
+    private graphWanted(): boolean {
+        const loopWanted = (["soundscapes", "atmosphere"] as const).some(
+            (layer) =>
+                this.layerGain(layer) > 0 &&
+                ((!this.elementFallbacks.has(layer) &&
+                    this.loopStatus[layer].requestedTrackKey !== null &&
+                    this.loopStatus[layer].state !== "failed") ||
+                    this[layer].hasRoutedDemand())
+        )
+        return loopWanted || (this.layerGain("cues") > 0 && this.cues.hasRoutedDemand())
     }
 
     private handleCueError(event: OneShotPlaybackErrorEvent): void {
