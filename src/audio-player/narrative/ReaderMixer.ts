@@ -4,6 +4,7 @@ import { OneShotEngine } from "./OneShotEngine"
 import type { OneShotPlaybackErrorEvent } from "./OneShotEngine"
 import { SCENE_FADE_MS, SceneMixEngine } from "./SceneMixEngine"
 import type { SceneMixAnalysisPolicy, SceneMixStatusSnapshot } from "./SceneMixEngine"
+import { ACTIVATION_EVENTS, isActivationEvent } from "./mediaRouting"
 import {
     LayerGainGraph,
     applyAudioSessionType,
@@ -222,7 +223,7 @@ export interface ReaderAtmosphereOption {
  * - `playing`: audible (or silent only because its switch, level or the master is off).
  * - `blocked`: the browser wants a user gesture; the next tap or key press retries.
  * - `failed`: the newest track could not load or play.
- * - `paused`: paused while the page is hidden.
+ * - `paused`: paused by the system or while the page is hidden.
  */
 export type ReaderMixerLayerStatus =
     "idle" | "loading" | "playing" | "blocked" | "failed" | "paused"
@@ -236,6 +237,8 @@ export interface ReaderMixerLayerState {
     readonly failure: string | null
     /** The gain this layer plays at right now (see {@link computeReaderMixerGain}). */
     readonly effectiveLevel: number
+    /** Per-layer routing, including an automatic downgrade after a media/CORS failure. */
+    readonly routing?: ReaderMixerRouting
 }
 
 /**
@@ -307,14 +310,13 @@ export interface ReaderMixerOptions {
      * - `"auto"`: Web Audio gain only where element volume is ignored (iOS
      *   Safari), so every slider sets real loudness; plain media elements
      *   everywhere else.
-     * - `"element"`: plain media elements everywhere. Works with any file
-     *   host; where element volume is ignored, sliders act as on/off.
+     * - `"element"`: plain media elements everywhere; where element volume
+     *   is ignored, sliders act as on/off.
      * - `"web-audio"`: Web Audio gain everywhere.
      *
-     * The Web Audio route loads audio with `crossOrigin="anonymous"`, so the
-     * file host must send `Access-Control-Allow-Origin` (the SEIHouse audio
-     * hosts do); without it files fail to load. Pass `"element"` for a host
-     * without CORS headers.
+     * All routes use anonymous CORS by default. `"auto"` retries a routed
+     * media/CORS failure once on a fresh non-CORS element for that layer.
+     * For non-CORS hosts, pass `crossOrigin: null` to use element routing.
      */
     routing?: "element" | "auto" | "web-audio"
     /** Soundscape crossfade length. Defaults to {@link SCENE_FADE_MS}. */
@@ -332,17 +334,26 @@ export interface ReaderMixerOptions {
     maxConcurrentCues?: number
     /**
      * Pause both loops while the page is hidden and resume when it returns.
-     * Defaults to true. Cues already playing finish; new cues are not hidden-aware.
+     * Defaults to true. Active cues are dropped; new cues are skipped while hidden.
      */
     pauseWhenHidden?: boolean
     /**
-     * Safari Audio Session type applied while Web Audio routing is active.
+     * Safari Audio Session type applied only while Web Audio output is audible.
      * Defaults to `"playback"` so the iPhone silent switch does not mute the
-     * mixer. Pass `null` to leave the page's session untouched.
+     * mixer. Restores the previous type when idle. Pass `null` to leave the
+     * page's session untouched.
      */
     audioSessionType?: string | null
-    /** `crossOrigin` for element routing only. Leave unset unless the host needs it. */
-    crossOrigin?: "anonymous" | "use-credentials"
+    /** All mixer requests default to anonymous CORS. Use null with element routing for non-CORS hosts. */
+    crossOrigin?: "anonymous" | "use-credentials" | null
+    /** Per-attempt loop load/start/stall deadline. Default 12,000 ms. */
+    loopAttemptTimeoutMs?: number
+    /** Same-source loop retries before advancing or failing. Default 2. */
+    loopMaxRetries?: number
+    /** Initial loop retry backoff (doubles per retry). Default 500 ms. */
+    loopRetryDelayMs?: number
+    /** A cue that has not started by this deadline is dropped. Default 1,500 ms. */
+    cueStartTimeoutMs?: number
     /** Fired when a soundscape or atmosphere source falls back to its next candidate. */
     onFallbackSource?: (event: FallbackSourceEvent & { layer: ReaderMixerLayer }) => void
 }
@@ -375,8 +386,6 @@ const DUCKED_LAYERS: ReadonlySet<ReaderMixerLayer> = new Set(["soundscapes", "at
 const DUCK_FADE_MS = 350
 const DUCK_TICK_MS = 33
 
-const UNLOCK_GESTURES = ["pointerdown", "keydown", "touchend"] as const
-
 type LoopLayer = "soundscapes" | "atmosphere"
 type CueStatus = "idle" | "blocked" | "failed"
 
@@ -387,6 +396,7 @@ const LOOP_STATUS: Record<SceneMixStatusSnapshot["state"], ReaderMixerLayerStatu
     playing: "playing",
     stopped: "idle",
     failed: "failed",
+    paused: "paused",
 }
 
 /* ------------------------------------------------------------------ */
@@ -440,6 +450,9 @@ export class ReaderMixer {
     private readonly cleanups: Array<() => void> = []
     private ready = false
     private disposed = false
+    private readonly elementFallbacks = new Set<ReaderMixerLayer>()
+    private readonly audioSessionType: string | null
+    private restoreAudioSession: (() => void) | null = null
 
     constructor(options: ReaderMixerOptions = {}) {
         this.defaults = normalizeReaderMixerPreferences(options.defaultPreferences)
@@ -457,11 +470,32 @@ export class ReaderMixer {
         this.atmosphereFadeMs = Math.max(0, options.atmosphereFadeMs ?? SCENE_FADE_MS)
         this.elementVolumeWorks = probeElementVolumeWrites()
 
-        this.graph = this.createGraph(options.routing ?? "auto")
-        const crossOrigin = this.graph ? "anonymous" : options.crossOrigin
+        this.graph = this.createGraph(
+            options.crossOrigin === null ? "element" : (options.routing ?? "auto")
+        )
+        const crossOrigin = options.crossOrigin === undefined ? "anonymous" : options.crossOrigin
+        this.audioSessionType =
+            options.audioSessionType === undefined ? "playback" : options.audioSessionType
         if (this.graph) {
-            this.cleanups.push(applyAudioSessionType(options.audioSessionType ?? "playback"))
-            this.cleanups.push(this.graph.onStateChange(() => this.refresh()))
+            this.cleanups.push(
+                this.graph.onStateChange(() => {
+                    if (this.ready && !this.pageHidden && this.graph?.state === "running") {
+                        this.cues.notifyOutputReady()
+                        for (const layer of ["soundscapes", "atmosphere"] as const) {
+                            if (this.layerGain(layer) > 0) this[layer].resume()
+                        }
+                    }
+                    this.refresh()
+                })
+            )
+        }
+
+        const recovery = {
+            attemptTimeoutMs: options.loopAttemptTimeoutMs ?? 12000,
+            maxRetries: options.loopMaxRetries ?? 2,
+            retryDelayMs: options.loopRetryDelayMs ?? 500,
+            allowElementFallback: (options.routing ?? "auto") === "auto" && !!this.graph,
+            onPlaybackChange: () => this.refresh(),
         }
 
         const fallback =
@@ -474,25 +508,34 @@ export class ReaderMixer {
                 }
             }
         this.soundscapes = new SceneMixEngine({
+            ...recovery,
             loop: true,
             fadeMs: this.fadeMs,
             crossOrigin,
             analysisPolicy: options.analysisPolicy ?? "off",
             onFallbackSource: fallback("soundscapes"),
             createGainSink: this.graph?.sinkFactory("soundscapes"),
+            onRoutingFallback: () => this.routingFallback("soundscapes"),
         })
         this.atmosphere = new SceneMixEngine({
+            ...recovery,
             loop: true,
             fadeMs: this.atmosphereFadeMs,
             crossOrigin,
             analysisPolicy: "off",
             onFallbackSource: fallback("atmosphere"),
             createGainSink: this.graph?.sinkFactory("atmosphere"),
+            onRoutingFallback: () => this.routingFallback("atmosphere"),
         })
         this.cues = new OneShotEngine({
             crossOrigin,
             maxConcurrent: options.maxConcurrentCues ?? 6,
             createGainSink: this.graph?.sinkFactory("cues"),
+            startTimeoutMs: options.cueStartTimeoutMs ?? 1500,
+            outputReady: () => !this.graph || this.graph.state === "running",
+            allowElementFallback: recovery.allowElementFallback,
+            onRoutingFallback: () => this.routingFallback("cues"),
+            onPlaybackChange: () => this.refresh(),
             onPlaybackError: (event) => this.handleCueError(event),
             onActiveCountChange: (count) => {
                 this.activeCues = count
@@ -516,9 +559,18 @@ export class ReaderMixer {
         this.applyLevels()
         this.armGestures()
         if (options.pauseWhenHidden ?? true) this.followVisibility()
+        if (typeof window !== "undefined") {
+            const online = () => {
+                this.soundscapes.retryFailed()
+                if (this.atmosphereActive) this.atmosphere.retryFailed()
+            }
+            window.addEventListener("online", online)
+            this.cleanups.push(() => window.removeEventListener("online", online))
+        }
 
         this.ready = true
         this.state = this.buildState()
+        this.syncRuntime()
     }
 
     /* ---------------------------- Soundscapes --------------------------- */
@@ -620,8 +672,8 @@ export class ReaderMixer {
      * or audio is unavailable.
      */
     playCue(url: string, options: PlayCueOptions = {}): boolean {
-        if (this.disposed) return false
-        if (computeReaderMixerGain(this.prefs, "cues") <= 0) return false
+        if (this.disposed || this.pageHidden) return false
+        if (computeReaderMixerGain(this.prefs, "cues", options.volume ?? 1) <= 0) return false
         const element = this.cues.playOneShot(url, {
             volume: options.volume,
             startTime: options.startTime,
@@ -779,10 +831,14 @@ export class ReaderMixer {
      */
     unlock(): void {
         if (this.disposed) return
-        this.graph?.resume()
+        if (!this.pageHidden && this.graphWanted()) this.graph?.resume(true)
         this.soundscapes.unlock()
         this.atmosphere.unlock()
         this.cues.unlock()
+        if (!this.pageHidden) {
+            if (this.layerGain("soundscapes") > 0) this.soundscapes.resume()
+            if (this.layerGain("atmosphere") > 0) this.atmosphere.resume()
+        }
         if (this.cueStatus === "blocked") {
             this.cueStatus = "idle"
             this.cueFailure = null
@@ -809,6 +865,8 @@ export class ReaderMixer {
         this.soundscapes.dispose()
         this.atmosphere.dispose()
         this.cues.dispose()
+        this.restoreAudioSession?.()
+        this.restoreAudioSession = null
         this.graph?.close()
         this.stateListeners.clear()
         this.preferenceListeners.clear()
@@ -904,15 +962,59 @@ export class ReaderMixer {
         for (const layer of READER_MIXER_LAYERS) {
             const gain = this.layerGain(layer)
             const engine = this.engineFor(layer)
-            if (this.graph) {
+            if (this.graph && !this.elementFallbacks.has(layer)) {
                 this.graph.setLayerGain(layer, gain)
                 engine.setLevel(1)
             } else {
+                this.graph?.setLayerGain(layer, 1)
                 engine.setLevel(gain)
             }
             // Muting is what silences a layer where element volume is ignored.
             engine.setMuted(gain <= 0)
         }
+        this.syncRuntime()
+    }
+
+    private routingFallback(layer: ReaderMixerLayer): void {
+        this.elementFallbacks.add(layer)
+        this.applyLevels()
+        this.refresh()
+    }
+
+    /** A context is useful only while there is enabled playback demand. */
+    private syncRuntime(): void {
+        if (!this.ready || this.disposed || !this.graph) return
+        if (!this.pageHidden && this.graphWanted()) this.graph.resume()
+        else this.graph.suspend()
+
+        const audible =
+            !this.pageHidden &&
+            this.graph.state === "running" &&
+            READER_MIXER_LAYERS.some(
+                (layer) =>
+                    this.layerGain(layer) > 0 &&
+                    (layer === "cues"
+                        ? this.cues.hasRoutedDemand(true)
+                        : this[layer].hasRoutedDemand())
+            )
+        if (audible && !this.restoreAudioSession) {
+            this.restoreAudioSession = applyAudioSessionType(this.audioSessionType)
+        } else if (!audible && this.restoreAudioSession) {
+            this.restoreAudioSession()
+            this.restoreAudioSession = null
+        }
+    }
+
+    private graphWanted(): boolean {
+        const loopWanted = (["soundscapes", "atmosphere"] as const).some(
+            (layer) =>
+                this.layerGain(layer) > 0 &&
+                ((!this.elementFallbacks.has(layer) &&
+                    this.loopStatus[layer].requestedTrackKey !== null &&
+                    this.loopStatus[layer].state !== "failed") ||
+                    this[layer].hasRoutedDemand())
+        )
+        return loopWanted || (this.layerGain("cues") > 0 && this.cues.hasRoutedDemand())
     }
 
     private handleCueError(event: OneShotPlaybackErrorEvent): void {
@@ -928,12 +1030,14 @@ export class ReaderMixer {
 
     private armGestures(): void {
         if (typeof document === "undefined") return
-        const onGesture = () => this.unlock()
-        for (const type of UNLOCK_GESTURES) {
+        const onGesture = (event: Event) => {
+            if (isActivationEvent(event)) this.unlock()
+        }
+        for (const type of ACTIVATION_EVENTS) {
             document.addEventListener(type, onGesture, { capture: true, passive: true })
         }
         this.cleanups.push(() => {
-            for (const type of UNLOCK_GESTURES) {
+            for (const type of ACTIVATION_EVENTS) {
                 document.removeEventListener(type, onGesture, true)
             }
         })
@@ -948,6 +1052,7 @@ export class ReaderMixer {
             if (hidden) {
                 this.soundscapes.pause()
                 this.atmosphere.pause()
+                this.cues.stopAll()
             } else {
                 this.soundscapes.resume()
                 this.atmosphere.resume()
@@ -960,7 +1065,7 @@ export class ReaderMixer {
     }
 
     private volumeControl(): ReaderMixerVolumeControl {
-        if (this.graph) return "level"
+        if (this.graph && this.elementFallbacks.size === 0) return "level"
         const locked =
             !this.elementVolumeWorks ||
             this.soundscapes.getVolumeWritesUnsupported() ||
@@ -979,6 +1084,7 @@ export class ReaderMixer {
             requested: snapshot.requestedTrackKey,
             failure: snapshot.failure?.message ?? null,
             effectiveLevel: this.layerGain(layer, this.duckTarget),
+            routing: this.graph && !this.elementFallbacks.has(layer) ? "web-audio" : "element",
         })
     }
 
@@ -994,14 +1100,24 @@ export class ReaderMixer {
                 requested: this.lastCue,
                 failure: this.cueFailure,
                 effectiveLevel: computeReaderMixerGain(this.prefs, "cues"),
+                routing: this.graph && !this.elementFallbacks.has("cues") ? "web-audio" : "element",
             }),
         })
-        const loopsRequested =
-            this.loopStatus.soundscapes.requestedTrackKey !== null ||
-            this.loopStatus.atmosphere.requestedTrackKey !== null
+        const loopsRequested = (["soundscapes", "atmosphere"] as const).some(
+            (layer) =>
+                !this.elementFallbacks.has(layer) &&
+                this.layerGain(layer) > 0 &&
+                this.loopStatus[layer].requestedTrackKey !== null &&
+                this.loopStatus[layer].state !== "failed"
+        )
         const needsGesture =
-            READER_MIXER_LAYERS.some((layer) => layers[layer].status === "blocked") ||
-            (this.graph?.state === "suspended" && loopsRequested && !this.pageHidden)
+            (!this.pageHidden &&
+                READER_MIXER_LAYERS.some(
+                    (layer) => this.layerGain(layer) > 0 && layers[layer].status === "blocked"
+                )) ||
+            ((this.graph?.state === "suspended" || this.graph?.state === "interrupted") &&
+                (loopsRequested || this.activeCues > 0) &&
+                !this.pageHidden)
         return Object.freeze({
             preferences: this.prefs,
             layers,
@@ -1030,6 +1146,7 @@ export class ReaderMixer {
 
     private refresh(): void {
         if (!this.ready || this.disposed) return
+        this.syncRuntime()
         const next = this.buildState()
         if (sameState(next, this.state)) return
         this.state = next

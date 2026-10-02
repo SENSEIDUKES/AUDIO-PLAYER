@@ -472,7 +472,7 @@ describe("SceneMixEngine", () => {
         })
 
         FakeAudio.playBehavior = "resolve"
-        document.dispatchEvent(new Event("pointerdown"))
+        document.dispatchEvent(new Event("pointerup"))
         await flushMicrotasks()
         expect(mix.getCurrentTrackKey()).toBe("id:SCENE_2")
         expect(snapshots.map((snapshot) => snapshot.state)).toEqual([
@@ -507,7 +507,7 @@ describe("SceneMixEngine", () => {
         const incoming = FakeAudio.created[1]
         const blockedSnapshot = mix.getStatusSnapshot()
 
-        document.dispatchEvent(new Event("pointerdown"))
+        document.dispatchEvent(new Event("pointerup"))
         await flushMicrotasks()
         expect(incoming.playCalls).toBe(2)
         expect(mix.getCurrentTrackKey()).toBe("id:SCENE_1")
@@ -581,7 +581,7 @@ describe("SceneMixEngine", () => {
         expect(incoming.src).not.toBe("")
 
         FakeAudio.playBehavior = "reject"
-        document.dispatchEvent(new Event("pointerdown"))
+        document.dispatchEvent(new Event("pointerup"))
         await flush()
         expect(mix.getCurrentTrackKey()).toBeNull()
         expect(incoming.src).toBe("")
@@ -602,7 +602,7 @@ describe("SceneMixEngine", () => {
         mix.subscribeStatus((snapshot) => snapshots.push(snapshot))
         mix.dispose()
 
-        document.dispatchEvent(new Event("pointerdown"))
+        document.dispatchEvent(new Event("pointerup"))
         await flush()
         expect(active.src).toBe("")
         expect(pending.src).toBe("")
@@ -742,7 +742,7 @@ describe("SceneMixEngine", () => {
 
         FakeAudio.playBehavior = (audio) =>
             audio === primary ? Promise.reject(new Error("retry failed")) : Promise.resolve()
-        document.dispatchEvent(new Event("pointerdown"))
+        document.dispatchEvent(new Event("pointerup"))
         await flushMicrotasks()
 
         expect(primary.playCalls).toBe(2)
@@ -854,7 +854,7 @@ describe("SceneMixEngine", () => {
         primary.dispatch("error")
         fallback.dispatch("error")
         fallback.dispatch("loadedmetadata")
-        document.dispatchEvent(new Event("pointerdown"))
+        document.dispatchEvent(new Event("pointerup"))
         await flushMicrotasks()
 
         expect(fallbackEvents).toHaveLength(1)

@@ -2,7 +2,7 @@ import type { FallbackSourceEvent, Track, TrackSource, TrackTrims } from "../typ
 import { trackKey } from "../utils/trackKey"
 import { getTrackSources } from "../utils/sources"
 import { ensureSourceAnalysis } from "../automix/silenceAnalysis"
-import { UnlockedAudioPool } from "./mediaRouting"
+import { ACTIVATION_EVENTS, isActivationEvent, UnlockedAudioPool } from "./mediaRouting"
 import type { MediaGainSink, MediaGainSinkFactory } from "./mediaRouting"
 
 /**
@@ -42,11 +42,18 @@ type Deck = {
     waitForMetadataBeforePlay: boolean
     playStarted: boolean
     trimStartMs: number
+    deadline: ReturnType<typeof setTimeout> | null
+    resumeTime: number | null
+    resuming: boolean
+    resumeToken: number
 }
 
 type PendingTransition = {
     request: SceneRequest
     incoming: Deck | null
+    retries: number
+    retryTimer: ReturnType<typeof setTimeout> | null
+    resumeTime: number | null
 }
 
 type SceneRequest = {
@@ -77,7 +84,7 @@ export interface SceneMixEngineOptions {
      * plain storage bucket/CDN without CORS headers then fail to load at all,
      * while a bare `<audio>` element would have played them fine.
      */
-    crossOrigin?: "anonymous" | "use-credentials"
+    crossOrigin?: "anonymous" | "use-credentials" | null
     /**
      * Silence-trim analysis for selected scene sources. Defaults to
      * `"automatic"`; `"off"` performs no analysis fetch or decode.
@@ -97,10 +104,19 @@ export interface SceneMixEngineOptions {
      * non-gesture scene switches. Defaults to 2.
      */
     unlockPoolSize?: number
+    /** Load/start or stalled-playback deadline in ms. Default 0 (disabled). */
+    attemptTimeoutMs?: number
+    /** Retries of the same source before advancing. Default 0. */
+    maxRetries?: number
+    /** Initial retry backoff in ms, doubled for each retry. Default 500. */
+    retryDelayMs?: number
+    /** Retry routed media failures once using a fresh, non-CORS element. Default false. */
+    allowElementFallback?: boolean
+    /** Reports the layer's permanent downgrade to element routing. */
+    onRoutingFallback?: () => void
+    /** Reports changes to actual element playback, including fade-out completion. */
+    onPlaybackChange?: () => void
 }
-
-/** User gestures that can unlock media playback after an autoplay rejection. */
-const UNLOCK_GESTURES = ["pointerdown", "keydown", "touchend"] as const
 
 export interface SceneCrossfadeOptions {
     /** Crossfade length for this switch only. */
@@ -113,7 +129,7 @@ export interface SceneCrossfadeOptions {
 }
 
 export type SceneMixTransitionState =
-    "idle" | "loading" | "autoplay-blocked" | "playing" | "stopped" | "failed"
+    "idle" | "loading" | "autoplay-blocked" | "playing" | "paused" | "stopped" | "failed"
 
 export type SceneMixFailureReason = "playback-failed" | "media-error"
 
@@ -179,7 +195,7 @@ export class SceneMixEngine {
     private volumeWritesUnsupported = false
     private loop: boolean
     private defaultFadeMs: number
-    private crossOrigin?: "anonymous" | "use-credentials"
+    private crossOrigin?: "anonymous" | "use-credentials" | null
     private analysisPolicy: SceneMixAnalysisPolicy
     private onFallbackSource?: (event: FallbackSourceEvent) => void
     private tickTimer: ReturnType<typeof setInterval> | null = null
@@ -200,6 +216,15 @@ export class SceneMixEngine {
     private paused = false
     /** Newest crossfadeTo() received or interrupted while paused. */
     private deferredRequest: { track: Track; options: SceneCrossfadeOptions } | null = null
+    private readonly attemptTimeoutMs: number
+    private readonly maxRetries: number
+    private readonly retryDelayMs: number
+    private readonly allowElementFallback: boolean
+    private readonly onRoutingFallback?: () => void
+    private readonly onPlaybackChange?: () => void
+    private elementFallback = false
+    private failedRequest: { request: SceneRequest; resumeTime: number | null } | null = null
+    private reportedPlayback = false
 
     constructor(options: SceneMixEngineOptions = {}) {
         this.loop = options.loop ?? true
@@ -208,6 +233,12 @@ export class SceneMixEngine {
         this.analysisPolicy = options.analysisPolicy ?? "automatic"
         this.onFallbackSource = options.onFallbackSource
         this.createGainSink = options.createGainSink
+        this.attemptTimeoutMs = Math.max(0, options.attemptTimeoutMs ?? 0)
+        this.maxRetries = Math.max(0, Math.floor(options.maxRetries ?? 0))
+        this.retryDelayMs = Math.max(0, options.retryDelayMs ?? 500)
+        this.allowElementFallback = options.allowElementFallback ?? false
+        this.onRoutingFallback = options.onRoutingFallback
+        this.onPlaybackChange = options.onPlaybackChange
         this.unlockPool = new UnlockedAudioPool(
             Math.max(0, Math.floor(options.unlockPoolSize ?? 2))
         )
@@ -255,6 +286,7 @@ export class SceneMixEngine {
     setLevel(value: number): void {
         this.level = clamp01(value)
         this.applyGains()
+        this.playbackChanged()
     }
 
     getLevel(): number {
@@ -266,6 +298,7 @@ export class SceneMixEngine {
         this.muted = muted
         for (const deck of this.decks) deck.el.muted = muted
         this.applyGains()
+        this.playbackChanged()
     }
 
     getMuted(): boolean {
@@ -290,6 +323,7 @@ export class SceneMixEngine {
         if (this.disposed || typeof Audio === "undefined") return
         const sources = getTrackSources(track)
         if (sources.length === 0) return
+        this.failedRequest = null
         const key = trackKey(track)
         if (this.paused) {
             this.deferWhilePaused(track, options, key)
@@ -321,6 +355,9 @@ export class SceneMixEngine {
         const transition: PendingTransition = {
             request,
             incoming: null,
+            retries: 0,
+            retryTimer: null,
+            resumeTime: null,
         }
 
         this.pendingTransition = transition
@@ -338,10 +375,9 @@ export class SceneMixEngine {
         const el = this.unlockPool.take()
         el.loop = this.loop
         el.preload = "auto"
-        // Only tag the request as CORS when the host asked for it: a forced
-        // crossOrigin turns "no ACAO header on the file host" into a hard media
-        // error, silencing scores a bare <audio> would play.
-        if (this.crossOrigin) el.crossOrigin = this.crossOrigin
+        // Standalone requests retain their opt-in CORS policy. ReaderMixer
+        // supplies a consistent anonymous mode; its emergency fallback opts out.
+        if (!this.elementFallback && this.crossOrigin) el.crossOrigin = this.crossOrigin
         el.muted = this.muted
         const sink = this.makeGainSink(el)
         // On volume-locked browsers the fade degrades to a hard swap that
@@ -374,19 +410,62 @@ export class SceneMixEngine {
             retiring: false,
             abort,
             waitForMetadataBeforePlay:
-                transition.request.trimStartMs !== null && transition.request.trimStartMs > 0,
+                (transition.request.trimStartMs !== null && transition.request.trimStartMs > 0) ||
+                (transition.resumeTime !== null && transition.resumeTime > 0),
             playStarted: false,
             trimStartMs: transition.request.trimStartMs ?? 0,
+            deadline: null,
+            resumeTime: transition.resumeTime,
+            resuming: false,
+            resumeToken: 0,
         }
 
         transition.incoming = deck
         this.decks.push(deck)
+        this.armDeadline(deck, () =>
+            this.advanceSourceOrFail(
+                transition,
+                deck,
+                "playback-failed",
+                new Error("Scene audio start timed out.")
+            )
+        )
 
         el.addEventListener(
             "loadedmetadata",
             () => this.handleCandidateMetadata(transition, deck),
             { signal: abort.signal }
         )
+        el.addEventListener(
+            "pause",
+            () => {
+                if (this.active !== deck || this.paused || deck.retiring) return
+                this.clearDeadline(deck)
+                if (!this.pendingTransition) this.publishStatus("paused", deck.key, null)
+                this.playbackChanged()
+            },
+            { signal: abort.signal }
+        )
+        el.addEventListener(
+            "playing",
+            () => {
+                if (this.active !== deck || this.paused || deck.retiring) return
+                this.clearDeadline(deck)
+                if (!this.pendingTransition && this.statusSnapshot.state !== "failed") {
+                    this.publishStatus("playing", deck.key, deck.key)
+                }
+                this.playbackChanged()
+            },
+            { signal: abort.signal }
+        )
+        const onStall = () => {
+            if (this.active !== deck || this.paused || deck.retiring || deck.el.paused) return
+            this.armDeadline(deck, () =>
+                this.recoverDeck(deck, "media-error", new Error("Scene audio stalled."))
+            )
+        }
+        el.addEventListener("waiting", onStall, { signal: abort.signal })
+        el.addEventListener("stalled", onStall, { signal: abort.signal })
         el.addEventListener(
             "error",
             () => {
@@ -430,6 +509,7 @@ export class SceneMixEngine {
 
     /** Fade the whole scene layer to silence and release every deck. */
     stop(fadeMs: number = this.defaultFadeMs): void {
+        this.failedRequest = null
         this.deferredRequest = null
         if (this.pendingTransition) {
             this.rollbackTransition(this.pendingTransition)
@@ -484,6 +564,9 @@ export class SceneMixEngine {
         this.disarmGestureRetry?.()
         this.disarmResumeRetry?.()
         for (const deck of [...this.decks]) {
+            this.clearDeadline(deck)
+            deck.resuming = false
+            deck.resumeToken += 1
             if (deck.retiring) {
                 this.releaseDeck(deck)
                 continue
@@ -498,6 +581,7 @@ export class SceneMixEngine {
                 // Best effort: an element that cannot pause is released later.
             }
         }
+        this.playbackChanged()
     }
 
     /**
@@ -507,13 +591,56 @@ export class SceneMixEngine {
      * retries it.
      */
     resume(): void {
-        if (this.disposed || !this.paused) return
+        if (this.disposed) return
+        if (!this.paused) {
+            if (this.active?.el.paused) this.resumeDeck(this.active)
+            return
+        }
         this.paused = false
         const deferred = this.deferredRequest
         this.deferredRequest = null
         const active = this.active
         if (active) this.resumeDeck(active)
         if (deferred) this.crossfadeTo(deferred.track, deferred.options)
+        else this.retryFailed()
+    }
+
+    /** Retry a still-wanted failed loop, for example after the browser comes online. */
+    retryFailed(): void {
+        const failed = this.failedRequest
+        if (this.disposed || !failed || this.statusSnapshot.state !== "failed") return
+        if (this.paused) return
+        this.failedRequest = null
+        const transition: PendingTransition = {
+            request: failed.request,
+            incoming: null,
+            retries: 0,
+            retryTimer: null,
+            resumeTime: failed.resumeTime,
+        }
+        this.pendingTransition = transition
+        this.publishStatus("loading", transition.request.key, this.active?.key ?? null)
+        this.startSourceAttempt(transition, 0)
+    }
+
+    /** Includes outgoing decks until their fade finishes. */
+    hasAudibleOutput(): boolean {
+        return (
+            !this.paused &&
+            !this.muted &&
+            this.level > 0 &&
+            this.decks.some((deck) => deck.curveGain > 0 && !deck.el.paused)
+        )
+    }
+
+    /** Includes routed outgoing decks until their fade completes. */
+    hasRoutedDemand(): boolean {
+        return (
+            !this.paused &&
+            !this.muted &&
+            this.level > 0 &&
+            this.decks.some((deck) => deck.sink && deck.curveGain > 0 && !deck.el.paused)
+        )
     }
 
     dispose(): void {
@@ -525,7 +652,8 @@ export class SceneMixEngine {
         this.disarmResumeRetry?.()
         this.gestureActions.clear()
         this.removeGestureListeners?.()
-        this.pendingTransition = null
+        if (this.pendingTransition) this.rollbackTransition(this.pendingTransition)
+        this.failedRequest = null
         for (const deck of [...this.decks]) this.releaseDeck(deck)
         this.active = null
         this.publishStatus("stopped", null, null)
@@ -543,31 +671,62 @@ export class SceneMixEngine {
     }
 
     private resumeDeck(deck: Deck): void {
+        if (deck.resuming || this.disposed || deck.abort.signal.aborted) return
+        deck.resuming = true
+        const token = ++deck.resumeToken
+        this.armDeadline(deck, () =>
+            this.recoverDeck(deck, "playback-failed", new Error("Scene audio resume timed out."))
+        )
         let playPromise: Promise<void>
         try {
             playPromise = deck.el.play()
-        } catch {
-            // A media error event, if any, drives the normal recovery path.
+        } catch (error) {
+            this.handleResumeFailure(deck, error)
             return
         }
         Promise.resolve(playPromise).then(
             () => {
-                if (this.disposed || this.paused || this.active !== deck) return
-                if (this.statusSnapshot.state === "autoplay-blocked" && !this.pendingTransition) {
+                if (
+                    this.disposed ||
+                    this.paused ||
+                    this.active !== deck ||
+                    token !== deck.resumeToken
+                )
+                    return
+                deck.resuming = false
+                this.clearDeadline(deck)
+                if (!this.pendingTransition && this.statusSnapshot.state !== "failed") {
                     this.publishStatus("playing", deck.key, deck.key)
                 }
+                this.playbackChanged()
             },
             (error: unknown) => {
-                if (this.disposed || this.paused || this.active !== deck) return
-                if (!this.isAutoplayPolicyError(error)) return
-                this.publishStatus(
-                    "autoplay-blocked",
-                    this.pendingTransition?.request.key ?? deck.key,
-                    deck.key
+                if (
+                    this.disposed ||
+                    this.paused ||
+                    this.active !== deck ||
+                    token !== deck.resumeToken
                 )
-                this.armResumeRetry(deck)
+                    return
+                this.handleResumeFailure(deck, error)
             }
         )
+    }
+
+    private handleResumeFailure(deck: Deck, error: unknown): void {
+        if (this.disposed || this.paused || this.active !== deck) return
+        this.clearDeadline(deck)
+        deck.resuming = false
+        if (this.isAutoplayPolicyError(error)) {
+            this.publishStatus(
+                "autoplay-blocked",
+                this.pendingTransition?.request.key ?? deck.key,
+                null
+            )
+            this.armResumeRetry(deck)
+        } else {
+            this.recoverDeck(deck, "playback-failed", error)
+        }
     }
 
     private handleCandidateMetadata(transition: PendingTransition, deck: Deck): void {
@@ -590,8 +749,8 @@ export class SceneMixEngine {
 
     /** Apply a selected candidate's trim only while it is still silent/pending. */
     private applyCandidateTrim(deck: Deck): void {
-        if (deck.trimStartMs <= 0 || deck.el.readyState < 1) return
-        const startSeconds = deck.trimStartMs / 1000
+        if ((deck.trimStartMs <= 0 && deck.resumeTime === null) || deck.el.readyState < 1) return
+        const startSeconds = deck.resumeTime ?? deck.trimStartMs / 1000
         const duration = deck.el.duration
         if (Number.isFinite(duration) && duration > 0 && startSeconds >= duration) return
         try {
@@ -615,6 +774,15 @@ export class SceneMixEngine {
         }
 
         let playPromise: Promise<void>
+        if (deck.deadline === null)
+            this.armDeadline(deck, () =>
+                this.advanceSourceOrFail(
+                    transition,
+                    deck,
+                    "playback-failed",
+                    new Error("Scene audio start timed out.")
+                )
+            )
         try {
             if (shouldLoad) {
                 deck.el.load()
@@ -635,7 +803,12 @@ export class SceneMixEngine {
 
     /** Commit exactly once, only while this is still the newest replacement. */
     private commitTransition(transition: PendingTransition, deck: Deck): void {
-        if (!this.isCurrentCandidate(transition, deck)) return
+        if (!this.isCurrentCandidate(transition, deck)) {
+            if (deck.abort.signal.aborted) deck.el.pause()
+            return
+        }
+
+        this.clearDeadline(deck)
 
         this.pendingTransition = null
         this.disarmGestureRetry?.()
@@ -655,11 +828,13 @@ export class SceneMixEngine {
         this.publishStatus("playing", incoming.key, incoming.key)
         this.applyGains()
         this.startTicking()
+        this.playbackChanged()
     }
 
     private handlePlaybackFailure(transition: PendingTransition, deck: Deck, error: unknown): void {
         if (!this.isCurrentCandidate(transition, deck)) return
         if (this.isAutoplayPolicyError(error)) {
+            this.clearDeadline(deck)
             this.publishStatus("autoplay-blocked", transition.request.key, this.active?.key ?? null)
             if (!this.isCurrentCandidate(transition, deck)) return
             this.armGestureRetry(transition, deck)
@@ -675,6 +850,7 @@ export class SceneMixEngine {
     private rollbackTransition(transition: PendingTransition): void {
         if (this.pendingTransition !== transition) return
         this.pendingTransition = null
+        if (transition.retryTimer !== null) clearTimeout(transition.retryTimer)
         this.disarmGestureRetry?.()
         const incoming = transition.incoming
         transition.incoming = null
@@ -688,6 +864,7 @@ export class SceneMixEngine {
     ): void {
         if (this.pendingTransition !== transition) return
         const requestedTrackKey = transition.request.key
+        this.failedRequest = { request: transition.request, resumeTime: transition.resumeTime }
         this.rollbackTransition(transition)
         this.publishStatus(
             "failed",
@@ -705,7 +882,11 @@ export class SceneMixEngine {
             return
         }
 
-        const mediaError = deck.el.error
+        this.recoverDeck(deck, "media-error", deck.el.error)
+    }
+
+    private recoverDeck(deck: Deck, reason: SceneMixFailureReason, error: unknown): void {
+        if (!this.decks.includes(deck)) return
         const wasActive = this.active === deck
         if (!wasActive) {
             this.releaseDeck(deck)
@@ -730,9 +911,12 @@ export class SceneMixEngine {
             const fallbackTransition: PendingTransition = {
                 request: deck.request,
                 incoming: deck,
+                retries: 0,
+                retryTimer: null,
+                resumeTime: Number.isFinite(deck.el.currentTime) ? deck.el.currentTime : null,
             }
             this.pendingTransition = fallbackTransition
-            this.advanceSourceOrFail(fallbackTransition, deck, "media-error", mediaError)
+            this.advanceSourceOrFail(fallbackTransition, deck, reason, error)
             return
         }
 
@@ -762,11 +946,40 @@ export class SceneMixEngine {
         if (!this.isCurrentCandidate(transition, deck)) return
 
         const failedSource = deck.source
+        const wasRouted = deck.sink !== null
         const nextIndex = deck.sourceIndex + 1
         const nextSource = transition.request.sources[nextIndex]
         this.disarmGestureRetry?.()
         transition.incoming = null
         this.releaseDeck(deck)
+        if (this.pendingTransition !== transition || this.disposed) return
+
+        if (
+            this.allowElementFallback &&
+            wasRouted &&
+            !this.elementFallback &&
+            (reason === "media-error" ||
+                (error as { name?: string } | null)?.name === "SecurityError")
+        ) {
+            // releaseDeck disconnected the source node; never reuse a routed element.
+            this.elementFallback = true
+            this.onRoutingFallback?.()
+            if (this.pendingTransition !== transition || this.disposed) return
+            this.publishStatus("loading", transition.request.key, this.active?.key ?? null)
+            this.startSourceAttempt(transition, deck.sourceIndex)
+            return
+        }
+
+        if (transition.retries < this.maxRetries) {
+            const delay = this.retryDelayMs * 2 ** transition.retries++
+            this.publishStatus("loading", transition.request.key, this.active?.key ?? null)
+            if (this.pendingTransition !== transition || this.disposed) return
+            transition.retryTimer = setTimeout(() => {
+                transition.retryTimer = null
+                this.startSourceAttempt(transition, deck.sourceIndex)
+            }, delay)
+            return
+        }
 
         if (!nextSource) {
             this.failTransition(transition, reason, error)
@@ -785,6 +998,7 @@ export class SceneMixEngine {
             error: this.normalizeFallbackError(reason, error),
         })
         if (this.pendingTransition !== transition || this.disposed) return
+        transition.retries = 0
         this.startSourceAttempt(transition, nextIndex)
     }
 
@@ -963,13 +1177,14 @@ export class SceneMixEngine {
         if (this.disposed || typeof document === "undefined") return () => {}
         this.gestureActions.add(action)
         if (!this.removeGestureListeners) {
-            const onGesture = () => {
+            const onGesture = (event: Event) => {
+                if (!isActivationEvent(event)) return
                 const actions = [...this.gestureActions]
                 this.gestureActions.clear()
                 this.removeGestureListeners?.()
                 for (const pending of actions) pending()
             }
-            for (const type of UNLOCK_GESTURES) {
+            for (const type of ACTIVATION_EVENTS) {
                 document.addEventListener(type, onGesture, {
                     capture: true,
                     passive: true,
@@ -977,7 +1192,7 @@ export class SceneMixEngine {
             }
             this.removeGestureListeners = () => {
                 this.removeGestureListeners = null
-                for (const type of UNLOCK_GESTURES) {
+                for (const type of ACTIVATION_EVENTS) {
                     document.removeEventListener(type, onGesture, true)
                 }
             }
@@ -1040,6 +1255,7 @@ export class SceneMixEngine {
             this.applyDeckGain(deck)
         }
         if (!anyRamping) this.stopTicking()
+        this.playbackChanged()
     }
 
     private applyGains(): void {
@@ -1082,7 +1298,7 @@ export class SceneMixEngine {
     }
 
     private makeGainSink(el: HTMLAudioElement): MediaGainSink | null {
-        if (!this.createGainSink) return null
+        if (!this.createGainSink || this.elementFallback) return null
         try {
             return this.createGainSink(el) ?? null
         } catch {
@@ -1111,6 +1327,7 @@ export class SceneMixEngine {
     }
 
     private releaseDeck(deck: Deck): void {
+        this.clearDeadline(deck)
         deck.abort.abort()
         this.decks = this.decks.filter((d) => d !== deck)
         if (this.active === deck) this.active = null
@@ -1130,6 +1347,27 @@ export class SceneMixEngine {
         } catch {
             // Best-effort release; the element is unreferenced either way.
         }
+        this.playbackChanged()
+    }
+
+    private armDeadline(deck: Deck, action: () => void): void {
+        if (!this.attemptTimeoutMs || deck.deadline !== null) return
+        deck.deadline = setTimeout(() => {
+            deck.deadline = null
+            if (!this.disposed && !this.paused && this.decks.includes(deck)) action()
+        }, this.attemptTimeoutMs)
+    }
+
+    private clearDeadline(deck: Deck): void {
+        if (deck.deadline !== null) clearTimeout(deck.deadline)
+        deck.deadline = null
+    }
+
+    private playbackChanged(): void {
+        const audible = this.hasAudibleOutput()
+        if (audible === this.reportedPlayback) return
+        this.reportedPlayback = audible
+        this.onPlaybackChange?.()
     }
 }
 

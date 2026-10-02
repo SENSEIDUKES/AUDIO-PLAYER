@@ -157,7 +157,7 @@ describe("narrative engine routing hooks", () => {
             expect(mix.getStatusSnapshot().state).toBe("autoplay-blocked")
 
             FakeAudio.playBehavior = "resolve"
-            document.dispatchEvent(new Event("pointerdown"))
+            document.dispatchEvent(new Event("pointerup"))
             await flushMicrotasks()
             expect(deckA.paused).toBe(false)
             expect(deckB.paused).toBe(false)

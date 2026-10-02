@@ -466,7 +466,7 @@ describe("ReaderMixer", () => {
             expect(mixer.getState().layers.cues.status).toBe("blocked")
             expect(mixer.getState().needsGesture).toBe(true)
 
-            document.dispatchEvent(new Event("pointerdown"))
+            document.dispatchEvent(new Event("pointerup"))
             expect(mixer.getState().layers.cues.status).toBe("idle")
         })
     })
@@ -487,7 +487,7 @@ describe("ReaderMixer", () => {
             await settle()
             const deck = only("https://a.test/ch1.mp3")
             expect(deck.paused).toBe(false)
-            expect(deck.crossOrigin).toBeNull()
+            expect(deck.crossOrigin).toBe("anonymous")
             expect(deck.muted).toBe(false)
 
             mixer.setLayerLevel("soundscapes", 0)
@@ -540,12 +540,15 @@ describe("ReaderMixer", () => {
         it("crossfades through per-element gain and resumes the context on a gesture", async () => {
             const mixer = makeMixer({ routing: "web-audio" })
             const ctx = FakeAudioContext.instances[0]
+            ctx.resumeBehavior = "reject"
             mixer.playSoundscape(CHAPTER, { fadeMs: 0 })
             await settle()
             expect(mixer.getState().needsGesture).toBe(true)
 
-            document.dispatchEvent(new Event("pointerdown"))
-            expect(ctx.resumeCalls).toBe(1)
+            ctx.resumeBehavior = "resolve"
+            const attempts = ctx.resumeCalls
+            document.dispatchEvent(new Event("pointerup"))
+            expect(ctx.resumeCalls).toBe(attempts + 1)
             expect(mixer.getState().needsGesture).toBe(false)
 
             mixer.playSoundscape(BATTLE, { fadeMs: 2000 })
@@ -607,7 +610,7 @@ describe("ReaderMixer", () => {
 
             FakeAudio.playBehavior = "resolve"
             const before = FakeAudio.created.length
-            document.dispatchEvent(new Event("pointerdown"))
+            document.dispatchEvent(new Event("pointerup"))
             await settle()
             expect(mixer.getState().layers.soundscapes.status).toBe("playing")
             expect(mixer.getState().layers.atmosphere.status).toBe("playing")
@@ -677,7 +680,7 @@ describe("ReaderMixer", () => {
         expect(FakeAudio.created.filter((audio) => audio.src !== "")).toHaveLength(0)
         mixer.playSoundscape(BATTLE)
         expect(mixer.playCue(GROWL)).toBe(false)
-        document.dispatchEvent(new Event("pointerdown"))
+        document.dispatchEvent(new Event("pointerup"))
         expect(FakeAudio.withSrc("https://a.test/battle.mp3")).toHaveLength(0)
         expect(listener).not.toHaveBeenCalled()
     })

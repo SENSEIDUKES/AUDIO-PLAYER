@@ -23,6 +23,9 @@ type PoolEntry = {
     lastUsed: number
     removeElementListeners: (() => void) | null
     removePlaybackListeners: (() => void) | null
+    started: boolean
+    onFailure: (() => void) | null
+    onOutputReady: (() => void) | null
 }
 
 type UrlPool = {
@@ -45,7 +48,7 @@ export interface OneShotEngineOptions {
      * Optional CORS mode for the detached audio elements. It is intentionally
      * unset by default so ordinary media hosts do not require CORS headers.
      */
-    crossOrigin?: "anonymous" | "use-credentials"
+    crossOrigin?: "anonymous" | "use-credentials" | null
     /**
      * Route each element's gain somewhere other than
      * `HTMLMediaElement.volume`, typically a Web Audio `GainNode`. Called once
@@ -58,6 +61,15 @@ export interface OneShotEngineOptions {
     onPlaybackError?: (event: OneShotPlaybackErrorEvent) => void
     /** Reports the number of cues playing whenever it changes. */
     onActiveCountChange?: (count: number) => void
+    /** Drop a cue that has not started within this many ms. Default 0 (disabled). */
+    startTimeoutMs?: number
+    /** Retry a routed media/CORS start failure once on a non-CORS element. Default false. */
+    allowElementFallback?: boolean
+    onRoutingFallback?: () => void
+    /** Reports actual playback changes (active counts also include pending loads). */
+    onPlaybackChange?: () => void
+    /** A host with a suspended output graph can keep the start deadline armed. */
+    outputReady?: () => boolean
 }
 
 /** Why a one-shot did not play. */
@@ -90,7 +102,7 @@ export class OneShotEngine {
     private readonly maxCachedUrls: number
     private readonly maxPoolSizePerUrl: number
     private readonly maxConcurrent: number
-    private readonly crossOrigin?: "anonymous" | "use-credentials"
+    private readonly crossOrigin?: "anonymous" | "use-credentials" | null
     private level: number
     private muted: boolean
     private volumeWritesUnsupported = false
@@ -101,6 +113,12 @@ export class OneShotEngine {
     private readonly onPlaybackError?: (event: OneShotPlaybackErrorEvent) => void
     private readonly onActiveCountChange?: (count: number) => void
     private reportedActiveCount = 0
+    private readonly startTimeoutMs: number
+    private readonly allowElementFallback: boolean
+    private readonly onRoutingFallback?: () => void
+    private readonly onPlaybackChange?: () => void
+    private elementFallback = false
+    private readonly outputReady?: () => boolean
 
     constructor(options: OneShotEngineOptions = {}) {
         this.level = clamp01(options.level ?? 1)
@@ -115,6 +133,11 @@ export class OneShotEngine {
         )
         this.onPlaybackError = options.onPlaybackError
         this.onActiveCountChange = options.onActiveCountChange
+        this.startTimeoutMs = Math.max(0, options.startTimeoutMs ?? 0)
+        this.allowElementFallback = options.allowElementFallback ?? false
+        this.onRoutingFallback = options.onRoutingFallback
+        this.onPlaybackChange = options.onPlaybackChange
+        this.outputReady = options.outputReady
     }
 
     /**
@@ -166,6 +189,18 @@ export class OneShotEngine {
      * failing element so it cannot poison subsequent calls.
      */
     playOneShot(url: string, options: PlayOneShotOptions = {}): HTMLAudioElement | null {
+        return this.playAttempt(
+            url,
+            options,
+            this.startTimeoutMs ? Date.now() + this.startTimeoutMs : null
+        )
+    }
+
+    private playAttempt(
+        url: string,
+        options: PlayOneShotOptions,
+        deadline: number | null
+    ): HTMLAudioElement | null {
         const key = url.trim()
         if (this.disposed || !key || typeof Audio === "undefined") return null
 
@@ -173,6 +208,7 @@ export class OneShotEngine {
         if (!entry) return null
 
         const generation = entry.generation
+        entry.started = false
         entry.playbackGain = clamp01(options.volume ?? 1)
         entry.el.muted = this.muted
         this.applyVolume(entry)
@@ -197,16 +233,92 @@ export class OneShotEngine {
         const onPause = () => {
             if (this.isCurrent(entry, generation)) this.release(key, entry)
         }
+        let timer: ReturnType<typeof setTimeout> | null = null
+        const clearTimer = () => {
+            if (timer !== null) clearTimeout(timer)
+            timer = null
+        }
+        const drop = () => {
+            if (!this.isCurrent(entry, generation)) return
+            this.evict(key, entry)
+            this.reportPlaybackError(key, "failed")
+        }
+        const armTimer = (remaining: number) => {
+            if (timer !== null) return
+            timer = setTimeout(drop, Math.max(0, remaining))
+        }
+        const onPlaying = () => {
+            if (!this.isCurrent(entry, generation)) return
+            if (!entry.started && deadline !== null && Date.now() >= deadline) {
+                drop()
+                return
+            }
+            if (!this.elementFallback && this.outputReady?.() === false) return
+            entry.started = true
+            clearTimer()
+            this.onPlaybackChange?.()
+        }
+        const onStall = () => {
+            if (this.isCurrent(entry, generation) && this.startTimeoutMs) {
+                armTimer(
+                    entry.started ? this.startTimeoutMs : (deadline ?? Date.now()) - Date.now()
+                )
+            }
+        }
+        let replacement: HTMLAudioElement | null = null
+        const fail = (error: unknown, mediaError = false): HTMLAudioElement | null => {
+            if (!this.isCurrent(entry, generation)) return null
+            if ((error as { name?: string } | null)?.name === "NotAllowedError") {
+                this.release(key, entry)
+                this.reportPlaybackError(key, "autoplay-blocked")
+                return null
+            }
+            const fallback =
+                !entry.started &&
+                entry.sink &&
+                this.allowElementFallback &&
+                !this.elementFallback &&
+                (mediaError || (error as { name?: string } | null)?.name === "SecurityError") &&
+                (deadline === null || Date.now() < deadline)
+            this.evict(key, entry)
+            if (fallback && !this.disposed) {
+                this.elementFallback = true
+                // A MediaElementAudioSourceNode captures its element permanently.
+                // Disconnecting it cannot turn that element into a plain player.
+                for (const [pooledUrl, pool] of [...this.pools]) {
+                    for (const idle of [...pool.entries]) {
+                        if (!idle.active && idle.sink) this.evict(pooledUrl, idle)
+                    }
+                }
+                this.onRoutingFallback?.()
+                return (replacement = this.playAttempt(key, options, deadline))
+            } else {
+                this.reportPlaybackError(key, "failed")
+                return null
+            }
+        }
+        entry.onFailure = () => fail(entry.el.error, true)
+        entry.onOutputReady = onPlaying
         // Attach before assigning src/loading: cached media events may arrive
         // immediately, and no lifecycle event should slip past the pool.
         entry.el.addEventListener("loadedmetadata", seekWhenReady)
         entry.el.addEventListener("ended", onEnded)
         entry.el.addEventListener("pause", onPause)
+        entry.el.addEventListener("playing", onPlaying)
+        entry.el.addEventListener("waiting", onStall)
+        entry.el.addEventListener("stalled", onStall)
         entry.removePlaybackListeners = () => {
+            clearTimer()
+            entry.onFailure = null
+            entry.onOutputReady = null
             entry.el.removeEventListener("loadedmetadata", seekWhenReady)
             entry.el.removeEventListener("ended", onEnded)
             entry.el.removeEventListener("pause", onPause)
+            entry.el.removeEventListener("playing", onPlaying)
+            entry.el.removeEventListener("waiting", onStall)
+            entry.el.removeEventListener("stalled", onStall)
         }
+        if (deadline !== null) armTimer(deadline - Date.now())
 
         let playPromise: Promise<void> | undefined
         try {
@@ -214,7 +326,7 @@ export class OneShotEngine {
             if (needsLoad) {
                 entry.el.src = key
                 entry.needsLoad = false
-                if (!this.isCurrent(entry, generation)) return null
+                if (!this.isCurrent(entry, generation)) return replacement
             }
             try {
                 entry.el.currentTime = startTime
@@ -223,26 +335,66 @@ export class OneShotEngine {
                 // valid if that later seek is rejected too.
             }
             if (needsLoad) entry.el.load()
-            if (!this.isCurrent(entry, generation)) return null
+            if (!this.isCurrent(entry, generation)) return replacement
             playPromise = entry.el.play()
-        } catch {
-            this.evict(key, entry)
-            this.reportPlaybackError(key, "failed")
-            return null
+        } catch (error) {
+            return fail(error)
         }
 
-        playPromise?.catch((error: unknown) => {
-            if (!this.isCurrent(entry, generation)) return
-            if ((error as { name?: string } | null)?.name === "NotAllowedError") {
-                this.release(key, entry)
-                this.reportPlaybackError(key, "autoplay-blocked")
-            } else {
-                this.evict(key, entry)
-                this.reportPlaybackError(key, "failed")
-            }
-        })
+        void playPromise?.then(
+            () => {
+                if (this.isCurrent(entry, generation)) onPlaying()
+                else if (entry.generation === generation) entry.el.pause()
+            },
+            (error: unknown) => fail(error)
+        )
 
         return entry.el
+    }
+
+    /** Drop active cues immediately; nothing is queued for later playback. */
+    stopAll(): void {
+        for (const [url, pool] of [...this.pools]) {
+            for (const entry of [...pool.entries]) if (entry.active) this.evict(url, entry)
+        }
+    }
+
+    hasAudibleOutput(): boolean {
+        return (
+            !this.muted &&
+            this.level > 0 &&
+            [...this.pools.values()].some((pool) =>
+                pool.entries.some(
+                    (entry) => entry.active && entry.started && entry.playbackGain > 0
+                )
+            )
+        )
+    }
+
+    /** Routed cues already in flight still need their context after a downgrade. */
+    hasRoutedDemand(audibleOnly = false): boolean {
+        return (
+            !this.muted &&
+            this.level > 0 &&
+            [...this.pools.values()].some((pool) =>
+                pool.entries.some(
+                    (entry) =>
+                        entry.active &&
+                        entry.sink &&
+                        entry.playbackGain > 0 &&
+                        (!audibleOnly || entry.started)
+                )
+            )
+        )
+    }
+
+    /** Called when a host's output context resumes; expired cues remain dropped. */
+    notifyOutputReady(): void {
+        for (const pool of this.pools.values()) {
+            for (const entry of pool.entries) {
+                if (entry.active && !entry.started && !entry.el.paused) entry.onOutputReady?.()
+            }
+        }
     }
 
     /** Stop active cues and release every retained media element. */
@@ -271,7 +423,7 @@ export class OneShotEngine {
             try {
                 const el = this.unlockPool.take()
                 el.preload = "auto"
-                if (this.crossOrigin) el.crossOrigin = this.crossOrigin
+                if (!this.elementFallback && this.crossOrigin) el.crossOrigin = this.crossOrigin
                 el.muted = this.muted
                 const created: PoolEntry = {
                     el,
@@ -283,11 +435,17 @@ export class OneShotEngine {
                     lastUsed: 0,
                     removeElementListeners: null,
                     removePlaybackListeners: null,
+                    started: false,
+                    onFailure: null,
+                    onOutputReady: null,
                 }
                 // This listener remains while the entry is idle as well as
                 // active: a late media failure must not leave a poisoned URL
                 // in the reusable pool.
-                const onError = () => this.evict(url, created)
+                const onError = () => {
+                    if (created.onFailure) created.onFailure()
+                    else this.evict(url, created)
+                }
                 el.addEventListener("error", onError)
                 created.removeElementListeners = () => {
                     el.removeEventListener("error", onError)
@@ -309,6 +467,10 @@ export class OneShotEngine {
     }
 
     private release(url: string, entry: PoolEntry): void {
+        if (this.elementFallback && entry.sink) {
+            this.evict(url, entry)
+            return
+        }
         entry.removePlaybackListeners?.()
         entry.removePlaybackListeners = null
         entry.active = false
@@ -323,6 +485,7 @@ export class OneShotEngine {
 
         const pool = this.pools.get(url)
         this.reportActiveCount()
+        this.onPlaybackChange?.()
         if (!pool || !pool.entries.includes(entry)) return
         this.touch(pool)
         this.trimPool(url, pool)
@@ -359,6 +522,7 @@ export class OneShotEngine {
             }
         }
         this.reportActiveCount()
+        this.onPlaybackChange?.()
     }
 
     private trimPool(url: string, pool: UrlPool): void {
@@ -432,7 +596,7 @@ export class OneShotEngine {
     }
 
     private makeGainSink(el: HTMLAudioElement): MediaGainSink | null {
-        if (!this.createGainSink) return null
+        if (!this.createGainSink || this.elementFallback) return null
         try {
             return this.createGainSink(el) ?? null
         } catch {

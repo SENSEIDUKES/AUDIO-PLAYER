@@ -73,6 +73,9 @@ export class LayerGainGraph<Layer extends string> {
     private readonly ctx: AudioContext
     private readonly buses = new Map<Layer, GainNode>()
     private closed = false
+    private desiredRunning = false
+    private changingState = false
+    private changeToken = 0
 
     constructor(Ctor: typeof AudioContext, layers: readonly Layer[]) {
         this.ctx = new Ctor()
@@ -83,8 +86,8 @@ export class LayerGainGraph<Layer extends string> {
         }
     }
 
-    get state(): AudioContextState | "closed" {
-        return this.closed ? "closed" : this.ctx.state
+    get state(): AudioContextState | "interrupted" {
+        return this.closed ? "closed" : (this.ctx.state as AudioContextState | "interrupted")
     }
 
     /** Listen for the context starting or suspending. Returns an unsubscribe. */
@@ -138,13 +141,46 @@ export class LayerGainGraph<Layer extends string> {
     }
 
     /** Start (or restart) the context. Call from a user gesture on iOS. */
-    resume(): void {
-        if (this.closed || this.ctx.state === "running") return
+    resume(fromActivation = false): void {
+        this.desiredRunning = true
+        this.syncState(fromActivation)
+    }
+
+    /** Stop the render thread while idle or hidden. */
+    suspend(): void {
+        this.desiredRunning = false
+        this.syncState()
+    }
+
+    private syncState(fromActivation = false): void {
+        if (this.closed || (this.changingState && !(fromActivation && this.desiredRunning))) return
+        const running = this.desiredRunning
+        if (
+            this.state === "closed" ||
+            (this.state === (running ? "running" : "suspended") &&
+                !(fromActivation && this.changingState && running))
+        )
+            return
+        this.changingState = true
+        const token = ++this.changeToken
+        let operation: Promise<void>
         try {
-            void Promise.resolve(this.ctx.resume()).catch(() => {})
+            operation = running ? this.ctx.resume() : this.ctx.suspend()
         } catch {
-            // Resume is retried on the next gesture.
+            if (token === this.changeToken) this.changingState = false
+            return
         }
+        void Promise.resolve(operation)
+            .catch(() => {})
+            .then(() => {
+                if (token !== this.changeToken) {
+                    this.syncState()
+                    return
+                }
+                this.changingState = false
+                // Serialize opposite requests: a late resume must not wake an idle page.
+                if (running !== this.desiredRunning) this.syncState()
+            })
     }
 
     close(): void {
