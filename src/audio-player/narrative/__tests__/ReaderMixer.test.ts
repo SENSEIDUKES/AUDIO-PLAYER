@@ -187,7 +187,7 @@ describe("ReaderMixer", () => {
             const second = makeMixer({ initialPreferences: saved as ReaderMixerPreferences })
             expect(second.getPreferences()).toEqual(first.getPreferences())
             expect(second.getPreferences()).toEqual({
-                version: 2,
+                version: 3,
                 masterEnabled: false,
                 layers: {
                     soundscapes: { enabled: true, level: 0.33 },
@@ -234,7 +234,7 @@ describe("ReaderMixer", () => {
             const mixer = createReaderMixer()
             mixers.push(mixer)
             expect(mixer.getPreferences()).toEqual({
-                version: 2,
+                version: 3,
                 masterEnabled: true,
                 layers: {
                     soundscapes: { enabled: true, level: 0.25 },

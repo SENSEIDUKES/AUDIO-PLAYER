@@ -57,7 +57,7 @@ export interface ReaderMixerLayerPreference {
  * `initialPreferences`.
  */
 export interface ReaderMixerPreferences {
-    readonly version: 2
+    readonly version: 3
     readonly masterEnabled: boolean
     readonly layers: Readonly<Record<ReaderMixerLayer, ReaderMixerLayerPreference>>
     /** Id of the chosen atmosphere, or `null` for Off. */
@@ -79,7 +79,7 @@ export interface ReaderMixerPreferencesInput {
  * `defaultPreferences`.
  */
 export const DEFAULT_READER_MIXER_PREFERENCES: ReaderMixerPreferences = Object.freeze({
-    version: 2,
+    version: 3,
     masterEnabled: true,
     layers: Object.freeze({
         soundscapes: Object.freeze({ enabled: true, level: 0.25 }),
@@ -171,13 +171,18 @@ export function normalizeReaderMixerPreferences(
                     : fallback.level,
         })
     }
+    // Version 1/2 master-off also silenced narration. Preserve that audible
+    // choice in Voice's own switch when the master becomes soundtrack-only.
+    if ((source.version === 1 || source.version === 2) && source.masterEnabled === false) {
+        layers.voice = Object.freeze({ ...layers.voice, enabled: false })
+    }
     let atmosphereId = base.atmosphereId
     if (source.atmosphereId === null) atmosphereId = null
     else if (typeof source.atmosphereId === "string" && source.atmosphereId.trim()) {
         atmosphereId = source.atmosphereId.trim()
     }
     return Object.freeze({
-        version: 2,
+        version: 3,
         masterEnabled:
             typeof source.masterEnabled === "boolean" ? source.masterEnabled : base.masterEnabled,
         layers: Object.freeze(layers),
@@ -203,7 +208,7 @@ export function computeReaderMixerGain(
     layer: ReaderMixerLayer,
     volume = 1
 ): number {
-    if (!preferences.masterEnabled) return 0
+    if (layer !== "voice" && !preferences.masterEnabled) return 0
     const layerPreference = preferences.layers[layer]
     if (!layerPreference.enabled) return 0
     return clamp01(layerPreference.level) * clamp01(volume)
@@ -1019,7 +1024,7 @@ export class ReaderMixer {
         this.updateLayer(layer, { enabled: Boolean(enabled) })
     }
 
-    /** Silence or restore everything without touching the layers' own settings. */
+    /** Soundtrack switch shared by panel and note; Voice keeps its own enable gate. */
     setMasterEnabled(enabled: boolean): void {
         if (this.disposed) return
         if (enabled) this.session.resume()

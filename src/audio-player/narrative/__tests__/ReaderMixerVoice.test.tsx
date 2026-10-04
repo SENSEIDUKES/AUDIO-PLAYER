@@ -150,7 +150,7 @@ describe("ReaderMixerVoice session connection", () => {
         expect(audio.muted).toBe(false)
     })
 
-    it("gates the session with master and voice switches without losing its settings or position", async () => {
+    it("keeps Voice audible under soundtrack mute and gates it with its own switch", async () => {
         const view = render(<Reader />)
         const audio = view.container.querySelector("audio")!
         await act(async () => session.play())
@@ -158,11 +158,11 @@ describe("ReaderMixerVoice session connection", () => {
         expect(mixer.getDuck()).toBe(0.6)
         audio.currentTime = 42
         fireEvent.click(screen.getByRole("switch", { name: "Master" }))
-        expect(audio.muted).toBe(true)
+        expect(audio.muted).toBe(false)
         expect(session.isMuted).toBe(false)
         expect(session.volume).toBe(0.6)
         expect(audio.currentTime).toBe(42)
-        expect(mixer.getDuck()).toBe(0)
+        expect(mixer.getDuck()).toBe(0.6)
         fireEvent.click(screen.getByRole("switch", { name: "Master" }))
         expect(audio.muted).toBe(false)
         expect(audio.volume).toBe(0.6)
@@ -210,7 +210,7 @@ describe("ReaderMixerVoice session connection", () => {
         expect(mixer.getState().layers.voice.status).toBe("playing")
         act(() => mixer.stopAll())
         expect(session.isPlaying).toBe(false)
-        act(() => mixer.setMasterEnabled(false))
+        act(() => mixer.setLayerEnabled("voice", false))
         expect(audio.muted).toBe(true)
         view.rerender(<Reader connected={false} />)
         expect(audio.muted).toBe(false)

@@ -1,4 +1,4 @@
-/* ReaderMixerPanel — inline three-layer mixer controls.
+/* ReaderMixerPanel and Note — controls in normal flow.
    Renders in normal flow (no fixed positioning) so hosts can place it in a
    settings menu. Theme it with the --sap-reader-mixer-* custom properties. */
 
@@ -26,6 +26,76 @@
     background: var(--_bg);
     color: var(--sap-reader-mixer-fg, inherit);
     font: var(--sap-reader-mixer-font, inherit);
+}
+
+.sap-reader-mixer-note {
+    display: inline-flex;
+    align-items: center;
+    color: var(--sap-reader-mixer-note-fg, var(--sap-reader-mixer-fg, currentColor));
+    opacity: var(--sap-reader-mixer-note-opacity, 1);
+    transition: opacity var(--sap-reader-mixer-note-fade-ms, 180ms) ease;
+}
+
+.sap-reader-mixer-note[data-scrolling="true"] {
+    opacity: var(--sap-reader-mixer-note-ghost-opacity, 0.3);
+}
+
+.sap-reader-mixer-note:focus-within,
+.sap-reader-mixer-note:hover {
+    opacity: var(--sap-reader-mixer-note-opacity, 1);
+}
+
+.sap-reader-mixer-note__button {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: max(44px, var(--sap-reader-mixer-target-size, 44px));
+    min-height: max(44px, var(--sap-reader-mixer-target-size, 44px));
+    padding: 0;
+    border: 0;
+    border-radius: var(--sap-reader-mixer-radius, 12px);
+    background: var(--sap-reader-mixer-note-bg, transparent);
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.sap-reader-mixer-note__button:focus-visible {
+    outline: 2px solid var(--sap-reader-mixer-focus, var(--sap-reader-mixer-accent, #8b7cf6));
+    outline-offset: 2px;
+}
+
+.sap-reader-mixer-note__glyph {
+    width: var(--sap-reader-mixer-note-glyph-size, 24px);
+    height: var(--sap-reader-mixer-note-glyph-size, 24px);
+}
+
+.sap-reader-mixer-note__timer {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-end: 0;
+    font-size: var(--sap-reader-mixer-note-timer-size, 12px);
+}
+
+.sap-reader-mixer-note__announcement {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.sap-reader-mixer-note[data-reduced-motion="true"] {
+    transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sap-reader-mixer-note {
+        transition: none;
+    }
 }
 
 .sap-reader-mixer *,

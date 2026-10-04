@@ -49,6 +49,21 @@ afterEach(() => {
 })
 
 describe("Voice mixer slot", () => {
+    it("migrates version 2 master mute into Voice without changing soundtrack levels", () => {
+        const saved = {
+            version: 2,
+            masterEnabled: false,
+            layers: { voice: { enabled: true, level: 0.4 }, cues: { enabled: false, level: 0.2 } },
+        }
+        const next = normalizeReaderMixerPreferences(saved)
+        expect(next.version).toBe(3)
+        expect(next.layers.voice).toEqual({ enabled: false, level: 0.4 })
+        expect(next.layers.cues).toEqual(saved.layers.cues)
+        expect(next.masterEnabled).toBe(false)
+        expect(normalizeReaderMixerPreferences({ ...saved, version: 3 }).layers.voice.enabled).toBe(
+            true
+        )
+    })
     it("migrates three-layer saves and round-trips all four settings", () => {
         const legacy = {
             version: 1,
@@ -63,8 +78,8 @@ describe("Voice mixer slot", () => {
         const migrated = normalizeReaderMixerPreferences(legacy)
         expect(migrated).toEqual({
             ...legacy,
-            version: 2,
-            layers: { ...legacy.layers, voice: { enabled: true, level: 1 } },
+            version: 3,
+            layers: { ...legacy.layers, voice: { enabled: false, level: 1 } },
         })
         const mixer = makeMixer()
         mixer.setPreferences(migrated)
@@ -83,7 +98,7 @@ describe("Voice mixer slot", () => {
         mixer.setDuck(0.8, { fadeMs: 0 })
         expect(mixer.getState().layers.voice.effectiveLevel).toBe(0.6)
         mixer.setMasterEnabled(false)
-        expect(output.setEnabled).toHaveBeenLastCalledWith(false)
+        expect(output.setEnabled).toHaveBeenLastCalledWith(true)
         expect(mixer.getPreferences().layers.voice).toEqual({ enabled: true, level: 0.6 })
         mixer.setLayerLevel("voice", 0.3)
         mixer.setMasterEnabled(true)

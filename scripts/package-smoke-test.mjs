@@ -157,11 +157,11 @@ function exerciseReaderVoice(moduleExports, label) {
         resume: () => {},
     })
     try {
-        if (level !== 0.4 || mixer.getPreferences().version !== 2) {
+        if (level !== 0.4 || mixer.getPreferences().version !== 3) {
             throw new Error(`${label} installed mixer did not migrate/apply Voice preferences`)
         }
         mixer.setMasterEnabled(false)
-        if (enabled || mixer.getPreferences().layers.voice.level !== 0.4) {
+        if (!enabled || mixer.getPreferences().layers.voice.level !== 0.4) {
             throw new Error(
                 `${label} installed mixer did not preserve Voice level under master mute`
             )

@@ -313,6 +313,8 @@ export {
 } from "./narrative/ReaderMixerContext"
 export type { ReaderMixerProviderProps } from "./narrative/ReaderMixerContext"
 export { ReaderMixerPanel, DEFAULT_READER_MIXER_LABELS } from "./components/ReaderMixerPanel"
+export { ReaderMixerNote, DEFAULT_READER_MIXER_NOTE_LABELS } from "./components/ReaderMixerNote"
+export type { ReaderMixerNoteProps, ReaderMixerNoteLabels } from "./components/ReaderMixerNote"
 export type {
     ReaderMixerPanelProps,
     ReaderMixerLabels,
