@@ -672,12 +672,12 @@ export class ReaderMixer {
         this.refresh()
     }
 
-    /** Replace the atmosphere catalog. Starts a pending saved choice that it now resolves. */
+    /** Replace the catalog and reconcile the open reader's chosen bed with its sources. */
     setAtmosphereOptions(atmospheres: readonly ReaderAtmosphereOption[]): void {
         if (this.disposed) return
         this.atmosphereOptions = Object.freeze([...atmospheres])
         this.refresh()
-        if (this.atmosphereActive && this.loopStatus.atmosphere.requestedTrackKey === null) {
+        if (this.atmosphereStarted && this.prefs.atmosphereId !== null) {
             this.startAtmosphere()
         }
     }

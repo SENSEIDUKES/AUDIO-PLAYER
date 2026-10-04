@@ -407,6 +407,45 @@ describe("ReaderMixer", () => {
             expect(mixer.getState().layers.atmosphere.status).toBe("playing")
         })
 
+        it("stops a removed catalog bed and restores it if the catalog returns", async () => {
+            const mixer = makeMixer({ initialPreferences: { atmosphereId: "rain" } })
+            mixer.startAtmosphere({ fadeMs: 0 })
+            await settle()
+            mixer.setAtmosphereOptions([])
+            await settle(2100)
+            expect(FakeAudio.withSrc("https://a.test/rain.mp3")).toHaveLength(0)
+            expect(mixer.getPreferences().atmosphereId).toBe("rain")
+            mixer.setAtmosphereOptions([RAIN])
+            await settle(2100)
+            expect(only("https://a.test/rain.mp3").paused).toBe(false)
+        })
+
+        it("crossfades a changed source under the same catalog id and defers it while hidden", async () => {
+            const mixer = makeMixer()
+            const rain = { ...RAIN, track: { ...CHAPTER, audioFile: "https://a.test/old.mp3" } }
+            mixer.setAtmosphere(rain, { fadeMs: 0 })
+            await settle()
+            const old = only("https://a.test/old.mp3")
+            FakeAudio.playBehavior = "pending"
+            mixer.setAtmosphereOptions([
+                { ...rain, track: { ...rain.track, audioFile: "https://a.test/new.mp3" } },
+            ])
+            await settle()
+            expect(old.paused).toBe(false)
+            expect(FakeAudio.withSrc("https://a.test/new.mp3")).toHaveLength(1)
+            setVisibility("hidden")
+            mixer.setAtmosphereOptions([
+                { ...rain, track: { ...rain.track, audioFile: "https://a.test/latest.mp3" } },
+            ])
+            await settle()
+            expect(FakeAudio.withSrc("https://a.test/latest.mp3")).toHaveLength(0)
+            FakeAudio.playBehavior = "resolve"
+            setVisibility("visible")
+            await settle(2100)
+            expect(only("https://a.test/latest.mp3").paused).toBe(false)
+            expect(old.src).toBe("")
+        })
+
         it("silences the bed when new preferences name an unknown atmosphere", async () => {
             const mixer = makeMixer()
             mixer.setAtmosphere(RAIN, { fadeMs: 0 })

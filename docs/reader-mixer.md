@@ -100,7 +100,7 @@ mixer.dispose()                    // release everything
 | `stopSoundscape({ fadeMs? })` | Fade the score out. |
 | `setAtmosphere(option \| id \| track \| null, { fadeMs? })` | Choose and play the reader's atmosphere and save it in the preferences. `null` saves Off and fades it out. |
 | `startAtmosphere()` / `stopAtmosphere()` | Start the saved atmosphere (entering the reader) or fade it out without changing the choice (leaving). |
-| `setAtmosphereOptions(options)` | Replace the catalog. A saved choice waiting for its option starts when it arrives. |
+| `setAtmosphereOptions(options)` | Replace the catalog. A pending saved choice starts when it arrives; a removed choice fades out, and changed sources crossfade even under the same id. The saved choice is retained. |
 | `playCue(url, { volume?, startTime? })` | Play a one-shot over the loops. Returns `false` when skipped: cues or master off, zero per-cue volume, a hidden page, the concurrency cap (`maxConcurrentCues`, default 6), or no audio. |
 | `preloadCues(urls)` | Warm up to `maxCachedCueUrls` unique chapter cue URLs (default 8). No playback, active slot, gain sink or audio-session demand. Later triggers reuse loaded elements and keep their original 1.5 s start deadline. |
 | `stopAll({ fadeMs? })` | Fade both loops out; preferences are untouched. |
