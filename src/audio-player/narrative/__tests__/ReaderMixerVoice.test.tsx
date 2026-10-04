@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest"
-import { StrictMode } from "react"
+import { StrictMode, Suspense, startTransition } from "react"
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { AudioSessionProvider, useAudioSession } from "../../session/AudioSessionContext"
+import * as AudioSession from "../../session/AudioSessionContext"
 import type { SessionEngine } from "../../types"
 import { ReaderMixerPanel } from "../../components/ReaderMixerPanel"
 import { NarrativeFace } from "../../skins/NarrativeFace"
@@ -74,6 +75,43 @@ afterEach(() => {
 })
 
 describe("ReaderMixerVoice session connection", () => {
+    it("resumes the committed session after a discarded Suspense render", async () => {
+        const pending = new Promise<void>(() => {})
+        function Discarded({ suspend }: { suspend: boolean }) {
+            if (suspend) throw pending
+            return null
+        }
+        function Tree({ suspend }: { suspend: boolean }) {
+            return (
+                <Suspense fallback="waiting">
+                    <Reader />
+                    <Discarded suspend={suspend} />
+                </Suspense>
+            )
+        }
+        const view = render(<Tree suspend={false} />)
+        const audio = view.container.querySelector("audio")!
+        await act(async () => session.play())
+        act(() => setVisibility("hidden"))
+        expect(audio.paused).toBe(true)
+        const discardedPlay = vi.fn(async () => {})
+        const useCommittedSession = AudioSession.useAudioSession
+        const speculative = vi
+            .spyOn(AudioSession, "useAudioSession")
+            .mockImplementation(function useSpeculativeSession() {
+                return { ...useCommittedSession(), hasAudio: false, play: discardedPlay }
+            })
+        await act(async () => {
+            startTransition(() => view.rerender(<Tree suspend={true} />))
+        })
+        expect(screen.queryByText("waiting")).not.toBeInTheDocument()
+        speculative.mockRestore()
+        act(() => setVisibility("visible"))
+        await act(async () => {})
+        expect(discardedPlay).not.toHaveBeenCalled()
+        expect(audio.paused).toBe(false)
+    })
+
     it("synchronizes external volume after a mixer write is superseded in the same batch", async () => {
         render(<Reader />)
         await act(async () => {

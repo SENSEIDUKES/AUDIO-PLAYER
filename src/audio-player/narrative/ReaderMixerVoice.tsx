@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react"
 import { useAudioSession } from "../session/AudioSessionContext"
 import { trackKey } from "../utils/trackKey"
 import { useOptionalReaderMixer, useReaderMixerState } from "./ReaderMixerContext"
@@ -22,7 +22,9 @@ export function ReaderMixerVoice({
     const state = useReaderMixerState(mixer)
     const session = useAudioSession()
     const sessionRef = useRef(session)
-    sessionRef.current = session
+    useLayoutEffect(() => {
+        sessionRef.current = session
+    }, [session])
     const binding = useMemo(() => {
         const listeners = new Set<() => void>()
         const elementVolumeWorks = probeElementVolumeWrites()
