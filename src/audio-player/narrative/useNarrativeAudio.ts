@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useAudioSession } from "../session/AudioSessionContext"
-import type { ReaderMixer } from "./ReaderMixer"
+import type { ReaderMixer, ReaderMixerDuckLease } from "./ReaderMixer"
 import { useReaderMixerState } from "./ReaderMixerContext"
 import {
     createAudioSpriteEngine,
@@ -253,15 +253,19 @@ export function useNarrativeAudio(
 
     // ---- Companion mixer: duck its loops under narration -----------------
     const mixerDuck = narrationAudible ? clamp01(duckAmount) * clamp01(intensity) : 0
+    const duckLeaseRef = useRef<ReaderMixerDuckLease | null>(null)
     useEffect(() => {
         if (!mixer) return
-        mixer.setDuck(mixerDuck)
-    }, [mixer, mixerDuck])
-    useEffect(() => {
-        if (!mixer) return
-        // Leaving (or swapping mixers) must never strand the reader's music ducked.
-        return () => mixer.setDuck(0)
+        const lease = mixer.retainDuck()
+        duckLeaseRef.current = lease
+        return () => {
+            lease.release()
+            duckLeaseRef.current = null
+        }
     }, [mixer])
+    useEffect(() => {
+        duckLeaseRef.current?.setDuck(mixerDuck)
+    }, [mixer, mixerDuck])
     // Mirror the mixer's Atmosphere level locally so disconnecting keeps it.
     const mixerAtmosphereLevel = mixerState?.preferences.layers.atmosphere.level
     useEffect(() => {

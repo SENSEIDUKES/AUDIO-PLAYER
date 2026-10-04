@@ -388,6 +388,12 @@ export interface ReaderMixerDuckOptions {
     fadeMs?: number
 }
 
+/** An independent ducking owner. Releasing it preserves every other owner's duck. */
+export interface ReaderMixerDuckLease {
+    setDuck(amount: number, options?: ReaderMixerDuckOptions): void
+    release(): void
+}
+
 /** Layers a duck lowers. Cues are short moments and are never ducked. */
 const DUCKED_LAYERS: ReadonlySet<ReaderMixerLayer> = new Set(["soundscapes", "atmosphere"])
 const DUCK_FADE_MS = 350
@@ -453,6 +459,8 @@ export class ReaderMixer {
     /** Duck applied to the engines right now (ramps toward duckTarget). */
     private duckLevel = 0
     private duckTarget = 0
+    private manualDuck = 0
+    private readonly duckOwners = new Map<object, number>()
     private duckTimer: ReturnType<typeof setInterval> | null = null
     private readonly defaults: ReaderMixerPreferences
     private readonly presets: readonly ReaderMixerPreset[]
@@ -751,7 +759,32 @@ export class ReaderMixer {
      */
     setDuck(amount: number, options: ReaderMixerDuckOptions = {}): void {
         if (this.disposed) return
-        const target = clamp01(amount)
+        this.manualDuck = clamp01(amount)
+        this.applyDuckTarget(options)
+    }
+
+    /** Retain an independent narration duck; overlapping owners use the strongest amount. */
+    retainDuck(): ReaderMixerDuckLease {
+        const owner = {}
+        let released = false
+        if (!this.disposed) this.duckOwners.set(owner, 0)
+        return {
+            setDuck: (amount, options = {}) => {
+                if (released || this.disposed) return
+                this.duckOwners.set(owner, clamp01(amount))
+                this.applyDuckTarget(options)
+            },
+            release: () => {
+                if (released) return
+                released = true
+                this.duckOwners.delete(owner)
+                if (!this.disposed) this.applyDuckTarget({})
+            },
+        }
+    }
+
+    private applyDuckTarget(options: ReaderMixerDuckOptions): void {
+        const target = Math.max(this.manualDuck, ...this.duckOwners.values())
         if (target === this.duckTarget) return
         this.duckTarget = target
         this.stopDuckRamp()
@@ -897,6 +930,7 @@ export class ReaderMixer {
         this.graph?.close()
         this.stateListeners.clear()
         this.preferenceListeners.clear()
+        this.duckOwners.clear()
     }
 
     /* ------------------------------ Internals --------------------------- */

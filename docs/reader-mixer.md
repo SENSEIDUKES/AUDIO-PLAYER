@@ -105,6 +105,7 @@ mixer.dispose()                    // release everything
 | `preloadCues(urls)` | Warm up to `maxCachedCueUrls` unique chapter cue URLs (default 8). No playback, active slot, gain sink or audio-session demand. Later triggers reuse loaded elements and keep their original 1.5 s start deadline. |
 | `stopAll({ fadeMs? })` | Fade both loops out; preferences are untouched. |
 | `setDuck(0..1, { fadeMs? })`, `getDuck()` | Temporarily lower Soundscapes and Atmosphere (for example under narration) without touching preferences. Cues are never ducked. `NarrativeFace` drives this for you. |
+| `retainDuck()` | Get an independent `setDuck` / `release` owner. The strongest active duck wins; removing one narration control preserves the others. |
 | `setLayerLevel(layer, 0..1)`, `setLayerEnabled(layer, on)`, `setMasterEnabled(on)` | The reader's controls. Changes apply live, including mid-crossfade. |
 | `applyPreset(preset \| id)`, `getPresets()`, `resetPreferences()` | Pick a named mix in one tap, or return to the defaults (see Presets). |
 | `getPreferences()`, `setPreferences(input)`, `subscribePreferences(fn)` | The reader's settings as one plain object (see below). |
