@@ -17,18 +17,21 @@ import {
 /* ------------------------------------------------------------------ */
 
 /**
- * The reader's three audio layers: the music score (`soundscapes`), the
+ * The reader's four audio layers: the music score (`soundscapes`), the
  * reader-chosen ambient bed (`atmosphere`) and short one-shot effects the
- * story places on words (`cues`).
+ * story places on words (`cues`), and recorded/generated narration (`voice`).
  */
-export type ReaderMixerLayer = "soundscapes" | "atmosphere" | "cues"
+export type ReaderMixerLayer = "soundscapes" | "atmosphere" | "cues" | "voice"
 
 /** The layers in display order. */
 export const READER_MIXER_LAYERS: readonly ReaderMixerLayer[] = Object.freeze([
     "soundscapes",
     "atmosphere",
     "cues",
+    "voice",
 ])
+
+const OWNED_LAYERS = ["soundscapes", "atmosphere", "cues"] as const
 
 /** One layer's switch and level, as the reader set them. */
 export interface ReaderMixerLayerPreference {
@@ -43,7 +46,7 @@ export interface ReaderMixerLayerPreference {
  * `initialPreferences`.
  */
 export interface ReaderMixerPreferences {
-    readonly version: 1
+    readonly version: 2
     readonly masterEnabled: boolean
     readonly layers: Readonly<Record<ReaderMixerLayer, ReaderMixerLayerPreference>>
     /** Id of the chosen atmosphere, or `null` for Off. */
@@ -60,17 +63,18 @@ export interface ReaderMixerPreferencesInput {
 
 /**
  * What a new reader starts with: everything on, the score at 25%, the
- * atmosphere at 30% on gentle rain, and cues at 75%. `atmosphereId` names a
+ * atmosphere at 30% on gentle rain, cues at 75% and voice at 100%. `atmosphereId` names a
  * catalog option; a host whose catalog has no `"gentle-rain"` passes its own
  * `defaultPreferences`.
  */
 export const DEFAULT_READER_MIXER_PREFERENCES: ReaderMixerPreferences = Object.freeze({
-    version: 1,
+    version: 2,
     masterEnabled: true,
     layers: Object.freeze({
         soundscapes: Object.freeze({ enabled: true, level: 0.25 }),
         atmosphere: Object.freeze({ enabled: true, level: 0.3 }),
         cues: Object.freeze({ enabled: true, level: 0.75 }),
+        voice: Object.freeze({ enabled: true, level: 1 }),
     }),
     atmosphereId: "gentle-rain",
 })
@@ -162,7 +166,7 @@ export function normalizeReaderMixerPreferences(
         atmosphereId = source.atmosphereId.trim()
     }
     return Object.freeze({
-        version: 1,
+        version: 2,
         masterEnabled:
             typeof source.masterEnabled === "boolean" ? source.masterEnabled : base.masterEnabled,
         layers: Object.freeze(layers),
@@ -253,6 +257,32 @@ export type ReaderMixerVolumeControl = "level" | "on-off"
 /** `element`: plain media elements. `web-audio`: each layer through its own GainNode. */
 export type ReaderMixerRouting = "element" | "web-audio"
 
+/** Playback state of caller-owned narration, independent of the mixer's controls. */
+export interface ReaderMixerVoiceSnapshot {
+    status: ReaderMixerLayerStatus
+    current?: string | null
+    failure?: string | null
+    muted?: boolean
+    routing?: ReaderMixerRouting
+    volumeControl?: ReaderMixerVolumeControl
+}
+
+/** Connect recorded/generated TTS audio. The host retains its transport and source ownership. */
+export interface ReaderMixerVoiceOutput {
+    /** Return the current transport state and actual routing/volume capabilities. */
+    getState(): ReaderMixerVoiceSnapshot
+    /** Observe snapshot changes; return an idempotent listener cleanup. */
+    subscribe(listener: () => void): () => void
+    /** Apply the reader's saved 0–1 volume independently of the enable gate. */
+    setLevel(level: number): void
+    /** Output gate that preserves the host's user volume and mute setting. */
+    setEnabled(enabled: boolean): void
+    /** Pause transport without dropping its source or playback position. */
+    pause(): void
+    /** Resume the retained source; the host reports loading or blocked playback through its snapshot. */
+    resume(): void
+}
+
 export interface ReaderMixerState {
     readonly preferences: ReaderMixerPreferences
     readonly layers: Readonly<Record<ReaderMixerLayer, ReaderMixerLayerState>>
@@ -340,7 +370,7 @@ export interface ReaderMixerOptions {
     /** Coalesce persistence callbacks. Default 300 ms; 0 delivers each change immediately. */
     preferencesDebounceMs?: number
     /**
-     * Pause both loops while the page is hidden and resume when it returns.
+     * Pause both loops and connected narration while hidden and resume when it returns.
      * Defaults to true. Active cues are dropped; new cues are skipped while hidden.
      */
     pauseWhenHidden?: boolean
@@ -388,6 +418,14 @@ export interface ReaderMixerDuckOptions {
     fadeMs?: number
 }
 
+/** An independent ducking owner. Releasing it preserves every other owner's duck. */
+export interface ReaderMixerDuckLease {
+    /** Set this owner's 0–1 duck amount; other owners keep their own amounts. */
+    setDuck(amount: number, options?: ReaderMixerDuckOptions): void
+    /** Idempotently remove this owner's contribution to the strongest active duck. */
+    release(): void
+}
+
 /** Layers a duck lowers. Cues are short moments and are never ducked. */
 const DUCKED_LAYERS: ReadonlySet<ReaderMixerLayer> = new Set(["soundscapes", "atmosphere"])
 const DUCK_FADE_MS = 350
@@ -411,12 +449,13 @@ const LOOP_STATUS: Record<SceneMixStatusSnapshot["state"], ReaderMixerLayerStatu
 /* ------------------------------------------------------------------ */
 
 /**
- * Three-layer reader audio: Soundscapes, Atmosphere and Sound Cues, each with
+ * Four-layer reader audio: Soundscapes, Atmosphere, Sound Cues and Voice, each with
  * its own switch and level under one master switch.
  *
  * Built from the existing engines: two looping {@link SceneMixEngine}s
  * (soundscape crossfades, atmosphere bed) and one {@link OneShotEngine}
- * (overlapping cues that never pause or duck the loops). Headless and
+ * (overlapping cues that never pause or duck the loops), with caller-owned TTS
+ * connected through `connectVoice`. Headless and
  * framework-free; `ReaderMixerProvider` shares one instance across a React
  * app.
  *
@@ -442,6 +481,8 @@ export class ReaderMixer {
     private pendingPreferences: ReaderMixerPreferences | null = null
     private atmosphereOptions: readonly ReaderAtmosphereOption[]
     private atmosphereActive = false
+    /** Reader lifetime, retained when its selected atmosphere is Off. */
+    private atmosphereStarted = false
     private loopStatus: Record<LoopLayer, SceneMixStatusSnapshot>
     private cueStatus: CueStatus = "idle"
     private cueFailure: string | null = null
@@ -451,6 +492,8 @@ export class ReaderMixer {
     /** Duck applied to the engines right now (ramps toward duckTarget). */
     private duckLevel = 0
     private duckTarget = 0
+    private manualDuck = 0
+    private readonly duckOwners = new Map<object, number>()
     private duckTimer: ReturnType<typeof setInterval> | null = null
     private readonly defaults: ReaderMixerPreferences
     private readonly presets: readonly ReaderMixerPreset[]
@@ -463,6 +506,10 @@ export class ReaderMixer {
     private readonly elementFallbacks = new Set<ReaderMixerLayer>()
     private readonly audioSessionType: string | null
     private restoreAudioSession: (() => void) | null = null
+    private voiceOutput: ReaderMixerVoiceOutput | null = null
+    private disconnectVoice: (() => void) | null = null
+    private voiceSnapshot: ReaderMixerVoiceSnapshot = { status: "idle" }
+    private voicePausedForVisibility = false
 
     constructor(options: ReaderMixerOptions = {}) {
         this.defaults = normalizeReaderMixerPreferences(options.defaultPreferences)
@@ -633,6 +680,7 @@ export class ReaderMixer {
         }
         const resolved = this.resolveAtmosphere(atmosphere)
         if (!resolved) return
+        this.atmosphereStarted = true
         this.atmosphereActive = true
         this.updatePreferences({ ...this.prefs, atmosphereId: resolved.id })
         this.atmosphere.crossfadeTo(resolved.track, { fadeMs })
@@ -646,6 +694,7 @@ export class ReaderMixer {
      */
     startAtmosphere(options: ReaderMixerFadeOptions = {}): void {
         if (this.disposed) return
+        this.atmosphereStarted = true
         this.atmosphereActive = true
         const id = this.prefs.atmosphereId
         const resolved = id ? this.resolveAtmosphere(id) : null
@@ -662,17 +711,18 @@ export class ReaderMixer {
     /** Fade the atmosphere out without changing the reader's choice (leaving the reader). */
     stopAtmosphere(options: ReaderMixerFadeOptions = {}): void {
         if (this.disposed) return
+        this.atmosphereStarted = false
         this.atmosphereActive = false
         this.atmosphere.stop(options.fadeMs ?? this.atmosphereFadeMs)
         this.refresh()
     }
 
-    /** Replace the atmosphere catalog. Starts a pending saved choice that it now resolves. */
+    /** Replace the catalog and reconcile the open reader's chosen bed with its sources. */
     setAtmosphereOptions(atmospheres: readonly ReaderAtmosphereOption[]): void {
         if (this.disposed) return
         this.atmosphereOptions = Object.freeze([...atmospheres])
         this.refresh()
-        if (this.atmosphereActive && this.loopStatus.atmosphere.requestedTrackKey === null) {
+        if (this.atmosphereStarted && this.prefs.atmosphereId !== null) {
             this.startAtmosphere()
         }
     }
@@ -706,19 +756,59 @@ export class ReaderMixer {
         return true
     }
 
-    /** Fade out both loops without changing any preference. Cues finish on their own. */
+    /** Fade both loops and pause connected narration. Preferences stay; cues finish on their own. */
     stopAll(options: ReaderMixerFadeOptions = {}): void {
         this.stopSoundscape(options)
         this.stopAtmosphere(options)
+        this.voicePausedForVisibility = false
+        this.voiceOutput?.pause()
+    }
+
+    /**
+     * Connect one caller-owned TTS output, pausing and detaching any previous connection.
+     * The returned cleanup releases its mixer gate and subscription; it retains host transport.
+     */
+    connectVoice(output: ReaderMixerVoiceOutput): () => void {
+        if (this.disposed) return () => {}
+        if (this.voiceOutput) this.voiceOutput.pause()
+        this.disconnectVoice?.()
+        this.voiceOutput = output
+        const sync = () => {
+            if (this.voiceOutput !== output || this.disposed) return
+            this.voiceSnapshot = { ...output.getState() }
+            this.pauseVoiceWhileHidden()
+            this.refresh()
+        }
+        const unsubscribe = output.subscribe(sync)
+        let detached = false
+        const disconnect = () => {
+            if (detached) return
+            detached = true
+            unsubscribe()
+            if (this.voiceOutput !== output) return
+            this.voiceOutput = null
+            this.disconnectVoice = null
+            this.voiceSnapshot = { status: "idle" }
+            this.voicePausedForVisibility = false
+            output.setEnabled(true)
+            this.refresh()
+        }
+        this.disconnectVoice = disconnect
+        output.setLevel(this.prefs.layers.voice.level)
+        output.setEnabled(!this.pageHidden && computeReaderMixerGain(this.prefs, "voice") > 0)
+        sync()
+        return disconnect
     }
 
     /* ------------------------------- Levels ----------------------------- */
 
+    /** Save a layer's clamped 0–1 level and apply it without changing its enable switch. */
     setLayerLevel(layer: ReaderMixerLayer, level: number): void {
         if (this.disposed || !READER_MIXER_LAYERS.includes(layer)) return
         this.updateLayer(layer, { level: clamp01(level) })
     }
 
+    /** Save a layer's enable switch while retaining its level and selected source. */
     setLayerEnabled(layer: ReaderMixerLayer, enabled: boolean): void {
         if (this.disposed || !READER_MIXER_LAYERS.includes(layer)) return
         this.updateLayer(layer, { enabled: Boolean(enabled) })
@@ -736,9 +826,10 @@ export class ReaderMixer {
 
     /**
      * Temporarily lower Soundscapes and Atmosphere, for example under
-     * narration: each plays at its normal level × (1 − amount). Cues are not
-     * ducked, and the reader's preferences never change. `setDuck(0)` restores
-     * the full levels. Ramps over `fadeMs` (default 350 ms).
+     * narration: each plays at its normal level × (1 − amount). Cues and Voice
+     * are not ducked, and the reader's preferences never change. Independent
+     * leases can request a stronger duck. `setDuck(0)` clears this manual duck
+     * while preserving their requests. Ramps over `fadeMs` (default 350 ms).
      *
      * Ducking needs real volume control: on the element route where the
      * browser ignores element volume (`volumeControl: "on-off"`), only a full
@@ -746,7 +837,33 @@ export class ReaderMixer {
      */
     setDuck(amount: number, options: ReaderMixerDuckOptions = {}): void {
         if (this.disposed) return
-        const target = clamp01(amount)
+        this.manualDuck = clamp01(amount)
+        this.applyDuckTarget(options)
+    }
+
+    /** Retain an independent narration duck; overlapping owners use the strongest amount. */
+    retainDuck(): ReaderMixerDuckLease {
+        const owner = {}
+        let released = false
+        if (!this.disposed) this.duckOwners.set(owner, 0)
+        return {
+            setDuck: (amount, options = {}) => {
+                if (released || this.disposed) return
+                this.duckOwners.set(owner, clamp01(amount))
+                this.applyDuckTarget(options)
+            },
+            release: () => {
+                if (released) return
+                released = true
+                this.duckOwners.delete(owner)
+                if (!this.disposed) this.applyDuckTarget({})
+            },
+        }
+    }
+
+    /** Ramp background gains toward the strongest manual or retained-owner duck. */
+    private applyDuckTarget(options: ReaderMixerDuckOptions): void {
+        const target = Math.max(this.manualDuck, ...this.duckOwners.values())
         if (target === this.duckTarget) return
         this.duckTarget = target
         this.stopDuckRamp()
@@ -785,9 +902,12 @@ export class ReaderMixer {
         const previousId = this.prefs.atmosphereId
         this.updatePreferences(normalizeReaderMixerPreferences(preferences, this.prefs))
         const nextId = this.prefs.atmosphereId
-        if (nextId === previousId || !this.atmosphereActive) return
-        if (nextId === null) this.atmosphere.stop(this.atmosphereFadeMs)
-        else this.startAtmosphere()
+        if (nextId === previousId || !this.atmosphereStarted) return
+        if (nextId === null) {
+            this.atmosphereActive = false
+            this.atmosphere.stop(this.atmosphereFadeMs)
+            this.refresh()
+        } else this.startAtmosphere()
     }
 
     /** The presets the reader can pick. */
@@ -843,7 +963,7 @@ export class ReaderMixer {
     /* ----------------------------- Lifecycle ---------------------------- */
 
     /**
-     * Unlock audio for all three layers. The mixer already calls this on
+     * Unlock audio for every layer. The mixer already calls this on
      * every tap, click and key press; call it yourself from the handler of
      * the control that turns audio on, so that tap counts too.
      */
@@ -856,6 +976,9 @@ export class ReaderMixer {
         if (!this.pageHidden) {
             if (this.layerGain("soundscapes") > 0) this.soundscapes.resume()
             if (this.layerGain("atmosphere") > 0) this.atmosphere.resume()
+            if (this.voiceSnapshot.status === "blocked" && this.layerGain("voice") > 0) {
+                this.voiceOutput?.resume()
+            }
         }
         if (this.cueStatus === "blocked") {
             this.cueStatus = "idle"
@@ -884,11 +1007,14 @@ export class ReaderMixer {
         this.soundscapes.dispose()
         this.atmosphere.dispose()
         this.cues.dispose()
+        this.voiceOutput?.pause()
+        this.disconnectVoice?.()
         this.restoreAudioSession?.()
         this.restoreAudioSession = null
         this.graph?.close()
         this.stateListeners.clear()
         this.preferenceListeners.clear()
+        this.duckOwners.clear()
     }
 
     /* ------------------------------ Internals --------------------------- */
@@ -901,13 +1027,13 @@ export class ReaderMixer {
         const Ctor = getAudioContextCtor()
         if (!Ctor) return null
         try {
-            return new LayerGainGraph(Ctor, READER_MIXER_LAYERS)
+            return new LayerGainGraph(Ctor, OWNED_LAYERS)
         } catch {
             return null
         }
     }
 
-    private engineFor(layer: ReaderMixerLayer): SceneMixEngine | OneShotEngine {
+    private engineFor(layer: (typeof OWNED_LAYERS)[number]): SceneMixEngine | OneShotEngine {
         if (layer === "soundscapes") return this.soundscapes
         if (layer === "atmosphere") return this.atmosphere
         return this.cues
@@ -1006,7 +1132,7 @@ export class ReaderMixer {
     }
 
     private applyLevels(): void {
-        for (const layer of READER_MIXER_LAYERS) {
+        for (const layer of OWNED_LAYERS) {
             const gain = this.layerGain(layer)
             const engine = this.engineFor(layer)
             if (this.graph && !this.elementFallbacks.has(layer)) {
@@ -1019,6 +1145,13 @@ export class ReaderMixer {
             // Muting is what silences a layer where element volume is ignored.
             engine.setMuted(gain <= 0)
         }
+        this.voiceOutput?.setLevel(this.prefs.layers.voice.level)
+        this.voiceOutput?.setEnabled(
+            !this.pageHidden &&
+                this.prefs.masterEnabled &&
+                this.prefs.layers.voice.enabled &&
+                this.prefs.layers.voice.level > 0
+        )
         this.syncRuntime()
     }
 
@@ -1037,7 +1170,7 @@ export class ReaderMixer {
         const audible =
             !this.pageHidden &&
             this.graph.state === "running" &&
-            READER_MIXER_LAYERS.some(
+            OWNED_LAYERS.some(
                 (layer) =>
                     this.layerGain(layer) > 0 &&
                     (layer === "cues"
@@ -1100,9 +1233,16 @@ export class ReaderMixer {
                 this.soundscapes.pause()
                 this.atmosphere.pause()
                 this.cues.stopAll()
+                this.voiceOutput?.setEnabled(false)
+                this.pauseVoiceWhileHidden()
             } else {
                 this.soundscapes.resume()
                 this.atmosphere.resume()
+                this.voiceOutput?.setEnabled(computeReaderMixerGain(this.prefs, "voice") > 0)
+                if (this.voicePausedForVisibility) {
+                    this.voicePausedForVisibility = false
+                    this.voiceOutput?.resume()
+                }
             }
             this.refresh()
         }
@@ -1111,7 +1251,20 @@ export class ReaderMixer {
         sync()
     }
 
+    /** Pause a hidden voice once, including starts that finish loading after the page hides. */
+    private pauseVoiceWhileHidden(): void {
+        if (
+            this.pageHidden &&
+            !this.voicePausedForVisibility &&
+            this.voiceSnapshot.status === "playing"
+        ) {
+            this.voicePausedForVisibility = true
+            this.voiceOutput?.pause()
+        }
+    }
+
     private volumeControl(): ReaderMixerVolumeControl {
+        if (this.voiceSnapshot.volumeControl === "on-off") return "on-off"
         if (this.graph && this.elementFallbacks.size === 0) return "level"
         const locked =
             !this.elementVolumeWorks ||
@@ -1148,6 +1301,19 @@ export class ReaderMixer {
                 failure: this.cueFailure,
                 effectiveLevel: computeReaderMixerGain(this.prefs, "cues"),
                 routing: this.graph && !this.elementFallbacks.has("cues") ? "web-audio" : "element",
+            }),
+            voice: Object.freeze({
+                status:
+                    this.pageHidden &&
+                    (this.voiceSnapshot.status === "playing" ||
+                        this.voiceSnapshot.status === "loading")
+                        ? "paused"
+                        : this.voiceSnapshot.status,
+                current: this.voiceSnapshot.current ?? null,
+                requested: this.voiceSnapshot.current ?? null,
+                failure: this.voiceSnapshot.failure ?? null,
+                effectiveLevel: this.voiceSnapshot.muted ? 0 : this.layerGain("voice"),
+                routing: this.voiceSnapshot.routing ?? "element",
             }),
         })
         const loopsRequested = (["soundscapes", "atmosphere"] as const).some(

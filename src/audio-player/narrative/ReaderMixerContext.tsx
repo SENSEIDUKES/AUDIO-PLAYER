@@ -30,7 +30,7 @@ export interface ReaderMixerProviderProps {
 /**
  * Shares one {@link ReaderMixer} with everything under it, so the reader's
  * audio button, its Settings menu and the chapter view all drive the same
- * three layers. Place it high enough to outlive chapter changes.
+ * four layers. Place it high enough to outlive chapter changes.
  */
 export function ReaderMixerProvider({ mixer, options, children }: ReaderMixerProviderProps) {
     const optionsRef = useRef(options)

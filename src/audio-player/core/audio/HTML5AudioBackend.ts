@@ -33,6 +33,9 @@ export class HTML5AudioBackend implements AudioBackend {
     private preloadAudio: HTMLAudioElement | null = null
     private info: AudioBackendInfo
     private rate = DEFAULT_PLAYBACK_RATE
+    private outputGain = 1
+    private volume = 1
+    private muted = false
 
     constructor(audioRef: RefObject<HTMLAudioElement | null>, info?: AudioBackendInfo) {
         this.audioRef = audioRef
@@ -138,22 +141,42 @@ export class HTML5AudioBackend implements AudioBackend {
         return (this.audio?.readyState ?? 0) >= 1
     }
 
+    /** Store the user's level and multiply element output by the independent mixer gain. */
     setVolume(value: number): void {
+        this.volume = value
         const audio = this.audio
-        if (audio) audio.volume = value
+        if (audio) audio.volume = value * this.outputGain
     }
 
+    /** Read the ungated level; retain the stored level when output is closed or unmounted. */
     getVolume(): number {
-        return this.audio?.volume ?? 1
-    }
-
-    isMuted(): boolean {
-        return this.audio?.muted ?? false
-    }
-
-    setMuted(muted: boolean): void {
         const audio = this.audio
-        if (audio) audio.muted = muted
+        return this.outputGain === 0 || !audio ? this.volume : audio.volume / this.outputGain
+    }
+
+    /** Read user mute separately from the mixer gate's forced element mute. */
+    isMuted(): boolean {
+        return this.outputGain === 0 ? this.muted : (this.audio?.muted ?? false)
+    }
+
+    /** Preserve user mute even when the mixer gate already silences the element. */
+    setMuted(muted: boolean): void {
+        this.muted = muted
+        const audio = this.audio
+        if (audio) audio.muted = muted || this.outputGain === 0
+    }
+
+    /** Clamp independent output to 0–1; zero forces element mute without changing user settings. */
+    setOutputGain(gain: number): void {
+        const next = Number.isFinite(gain) ? Math.max(0, Math.min(1, gain)) : 0
+        if (next === this.outputGain) return
+        if (this.audio) this.muted = this.isMuted()
+        this.outputGain = next
+        const audio = this.audio
+        if (audio) {
+            audio.volume = this.volume * next
+            audio.muted = this.muted || next === 0
+        }
     }
 
     setLoop(loop: boolean): void {

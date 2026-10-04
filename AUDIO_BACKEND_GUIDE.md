@@ -178,6 +178,10 @@ semantics:
 - `pause()`, `getCurrentTime()`, `setCurrentTime()`, `getDuration()`,
   `isPaused()`, `isEnded()`, `hasMetadata()`
 - `setVolume()` / `getVolume()` / `setMuted()` / `setLoop()`
+- Optional `setOutputGain(0..1)` — an independent output gain for the ReaderMixer
+  Voice gate. Built-in backends implement it without changing user volume/mute.
+  HTML5 also uses element mute at zero so the gate works when volume writes are
+  ignored. Custom backends need this method to use `ReaderMixerVoice`.
 - `getBufferedRanges()`, `getError()` (normalized `MediaError`-style codes)
 - `addEventListener` / `removeEventListener` for the 13 media events the
   engine consumes (`play`, `pause`, `ended`, `loadedmetadata`, `waiting`,

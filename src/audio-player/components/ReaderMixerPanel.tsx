@@ -42,6 +42,7 @@ export const DEFAULT_READER_MIXER_LABELS: ReaderMixerLabels = Object.freeze({
         soundscapes: "Soundscapes",
         atmosphere: "Atmosphere",
         cues: "Sound Cues",
+        voice: "Voice",
     }),
     volume: (layerLabel: string) => `${layerLabel} volume`,
     formatPercent: (percent: number) => `${percent}%`,
@@ -52,7 +53,7 @@ export const DEFAULT_READER_MIXER_LABELS: ReaderMixerLabels = Object.freeze({
         loading: "Loading…",
         blocked: "Tap anywhere to start audio",
         failed: "This sound couldn’t play",
-        paused: "Paused while the page is hidden",
+        paused: "Paused",
     }),
 })
 

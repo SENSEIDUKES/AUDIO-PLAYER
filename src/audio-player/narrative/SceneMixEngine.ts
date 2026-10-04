@@ -20,6 +20,14 @@ function clamp01(value: number): number {
     return Math.max(0, Math.min(1, value))
 }
 
+/** Compare normalized source lists so an unchanged track id can still replace stale media. */
+function sameSources(a: readonly TrackSource[], b: readonly TrackSource[]): boolean {
+    return (
+        a.length === b.length &&
+        a.every((source, index) => source.url === b[index].url && source.type === b[index].type)
+    )
+}
+
 type Deck = {
     el: HTMLAudioElement
     /** Web Audio gain for this element, when the host routes it; else null. */
@@ -336,11 +344,20 @@ export class SceneMixEngine {
         this.failedRequest = null
         const key = trackKey(track)
         if (this.paused) {
-            this.deferWhilePaused(track, options, key)
+            this.deferWhilePaused(track, options, key, sources)
             return
         }
-        if (this.pendingTransition?.request.key === key) return
-        if (this.active && this.active.key === key && !this.active.retiring) {
+        if (
+            this.pendingTransition?.request.key === key &&
+            sameSources(this.pendingTransition.request.sources, sources)
+        )
+            return
+        if (
+            this.active &&
+            this.active.key === key &&
+            sameSources(this.active.request.sources, sources) &&
+            !this.active.retiring
+        ) {
             if (this.pendingTransition) {
                 this.rollbackTransition(this.pendingTransition)
             }
@@ -709,8 +726,18 @@ export class SceneMixEngine {
     }
 
     /** Record the newest switch requested while paused, or drop a no-op. */
-    private deferWhilePaused(track: Track, options: SceneCrossfadeOptions, key: string): void {
-        if (this.active && this.active.key === key && !this.active.retiring) {
+    private deferWhilePaused(
+        track: Track,
+        options: SceneCrossfadeOptions,
+        key: string,
+        sources: readonly TrackSource[]
+    ): void {
+        if (
+            this.active &&
+            this.active.key === key &&
+            sameSources(this.active.request.sources, sources) &&
+            !this.active.retiring
+        ) {
             this.deferredRequest = null
             return
         }
