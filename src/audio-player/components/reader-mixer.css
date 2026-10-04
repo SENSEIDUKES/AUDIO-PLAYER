@@ -40,6 +40,32 @@
     font-weight: 600;
 }
 
+.sap-reader-mixer__atmosphere-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--_gap);
+    width: 100%;
+    min-height: var(--_target);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+}
+
+.sap-reader-mixer__atmosphere-summary:focus-visible {
+    outline: 2px solid var(--_focus);
+    outline-offset: 2px;
+}
+
+.sap-reader-mixer__empty {
+    margin: 0;
+    color: var(--_muted);
+}
+
 .sap-reader-mixer__layers {
     display: flex;
     flex-direction: column;

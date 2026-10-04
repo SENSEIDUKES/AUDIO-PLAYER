@@ -23,6 +23,9 @@ import {
  */
 export type ReaderMixerLayer = "soundscapes" | "atmosphere" | "cues" | "voice"
 
+/** Host-declared use of each layer, independent of the reader's saved switches. */
+export type ReaderMixerLayerAvailability = Readonly<Record<ReaderMixerLayer, boolean>>
+
 /** The layers in display order. */
 export const READER_MIXER_LAYERS: readonly ReaderMixerLayer[] = Object.freeze([
     "soundscapes",
@@ -285,6 +288,7 @@ export interface ReaderMixerVoiceOutput {
 
 export interface ReaderMixerState {
     readonly preferences: ReaderMixerPreferences
+    readonly availability: ReaderMixerLayerAvailability
     readonly layers: Readonly<Record<ReaderMixerLayer, ReaderMixerLayerState>>
     /** The atmosphere catalog the mixer resolves ids against. */
     readonly atmosphereOptions: readonly ReaderAtmosphereOption[]
@@ -294,6 +298,8 @@ export interface ReaderMixerState {
     readonly activePresetId: string | null
     /** Whether the atmosphere layer is meant to be sounding (started and not stopped). */
     readonly atmosphereActive: boolean
+    /** A bounded audition outside an open chapter. */
+    readonly atmospherePreviewing: boolean
     /** Cues playing right now. */
     readonly activeCues: number
     readonly routing: ReaderMixerRouting
@@ -317,6 +323,12 @@ export type ReaderMixerPreferencesListener = (preferences: ReaderMixerPreference
 /* ------------------------------------------------------------------ */
 
 export interface ReaderMixerOptions {
+    /** Omitted soundtrack layers are available; Voice follows its connection unless overridden. */
+    layerAvailability?: Partial<ReaderMixerLayerAvailability>
+    /** Total atmosphere audition length outside a chapter. Default 10,000 ms. */
+    atmospherePreviewMs?: number
+    /** Fade at each end of an atmosphere audition. Default 1,000 ms. */
+    atmospherePreviewFadeMs?: number
     /** Saved preferences to start from. Missing or invalid fields use `defaultPreferences`. */
     initialPreferences?: ReaderMixerPreferencesInput | ReaderMixerPreferences | null
     /**
@@ -483,6 +495,11 @@ export class ReaderMixer {
     private atmosphereActive = false
     /** Reader lifetime, retained when its selected atmosphere is Off. */
     private atmosphereStarted = false
+    private availabilityInput: Partial<ReaderMixerLayerAvailability>
+    private atmospherePreviewing = false
+    private previewTimer: ReturnType<typeof setTimeout> | null = null
+    private readonly previewMs: number
+    private readonly previewFadeMs: number
     private loopStatus: Record<LoopLayer, SceneMixStatusSnapshot>
     private cueStatus: CueStatus = "idle"
     private cueFailure: string | null = null
@@ -512,6 +529,9 @@ export class ReaderMixer {
     private voicePausedForVisibility = false
 
     constructor(options: ReaderMixerOptions = {}) {
+        this.availabilityInput = { ...options.layerAvailability }
+        this.previewMs = Math.max(0, options.atmospherePreviewMs ?? 10000)
+        this.previewFadeMs = Math.max(0, options.atmospherePreviewFadeMs ?? 1000)
         this.defaults = normalizeReaderMixerPreferences(options.defaultPreferences)
         this.prefs = normalizeReaderMixerPreferences(options.initialPreferences, this.defaults)
         this.presets = Object.freeze(
@@ -670,6 +690,7 @@ export class ReaderMixer {
         options: ReaderMixerFadeOptions = {}
     ): void {
         if (this.disposed) return
+        this.cancelAtmospherePreview()
         const fadeMs = options.fadeMs ?? this.atmosphereFadeMs
         if (atmosphere === null) {
             this.atmosphereActive = false
@@ -680,10 +701,21 @@ export class ReaderMixer {
         }
         const resolved = this.resolveAtmosphere(atmosphere)
         if (!resolved) return
-        this.atmosphereStarted = true
-        this.atmosphereActive = true
         this.updatePreferences({ ...this.prefs, atmosphereId: resolved.id })
-        this.atmosphere.crossfadeTo(resolved.track, { fadeMs })
+        if (this.atmosphereStarted) {
+            this.atmosphereActive = true
+            this.atmosphere.crossfadeTo(resolved.track, { fadeMs })
+        } else if (!this.pageHidden) {
+            this.atmospherePreviewing = true
+            const previewFade = Math.min(options.fadeMs ?? this.previewFadeMs, this.previewMs / 2)
+            this.atmosphere.crossfadeTo(resolved.track, { fadeMs: previewFade })
+            this.previewTimer = setTimeout(() => {
+                this.previewTimer = null
+                this.atmospherePreviewing = false
+                this.atmosphere.stop(previewFade)
+                this.refresh()
+            }, this.previewMs - previewFade)
+        }
         this.refresh()
     }
 
@@ -694,6 +726,7 @@ export class ReaderMixer {
      */
     startAtmosphere(options: ReaderMixerFadeOptions = {}): void {
         if (this.disposed) return
+        this.cancelAtmospherePreview()
         this.atmosphereStarted = true
         this.atmosphereActive = true
         const id = this.prefs.atmosphereId
@@ -711,6 +744,7 @@ export class ReaderMixer {
     /** Fade the atmosphere out without changing the reader's choice (leaving the reader). */
     stopAtmosphere(options: ReaderMixerFadeOptions = {}): void {
         if (this.disposed) return
+        this.cancelAtmospherePreview()
         this.atmosphereStarted = false
         this.atmosphereActive = false
         this.atmosphere.stop(options.fadeMs ?? this.atmosphereFadeMs)
@@ -729,6 +763,19 @@ export class ReaderMixer {
 
     getAtmosphereOptions(): readonly ReaderAtmosphereOption[] {
         return this.atmosphereOptions
+    }
+
+    /** Change host use without changing saved switches, levels, sources or presets. */
+    setLayerAvailability(availability: Partial<ReaderMixerLayerAvailability>): void {
+        if (this.disposed) return
+        this.availabilityInput = { ...this.availabilityInput, ...availability }
+        this.refresh()
+    }
+
+    private cancelAtmospherePreview(): void {
+        if (this.previewTimer !== null) clearTimeout(this.previewTimer)
+        this.previewTimer = null
+        this.atmospherePreviewing = false
     }
 
     /* -------------------------------- Cues ------------------------------ */
@@ -997,6 +1044,7 @@ export class ReaderMixer {
         this.flushPreferences()
         this.disposed = true
         this.stopDuckRamp()
+        this.cancelAtmospherePreview()
         for (const cleanup of this.cleanups.splice(0)) {
             try {
                 cleanup()
@@ -1230,6 +1278,10 @@ export class ReaderMixer {
             if (hidden === this.pageHidden) return
             this.pageHidden = hidden
             if (hidden) {
+                if (this.atmospherePreviewing) {
+                    this.cancelAtmospherePreview()
+                    this.atmosphere.stop(0)
+                }
                 this.soundscapes.pause()
                 this.atmosphere.pause()
                 this.cues.stopAll()
@@ -1333,11 +1385,18 @@ export class ReaderMixer {
                 !this.pageHidden)
         return Object.freeze({
             preferences: this.prefs,
+            availability: Object.freeze({
+                soundscapes: this.availabilityInput.soundscapes ?? true,
+                atmosphere: this.availabilityInput.atmosphere ?? true,
+                cues: this.availabilityInput.cues ?? true,
+                voice: this.availabilityInput.voice ?? !!this.voiceOutput,
+            }),
             layers,
             atmosphereOptions: this.atmosphereOptions,
             presets: this.presets,
             activePresetId: this.matchPreset(),
             atmosphereActive: this.atmosphereActive,
+            atmospherePreviewing: this.atmospherePreviewing,
             activeCues: this.activeCues,
             routing: this.graph ? "web-audio" : "element",
             volumeControl: this.volumeControl(),

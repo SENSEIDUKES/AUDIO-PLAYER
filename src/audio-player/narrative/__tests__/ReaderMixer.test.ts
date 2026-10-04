@@ -425,6 +425,7 @@ describe("ReaderMixer", () => {
 
         it("crossfades a changed source under the same catalog id and defers it while hidden", async () => {
             const mixer = makeMixer()
+            mixer.startAtmosphere()
             const rain = { ...RAIN, track: { ...CHAPTER, audioFile: "https://a.test/old.mp3" } }
             mixer.setAtmosphere(rain, { fadeMs: 0 })
             await settle()
@@ -451,6 +452,7 @@ describe("ReaderMixer", () => {
 
         it("silences the bed when new preferences name an unknown atmosphere", async () => {
             const mixer = makeMixer()
+            mixer.startAtmosphere()
             mixer.setAtmosphere(RAIN, { fadeMs: 0 })
             await settle()
             mixer.setPreferences({ atmosphereId: "not-in-catalog" })
@@ -626,6 +628,7 @@ describe("ReaderMixer", () => {
     describe("page visibility", () => {
         it("pauses both loops while hidden and resumes them after", async () => {
             const mixer = makeMixer()
+            mixer.startAtmosphere()
             mixer.playSoundscape(CHAPTER, { fadeMs: 0 })
             mixer.setAtmosphere(RAIN, { fadeMs: 0 })
             await settle()

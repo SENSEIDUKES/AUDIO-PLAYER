@@ -263,6 +263,7 @@ export {
 } from "./narrative/ReaderMixer"
 export type {
     ReaderMixerLayer,
+    ReaderMixerLayerAvailability,
     ReaderMixerLayerPreference,
     ReaderMixerPreferences,
     ReaderMixerPreferencesInput,
