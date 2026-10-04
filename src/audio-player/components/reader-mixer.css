@@ -66,6 +66,29 @@
     color: var(--_muted);
 }
 
+.sap-reader-mixer__sleep-select,
+.sap-reader-mixer__sleep-cancel {
+    min-height: var(--_target);
+    max-width: 100%;
+    padding: 0 12px;
+    border: 1px solid var(--_border);
+    border-radius: var(--_radius);
+    background: var(--_chip-bg);
+    color: inherit;
+    font: inherit;
+}
+
+.sap-reader-mixer__sleep-label {
+    display: block;
+    margin-bottom: 4px;
+}
+
+.sap-reader-mixer__sleep-select:focus-visible,
+.sap-reader-mixer__sleep-cancel:focus-visible {
+    outline: 2px solid var(--_focus);
+    outline-offset: 2px;
+}
+
 .sap-reader-mixer__layers {
     display: flex;
     flex-direction: column;

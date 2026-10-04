@@ -24,6 +24,11 @@ export interface ReaderMixerLabels {
     atmosphereOff: string
     /** Empty chapter message under the master switch. */
     noAudio: string
+    sleepTimer: string
+    cancelTimer: string
+    sleepStopped: string
+    /** Receives remaining wall-clock milliseconds. */
+    formatRemainingTime: (remainingMs: number) => string
     /** Shown where the browser ignores volume and sliders act as on/off. */
     deviceVolumeHint: string
     /** Row messages for statuses worth telling the reader about. */
@@ -51,12 +56,17 @@ export const DEFAULT_READER_MIXER_LABELS: ReaderMixerLabels = Object.freeze({
     atmospherePicker: "Atmosphere sound",
     atmosphereOff: "Off",
     noAudio: "This chapter has no audio",
+    sleepTimer: "Sleep timer",
+    cancelTimer: "Cancel timer",
+    sleepStopped: "Stopped by sleep timer",
+    formatRemainingTime: (remainingMs: number) => `Stops in ${Math.ceil(remainingMs / 60000)} min`,
     deviceVolumeHint: "Volume is set by your device on this browser",
     status: Object.freeze({
         loading: "Loading…",
         blocked: "Tap anywhere to start audio",
         failed: "This sound couldn’t play",
         paused: "Paused",
+        resting: "Music is resting until the next scene",
     }),
 })
 
@@ -317,7 +327,7 @@ export function ReaderMixerPanel({
                     {labels.master}
                 </span>
                 <MixerSwitch
-                    checked={preferences.masterEnabled}
+                    checked={preferences.masterEnabled && state.sleepTimer.status !== "fired"}
                     labelledBy={ids.master}
                     onChange={(enabled) => mixer.setMasterEnabled(enabled)}
                 />
@@ -402,6 +412,48 @@ export function ReaderMixerPanel({
             {state.volumeControl === "on-off" && (
                 <p className="sap-reader-mixer__hint">{labels.deviceVolumeHint}</p>
             )}
+            <div className="sap-reader-mixer__sleep">
+                <label className="sap-reader-mixer__sleep-label" htmlFor={`${baseId}-sleep`}>
+                    {labels.sleepTimer}
+                </label>
+                <select
+                    className="sap-reader-mixer__sleep-select"
+                    id={`${baseId}-sleep`}
+                    value={
+                        state.sleepTimer.choiceId ??
+                        state.sleepTimerChoices.find((choice) => choice.kind === "off")?.id ??
+                        ""
+                    }
+                    onChange={(event) => mixer.setSleepTimer(event.target.value)}
+                >
+                    {!state.sleepTimerChoices.some((choice) => choice.kind === "off") && (
+                        <option value="" disabled>
+                            {labels.cancelTimer}
+                        </option>
+                    )}
+                    {state.sleepTimerChoices.map((choice) => (
+                        <option key={choice.id} value={choice.id}>
+                            {choice.label}
+                        </option>
+                    ))}
+                </select>
+                <p className="sap-reader-mixer__status" aria-live="polite">
+                    {state.sleepTimer.status === "fired"
+                        ? labels.sleepStopped
+                        : state.sleepTimer.remainingMs !== null
+                          ? labels.formatRemainingTime(state.sleepTimer.remainingMs)
+                          : ""}
+                </p>
+                {state.sleepTimer.status === "running" && (
+                    <button
+                        className="sap-reader-mixer__sleep-cancel"
+                        type="button"
+                        onClick={() => mixer.cancelSleepTimer()}
+                    >
+                        {labels.cancelTimer}
+                    </button>
+                )}
+            </div>
         </section>
     )
 }

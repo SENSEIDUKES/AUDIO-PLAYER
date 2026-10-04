@@ -307,6 +307,7 @@ describe("ReaderMixer production recovery", () => {
 
     it("recovers failed wanted loops on online without replacing the old score early", async () => {
         const instance = mixer({ loopRetryDelayMs: 10 })
+        instance.startAtmosphere()
         instance.playSoundscape(SCORE)
         await settle()
         const old = latest(SCORE)

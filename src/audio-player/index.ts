@@ -286,6 +286,12 @@ export type {
     ReaderMixerPreset,
 } from "./narrative/ReaderMixer"
 export { ReaderMixerVoice } from "./narrative/ReaderMixerVoice"
+export { READER_MIXER_SLEEP_TIMERS } from "./narrative/ReaderMixerSession"
+export type {
+    ReaderMixerSleepTimerChoice,
+    ReaderMixerSleepTimerState,
+    ReaderMixerSleepEvent,
+} from "./narrative/ReaderMixerSession"
 export type { ReaderMixerVoiceProps } from "./narrative/ReaderMixerVoice"
 export {
     ReaderMixerProvider,

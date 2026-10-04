@@ -4,6 +4,12 @@ import { OneShotEngine } from "./OneShotEngine"
 import type { OneShotPlaybackErrorEvent } from "./OneShotEngine"
 import { SCENE_FADE_MS, SceneMixEngine } from "./SceneMixEngine"
 import type { SceneMixAnalysisPolicy, SceneMixStatusSnapshot } from "./SceneMixEngine"
+import { ReaderMixerSession } from "./ReaderMixerSession"
+import type {
+    ReaderMixerSleepEvent,
+    ReaderMixerSleepTimerChoice,
+    ReaderMixerSleepTimerState,
+} from "./ReaderMixerSession"
 import { ACTIVATION_EVENTS, isActivationEvent } from "./mediaRouting"
 import {
     LayerGainGraph,
@@ -233,7 +239,7 @@ export interface ReaderAtmosphereOption {
  * - `paused`: paused by the system or while the page is hidden.
  */
 export type ReaderMixerLayerStatus =
-    "idle" | "loading" | "playing" | "blocked" | "failed" | "paused"
+    "idle" | "loading" | "playing" | "blocked" | "failed" | "paused" | "resting"
 
 export interface ReaderMixerLayerState {
     readonly status: ReaderMixerLayerStatus
@@ -300,6 +306,10 @@ export interface ReaderMixerState {
     readonly atmosphereActive: boolean
     /** A bounded audition outside an open chapter. */
     readonly atmospherePreviewing: boolean
+    readonly sleepTimer: ReaderMixerSleepTimerState
+    readonly sleepTimerChoices: readonly ReaderMixerSleepTimerChoice[]
+    readonly idle: boolean
+    readonly soundscapePlays: number
     /** Cues playing right now. */
     readonly activeCues: number
     readonly routing: ReaderMixerRouting
@@ -323,6 +333,20 @@ export type ReaderMixerPreferencesListener = (preferences: ReaderMixerPreference
 /* ------------------------------------------------------------------ */
 
 export interface ReaderMixerOptions {
+    /** Session-only timer choices, including their translated labels. */
+    sleepTimerChoices?: readonly ReaderMixerSleepTimerChoice[]
+    /** Slow fade before sleep stops both beds. Default 20,000 ms. */
+    sleepFadeMs?: number
+    /** The host can stop browser Listen when this event fires. Also exposed by subscribeSleep. */
+    onSleepTimer?: (event: ReaderMixerSleepEvent) => void
+    /** Plays before a score rests. Default 2; null disables music rests. */
+    soundscapeMaxPlays?: number | null
+    /** Fade at the end of the final score play. Default 8,000 ms. */
+    soundscapeRestFadeMs?: number
+    /** No-input timeout. Default 600,000 ms; null disables idle pause. */
+    idleTimeoutMs?: number | null
+    /** Idle fade before pausing in place. Default 8,000 ms. */
+    idleFadeMs?: number
     /** Omitted soundtrack layers are available; Voice follows its connection unless overridden. */
     layerAvailability?: Partial<ReaderMixerLayerAvailability>
     /** Total atmosphere audition length outside a chapter. Default 10,000 ms. */
@@ -408,6 +432,8 @@ export interface ReaderMixerOptions {
 }
 
 export interface PlaySoundscapeOptions {
+    /** Same track in a new scene starts a fresh play count; same scene is a no-op, including a rest. */
+    scene?: string
     /** Crossfade length for this switch only. */
     fadeMs?: number
     /** Precomputed start trim in ms; skips silence analysis for this track. */
@@ -454,6 +480,7 @@ const LOOP_STATUS: Record<SceneMixStatusSnapshot["state"], ReaderMixerLayerStatu
     stopped: "idle",
     failed: "failed",
     paused: "paused",
+    resting: "resting",
 }
 
 /* ------------------------------------------------------------------ */
@@ -479,6 +506,14 @@ const LOOP_STATUS: Record<SceneMixStatusSnapshot["state"], ReaderMixerLayerStatu
  * ```
  */
 export class ReaderMixer {
+    private readonly session: ReaderMixerSession
+    private readonly sleepFadeMs: number
+    private readonly idleFadeMs: number
+    private readonly sleepListeners = new Set<(event: ReaderMixerSleepEvent) => void>()
+    private wantedSoundscape: { track: Track; options: PlaySoundscapeOptions } | null = null
+    private idleGain = 1
+    private idleFadeTimer: ReturnType<typeof setInterval> | null = null
+    private voicePausedForIdle = false
     private prefs: ReaderMixerPreferences
     private readonly soundscapes: SceneMixEngine
     private readonly atmosphere: SceneMixEngine
@@ -529,6 +564,9 @@ export class ReaderMixer {
     private voicePausedForVisibility = false
 
     constructor(options: ReaderMixerOptions = {}) {
+        this.sleepFadeMs = Math.max(0, options.sleepFadeMs ?? 20000)
+        this.idleFadeMs = Math.max(0, options.idleFadeMs ?? 8000)
+        if (options.onSleepTimer) this.sleepListeners.add(options.onSleepTimer)
         this.availabilityInput = { ...options.layerAvailability }
         this.previewMs = Math.max(0, options.atmospherePreviewMs ?? 10000)
         this.previewFadeMs = Math.max(0, options.atmospherePreviewFadeMs ?? 1000)
@@ -557,7 +595,13 @@ export class ReaderMixer {
         if (this.graph) {
             this.cleanups.push(
                 this.graph.onStateChange(() => {
-                    if (this.ready && !this.pageHidden && this.graph?.state === "running") {
+                    if (
+                        this.ready &&
+                        !this.pageHidden &&
+                        !this.session.idle &&
+                        this.session.sleep.status !== "fired" &&
+                        this.graph?.state === "running"
+                    ) {
                         this.cues.notifyOutputReady()
                         for (const layer of ["soundscapes", "atmosphere"] as const) {
                             if (this.layerGain(layer) > 0) this[layer].resume()
@@ -589,6 +633,8 @@ export class ReaderMixer {
         this.soundscapes = new SceneMixEngine({
             ...recovery,
             loop: true,
+            maxPlays: options.soundscapeMaxPlays === undefined ? 2 : options.soundscapeMaxPlays,
+            restFadeMs: options.soundscapeRestFadeMs ?? 8000,
             fadeMs: this.fadeMs,
             crossOrigin,
             analysisPolicy: options.analysisPolicy ?? "off",
@@ -638,6 +684,18 @@ export class ReaderMixer {
             )
         }
 
+        this.session = new ReaderMixerSession({
+            choices: options.sleepTimerChoices,
+            idleTimeoutMs:
+                options.idleTimeoutMs === null
+                    ? null
+                    : Math.max(1, options.idleTimeoutMs ?? 600000),
+            onChange: () => this.refresh(),
+            onSleep: (event) => this.fireSleep(event),
+            onResume: () => this.resumeAfterSleep(),
+            onIdle: (idle) => this.changeIdle(idle),
+        })
+
         this.applyLevels()
         this.armGestures()
         if (options.pauseWhenHidden ?? true) this.followVisibility()
@@ -666,7 +724,12 @@ export class ReaderMixer {
      */
     playSoundscape(track: Track, options: PlaySoundscapeOptions = {}): void {
         if (this.disposed) return
+        this.wantedSoundscape = { track, options }
+        this.session.start()
+        if (this.session.sleep.status === "fired") return
+        if (!this.pageHidden && !this.session.idle) this.soundscapes.resume()
         this.soundscapes.crossfadeTo(track, {
+            scene: options.scene,
             fadeMs: options.fadeMs ?? this.fadeMs,
             ...(options.trimStartMs !== undefined ? { trimStartMs: options.trimStartMs } : {}),
         })
@@ -675,6 +738,7 @@ export class ReaderMixer {
     /** Fade the music out. */
     stopSoundscape(options: ReaderMixerFadeOptions = {}): void {
         if (this.disposed) return
+        this.wantedSoundscape = null
         this.soundscapes.stop(options.fadeMs ?? this.fadeMs)
     }
 
@@ -702,6 +766,10 @@ export class ReaderMixer {
         const resolved = this.resolveAtmosphere(atmosphere)
         if (!resolved) return
         this.updatePreferences({ ...this.prefs, atmosphereId: resolved.id })
+        if (this.session.sleep.status === "fired") {
+            this.refresh()
+            return
+        }
         if (this.atmosphereStarted) {
             this.atmosphereActive = true
             this.atmosphere.crossfadeTo(resolved.track, { fadeMs })
@@ -729,6 +797,12 @@ export class ReaderMixer {
         this.cancelAtmospherePreview()
         this.atmosphereStarted = true
         this.atmosphereActive = true
+        this.session.start()
+        if (this.session.sleep.status === "fired") {
+            this.refresh()
+            return
+        }
+        if (!this.pageHidden && !this.session.idle) this.atmosphere.resume()
         const id = this.prefs.atmosphereId
         const resolved = id ? this.resolveAtmosphere(id) : null
         const fadeMs = options.fadeMs ?? this.atmosphereFadeMs
@@ -787,13 +861,20 @@ export class ReaderMixer {
      * or audio is unavailable.
      */
     playCue(url: string, options: PlayCueOptions = {}): boolean {
-        if (this.disposed || this.pageHidden) return false
+        if (
+            this.disposed ||
+            this.pageHidden ||
+            this.session.idle ||
+            this.session.sleep.status === "fired"
+        )
+            return false
         if (computeReaderMixerGain(this.prefs, "cues", options.volume ?? 1) <= 0) return false
         const element = this.cues.playOneShot(url, {
             volume: options.volume,
             startTime: options.startTime,
         })
         if (!element) return false
+        this.session.start()
         this.lastCue = url.trim()
         if (this.cueStatus === "failed") {
             this.cueStatus = "idle"
@@ -805,10 +886,54 @@ export class ReaderMixer {
 
     /** Fade both loops and pause connected narration. Preferences stay; cues finish on their own. */
     stopAll(options: ReaderMixerFadeOptions = {}): void {
+        if (this.disposed) return
+        this.session.reset()
+        this.cancelIdleFade()
+        this.idleGain = 1
+        this.voicePausedForIdle = false
         this.stopSoundscape(options)
         this.stopAtmosphere(options)
         this.voicePausedForVisibility = false
         this.voiceOutput?.pause()
+        this.applyLevels()
+        this.refresh()
+    }
+
+    /** Arm a session-only wall-clock timer by its host-defined choice id. A new choice resumes sleep-stopped audio. */
+    setSleepTimer(choiceId: string): void {
+        this.session.setTimer(choiceId)
+    }
+
+    /** Cancel a running timer without changing preferences or playback. */
+    cancelSleepTimer(): void {
+        this.session.cancelTimer()
+    }
+
+    /** Required host signal for End of chapter; scrolling alone never stops or resumes sleep audio. */
+    notifyChapterEnd(): void {
+        this.session.chapterEnd()
+    }
+
+    /** Observe sleep firing so the host can stop its own browser speech. */
+    subscribeSleep(listener: (event: ReaderMixerSleepEvent) => void): () => void {
+        if (this.disposed) return () => {}
+        this.sleepListeners.add(listener)
+        return () => {
+            this.sleepListeners.delete(listener)
+        }
+    }
+
+    /** Hold activity while host-owned Listen speaks; release is idempotent. */
+    retainActivity(): () => void {
+        return this.session.retainActivity()
+    }
+
+    /** Explicit reader intent from the note/master, never called by scroll/activity listeners. */
+    resumeAudio(): void {
+        if (this.disposed) return
+        this.session.resume()
+        this.setMasterEnabled(true)
+        this.unlock()
     }
 
     /**
@@ -823,6 +948,8 @@ export class ReaderMixer {
         const sync = () => {
             if (this.voiceOutput !== output || this.disposed) return
             this.voiceSnapshot = { ...output.getState() }
+            this.session.setVoicePlaying(this.voiceSnapshot.status === "playing")
+            if (this.voiceSnapshot.status === "playing") this.session.start()
             this.pauseVoiceWhileHidden()
             this.refresh()
         }
@@ -837,12 +964,13 @@ export class ReaderMixer {
             this.disconnectVoice = null
             this.voiceSnapshot = { status: "idle" }
             this.voicePausedForVisibility = false
+            this.session.setVoicePlaying(false)
             output.setEnabled(true)
             this.refresh()
         }
         this.disconnectVoice = disconnect
         output.setLevel(this.prefs.layers.voice.level)
-        output.setEnabled(!this.pageHidden && computeReaderMixerGain(this.prefs, "voice") > 0)
+        output.setEnabled(this.voiceEnabled())
         sync()
         return disconnect
     }
@@ -864,6 +992,7 @@ export class ReaderMixer {
     /** Silence or restore everything without touching the layers' own settings. */
     setMasterEnabled(enabled: boolean): void {
         if (this.disposed) return
+        if (enabled) this.session.resume()
         this.updatePreferences({ ...this.prefs, masterEnabled: Boolean(enabled) })
     }
 
@@ -1020,7 +1149,7 @@ export class ReaderMixer {
         this.soundscapes.unlock()
         this.atmosphere.unlock()
         this.cues.unlock()
-        if (!this.pageHidden) {
+        if (!this.pageHidden && !this.session.idle && this.session.sleep.status !== "fired") {
             if (this.layerGain("soundscapes") > 0) this.soundscapes.resume()
             if (this.layerGain("atmosphere") > 0) this.atmosphere.resume()
             if (this.voiceSnapshot.status === "blocked" && this.layerGain("voice") > 0) {
@@ -1044,6 +1173,8 @@ export class ReaderMixer {
         this.flushPreferences()
         this.disposed = true
         this.stopDuckRamp()
+        this.session.dispose()
+        this.cancelIdleFade()
         this.cancelAtmospherePreview()
         for (const cleanup of this.cleanups.splice(0)) {
             try {
@@ -1063,6 +1194,7 @@ export class ReaderMixer {
         this.stateListeners.clear()
         this.preferenceListeners.clear()
         this.duckOwners.clear()
+        this.sleepListeners.clear()
     }
 
     /* ------------------------------ Internals --------------------------- */
@@ -1176,7 +1308,7 @@ export class ReaderMixer {
     /** A layer's gain including a duck (the ramping one, or the target for state). */
     private layerGain(layer: ReaderMixerLayer, duck = this.duckLevel): number {
         const gain = computeReaderMixerGain(this.prefs, layer)
-        return DUCKED_LAYERS.has(layer) ? gain * (1 - duck) : gain
+        return DUCKED_LAYERS.has(layer) ? gain * (1 - duck) * this.idleGain : gain
     }
 
     private applyLevels(): void {
@@ -1194,12 +1326,7 @@ export class ReaderMixer {
             engine.setMuted(gain <= 0)
         }
         this.voiceOutput?.setLevel(this.prefs.layers.voice.level)
-        this.voiceOutput?.setEnabled(
-            !this.pageHidden &&
-                this.prefs.masterEnabled &&
-                this.prefs.layers.voice.enabled &&
-                this.prefs.layers.voice.level > 0
-        )
+        this.voiceOutput?.setEnabled(this.voiceEnabled())
         this.syncRuntime()
     }
 
@@ -1234,12 +1361,14 @@ export class ReaderMixer {
     }
 
     private graphWanted(): boolean {
+        if (this.session?.idle && this.idleGain === 0) return false
         const loopWanted = (["soundscapes", "atmosphere"] as const).some(
             (layer) =>
                 this.layerGain(layer) > 0 &&
                 ((!this.elementFallbacks.has(layer) &&
                     this.loopStatus[layer].requestedTrackKey !== null &&
-                    this.loopStatus[layer].state !== "failed") ||
+                    this.loopStatus[layer].state !== "failed" &&
+                    this.loopStatus[layer].state !== "resting") ||
                     this[layer].hasRoutedDemand())
         )
         return loopWanted || (this.layerGain("cues") > 0 && this.cues.hasRoutedDemand())
@@ -1277,6 +1406,7 @@ export class ReaderMixer {
             const hidden = document.visibilityState === "hidden"
             if (hidden === this.pageHidden) return
             this.pageHidden = hidden
+            this.session.setHidden(hidden)
             if (hidden) {
                 if (this.atmospherePreviewing) {
                     this.cancelAtmospherePreview()
@@ -1287,10 +1417,10 @@ export class ReaderMixer {
                 this.cues.stopAll()
                 this.voiceOutput?.setEnabled(false)
                 this.pauseVoiceWhileHidden()
-            } else {
+            } else if (!this.session.idle && this.session.sleep.status !== "fired") {
                 this.soundscapes.resume()
                 this.atmosphere.resume()
-                this.voiceOutput?.setEnabled(computeReaderMixerGain(this.prefs, "voice") > 0)
+                this.voiceOutput?.setEnabled(this.voiceEnabled())
                 if (this.voicePausedForVisibility) {
                     this.voicePausedForVisibility = false
                     this.voiceOutput?.resume()
@@ -1330,6 +1460,8 @@ export class ReaderMixer {
         const snapshot = this.loopStatus[layer]
         let status = LOOP_STATUS[snapshot.state]
         if (this.pageHidden && (status === "playing" || status === "loading")) status = "paused"
+        if (this.session.idle && status !== "idle" && status !== "resting" && status !== "failed")
+            status = "paused"
         return Object.freeze({
             status,
             current: snapshot.audibleTrackKey,
@@ -1373,7 +1505,8 @@ export class ReaderMixer {
                 !this.elementFallbacks.has(layer) &&
                 this.layerGain(layer) > 0 &&
                 this.loopStatus[layer].requestedTrackKey !== null &&
-                this.loopStatus[layer].state !== "failed"
+                this.loopStatus[layer].state !== "failed" &&
+                this.loopStatus[layer].state !== "resting"
         )
         const needsGesture =
             (!this.pageHidden &&
@@ -1397,6 +1530,10 @@ export class ReaderMixer {
             activePresetId: this.matchPreset(),
             atmosphereActive: this.atmosphereActive,
             atmospherePreviewing: this.atmospherePreviewing,
+            sleepTimer: this.session.sleep,
+            sleepTimerChoices: this.session.choices,
+            idle: this.session.idle,
+            soundscapePlays: this.soundscapes.getCompletedPlays(),
             activeCues: this.activeCues,
             routing: this.graph ? "web-audio" : "element",
             volumeControl: this.volumeControl(),
@@ -1429,6 +1566,95 @@ export class ReaderMixer {
                 // State observers cannot break playback.
             }
         }
+    }
+
+    private voiceEnabled(): boolean {
+        return (
+            !this.pageHidden &&
+            !this.session?.idle &&
+            this.session?.sleep.status !== "fired" &&
+            computeReaderMixerGain(this.prefs, "voice") > 0
+        )
+    }
+
+    private fireSleep(event: ReaderMixerSleepEvent): void {
+        this.cancelAtmospherePreview()
+        this.cancelIdleFade()
+        this.idleGain = 1
+        this.soundscapes.stop(this.sleepFadeMs)
+        this.atmosphere.stop(this.sleepFadeMs)
+        this.voicePausedForVisibility = false
+        this.voicePausedForIdle = false
+        this.voiceOutput?.setEnabled(false)
+        this.voiceOutput?.pause()
+        this.applyLevels()
+        this.refresh()
+        for (const listener of [...this.sleepListeners]) {
+            try {
+                listener(event)
+            } catch {
+                /* Host speech cannot interrupt cleanup. */
+            }
+        }
+    }
+
+    private resumeAfterSleep(): void {
+        this.cancelIdleFade()
+        this.idleGain = 1
+        this.soundscapes.resume()
+        this.atmosphere.resume()
+        if (this.wantedSoundscape)
+            this.playSoundscape(this.wantedSoundscape.track, this.wantedSoundscape.options)
+        if (this.atmosphereStarted) this.startAtmosphere()
+        this.voiceOutput?.setEnabled(this.voiceEnabled())
+        if (this.layerGain("voice") > 0) this.voiceOutput?.resume()
+        this.applyLevels()
+    }
+
+    private changeIdle(idle: boolean): void {
+        this.cancelIdleFade()
+        if (!idle) {
+            this.idleGain = 1
+            this.applyLevels()
+            if (!this.pageHidden && this.session.sleep.status !== "fired") {
+                this.soundscapes.resume()
+                this.atmosphere.resume()
+                if (this.voicePausedForIdle) {
+                    this.voicePausedForIdle = false
+                    this.voiceOutput?.resume()
+                }
+            }
+            return
+        }
+        if (this.voiceSnapshot.status === "playing") {
+            this.voicePausedForIdle = true
+            this.voiceOutput?.pause()
+        }
+        const finish = () => {
+            this.cancelIdleFade()
+            this.idleGain = 0
+            this.soundscapes.pause()
+            this.atmosphere.pause()
+            this.applyLevels()
+            this.refresh()
+        }
+        if (this.pageHidden || this.idleFadeMs === 0) {
+            finish()
+            return
+        }
+        const from = this.idleGain
+        const began = Date.now()
+        this.idleFadeTimer = setInterval(() => {
+            const progress = Math.min(1, (Date.now() - began) / this.idleFadeMs)
+            this.idleGain = from * (1 - progress)
+            this.applyLevels()
+            if (progress >= 1) finish()
+        }, 33)
+    }
+
+    private cancelIdleFade(): void {
+        if (this.idleFadeTimer !== null) clearInterval(this.idleFadeTimer)
+        this.idleFadeTimer = null
     }
 }
 
