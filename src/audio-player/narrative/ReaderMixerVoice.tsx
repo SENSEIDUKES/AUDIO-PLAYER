@@ -26,7 +26,10 @@ export function ReaderMixerVoice({
     const binding = useMemo(() => {
         const listeners = new Set<() => void>()
         const elementVolumeWorks = probeElementVolumeWrites()
-        const levels: { applied: number | null; pending: number | null } = {
+        const levels: {
+            applied: number | null
+            pending: { expected: number; previous: number } | null
+        } = {
             applied: null,
             pending: null,
         }
@@ -67,7 +70,8 @@ export function ReaderMixerVoice({
                 if (levels.applied === level) return
                 levels.applied = level
                 const current = sessionRef.current
-                levels.pending = current.volume !== level ? level : null
+                levels.pending =
+                    current.volume !== level ? { expected: level, previous: current.volume } : null
                 if (levels.pending !== null) current.setVolume(level)
             },
             setEnabled: (enabled) => sessionRef.current.setOutputGain?.(enabled ? 1 : 0),
@@ -84,10 +88,15 @@ export function ReaderMixerVoice({
     useEffect(() => {
         if (!mixer || !session.setOutputGain) return
         const levels = binding.levels
-        // Ignore the render preceding a mixer-issued volume change. Once it
-        // lands, other session controls can update the saved Voice level too.
-        if (levels.pending !== null) {
-            if (session.volume === levels.pending) levels.pending = null
+        // Consume each write guard on its next observation. Ignore only its
+        // old render or acknowledgement; a different value may be a newer
+        // external write that superseded ours in the same React batch.
+        const pending = levels.pending
+        levels.pending = null
+        if (
+            pending &&
+            (session.volume === pending.previous || session.volume === pending.expected)
+        ) {
             return
         }
         if (session.volume !== levels.applied) mixer.setLayerLevel("voice", session.volume)

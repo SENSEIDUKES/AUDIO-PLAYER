@@ -74,6 +74,18 @@ afterEach(() => {
 })
 
 describe("ReaderMixerVoice session connection", () => {
+    it("synchronizes external volume after a mixer write is superseded in the same batch", async () => {
+        render(<Reader />)
+        await act(async () => {
+            mixer.setLayerLevel("voice", 0.25)
+            session.setVolume(0.8)
+        })
+        expect(mixer.getPreferences().layers.voice.level).toBe(0.8)
+        await act(async () => session.setVolume(0.9))
+        expect(mixer.getPreferences().layers.voice.level).toBe(0.9)
+        expect(screen.getByRole("slider", { name: "Voice volume" })).toHaveValue("90")
+    })
+
     it("applies saved voice levels in StrictMode and syncs both controls and external volume", async () => {
         const view = render(
             <StrictMode>
