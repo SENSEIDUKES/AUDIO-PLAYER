@@ -6,8 +6,8 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 // These budgets stay below the measured unminified outputs while leaving room
 // for incremental library growth.
 const bundleLimits = {
-    // Reader loop overlap and shared context leases add ~8 KiB to the 546 KiB ESM baseline.
-    "dist/index.js": 560 * 1024,
+    // Voice/session controls and ownership add ~7 KiB to the 554 KiB reader baseline.
+    "dist/index.js": 570 * 1024,
     "dist/index.cjs": 500 * 1024,
 }
 

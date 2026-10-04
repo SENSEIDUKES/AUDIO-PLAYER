@@ -134,6 +134,47 @@ async function exerciseAutomixWorker(moduleExports, label, packageRoot) {
     await access(workerPath)
 }
 
+/** Verify installed Voice exports, preference migration, and independent master/cleanup gates. */
+function exerciseReaderVoice(moduleExports, label) {
+    if (typeof moduleExports.ReaderMixerVoice !== "function") {
+        throw new Error(`${label} package export is missing ReaderMixerVoice`)
+    }
+    const mixer = moduleExports.createReaderMixer({
+        initialPreferences: { version: 1, layers: { voice: { level: 0.4 } } },
+    })
+    let enabled = true
+    let level = 1
+    const disconnect = mixer.connectVoice({
+        getState: () => ({ status: "paused", current: "tts" }),
+        subscribe: () => () => {},
+        setLevel: (value) => {
+            level = value
+        },
+        setEnabled: (value) => {
+            enabled = value
+        },
+        pause: () => {},
+        resume: () => {},
+    })
+    try {
+        if (level !== 0.4 || mixer.getPreferences().version !== 2) {
+            throw new Error(`${label} installed mixer did not migrate/apply Voice preferences`)
+        }
+        mixer.setMasterEnabled(false)
+        if (enabled || mixer.getPreferences().layers.voice.level !== 0.4) {
+            throw new Error(
+                `${label} installed mixer did not preserve Voice level under master mute`
+            )
+        }
+        disconnect()
+        if (!enabled || mixer.getState().layers.voice.status !== "idle") {
+            throw new Error(`${label} installed mixer did not release the Voice connection`)
+        }
+    } finally {
+        mixer.dispose()
+    }
+}
+
 const temporaryRoot = await mkdtemp(path.join(tmpdir(), "seihouse-audio-player-package-"))
 
 try {
@@ -179,6 +220,13 @@ try {
     if (installedPackage.name !== "@seihouse/audio-player") {
         throw new Error("Packed artifact did not install as @seihouse/audio-player")
     }
+    const sourcePackage = JSON.parse(await readFile(path.join(projectRoot, "package.json"), "utf8"))
+    if (installedPackage.version !== sourcePackage.version) {
+        throw new Error("Installed package version differs from the release manifest")
+    }
+    await access(
+        path.join(packageRoot, "dist", "audio-player", "narrative", "ReaderMixerVoice.d.ts")
+    )
 
     const forbiddenBrowserMarkers = ["OPENROUTER_API_KEY", "openrouter.ai"]
     for (const bundleName of ["index.js", "index.cjs"]) {
@@ -196,16 +244,18 @@ try {
     if (typeof commonJsExports.AudioPlayer !== "function") {
         throw new Error("CommonJS package export did not load the audio player")
     }
-    await exerciseAutomixWorker(commonJsExports, "CommonJS", packageRoot)
+    exerciseReaderVoice(commonJsExports, "CommonJS")
 
     const esmFixturePath = path.join(consumerDir, "smoke.mjs")
     await writeFile(esmFixturePath, 'export * from "@seihouse/audio-player"\n')
     const esmExports = await import(`${pathToFileURL(esmFixturePath).href}?package-smoke`)
+    exerciseReaderVoice(esmExports, "ESM")
+    await exerciseAutomixWorker(commonJsExports, "CommonJS", packageRoot)
     await exerciseAutomixWorker(esmExports, "ESM", packageRoot)
 
     console.log("Installed package smoke test passed.")
     console.log(
-        "Verified Node CommonJS loading, package-relative Automix workers, and no browser OpenRouter access."
+        "Verified ESM/CommonJS Voice exports and preferences, package-relative Automix workers, and no browser OpenRouter access."
     )
 } finally {
     await rm(temporaryRoot, { recursive: true, force: true })

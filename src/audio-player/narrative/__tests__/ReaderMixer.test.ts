@@ -187,12 +187,13 @@ describe("ReaderMixer", () => {
             const second = makeMixer({ initialPreferences: saved as ReaderMixerPreferences })
             expect(second.getPreferences()).toEqual(first.getPreferences())
             expect(second.getPreferences()).toEqual({
-                version: 1,
+                version: 2,
                 masterEnabled: false,
                 layers: {
                     soundscapes: { enabled: true, level: 0.33 },
                     atmosphere: { enabled: true, level: 0.4 },
                     cues: { enabled: false, level: 0.8 },
+                    voice: { enabled: true, level: 1 },
                 },
                 atmosphereId: "rain",
             })
@@ -233,12 +234,13 @@ describe("ReaderMixer", () => {
             const mixer = createReaderMixer()
             mixers.push(mixer)
             expect(mixer.getPreferences()).toEqual({
-                version: 1,
+                version: 2,
                 masterEnabled: true,
                 layers: {
                     soundscapes: { enabled: true, level: 0.25 },
                     atmosphere: { enabled: true, level: 0.3 },
                     cues: { enabled: true, level: 0.75 },
+                    voice: { enabled: true, level: 1 },
                 },
                 atmosphereId: "gentle-rain",
             })
@@ -272,6 +274,7 @@ describe("ReaderMixer", () => {
                 soundscapes: { enabled: true, level: 0.15 },
                 atmosphere: { enabled: true, level: 0.4 },
                 cues: { enabled: true, level: 0.4 },
+                voice: { enabled: true, level: 1 },
             })
             expect(mixer.getPreferences().atmosphereId).toBe("rain")
             expect(mixer.getState().activePresetId).toBe("calm")
@@ -354,6 +357,25 @@ describe("ReaderMixer", () => {
     })
 
     describe("atmosphere", () => {
+        it("restores the default atmosphere after Off while the reader is open", async () => {
+            const mixer = makeMixer({ defaultPreferences: { atmosphereId: "rain" } })
+            mixer.startAtmosphere({ fadeMs: 0 })
+            await settle()
+            mixer.setAtmosphere(null, { fadeMs: 0 })
+            await settle()
+            mixer.applyPreset("default")
+            await settle(2100)
+            expect(mixer.getPreferences().atmosphereId).toBe("rain")
+            expect(mixer.getState().layers.atmosphere.status).toBe("playing")
+            expect(only("https://a.test/rain.mp3").paused).toBe(false)
+
+            mixer.stopAtmosphere({ fadeMs: 0 })
+            mixer.setPreferences({ atmosphereId: null })
+            mixer.applyPreset("default")
+            await settle()
+            expect(FakeAudio.withSrc("https://a.test/rain.mp3")).toHaveLength(0)
+        })
+
         it("fades out on setAtmosphere(null) and saves Off", async () => {
             const mixer = makeMixer()
             mixer.setAtmosphere(RAIN, { fadeMs: 0 })
@@ -386,6 +408,45 @@ describe("ReaderMixer", () => {
             await settle(2100)
             expect(only("https://a.test/wind.mp3").paused).toBe(false)
             expect(mixer.getState().layers.atmosphere.status).toBe("playing")
+        })
+
+        it("stops a removed catalog bed and restores it if the catalog returns", async () => {
+            const mixer = makeMixer({ initialPreferences: { atmosphereId: "rain" } })
+            mixer.startAtmosphere({ fadeMs: 0 })
+            await settle()
+            mixer.setAtmosphereOptions([])
+            await settle(2100)
+            expect(FakeAudio.withSrc("https://a.test/rain.mp3")).toHaveLength(0)
+            expect(mixer.getPreferences().atmosphereId).toBe("rain")
+            mixer.setAtmosphereOptions([RAIN])
+            await settle(2100)
+            expect(only("https://a.test/rain.mp3").paused).toBe(false)
+        })
+
+        it("crossfades a changed source under the same catalog id and defers it while hidden", async () => {
+            const mixer = makeMixer()
+            const rain = { ...RAIN, track: { ...CHAPTER, audioFile: "https://a.test/old.mp3" } }
+            mixer.setAtmosphere(rain, { fadeMs: 0 })
+            await settle()
+            const old = only("https://a.test/old.mp3")
+            FakeAudio.playBehavior = "pending"
+            mixer.setAtmosphereOptions([
+                { ...rain, track: { ...rain.track, audioFile: "https://a.test/new.mp3" } },
+            ])
+            await settle()
+            expect(old.paused).toBe(false)
+            expect(FakeAudio.withSrc("https://a.test/new.mp3")).toHaveLength(1)
+            setVisibility("hidden")
+            mixer.setAtmosphereOptions([
+                { ...rain, track: { ...rain.track, audioFile: "https://a.test/latest.mp3" } },
+            ])
+            await settle()
+            expect(FakeAudio.withSrc("https://a.test/latest.mp3")).toHaveLength(0)
+            FakeAudio.playBehavior = "resolve"
+            setVisibility("visible")
+            await settle(2100)
+            expect(only("https://a.test/latest.mp3").paused).toBe(false)
+            expect(old.src).toBe("")
         })
 
         it("silences the bed when new preferences name an unknown atmosphere", async () => {

@@ -51,21 +51,23 @@ describe("ReaderMixerPanel", () => {
         vi.unstubAllGlobals()
     })
 
-    it("shows a master switch, then Soundscapes, Atmosphere and Sound Cues in order", () => {
+    it("shows a master switch and all four layers in order", () => {
         renderPanel()
         const switches = screen.getAllByRole("switch")
         expect(
             switches.map((node) => node.textContent || node.getAttribute("aria-labelledby"))
-        ).toHaveLength(4)
+        ).toHaveLength(5)
         expect(screen.getByRole("switch", { name: "Master" })).toBe(switches[0])
         expect(screen.getByRole("switch", { name: "Soundscapes" })).toBe(switches[1])
         expect(screen.getByRole("switch", { name: "Atmosphere" })).toBe(switches[2])
         expect(screen.getByRole("switch", { name: "Sound Cues" })).toBe(switches[3])
+        expect(screen.getByRole("switch", { name: "Voice" })).toBe(switches[4])
         const sliders = screen.getAllByRole("slider")
         expect(sliders.map((node) => node.getAttribute("aria-label"))).toEqual([
             "Soundscapes volume",
             "Atmosphere volume",
             "Sound Cues volume",
+            "Voice volume",
         ])
         expect(sliders[0]).toHaveAttribute("aria-valuetext", "25%")
         expect(screen.getByText("25%")).toBeInTheDocument()

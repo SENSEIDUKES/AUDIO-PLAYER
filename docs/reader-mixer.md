@@ -1,6 +1,6 @@
 # Reader mixer
 
-`createReaderMixer` plays a story reader's audio as three independent layers,
+`createReaderMixer` controls a story reader's audio as four independent layers,
 each with its own on/off switch and volume, under one master switch:
 
 | Layer | What it is | Chosen by | Behavior |
@@ -8,14 +8,18 @@ each with its own on/off switch and volume, under one master switch:
 | **Soundscapes** | The music score | The app (per chapter, or mid-chapter when the story turns) | Loops; crossfades (about 2 s) when the track changes; repeating the current track does nothing. |
 | **Atmosphere** | An ambient bed: rain, wind, waves, crowd, city | The reader, as a personal preference shared by every story | Loops under everything until the reader changes it or picks Off. |
 | **Sound Cues** | Short one-shot effects placed on words: a growl, a chime | The app | Play over the other layers without pausing or ducking them; cues may overlap. |
+| **Voice** | Recorded or AI-generated TTS audio | The host's narration session | Shares its existing transport, queue and playback speed; the mixer controls volume and on/off. Never ducked. |
 
 The mixer is built from the player's existing engines: two looping
 `SceneMixEngine`s (soundscapes and atmosphere) and one `OneShotEngine` (cues).
 It is headless and works without React; `ReaderMixerProvider` shares one
 instance across a React app, and `ReaderMixerPanel` is the inline mixer view.
 
-Narration is not one of these layers. `useNarrativeAudio` and `NarrativeFace`
-keep working as before, independently of the mixer.
+Mount `ReaderMixerVoice` once inside both providers to connect an existing
+`AudioSessionProvider` to Voice. A headless host can use `connectVoice(output)`
+instead. The mixer does not generate speech or create a second narration player.
+Browser `speechSynthesis` is not connected: use recorded/generated audio files
+for the supported TTS path. Stand-alone `NarrativeFace` still works without a mixer.
 
 ## Host example
 
@@ -100,11 +104,13 @@ mixer.dispose()                    // release everything
 | `stopSoundscape({ fadeMs? })` | Fade the score out. |
 | `setAtmosphere(option \| id \| track \| null, { fadeMs? })` | Choose and play the reader's atmosphere and save it in the preferences. `null` saves Off and fades it out. |
 | `startAtmosphere()` / `stopAtmosphere()` | Start the saved atmosphere (entering the reader) or fade it out without changing the choice (leaving). |
-| `setAtmosphereOptions(options)` | Replace the catalog. A saved choice waiting for its option starts when it arrives. |
+| `setAtmosphereOptions(options)` | Replace the catalog. A pending saved choice starts when it arrives; a removed choice fades out, and changed sources crossfade even under the same id. The saved choice is retained. |
 | `playCue(url, { volume?, startTime? })` | Play a one-shot over the loops. Returns `false` when skipped: cues or master off, zero per-cue volume, a hidden page, the concurrency cap (`maxConcurrentCues`, default 6), or no audio. |
 | `preloadCues(urls)` | Warm up to `maxCachedCueUrls` unique chapter cue URLs (default 8). No playback, active slot, gain sink or audio-session demand. Later triggers reuse loaded elements and keep their original 1.5 s start deadline. |
-| `stopAll({ fadeMs? })` | Fade both loops out; preferences are untouched. |
-| `setDuck(0..1, { fadeMs? })`, `getDuck()` | Temporarily lower Soundscapes and Atmosphere (for example under narration) without touching preferences. Cues are never ducked. `NarrativeFace` drives this for you. |
+| `stopAll({ fadeMs? })` | Fade both loops out and pause connected Voice; preferences are untouched and cues finish on their own. |
+| `connectVoice(output)` | Connect one `ReaderMixerVoiceOutput`; returns an idempotent cleanup. Replacing an output pauses and detaches the old one. Cleanup releases the mixer gate and subscription; the host owns the audio source and transport. |
+| `setDuck(0..1, { fadeMs? })`, `getDuck()` | Temporarily lower Soundscapes and Atmosphere (for example under narration) without touching preferences. Cues and Voice are never ducked. `NarrativeFace` drives this for you. |
+| `retainDuck()` | Get an independent `setDuck` / `release` owner. The strongest active duck wins; removing one narration control preserves the others. |
 | `setLayerLevel(layer, 0..1)`, `setLayerEnabled(layer, on)`, `setMasterEnabled(on)` | The reader's controls. Changes apply live, including mid-crossfade. |
 | `applyPreset(preset \| id)`, `getPresets()`, `resetPreferences()` | Pick a named mix in one tap, or return to the defaults (see Presets). |
 | `getPreferences()`, `setPreferences(input)`, `subscribePreferences(fn)` | The reader's settings as one plain object (see below). |
@@ -142,10 +148,15 @@ the master is off still reports `playing`.
 with the mixer. Render it inside the same `ReaderMixerProvider`, or pass
 `mixer={...}`, and:
 
+- **One Voice control.** With `ReaderMixerVoice` connected, the face's voice
+  slider and mute button share the saved Voice level and switch with the mixer.
+  The master switch gates narration without changing the session's user mute,
+  saved level, queue or playback position. Other session volume controls also
+  update the saved Voice level.
 - **Narration ducks the reader's music and atmosphere.** While the voice plays, the
   mixer's Soundscapes and Atmosphere drop by `duckAmount × intensity` (defaults
   0.6 × 1), with a short ramp, and return when it pauses or the face unmounts. Sound Cues
-  keep their level.
+  keep their level. Muted, disabled or zero-volume narration restores the background mix.
 - **One atmosphere control.** The face's Ambience slider reads and writes the
   mixer's Atmosphere level (the reader's saved setting), so it always agrees with
   `ReaderMixerPanel`.
@@ -155,13 +166,27 @@ with the mixer. Render it inside the same `ReaderMixerProvider`, or pass
   the Settings › Audio view that holds `ReaderMixerPanel`.
 
 ```tsx
-<AudioSessionProvider initialQueue={chapterNarration}>
+<AudioSessionProvider initialQueue={chapterNarration} audioBackend="webaudio">
     <ReaderMixerProvider options={mixerOptions}>
+        <ReaderMixerVoice />
         <ChapterView />
         <NarrativeFace embedded showExpand onExpand={openAudioSettings} />
     </ReaderMixerProvider>
 </AudioSessionProvider>
 ```
+
+Mount one `ReaderMixerVoice` per narration session, even if several faces render
+its controls. It accepts `mixer` for an explicit instance and `audioSessionType`
+(default `"playback"`, or `null` to leave Safari's session untouched). The caller
+continues to load/play TTS through the session. Mixer connection never starts
+idle narration. Closing the chapter with `stopAll()` pauses narration, while
+switches mute its output and keep transport running.
+
+For another player, implement `ReaderMixerVoiceOutput`: `getState()` and
+`subscribe()` report playback/mute/routing, `setLevel()` applies user volume,
+`setEnabled()` gates output without overwriting that volume or user mute, and
+`pause()`/`resume()` preserve playback position. Dispose pauses the connected
+voice and releases its gate; it does not release the caller's source.
 
 Pass `mixer={null}` to keep a face stand-alone inside a provider. A face with
 its own `ambienceManifest` keeps that sprite ambience too, and it ducks as before.
@@ -173,12 +198,13 @@ avoids that on iPhone.
 
 ```json
 {
-    "version": 1,
+    "version": 2,
     "masterEnabled": true,
     "layers": {
         "soundscapes": { "enabled": true, "level": 0.25 },
         "atmosphere": { "enabled": true, "level": 0.3 },
-        "cues": { "enabled": true, "level": 0.75 }
+        "cues": { "enabled": true, "level": 0.75 },
+        "voice": { "enabled": true, "level": 1 }
     },
     "atmosphereId": "gentle-rain"
 }
@@ -195,6 +221,13 @@ one persistence callback. Set `preferencesDebounceMs: 0` for the previous
 immediate callback timing, or call `flushPreferences()` on an explicit commit.
 Pagehide and dispose flush pending changes once. Asynchronous server writes still
 belong to the host; flushing invokes the callback and cannot await a network save.
+
+Version 1 saves migrate to version 2 without changing their three existing
+layers, master switch or atmosphere. Voice defaults to enabled at 100%, or the
+host's `defaultPreferences.layers.voice`. New snapshots always use version 2.
+The package's 2.0.0 release expands the typed `ReaderMixerLayer` union and layer
+records: update exhaustive host labels/maps to include `voice`, and normalize
+stored JSON rather than casting a version 1 object as `ReaderMixerPreferences`.
 
 ## Loop boundaries and cue resources
 
@@ -242,20 +275,25 @@ the host chooses. The package hardcodes no key.
 
 A new reader starts on the **default mix**: everything on, Soundscapes 25%,
 Atmosphere 30% on the catalog option with id `"gentle-rain"`, and Sound Cues
-75% (`DEFAULT_READER_MIXER_PREFERENCES`). A host whose catalog uses different
+75%, Voice 100% (`DEFAULT_READER_MIXER_PREFERENCES`). A host whose catalog uses different
 ids, or that wants another starting mix, passes `defaultPreferences`; saved
 `initialPreferences` fill in on top of it.
 
 Presets switch the whole mix in one tap. The built-in `READER_MIXER_PRESETS` are:
 
-| Preset | Soundscapes | Atmosphere | Sound Cues | Atmosphere choice |
-| --- | --- | --- | --- | --- |
-| Default | 25% | 30% | 75% | resets to the default (gentle rain) |
-| Cinematic | 60% | 35% | 90% | kept |
-| Calm | 15% | 40% | 40% | kept |
-| Focus | off | 30% | off | kept |
+| Preset | Soundscapes | Atmosphere | Sound Cues | Voice | Atmosphere choice |
+| --- | --- | --- | --- | --- | --- |
+| Default | 25% | 30% | 75% | 100% | resets to the default (gentle rain) |
+| Cinematic | 60% | 35% | 90% | kept | kept |
+| Calm | 15% | 40% | 40% | kept | kept |
+| Focus | off | 30% | off | kept | kept |
 
-Every preset turns the master on. A preset's `preferences` may be partial:
+Every preset turns the master on. Choosing Off keeps the open reader's
+atmosphere lifetime: applying Default can
+start its rain again. After `stopAtmosphere()` or `stopAll()` (leaving the reader),
+presets only change saved settings until the host starts the atmosphere again.
+
+A preset's `preferences` may be partial:
 fields it leaves out keep the reader's current choice. `state.activePresetId`
 names the preset the current mix matches, or `null` for a custom mix, and
 `ReaderMixerPanel` shows the presets as a chip row above the master switch
@@ -265,7 +303,7 @@ offer your own list and labels, for example translated ones.
 ## Routing and iPhone volume
 
 iOS Safari ignores `HTMLMediaElement.volume`. The mixer therefore has two
-routes, chosen with `routing`:
+routes for its loops and cues, chosen with `routing`:
 
 | `routing` | How audio plays | Sliders on iPhone | File host needs CORS |
 | --- | --- | --- | --- |
@@ -292,6 +330,15 @@ does not downgrade. A failed replacement still leaves the previous mix playing.
 
 `state.volumeControl` is `"on-off"` when sliders cannot set loudness, and
 `ReaderMixerPanel` then shows "Volume is set by your device on this browser".
+
+**Voice routing belongs to the narration session.** Use
+`AudioSessionProvider audioBackend="webaudio"` for real volume on decoded TTS
+audio files, including iPhone. That backend downloads/decodes complete files and
+requires CORS; it does not stream a live TTS response. HTML5 can play compatible
+streams and non-CORS sources. Its volume works on browsers that honor element
+volume, and falls back to on/off on iPhone. Voice zero, switch off and master off
+still silence HTML5 output through its mute gate. `state.layers.voice.routing`
+reports the session's active route; mixer `routing` does not change it.
 
 ### CORS on the SEIHouse audio hosts
 
@@ -343,8 +390,8 @@ sets Safari's Audio Session API, `navigator.audioSession.type = "playback"`
 The context suspends when no enabled loop is wanted and no enabled cue is active,
 when the master is off, and while hidden under the default visibility policy.
 An idle tap primes spares without resuming the context or claiming the session.
-The previous session type is restored when output becomes idle or hidden and on
-disposal. The mixer does not force an idle type: a host using mixable `"ambient"`
+The previous session type is restored when all mixer/Voice owners release it,
+so stopping one does not undo another's playback session. The mixer does not force an idle type: a host using mixable `"ambient"`
 gets it back, and a host using `"auto"` gets that back. Pass `audioSessionType: null`
 to leave the page's session untouched. The element route needs nothing.
 
@@ -411,10 +458,15 @@ keep playing in the background. If the browser refuses the resume (iOS after a
 long time in the background), the layer reports `blocked` and the next tap
 resumes it.
 
+Connected Voice also pauses if it was playing, and resumes only when the mixer
+paused it for visibility. A previously paused voice stays paused. Output is gated
+while hidden, including a pending TTS load that finishes there; closing the
+chapter with `stopAll()` cancels any automatic Voice resume.
+
 ## Mixer view
 
 `ReaderMixerPanel` renders a master switch, then one row per layer
-(Soundscapes, Atmosphere, Sound Cues), each with an on/off switch, a 0–100
+(Soundscapes, Atmosphere, Sound Cues, Voice), each with an on/off switch, a 0–100
 slider and its percentage. An atmosphere picker sits under the Atmosphere row,
 with Off first and the host's options grouped by `group`.
 
@@ -454,13 +506,13 @@ with Off first and the host's options grouped by `group`.
 
 ## Manual verification
 
-The Workshop's **SEN → Reader Mixer** workspace drives all three layers with the
+The Workshop's **SEN → Reader Mixer** workspace drives all four layers with the
 mixer view. Before shipping a change to this path:
 
 1. Desktop Chrome: open a chapter, pick an atmosphere, fire overlapping cues,
    switch the score mid-chapter, move each slider and switch, toggle the master,
    reload and confirm the settings return, then hide the tab and come back.
-2. iPhone Safari, ring switch **on**, Element route: all three layers play
+2. iPhone Safari, ring switch **on**, Element route: loops and cues play
    together after one tap; sliders act as on/off and the view says so (the
    fallback for hosts without CORS).
 3. iPhone Safari, ring switch **silent**, Element route: audio keeps playing.
@@ -481,5 +533,16 @@ mixer view. Before shipping a change to this path:
 9. Listen across several boundaries of a rain bed for loop seams (repeat after
    the follow-up loop-crossfade PR). Record a listening result separately from
    automated/browser checks.
+10. **Voice/TTS on a physical iPhone (still required):** play a CORS-enabled
+    generated/recorded TTS file with the narration session's Web Audio backend.
+    Move the Voice slider, mute Voice, toggle master and restore each; confirm
+    both actual loudness and unchanged playback position/queue/rate. Repeat
+    with the ring switch on and silent, after backgrounding, and after a phone
+    call. Test HTML5 separately: its zero/off gates must silence narration even
+    when intermediate levels are controlled by the device. A slider test double
+    or desktop screenshot is not physical listening evidence.
+11. Desktop: compare the face's voice volume/mute with the fourth mixer row,
+    try Off → Default for Atmosphere, and reset settings during a slider drag.
+    Reload and confirm the saved defaults, including Voice, are restored.
 
 Record browser and OS versions in the pull request.

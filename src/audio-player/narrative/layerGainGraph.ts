@@ -29,6 +29,10 @@ export function probeElementVolumeWrites(): boolean {
 }
 
 type AudioSessionLike = { type: string }
+const sessionOwners = new WeakMap<
+    AudioSessionLike,
+    { previous: string; owners: Map<object, string> }
+>()
 
 function getAudioSession(): AudioSessionLike | null {
     if (typeof navigator === "undefined") return null
@@ -45,16 +49,26 @@ export function applyAudioSessionType(type: string | null | undefined): () => vo
     if (!type) return () => {}
     const session = getAudioSession()
     if (!session) return () => {}
-    let previous: string
+    let entry = sessionOwners.get(session)
+    const owner = {}
     try {
-        previous = session.type
+        if (!entry) entry = { previous: session.type, owners: new Map() }
         session.type = type
     } catch {
         return () => {}
     }
+    entry.owners.set(owner, type)
+    sessionOwners.set(session, entry)
     return () => {
+        if (!entry.owners.has(owner)) return
+        const before = [...entry.owners.values()]
+        const currentType = before[before.length - 1]
+        entry.owners.delete(owner)
+        const remaining = [...entry.owners.values()]
+        const nextType = remaining[remaining.length - 1] ?? entry.previous
+        if (entry.owners.size === 0) sessionOwners.delete(session)
         try {
-            if (session.type === type) session.type = previous
+            if (session.type === currentType) session.type = nextType
         } catch {
             // Restoring is best effort.
         }

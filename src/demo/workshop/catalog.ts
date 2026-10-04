@@ -765,21 +765,22 @@ export const WORKSHOP_ENTRIES: readonly WorkshopEntry[] = [
         category: "sen",
         title: "Reader Mixer",
         summary:
-            "Music, atmosphere and sound cues playing together, each with its own switch and volume, plus the inline mixer view for the reader's Settings › Audio.",
+            "Music, atmosphere, sound cues and voice playing together, each with its own switch and volume, plus the inline mixer view for the reader's Settings › Audio.",
         status: "live",
-        tags: ["ReaderMixer", "ReaderMixerPanel", "Three layers"],
+        tags: ["ReaderMixer", "ReaderMixerPanel", "Four layers"],
         working: [
             "All 43 SEN Soundscapes (Volume 1) by category; any score crossfades in per chapter or mid-chapter, and repeat requests do nothing",
             "A reader-chosen atmosphere loops under everything; Off fades it out",
             "Sound cues overlap over both loops without pausing them",
             "Master, per-layer switches and sliders, with settings saved in this browser",
-            "Presets (Default, Cinematic, Calm, Focus); new readers start on Default: 25 / 30 / 75 with gentle rain",
+            "Presets (Default, Cinematic, Calm, Focus); new readers start on Default: 25 / 30 / 75 / 100 with gentle rain",
             "Auto, Element or Web Audio routing; SEIHouse files play on all three, and the iPhone on/off fallback is shown in the view",
-            "Both loops pause while the page is hidden",
-            "NarrativeFace as companion: narration ducks the music and atmosphere, its Ambience slider is the Atmosphere level, and its … button opens the mixer view",
+            "Both loops and a playing voice pause while the page is hidden",
+            "NarrativeFace as companion: its voice volume and mute share the Voice slot; audible narration ducks the music and atmosphere, its Ambience slider is the Atmosphere level, and its … button opens the mixer view",
         ],
         placeholders: [
             "iPhone behavior (silent switch, per-element unlock) needs a real device; this page cannot prove it",
+            "Voice uses recorded help files on HTML5; its current host lacks CORS. Web Audio TTS files need CORS for real iPhone volume",
         ],
         sources: [
             "src/audio-player/narrative/ReaderMixer.ts",

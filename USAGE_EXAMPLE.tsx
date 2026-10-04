@@ -5,6 +5,10 @@ import { useMemo } from "react"
 import {
     AudioPlayer,
     AudioSessionProvider,
+    NarrativeFace,
+    ReaderMixerPanel,
+    ReaderMixerProvider,
+    ReaderMixerVoice,
     createAutomixPlugin,
     createKeyboardShortcutPlugin,
     StickyBottomPlayer,
@@ -36,6 +40,20 @@ export function SharedSessionExample() {
             <CustomPlayerControls />
             <StickyBottomPlayer />
         </AudioSessionProvider>
+    )
+}
+
+// Recorded or generated TTS audio uses the same queue and the fourth mixer slot.
+// Mount one Voice connection per narration session, alongside its visual controls.
+export function ReaderMixerExample({ narration }: { narration: Track[] }) {
+    return (
+        <ReaderMixerProvider>
+            <AudioSessionProvider initialQueue={narration} audioBackend="webaudio">
+                <ReaderMixerVoice />
+                <NarrativeFace />
+                <ReaderMixerPanel />
+            </AudioSessionProvider>
+        </ReaderMixerProvider>
     )
 }
 

@@ -87,6 +87,40 @@ describe("NarrativeFace with a reader mixer", () => {
         expect(slider).toHaveValue("70")
     })
 
+    it("restores the background mix when narration is muted or its volume is zero", () => {
+        render(<Reader narrationState="playing" />)
+        expect(mixer.getDuck()).toBeCloseTo(0.6)
+        fireEvent.click(screen.getByRole("button", { name: "Mute" }))
+        expect(mixer.getDuck()).toBe(0)
+        fireEvent.click(screen.getByRole("button", { name: "Unmute" }))
+        expect(mixer.getDuck()).toBeCloseTo(0.6)
+        fireEvent.keyDown(screen.getByRole("slider", { name: "Volume" }), {
+            key: "Home",
+        })
+        expect(mixer.getDuck()).toBe(0)
+    })
+
+    it("keeps ducking when one of two narration controls unmounts", () => {
+        function SharedReader({ second }: { second: boolean }) {
+            return (
+                <AudioSessionProvider initialQueue={NARRATION}>
+                    <ReaderMixerProvider mixer={mixer}>
+                        <NarrativeFace key="first" narrationState="playing" duckAmount={0.4} />
+                        {second && (
+                            <NarrativeFace key="second" narrationState="playing" duckAmount={0.7} />
+                        )}
+                    </ReaderMixerProvider>
+                </AudioSessionProvider>
+            )
+        }
+        const view = render(<SharedReader second />)
+        expect(mixer.getDuck()).toBeCloseTo(0.7)
+        view.rerender(<SharedReader second={false} />)
+        expect(mixer.getDuck()).toBeCloseTo(0.4)
+        view.unmount()
+        expect(mixer.getDuck()).toBe(0)
+    })
+
     it("shows the reader's atmosphere as its mood", () => {
         const { container } = render(<Reader narrationState="paused" />)
         const mood = () => container.querySelector(".ap-nf__mood")?.textContent

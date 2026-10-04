@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useAudioSession } from "../session/AudioSessionContext"
-import type { ReaderMixer } from "./ReaderMixer"
+import { computeReaderMixerGain } from "./ReaderMixer"
+import type { ReaderMixer, ReaderMixerDuckLease } from "./ReaderMixer"
 import { useReaderMixerState } from "./ReaderMixerContext"
 import {
     createAudioSpriteEngine,
@@ -51,7 +52,8 @@ export interface UseNarrativeAudioOptions {
      * level (the reader's saved setting wins over `ambienceVolume`), the mood
      * falls back to the reader's chosen atmosphere, and narration ducks the
      * mixer's Soundscapes and Atmosphere by `duckAmount × intensity` while it
-     * plays. Cues are never ducked. Any `ambienceManifest` keeps working
+     * plays audibly. With `ReaderMixerVoice` connected, narration's volume and
+     * mute also share the saved Voice controls. Cues and Voice are never ducked. Any `ambienceManifest` keeps working
      * alongside. Omit or pass `null` for the stand-alone behavior.
      */
     mixer?: ReaderMixer | null
@@ -128,6 +130,11 @@ export function useNarrativeAudio(
 
     const session = useAudioSession()
     const mixerState = useReaderMixerState(mixer)
+    const voiceLevel = mixerState?.preferences.layers.voice.level ?? session.volume
+    const previousVoiceLevel = useRef(voiceLevel > 0 ? voiceLevel : 1)
+    useEffect(() => {
+        if (voiceLevel > 0) previousVoiceLevel.current = voiceLevel
+    }, [voiceLevel])
 
     // The sprite engine is created lazily on first use (it needs a user gesture
     // for the AudioContext) and disposed on unmount.
@@ -154,8 +161,13 @@ export function useNarrativeAudio(
     const targetAmbience = clamp01(ambienceVolume * clamp01(intensity))
     const isNarrating =
         narrationState === "playing" || (narrationState === undefined && session.isPlaying)
+    const narrationAudible =
+        isNarrating &&
+        !session.isMuted &&
+        session.volume > 0 &&
+        (!mixerState || computeReaderMixerGain(mixerState.preferences, "voice") > 0)
     const duckedAmbience = clamp01(targetAmbience * (1 - clamp01(duckAmount) * clamp01(intensity)))
-    const liveAmbienceTarget = isNarrating ? duckedAmbience : targetAmbience
+    const liveAmbienceTarget = narrationAudible ? duckedAmbience : targetAmbience
 
     // ---- Ambience manifest load + profile crossfade ----------------------
     useEffect(() => {
@@ -251,16 +263,20 @@ export function useNarrativeAudio(
     }, [liveAmbienceTarget])
 
     // ---- Companion mixer: duck its loops under narration -----------------
-    const mixerDuck = isNarrating ? clamp01(duckAmount) * clamp01(intensity) : 0
+    const mixerDuck = narrationAudible ? clamp01(duckAmount) * clamp01(intensity) : 0
+    const duckLeaseRef = useRef<ReaderMixerDuckLease | null>(null)
     useEffect(() => {
         if (!mixer) return
-        mixer.setDuck(mixerDuck)
-    }, [mixer, mixerDuck])
-    useEffect(() => {
-        if (!mixer) return
-        // Leaving (or swapping mixers) must never strand the reader's music ducked.
-        return () => mixer.setDuck(0)
+        const lease = mixer.retainDuck()
+        duckLeaseRef.current = lease
+        return () => {
+            lease.release()
+            duckLeaseRef.current = null
+        }
     }, [mixer])
+    useEffect(() => {
+        duckLeaseRef.current?.setDuck(mixerDuck)
+    }, [mixer, mixerDuck])
     // Mirror the mixer's Atmosphere level locally so disconnecting keeps it.
     const mixerAtmosphereLevel = mixerState?.preferences.layers.atmosphere.level
     useEffect(() => {
@@ -270,8 +286,9 @@ export function useNarrativeAudio(
     // ---- Narration volume passthrough -------------------------------------
     useEffect(() => {
         if (narrationVolumeProp === undefined) return
-        session.setVolume(clamp01(narrationVolumeProp))
-    }, [narrationVolumeProp, session])
+        if (mixer) mixer.setLayerLevel("voice", clamp01(narrationVolumeProp))
+        else session.setVolume(clamp01(narrationVolumeProp))
+    }, [narrationVolumeProp, session, mixer])
 
     // ---- Cleanup ----------------------------------------------------------
     useEffect(() => {
@@ -292,9 +309,35 @@ export function useNarrativeAudio(
     )
 
     const setNarrationVolume = useCallback(
-        (value: number) => session.setVolume(clamp01(value)),
-        [session]
+        (value: number) => {
+            if (mixer) {
+                const level = clamp01(value)
+                mixer.setPreferences({
+                    layers: { voice: { level, ...(level > 0 ? { enabled: true } : {}) } },
+                })
+            } else session.setVolume(clamp01(value))
+        },
+        [session, mixer]
     )
+    const toggleNarrationMute = useCallback(() => {
+        if (!mixer) return session.toggleMute()
+        if (session.isMuted) {
+            session.toggleMute()
+            mixer.setLayerEnabled("voice", true)
+        } else {
+            const voice = mixer.getPreferences().layers.voice
+            const enabled = !voice.enabled
+            mixer.setPreferences({
+                layers: {
+                    voice: {
+                        enabled,
+                        level:
+                            enabled && voice.level === 0 ? previousVoiceLevel.current : voice.level,
+                    },
+                },
+            })
+        }
+    }, [session, mixer])
 
     const hasSpriteAmbience = Boolean(ambienceManifest?.src?.trim()) && Boolean(ambientProfile)
     const mixerLoopsPlaying =
@@ -313,7 +356,9 @@ export function useNarrativeAudio(
 
     return {
         isPlaying: session.isPlaying,
-        isMuted: session.isMuted,
+        isMuted:
+            session.isMuted ||
+            (mixerState !== null && !mixerState.preferences.layers.voice.enabled),
         hasNarration: session.hasAudio,
         hasAmbience: hasSpriteAmbience || mixerState !== null,
         mood: sceneMood ?? atmosphereLabel,
@@ -321,9 +366,9 @@ export function useNarrativeAudio(
         ambienceVolume: mixerState
             ? mixerState.preferences.layers.atmosphere.level
             : ambienceVolume,
-        narrationVolume: session.volume,
+        narrationVolume: mixerState?.preferences.layers.voice.level ?? session.volume,
         togglePlay: session.toggle,
-        toggleMute: session.toggleMute,
+        toggleMute: toggleNarrationMute,
         setAmbienceVolume,
         setNarrationVolume,
         mixer,
