@@ -385,9 +385,8 @@ export interface ReaderMixerOptions {
     /**
      * How audio reaches the speakers. Defaults to `"auto"`.
      *
-     * - `"auto"`: Web Audio gain only where element volume is ignored (iOS
-     *   Safari), so every slider sets real loudness; plain media elements
-     *   everywhere else.
+     * - `"auto"`: Web Audio while leveling is on (the default), or where
+     *   element volume is ignored. With leveling off, plain elements elsewhere.
      * - `"element"`: plain media elements everywhere; where element volume
      *   is ignored, sliders act as on/off.
      * - `"web-audio"`: Web Audio gain everywhere.
@@ -413,7 +412,7 @@ export interface ReaderMixerOptions {
     /** Idle cue cache limits. Defaults to 8 URLs, 2 elements each. */
     maxCachedCueUrls?: number
     maxCuePoolSizePerUrl?: number
-    /** Short overlap at each bed boundary. Default 250 ms; 0 selects native looping. */
+    /** Short overlap at each bed boundary. Default 250 ms; 0 disables overlap. */
     loopCrossfadeMs?: number
     /** Coalesce persistence callbacks. Default 300 ms; 0 delivers each change immediately. */
     preferencesDebounceMs?: number
@@ -503,7 +502,8 @@ const LOOP_STATUS: Record<SceneMixStatusSnapshot["state"], ReaderMixerLayerStatu
 
 /**
  * Four-layer reader audio: Soundscapes, Atmosphere, Sound Cues and Voice, each with
- * its own switch and level under one master switch.
+ * its own switch and level. The master gates the three soundtrack layers;
+ * Voice remains independent.
  *
  * Built from the existing engines: two looping {@link SceneMixEngine}s
  * (soundscape crossfades, atmosphere bed) and one {@link OneShotEngine}
@@ -577,6 +577,7 @@ export class ReaderMixer {
     private disconnectVoice: (() => void) | null = null
     private voiceSnapshot: ReaderMixerVoiceSnapshot = { status: "idle" }
     private voicePausedForVisibility = false
+    private voicePausedForSleep = false
 
     constructor(options: ReaderMixerOptions = {}) {
         this.leveling = {
@@ -916,6 +917,7 @@ export class ReaderMixer {
         this.cancelIdleFade()
         this.idleGain = 1
         this.voicePausedForIdle = false
+        this.voicePausedForSleep = false
         this.stopSoundscape(options)
         this.stopAtmosphere(options)
         this.voicePausedForVisibility = false
@@ -973,6 +975,11 @@ export class ReaderMixer {
         const sync = () => {
             if (this.voiceOutput !== output || this.disposed) return
             this.voiceSnapshot = { ...output.getState() }
+            if (this.session.sleep.status === "fired" && this.voiceSnapshot.status === "playing") {
+                this.voicePausedForSleep = true
+                output.pause()
+                return
+            }
             this.session.setVoicePlaying(this.voiceSnapshot.status === "playing")
             if (this.voiceSnapshot.status === "playing") this.session.start()
             this.pauseVoiceWhileHidden()
@@ -989,6 +996,8 @@ export class ReaderMixer {
             this.disconnectVoice = null
             this.voiceSnapshot = { status: "idle" }
             this.voicePausedForVisibility = false
+            this.voicePausedForSleep = false
+            this.voicePausedForIdle = false
             this.session.setVoicePlaying(false)
             output.setEnabled(true)
             this.refresh()
@@ -1238,7 +1247,8 @@ export class ReaderMixer {
         routing: NonNullable<ReaderMixerOptions["routing"]>
     ): LayerGainGraph<ReaderMixerLayer> | null {
         if (routing === "element") return null
-        if (routing === "auto" && this.elementVolumeWorks) return null
+        if (routing === "auto" && this.elementVolumeWorks && this.leveling.enabled === false)
+            return null
         const Ctor = getAudioContextCtor()
         if (!Ctor) return null
         try {
@@ -1626,6 +1636,11 @@ export class ReaderMixer {
         this.idleGain = 1
         this.soundscapes.stop(this.sleepFadeMs)
         this.atmosphere.stop(this.sleepFadeMs)
+        this.voicePausedForSleep =
+            this.voicePausedForVisibility ||
+            this.voiceSnapshot.status === "playing" ||
+            this.voiceSnapshot.status === "loading" ||
+            this.voiceSnapshot.status === "blocked"
         this.voicePausedForVisibility = false
         this.voicePausedForIdle = false
         this.voiceOutput?.setEnabled(false)
@@ -1650,7 +1665,9 @@ export class ReaderMixer {
             this.playSoundscape(this.wantedSoundscape.track, this.wantedSoundscape.options)
         if (this.atmosphereStarted) this.startAtmosphere()
         this.voiceOutput?.setEnabled(this.voiceEnabled())
-        if (this.layerGain("voice") > 0) this.voiceOutput?.resume()
+        const resumeVoice = this.voicePausedForSleep
+        this.voicePausedForSleep = false
+        if (resumeVoice && this.layerGain("voice") > 0) this.voiceOutput?.resume()
         this.applyLevels()
     }
 

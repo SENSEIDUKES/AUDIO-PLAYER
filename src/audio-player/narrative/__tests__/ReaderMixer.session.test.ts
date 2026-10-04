@@ -118,6 +118,26 @@ describe("sleep", () => {
         expect(mixer.getState().layers.soundscapes.status).toBe("idle")
     })
 
+    it("does not start narration that the reader had already paused when sleep resumes", async () => {
+        const mixer = make({ sleepFadeMs: 0 })
+        const voice = {
+            getState: () => ({ status: "paused" as const }),
+            subscribe: () => () => {},
+            setLevel: vi.fn(),
+            setEnabled: vi.fn(),
+            pause: vi.fn(),
+            resume: vi.fn(),
+        }
+        mixer.connectVoice(voice)
+        await start(mixer)
+        mixer.setSleepTimer("chapter-end")
+        mixer.notifyChapterEnd()
+        mixer.resumeAudio()
+        await settle()
+        expect(voice.resume).not.toHaveBeenCalled()
+        expect(mixer.getState().layers.soundscapes.status).toBe("playing")
+    })
+
     it("fires End of chapter only on the host signal; emits an event and resumes on a new choice", async () => {
         const mixer = make({ sleepFadeMs: 0 })
         const fired = vi.fn()
@@ -152,6 +172,23 @@ describe("sleep", () => {
         mixer.notifyChapterEnd()
         expect(mixer.getState().sleepTimer.status).toBe("off")
         expect(mixer.getState().soundscapePlays).toBe(0)
+    })
+
+    it("starts a fresh idle window when a new timer explicitly resumes sleep after idle", async () => {
+        const mixer = make({ idleTimeoutMs: 1000, idleFadeMs: 0, sleepFadeMs: 0 })
+        await start(mixer)
+        await settle(1100)
+        expect(mixer.getState().idle).toBe(true)
+        mixer.setSleepTimer("chapter-end")
+        mixer.notifyChapterEnd()
+        mixer.setSleepTimer("15-minutes")
+        await settle()
+        expect(mixer.getState().idle).toBe(false)
+        expect(mixer.getState().layers.soundscapes.status).toBe("playing")
+        await settle(700)
+        expect(mixer.getState().idle).toBe(false)
+        await settle(400)
+        expect(mixer.getState().idle).toBe(true)
     })
 })
 
@@ -291,18 +328,48 @@ describe("music rest", () => {
         expect(mixer.getState().layers.soundscapes.current).toBe("id:different")
     })
 
-    it("allows never-rest and configurable single-play rests", async () => {
+    it("allows configurable single-play rests", async () => {
         const mixer = make({ soundscapeMaxPlays: 1, soundscapeRestFadeMs: 0 })
         const { music } = await start(mixer)
         music.duration = 4
         music.dispatch("loadedmetadata")
         await settle(4050)
         expect(mixer.getState().layers.soundscapes.status).toBe("resting")
-        const unlimited = make({ soundscapeMaxPlays: null })
-        await start(unlimited)
-        const unlimitedMusic = FakeAudio.withSrc(score.audioFile)[0]
-        unlimitedMusic.duration = 4
-        unlimitedMusic.dispatch("loadedmetadata")
-        expect(unlimited.getState().layers.soundscapes.status).toBe("playing")
+    })
+
+    it("keeps repeating beyond the default limit when never-rest is selected", async () => {
+        const mixer = make({ soundscapeMaxPlays: null })
+        const { music } = await start(mixer)
+        music.duration = 4
+        music.dispatch("loadedmetadata")
+        const standby = FakeAudio.withSrc(score.audioFile)[1]
+        standby.duration = 4
+        standby.dispatch("loadedmetadata")
+        await settle(17000)
+        expect(mixer.getState().soundscapePlays).toBeGreaterThanOrEqual(4)
+        expect(mixer.getState().layers.soundscapes.status).toBe("playing")
+        expect(FakeAudio.withSrc(score.audioFile).some((deck) => !deck.paused)).toBe(true)
+    })
+
+    it("lets the old score rest without cancelling a replacement still waiting to start", async () => {
+        const mixer = make({ soundscapeMaxPlays: 1, soundscapeRestFadeMs: 1000 })
+        const { music } = await start(mixer)
+        music.duration = 4
+        music.dispatch("loadedmetadata")
+        let resolveReplacement = () => {}
+        FakeAudio.playBehavior = () =>
+            new Promise<void>((resolve) => {
+                resolveReplacement = resolve
+            })
+        const next = { ...score, id: "next", audioFile: "https://a.test/next.mp3" }
+        mixer.playSoundscape(next, { scene: "chapter-2" })
+        await settle(4100)
+        expect(music.paused).toBe(true)
+        expect(mixer.getState().layers.soundscapes.status).toBe("resting")
+        resolveReplacement()
+        await settle()
+        expect(mixer.getState().layers.soundscapes.current).toBe("id:next")
+        expect(mixer.getState().layers.soundscapes.status).toBe("playing")
+        expect(mixer.getState().soundscapePlays).toBe(0)
     })
 })

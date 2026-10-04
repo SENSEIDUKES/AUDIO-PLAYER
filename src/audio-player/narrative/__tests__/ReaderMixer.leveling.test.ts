@@ -60,6 +60,21 @@ it("has a summed-output limiter, not one limiter per layer", () => {
     expect(limiter.connections).toEqual([ctx.destination])
 })
 
+it("releases a context lease if limiter construction fails before the element fallback", async () => {
+    const compressor = vi.spyOn(FakeAudioContext.prototype, "createDynamicsCompressor")
+    compressor.mockImplementation(() => {
+        throw new Error("No compressor")
+    })
+    try {
+        mixer = createReaderMixer()
+        await flushMicrotasks()
+        expect(mixer.getState().routing).toBe("element")
+        expect(FakeAudioContext.instances[0].state).toBe("closed")
+    } finally {
+        compressor.mockRestore()
+    }
+})
+
 it("attenuates elements, applies no boosts, and cannot level volume-locked iPhones", async () => {
     mixer = createReaderMixer({ routing: "element", fadeMs: 0 })
     mixer.playSoundscape(scores)

@@ -593,11 +593,13 @@ describe("ReaderMixer", () => {
             vi.stubGlobal("AudioContext", FakeAudioContext)
         })
 
-        it("stays on media elements where element volume works, by default", () => {
-            expect(makeMixer().getState().routing).toBe("element")
-            expect(makeMixer({ routing: "auto" }).getState().routing).toBe("element")
+        it("uses Web Audio for default leveling and can retain plain elements with leveling off", () => {
+            expect(makeMixer().getState().routing).toBe("web-audio")
+            expect(makeMixer({ routing: "auto", leveling: false }).getState().routing).toBe(
+                "element"
+            )
             expect(makeMixer({ routing: "element" }).getState().routing).toBe("element")
-            expect(FakeAudioContext.instances).toHaveLength(0)
+            expect(FakeAudioContext.instances).toHaveLength(1)
         })
 
         it("crossfades through per-element gain and resumes the context on a gesture", async () => {

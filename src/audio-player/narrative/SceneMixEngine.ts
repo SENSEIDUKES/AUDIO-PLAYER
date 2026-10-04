@@ -544,6 +544,11 @@ export class SceneMixEngine {
                 )
                     return
                 this.completedPlays += 1
+                try {
+                    this.onPlaybackChange?.()
+                } catch {
+                    /* Observers cannot break a repeat. */
+                }
                 if (this.maxPlays !== null && this.completedPlays >= this.maxPlays) {
                     this.rest(deck, 0)
                     return
@@ -986,6 +991,7 @@ export class SceneMixEngine {
         this.cancelLoop()
 
         if (transition.resumeTime === null) this.completedPlays = 0
+        this.restingRequest = null
 
         this.pendingTransition = null
         this.disarmGestureRetry?.()
@@ -1561,14 +1567,7 @@ export class SceneMixEngine {
 
     /** Rest inside the final play's tail, rather than starting one extra repeat for the fade. */
     private scheduleRest(deck: Deck): void {
-        if (
-            this.active !== deck ||
-            this.paused ||
-            this.disposed ||
-            deck.el.paused ||
-            this.pendingTransition
-        )
-            return
+        if (this.active !== deck || this.paused || this.disposed || deck.el.paused) return
         const remaining = (deck.el.duration - deck.el.currentTime) * 1000
         if (!Number.isFinite(remaining) || remaining < 0) return
         this.clearLoopTimer()
@@ -1579,8 +1578,7 @@ export class SceneMixEngine {
         this.loopTimer = setTimeout(
             () => {
                 this.loopTimer = null
-                if (this.active === deck && !this.paused && !this.pendingTransition)
-                    this.rest(deck, fadeMs)
+                if (this.active === deck && !this.paused) this.rest(deck, fadeMs)
             },
             Math.max(0, remaining - fadeMs)
         )
@@ -1589,9 +1587,16 @@ export class SceneMixEngine {
     private rest(deck: Deck, fadeMs: number): void {
         const request = deck.request
         const completed = this.maxPlays ?? this.completedPlays
-        this.stop(fadeMs)
+        // A slow replacement must neither extend the old score indefinitely
+        // nor get cancelled when that score reaches its rest limit.
+        this.cancelLoop()
+        for (const candidate of this.decks) {
+            if (candidate !== this.pendingTransition?.incoming) this.retire(candidate, fadeMs)
+        }
+        this.active = null
         this.completedPlays = completed
         this.restingRequest = request
+        this.startTicking()
         this.publishStatus("resting", request.key, null)
     }
 

@@ -78,7 +78,7 @@ export function applyAudioSessionType(type: string | null | undefined): () => vo
 /**
  * One Web Audio graph for several independent layers:
  *
- *     element → MediaElementAudioSourceNode → element gain → layer bus → destination
+ *     element → MediaElementAudioSourceNode → element gain → layer bus → limiter → destination
  *
  * The element gain carries an engine's per-element value (fade curve and
  * per-call volume); the layer bus carries the reader's layer level. Both work
@@ -98,17 +98,36 @@ export class LayerGainGraph<Layer extends string> {
     constructor(Ctor: typeof AudioContext, layers: readonly Layer[]) {
         this.lease = retainAudioContext(Ctor)
         this.ctx = this.lease.context
-        this.limiter = this.ctx.createDynamicsCompressor()
-        this.limiter.threshold.value = -1
-        this.limiter.knee.value = 0
-        this.limiter.ratio.value = 20
-        this.limiter.attack.value = 0.001
-        this.limiter.release.value = 0.1
-        this.limiter.connect(this.ctx.destination)
-        for (const layer of layers) {
-            const bus = this.ctx.createGain()
-            bus.connect(this.limiter)
-            this.buses.set(layer, bus)
+        let limiter: DynamicsCompressorNode | undefined
+        try {
+            limiter = this.ctx.createDynamicsCompressor()
+            this.limiter = limiter
+            limiter.threshold.value = -1
+            limiter.knee.value = 0
+            limiter.ratio.value = 20
+            limiter.attack.value = 0.001
+            limiter.release.value = 0.1
+            limiter.connect(this.ctx.destination)
+            for (const layer of layers) {
+                const bus = this.ctx.createGain()
+                this.buses.set(layer, bus)
+                bus.connect(limiter)
+            }
+        } catch (error) {
+            for (const bus of this.buses.values()) {
+                try {
+                    bus.disconnect()
+                } catch {
+                    /* Best effort after partial construction. */
+                }
+            }
+            try {
+                limiter?.disconnect()
+            } catch {
+                /* Best effort. */
+            }
+            this.lease.release()
+            throw error
         }
     }
 

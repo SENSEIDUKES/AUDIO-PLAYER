@@ -115,7 +115,11 @@ export class ReaderMixerSession {
                       endsAt,
                       remainingMs: choice.durationMs ?? null,
                   })
-        if (wasStopped) this.options.onResume()
+        if (wasStopped) {
+            this.lastActivity = Date.now()
+            this.idle = false
+            this.options.onResume()
+        }
         this.options.onChange()
         this.check()
     }
