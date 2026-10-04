@@ -165,7 +165,7 @@ export class HTML5AudioBackend implements AudioBackend {
     setOutputGain(gain: number): void {
         const next = Number.isFinite(gain) ? Math.max(0, Math.min(1, gain)) : 0
         if (next === this.outputGain) return
-        this.muted = this.isMuted()
+        if (this.audio) this.muted = this.isMuted()
         this.outputGain = next
         const audio = this.audio
         if (audio) {

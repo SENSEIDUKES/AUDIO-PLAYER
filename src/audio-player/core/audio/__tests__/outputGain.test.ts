@@ -15,6 +15,21 @@ afterEach(() => {
 })
 
 describe("independent mixer output gain", () => {
+    it("preserves a mute set before the HTML5 element mounts", () => {
+        const audioRef: { current: HTMLAudioElement | null } = { current: null }
+        const backend = new HTML5AudioBackend(audioRef)
+        backend.setVolume(0.6)
+        backend.setMuted(true)
+        backend.setOutputGain(0.5)
+        backend.setOutputGain(0)
+        expect(backend.isMuted()).toBe(true)
+        const audio = new Audio()
+        audioRef.current = audio
+        backend.setOutputGain(1)
+        expect(audio.muted).toBe(true)
+        expect(audio.volume).toBe(0.6)
+    })
+
     it("gates HTML5 output while preserving user volume and mute", () => {
         const audio = new Audio()
         const backend = new HTML5AudioBackend({ current: audio })
