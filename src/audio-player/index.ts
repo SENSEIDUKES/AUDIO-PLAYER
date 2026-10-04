@@ -280,8 +280,12 @@ export type {
     ReaderMixerFadeOptions,
     ReaderMixerDuckOptions,
     ReaderMixerDuckLease,
+    ReaderMixerVoiceSnapshot,
+    ReaderMixerVoiceOutput,
     ReaderMixerPreset,
 } from "./narrative/ReaderMixer"
+export { ReaderMixerVoice } from "./narrative/ReaderMixerVoice"
+export type { ReaderMixerVoiceProps } from "./narrative/ReaderMixerVoice"
 export {
     ReaderMixerProvider,
     useReaderMixer,

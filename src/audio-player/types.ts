@@ -438,6 +438,8 @@ export interface AudioPlayerEngine {
     seekBy: (delta: number) => void
     setSeeking: (active: boolean) => void
     setVolume: (value: number) => void
+    /** Optional output gain for a host mixer; preserves the user's volume and mute. */
+    setOutputGain?: (gain: number) => void
     /** Set playback rate; finite values clamp to 0.5x-4x, others reset to 1x. */
     setPlaybackRate: (rate: number) => void
     toggleMute: () => void

@@ -1248,6 +1248,9 @@ export function useAudioPlayer(options: UseAudioPlayerOptions): AudioPlayerEngin
     }, [])
 
     const getBackendInfo = useCallback(() => backendRef.current!.getInfo(), [])
+    const setOutputGain = useCallback((gain: number) => {
+        backendRef.current!.setOutputGain?.(gain)
+    }, [])
     const getDecodedData = useCallback(() => backendRef.current!.getDecodedData(), [])
 
     return {
@@ -1277,6 +1280,7 @@ export function useAudioPlayer(options: UseAudioPlayerOptions): AudioPlayerEngin
         seekBy,
         setSeeking,
         setVolume,
+        setOutputGain,
         setPlaybackRate,
         toggleMute,
         retry,

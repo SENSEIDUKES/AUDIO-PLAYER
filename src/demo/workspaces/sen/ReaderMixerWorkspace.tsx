@@ -5,6 +5,7 @@ import {
     NarrativeFace,
     ReaderMixerPanel,
     ReaderMixerProvider,
+    ReaderMixerVoice,
     loadReaderMixerPreferences,
     saveReaderMixerPreferences,
     useReaderMixer,
@@ -34,7 +35,7 @@ import {
 } from "../../workshop/ui"
 import type { LogLine } from "../../workshop/ui"
 
-/* SEN reader audio: the three-layer ReaderMixer driven the way the NovelExpanded
+/* SEN reader audio: the four-layer ReaderMixer driven the way the NovelExpanded
    reader will drive it. The chapter buttons and cue pads stand in for the host
    app; the mixer view is the piece that goes in the reader's Settings › Audio.
    Preferences persist in this browser only, under a Workshop-owned key. */
@@ -187,6 +188,7 @@ const LAYER_NAMES: Record<ReaderMixerLayer, string> = {
     soundscapes: "Soundscapes",
     atmosphere: "Atmosphere",
     cues: "Sound Cues",
+    voice: "Voice",
 }
 
 const MIXER_VIEW_ID = "sen-reader-mixer-view"
@@ -250,7 +252,8 @@ function ReaderSimulation({
                     The NarrativeFace carries the narration. Inside the same ReaderMixerProvider it
                     becomes the mixer&apos;s companion: its Ambience slider is the reader&apos;s
                     Atmosphere level, its mood shows the chosen atmosphere, and while the voice
-                    plays the music and atmosphere step back under it. Cues stay at full level.
+                    plays the music and atmosphere step back under it. Voice volume and mute agree
+                    with the mixer&apos;s fourth slot. Cues stay at full level.
                 </p>
                 <NarrativeFace
                     duckAmount={duckAmount}
@@ -328,6 +331,7 @@ function ReaderSimulation({
                         ["Soundscapes", row("soundscapes")],
                         ["Atmosphere", row("atmosphere")],
                         ["Sound Cues", `${row("cues")} · ${state.activeCues} playing`],
+                        ["Voice", row("voice")],
                         ["Saved atmosphere", state.preferences.atmosphereId ?? "Off"],
                         ["Routing", state.routing],
                         ["Sliders", state.volumeControl === "level" ? "set loudness" : "on/off"],
@@ -439,7 +443,8 @@ export function ReaderMixerWorkspace() {
             <SplitLayout
                 stage={
                     <>
-                        <AudioSessionProvider initialQueue={narrationTracks}>
+                        <AudioSessionProvider initialQueue={narrationTracks} audioBackend="html5">
+                            <ReaderMixerVoice />
                             <ReaderSimulation
                                 set={set}
                                 width={parseStageWidth(stageWidth)}
@@ -512,16 +517,20 @@ export function ReaderMixerWorkspace() {
                             Auto (the default) uses Web Audio only where the browser ignores element
                             volume, as iPhone Safari does, so every slider sets real loudness there.
                             Element forces plain media elements: on iPhone the sliders then work as
-                            on/off and the view says so. Web Audio routes every layer through its
-                            own GainNode on every browser.
+                            on/off and the view says so. Web Audio routes the score, atmosphere and
+                            cues through their own GainNodes. Voice uses the recorded help lines on
+                            HTML5: desktop volume works; iPhone uses the on/off fallback. TTS files
+                            with CORS can use the narration session&apos;s Web Audio backend for
+                            real iPhone volume.
                         </Note>
                         <Note>
                             celestialaudio.seihouse.org and audio.seihouse.org send CORS headers
                             (enabled 2026-10-02), so SEIHouse files play on every route.
                         </Note>
                         <Note>
-                            Hide this tab to see both loops pause; they resume when it returns. Your
-                            levels, switches and atmosphere are saved in this browser only.
+                            Hide this tab to see both loops and a playing voice pause; they resume
+                            when it returns. Your levels, switches and atmosphere are saved in this
+                            browser only.
                         </Note>
                     </>
                 }

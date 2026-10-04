@@ -42,7 +42,7 @@ The player currently supports:
 - Browser and mobile quality checks documented in the repo.
 - Opt-in **Automix Lite** transitions with conservative silence trimming.
 - Multiple player surfaces, including standalone/full-card and sticky bottom player contexts.
-- A three-layer **reader mixer** (music score, ambient atmosphere, sound cues) with per-layer switches and volume and an inline mixer view.
+- A four-layer **reader mixer** (music score, ambient atmosphere, sound cues, recorded/generated TTS voice) with per-layer switches and volume and an inline mixer view.
 
 ---
 
@@ -86,6 +86,14 @@ Git and local-link installs are reserved for testing **unreleased** player
 changes. See the
 [distribution and publishing guide](https://github.com/SENSEIDUKES/AUDIO-PLAYER/blob/main/PUBLISHING_GUIDE.md)
 for those development workflows and the release-owner process.
+
+The 2.0.0 package adds the reader mixer's Voice slot. Connect narration once with
+`ReaderMixerVoice` under both `ReaderMixerProvider` and `AudioSessionProvider`;
+use `audioBackend="webaudio"` for volume on TTS audio files, including iPhone.
+Existing version 1 mixer saves normalize to version 2 with their original
+settings and Voice enabled at 100%. Update exhaustive layer maps to include
+`voice`. The [reader mixer guide](https://github.com/SENSEIDUKES/AUDIO-PLAYER/blob/main/docs/reader-mixer.md)
+includes integration, migration, streaming limits and device checks.
 
 ### Use it in React
 

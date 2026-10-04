@@ -126,6 +126,8 @@ export interface AudioBackend {
 
     /** Raw volume write — no support detection; the hook owns that probe. */
     setVolume(value: number): void
+    /** Optional output gain, separate from the user's volume and mute controls. */
+    setOutputGain?(gain: number): void
     /** Read-back used by the hook's iOS volume-unsupported probe. */
     getVolume(): number
     isMuted(): boolean

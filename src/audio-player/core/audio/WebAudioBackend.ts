@@ -93,6 +93,7 @@ export class WebAudioBackend implements AudioBackend {
     private offset = 0
     private startedAtCtxTime = 0
     private volume = 1
+    private outputGain = 1
     private muted = false
     private loopFlag = false
     private lastError: AudioBackendErrorCode | null = null
@@ -155,7 +156,7 @@ export class WebAudioBackend implements AudioBackend {
         this.panner.orientationZ.value = this.orientation[2]
 
         this.gain = this.ctx.createGain()
-        this.gain.gain.value = this.muted ? 0 : this.volume
+        this.gain.gain.value = this.muted ? 0 : this.volume * this.outputGain
 
         if (typeof this.ctx.createStereoPanner === "function") {
             this.stereoPanner = this.ctx.createStereoPanner()
@@ -518,7 +519,7 @@ export class WebAudioBackend implements AudioBackend {
     setVolume(value: number): void {
         this.volume = Math.max(0, Math.min(1, value))
         if (this.gain) {
-            this.gain.gain.value = this.muted ? 0 : this.volume
+            this.gain.gain.value = this.muted ? 0 : this.volume * this.outputGain
         }
     }
 
@@ -533,8 +534,13 @@ export class WebAudioBackend implements AudioBackend {
     setMuted(muted: boolean): void {
         this.muted = muted
         if (this.gain) {
-            this.gain.gain.value = muted ? 0 : this.volume
+            this.gain.gain.value = muted ? 0 : this.volume * this.outputGain
         }
+    }
+
+    setOutputGain(gain: number): void {
+        this.outputGain = Number.isFinite(gain) ? Math.max(0, Math.min(1, gain)) : 0
+        if (this.gain) this.gain.gain.value = this.muted ? 0 : this.volume * this.outputGain
     }
 
     setLoop(loop: boolean): void {

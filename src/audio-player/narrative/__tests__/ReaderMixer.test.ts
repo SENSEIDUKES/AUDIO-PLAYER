@@ -187,12 +187,13 @@ describe("ReaderMixer", () => {
             const second = makeMixer({ initialPreferences: saved as ReaderMixerPreferences })
             expect(second.getPreferences()).toEqual(first.getPreferences())
             expect(second.getPreferences()).toEqual({
-                version: 1,
+                version: 2,
                 masterEnabled: false,
                 layers: {
                     soundscapes: { enabled: true, level: 0.33 },
                     atmosphere: { enabled: true, level: 0.4 },
                     cues: { enabled: false, level: 0.8 },
+                    voice: { enabled: true, level: 1 },
                 },
                 atmosphereId: "rain",
             })
@@ -233,12 +234,13 @@ describe("ReaderMixer", () => {
             const mixer = createReaderMixer()
             mixers.push(mixer)
             expect(mixer.getPreferences()).toEqual({
-                version: 1,
+                version: 2,
                 masterEnabled: true,
                 layers: {
                     soundscapes: { enabled: true, level: 0.25 },
                     atmosphere: { enabled: true, level: 0.3 },
                     cues: { enabled: true, level: 0.75 },
+                    voice: { enabled: true, level: 1 },
                 },
                 atmosphereId: "gentle-rain",
             })
@@ -272,6 +274,7 @@ describe("ReaderMixer", () => {
                 soundscapes: { enabled: true, level: 0.15 },
                 atmosphere: { enabled: true, level: 0.4 },
                 cues: { enabled: true, level: 0.4 },
+                voice: { enabled: true, level: 1 },
             })
             expect(mixer.getPreferences().atmosphereId).toBe("rain")
             expect(mixer.getState().activePresetId).toBe("calm")
