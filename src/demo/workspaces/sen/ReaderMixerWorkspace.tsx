@@ -398,12 +398,27 @@ function ReaderSimulation({
     )
 }
 
+function ResetMixerSettings({ append }: { append: ReturnType<typeof useEventLog>["append"] }) {
+    const mixer = useReaderMixer()
+    return (
+        <Button
+            variant="ghost"
+            onClick={() => {
+                mixer.resetPreferences()
+                mixer.flushPreferences()
+                append("saved settings reset")
+            }}
+        >
+            Reset saved settings
+        </Button>
+    )
+}
+
 export function ReaderMixerWorkspace() {
     const { lines, append, clear } = useEventLog(60)
     const [routing, setRouting] = useState<Routing>("auto")
     const [host, setHost] = useState<Host>("seihouse")
     const [stageWidth, setStageWidth] = useState("390")
-    const [generation, setGeneration] = useState(0)
     const [duckAmount, setDuckAmount] = useState(0.6)
     const set = SETS[host]
 
@@ -416,119 +431,101 @@ export function ReaderMixerWorkspace() {
             onPreferencesChange: (preferences) =>
                 saveReaderMixerPreferences(STORAGE_KEY, preferences),
         }),
-        // generation forces a fresh mixer after "Reset saved settings".
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [routing, set, generation]
+        [routing, set]
     )
 
     return (
-        <SplitLayout
-            stage={
-                <>
-                    <AudioSessionProvider initialQueue={narrationTracks}>
-                        <ReaderMixerProvider
-                            key={`${routing}:${host}:${generation}`}
-                            options={options}
-                        >
+        <ReaderMixerProvider key={`${routing}:${host}`} options={options}>
+            <SplitLayout
+                stage={
+                    <>
+                        <AudioSessionProvider initialQueue={narrationTracks}>
                             <ReaderSimulation
                                 set={set}
                                 width={parseStageWidth(stageWidth)}
                                 duckAmount={duckAmount}
                                 append={append}
                             />
-                        </ReaderMixerProvider>
-                    </AudioSessionProvider>
-                    <Panel
-                        title="Events"
-                        actions={
-                            <Button variant="ghost" onClick={clear}>
-                                Clear
-                            </Button>
-                        }
-                    >
-                        <EventLog
-                            lines={lines}
-                            empty="Open a chapter, pick an atmosphere, fire a cue."
-                        />
-                    </Panel>
-                </>
-            }
-            controls={
-                <>
-                    <Panel title="Mixer setup">
-                        <Segmented
-                            label="Routing"
-                            value={routing}
-                            options={[
-                                { value: "element", label: "Element" },
-                                { value: "auto", label: "Auto" },
-                                { value: "web-audio", label: "Web Audio" },
-                            ]}
-                            onChange={setRouting}
-                        />
-                        <Segmented
-                            label="Audio files"
-                            value={host}
-                            options={[
-                                { value: "seihouse", label: "SEIHouse" },
-                                { value: "cors-sample", label: "CORS sample" },
-                            ]}
-                            onChange={setHost}
-                        />
-                        <Segmented
-                            label="Settings width"
-                            value={stageWidth}
-                            options={[
-                                { value: "auto", label: "Auto" },
-                                { value: "320", label: "320" },
-                                { value: "390", label: "390" },
-                                { value: "480", label: "480" },
-                            ]}
-                            onChange={setStageWidth}
-                        />
-                        <ButtonRow>
-                            <Button
-                                variant="ghost"
-                                onClick={() => {
-                                    try {
-                                        localStorage.removeItem(STORAGE_KEY)
-                                    } catch {
-                                        // Storage may be blocked; the fresh mixer still resets.
-                                    }
-                                    setGeneration((value) => value + 1)
-                                    append("saved settings cleared")
-                                }}
-                            >
-                                Reset saved settings
-                            </Button>
-                        </ButtonRow>
-                        <RangeField
-                            label="Duck under narration"
-                            value={duckAmount}
-                            min={0}
-                            max={1}
-                            step={0.05}
-                            format={(value) => `${Math.round(value * 100)}%`}
-                            onChange={setDuckAmount}
-                        />
-                    </Panel>
-                    <Note>
-                        Auto (the default) uses Web Audio only where the browser ignores element
-                        volume, as iPhone Safari does, so every slider sets real loudness there.
-                        Element forces plain media elements: on iPhone the sliders then work as
-                        on/off and the view says so. Web Audio routes every layer through its own
-                        GainNode on every browser.
-                    </Note>
-                    <Note>
-                        celestialaudio.seihouse.org and audio.seihouse.org send CORS headers
-                        (enabled 2026-10-02), so SEIHouse files play on every route.
-                    </Note>
-                    <Note>
-                        Hide this tab to see both loops pause; they resume when it returns. Your
-                        levels, switches and atmosphere are saved in this browser only.
-                    </Note>
-                </>
-            }
-        />
+                        </AudioSessionProvider>
+                        <Panel
+                            title="Events"
+                            actions={
+                                <Button variant="ghost" onClick={clear}>
+                                    Clear
+                                </Button>
+                            }
+                        >
+                            <EventLog
+                                lines={lines}
+                                empty="Open a chapter, pick an atmosphere, fire a cue."
+                            />
+                        </Panel>
+                    </>
+                }
+                controls={
+                    <>
+                        <Panel title="Mixer setup">
+                            <Segmented
+                                label="Routing"
+                                value={routing}
+                                options={[
+                                    { value: "element", label: "Element" },
+                                    { value: "auto", label: "Auto" },
+                                    { value: "web-audio", label: "Web Audio" },
+                                ]}
+                                onChange={setRouting}
+                            />
+                            <Segmented
+                                label="Audio files"
+                                value={host}
+                                options={[
+                                    { value: "seihouse", label: "SEIHouse" },
+                                    { value: "cors-sample", label: "CORS sample" },
+                                ]}
+                                onChange={setHost}
+                            />
+                            <Segmented
+                                label="Settings width"
+                                value={stageWidth}
+                                options={[
+                                    { value: "auto", label: "Auto" },
+                                    { value: "320", label: "320" },
+                                    { value: "390", label: "390" },
+                                    { value: "480", label: "480" },
+                                ]}
+                                onChange={setStageWidth}
+                            />
+                            <ButtonRow>
+                                <ResetMixerSettings append={append} />
+                            </ButtonRow>
+                            <RangeField
+                                label="Duck under narration"
+                                value={duckAmount}
+                                min={0}
+                                max={1}
+                                step={0.05}
+                                format={(value) => `${Math.round(value * 100)}%`}
+                                onChange={setDuckAmount}
+                            />
+                        </Panel>
+                        <Note>
+                            Auto (the default) uses Web Audio only where the browser ignores element
+                            volume, as iPhone Safari does, so every slider sets real loudness there.
+                            Element forces plain media elements: on iPhone the sliders then work as
+                            on/off and the view says so. Web Audio routes every layer through its
+                            own GainNode on every browser.
+                        </Note>
+                        <Note>
+                            celestialaudio.seihouse.org and audio.seihouse.org send CORS headers
+                            (enabled 2026-10-02), so SEIHouse files play on every route.
+                        </Note>
+                        <Note>
+                            Hide this tab to see both loops pause; they resume when it returns. Your
+                            levels, switches and atmosphere are saved in this browser only.
+                        </Note>
+                    </>
+                }
+            />
+        </ReaderMixerProvider>
     )
 }
