@@ -516,6 +516,7 @@ export class WebAudioBackend implements AudioBackend {
         return this.buffer !== null
     }
 
+    /** Clamp and store the user's level while retaining mixer output gain and mute. */
     setVolume(value: number): void {
         this.volume = Math.max(0, Math.min(1, value))
         if (this.gain) {
@@ -531,6 +532,7 @@ export class WebAudioBackend implements AudioBackend {
         return this.muted
     }
 
+    /** Silence the gain node without changing the stored level or mixer output gain. */
     setMuted(muted: boolean): void {
         this.muted = muted
         if (this.gain) {
@@ -538,6 +540,7 @@ export class WebAudioBackend implements AudioBackend {
         }
     }
 
+    /** Apply independent 0–1 mixer gain, including before decoding or creating a gain node. */
     setOutputGain(gain: number): void {
         this.outputGain = Number.isFinite(gain) ? Math.max(0, Math.min(1, gain)) : 0
         if (this.gain) this.gain.gain.value = this.muted ? 0 : this.volume * this.outputGain

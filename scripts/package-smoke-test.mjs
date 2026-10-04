@@ -134,6 +134,7 @@ async function exerciseAutomixWorker(moduleExports, label, packageRoot) {
     await access(workerPath)
 }
 
+/** Verify installed Voice exports, preference migration, and independent master/cleanup gates. */
 function exerciseReaderVoice(moduleExports, label) {
     if (typeof moduleExports.ReaderMixerVoice !== "function") {
         throw new Error(`${label} package export is missing ReaderMixerVoice`)

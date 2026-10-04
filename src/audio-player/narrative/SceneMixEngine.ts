@@ -20,6 +20,7 @@ function clamp01(value: number): number {
     return Math.max(0, Math.min(1, value))
 }
 
+/** Compare normalized source lists so an unchanged track id can still replace stale media. */
 function sameSources(a: readonly TrackSource[], b: readonly TrackSource[]): boolean {
     return (
         a.length === b.length &&

@@ -141,27 +141,32 @@ export class HTML5AudioBackend implements AudioBackend {
         return (this.audio?.readyState ?? 0) >= 1
     }
 
+    /** Store the user's level and multiply element output by the independent mixer gain. */
     setVolume(value: number): void {
         this.volume = value
         const audio = this.audio
         if (audio) audio.volume = value * this.outputGain
     }
 
+    /** Read the ungated level; retain the stored level when output is closed or unmounted. */
     getVolume(): number {
         const audio = this.audio
         return this.outputGain === 0 || !audio ? this.volume : audio.volume / this.outputGain
     }
 
+    /** Read user mute separately from the mixer gate's forced element mute. */
     isMuted(): boolean {
         return this.outputGain === 0 ? this.muted : (this.audio?.muted ?? false)
     }
 
+    /** Preserve user mute even when the mixer gate already silences the element. */
     setMuted(muted: boolean): void {
         this.muted = muted
         const audio = this.audio
         if (audio) audio.muted = muted || this.outputGain === 0
     }
 
+    /** Clamp independent output to 0–1; zero forces element mute without changing user settings. */
     setOutputGain(gain: number): void {
         const next = Number.isFinite(gain) ? Math.max(0, Math.min(1, gain)) : 0
         if (next === this.outputGain) return

@@ -269,12 +269,17 @@ export interface ReaderMixerVoiceSnapshot {
 
 /** Connect recorded/generated TTS audio. The host retains its transport and source ownership. */
 export interface ReaderMixerVoiceOutput {
+    /** Return the current transport state and actual routing/volume capabilities. */
     getState(): ReaderMixerVoiceSnapshot
+    /** Observe snapshot changes; return an idempotent listener cleanup. */
     subscribe(listener: () => void): () => void
+    /** Apply the reader's saved 0–1 volume independently of the enable gate. */
     setLevel(level: number): void
     /** Output gate that preserves the host's user volume and mute setting. */
     setEnabled(enabled: boolean): void
+    /** Pause transport without dropping its source or playback position. */
     pause(): void
+    /** Resume the retained source; the host reports loading or blocked playback through its snapshot. */
     resume(): void
 }
 
@@ -415,7 +420,9 @@ export interface ReaderMixerDuckOptions {
 
 /** An independent ducking owner. Releasing it preserves every other owner's duck. */
 export interface ReaderMixerDuckLease {
+    /** Set this owner's 0–1 duck amount; other owners keep their own amounts. */
     setDuck(amount: number, options?: ReaderMixerDuckOptions): void
+    /** Idempotently remove this owner's contribution to the strongest active duck. */
     release(): void
 }
 
@@ -757,7 +764,10 @@ export class ReaderMixer {
         this.voiceOutput?.pause()
     }
 
-    /** Connect one caller-owned TTS output; the returned cleanup releases its mixer gate. */
+    /**
+     * Connect one caller-owned TTS output, pausing and detaching any previous connection.
+     * The returned cleanup releases its mixer gate and subscription; it retains host transport.
+     */
     connectVoice(output: ReaderMixerVoiceOutput): () => void {
         if (this.disposed) return () => {}
         if (this.voiceOutput) this.voiceOutput.pause()
@@ -792,11 +802,13 @@ export class ReaderMixer {
 
     /* ------------------------------- Levels ----------------------------- */
 
+    /** Save a layer's clamped 0–1 level and apply it without changing its enable switch. */
     setLayerLevel(layer: ReaderMixerLayer, level: number): void {
         if (this.disposed || !READER_MIXER_LAYERS.includes(layer)) return
         this.updateLayer(layer, { level: clamp01(level) })
     }
 
+    /** Save a layer's enable switch while retaining its level and selected source. */
     setLayerEnabled(layer: ReaderMixerLayer, enabled: boolean): void {
         if (this.disposed || !READER_MIXER_LAYERS.includes(layer)) return
         this.updateLayer(layer, { enabled: Boolean(enabled) })
@@ -814,9 +826,10 @@ export class ReaderMixer {
 
     /**
      * Temporarily lower Soundscapes and Atmosphere, for example under
-     * narration: each plays at its normal level × (1 − amount). Cues are not
-     * ducked, and the reader's preferences never change. `setDuck(0)` restores
-     * the full levels. Ramps over `fadeMs` (default 350 ms).
+     * narration: each plays at its normal level × (1 − amount). Cues and Voice
+     * are not ducked, and the reader's preferences never change. Independent
+     * leases can request a stronger duck. `setDuck(0)` clears this manual duck
+     * while preserving their requests. Ramps over `fadeMs` (default 350 ms).
      *
      * Ducking needs real volume control: on the element route where the
      * browser ignores element volume (`volumeControl: "on-off"`), only a full
@@ -848,6 +861,7 @@ export class ReaderMixer {
         }
     }
 
+    /** Ramp background gains toward the strongest manual or retained-owner duck. */
     private applyDuckTarget(options: ReaderMixerDuckOptions): void {
         const target = Math.max(this.manualDuck, ...this.duckOwners.values())
         if (target === this.duckTarget) return
@@ -1237,6 +1251,7 @@ export class ReaderMixer {
         sync()
     }
 
+    /** Pause a hidden voice once, including starts that finish loading after the page hides. */
     private pauseVoiceWhileHidden(): void {
         if (
             this.pageHidden &&
