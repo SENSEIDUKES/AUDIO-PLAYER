@@ -145,7 +145,7 @@ with the mixer. Render it inside the same `ReaderMixerProvider`, or pass
 - **Narration ducks the reader's music and atmosphere.** While the voice plays, the
   mixer's Soundscapes and Atmosphere drop by `duckAmount × intensity` (defaults
   0.6 × 1), with a short ramp, and return when it pauses or the face unmounts. Sound Cues
-  keep their level.
+  keep their level. Muted or zero-volume narration restores the background mix.
 - **One atmosphere control.** The face's Ambience slider reads and writes the
   mixer's Atmosphere level (the reader's saved setting), so it always agrees with
   `ReaderMixerPanel`.

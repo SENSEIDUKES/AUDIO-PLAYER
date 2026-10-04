@@ -154,8 +154,9 @@ export function useNarrativeAudio(
     const targetAmbience = clamp01(ambienceVolume * clamp01(intensity))
     const isNarrating =
         narrationState === "playing" || (narrationState === undefined && session.isPlaying)
+    const narrationAudible = isNarrating && !session.isMuted && session.volume > 0
     const duckedAmbience = clamp01(targetAmbience * (1 - clamp01(duckAmount) * clamp01(intensity)))
-    const liveAmbienceTarget = isNarrating ? duckedAmbience : targetAmbience
+    const liveAmbienceTarget = narrationAudible ? duckedAmbience : targetAmbience
 
     // ---- Ambience manifest load + profile crossfade ----------------------
     useEffect(() => {
@@ -251,7 +252,7 @@ export function useNarrativeAudio(
     }, [liveAmbienceTarget])
 
     // ---- Companion mixer: duck its loops under narration -----------------
-    const mixerDuck = isNarrating ? clamp01(duckAmount) * clamp01(intensity) : 0
+    const mixerDuck = narrationAudible ? clamp01(duckAmount) * clamp01(intensity) : 0
     useEffect(() => {
         if (!mixer) return
         mixer.setDuck(mixerDuck)

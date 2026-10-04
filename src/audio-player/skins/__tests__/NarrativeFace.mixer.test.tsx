@@ -87,6 +87,19 @@ describe("NarrativeFace with a reader mixer", () => {
         expect(slider).toHaveValue("70")
     })
 
+    it("restores the background mix when narration is muted or its volume is zero", () => {
+        render(<Reader narrationState="playing" />)
+        expect(mixer.getDuck()).toBeCloseTo(0.6)
+        fireEvent.click(screen.getByRole("button", { name: "Mute" }))
+        expect(mixer.getDuck()).toBe(0)
+        fireEvent.click(screen.getByRole("button", { name: "Unmute" }))
+        expect(mixer.getDuck()).toBeCloseTo(0.6)
+        fireEvent.keyDown(screen.getByRole("slider", { name: "Volume" }), {
+            key: "Home",
+        })
+        expect(mixer.getDuck()).toBe(0)
+    })
+
     it("shows the reader's atmosphere as its mood", () => {
         const { container } = render(<Reader narrationState="paused" />)
         const mood = () => container.querySelector(".ap-nf__mood")?.textContent
