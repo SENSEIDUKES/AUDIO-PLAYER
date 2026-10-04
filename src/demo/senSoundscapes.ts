@@ -1,4 +1,4 @@
-import type { LoudnessMeasurement } from "../audio-player/narrative/loudness"
+import type { LoudnessMeasurement } from "../audio-player"
 import measurements from "./readerLoudness.json"
 
 /* SEN Soundscapes — Volume 1 (catalog version 1.0.1): the 43 scores from the

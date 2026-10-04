@@ -276,4 +276,19 @@ describe("ReaderMixerPanel", () => {
         expect(screen.getAllByRole("switch")).toHaveLength(1)
         expect(screen.queryAllByRole("slider")).toHaveLength(0)
     })
+
+    it("arms translated timers, reports remaining wall-clock time, and cancels", () => {
+        vi.useFakeTimers()
+        renderPanel({ labels: { sleepTimer: "Stop audio", cancelTimer: "Keep playing" } })
+        fireEvent.change(screen.getByRole("combobox", { name: "Stop audio" }), {
+            target: { value: "30-minutes" },
+        })
+        expect(screen.getByText("Stops in 30 min")).toBeInTheDocument()
+        act(() => vi.advanceTimersByTime(7 * 60000))
+        expect(screen.getByText("Stops in 23 min")).toBeInTheDocument()
+        fireEvent.click(screen.getByRole("button", { name: "Keep playing" }))
+        expect(mixer!.getState().sleepTimer.status).toBe("off")
+        mixer!.dispose()
+        vi.useRealTimers()
+    })
 })

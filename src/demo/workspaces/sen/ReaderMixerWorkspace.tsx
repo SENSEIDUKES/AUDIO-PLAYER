@@ -6,6 +6,10 @@ import {
     ReaderMixerPanel,
     ReaderMixerProvider,
     ReaderMixerVoice,
+    ReaderMixerNote,
+    READER_MIXER_SLEEP_TIMERS,
+    measureLoudness,
+    measureLoudnessPcm,
     loadReaderMixerPreferences,
     saveReaderMixerPreferences,
     useReaderMixer,
@@ -219,11 +223,13 @@ function ReaderSimulation({
     width,
     duckAmount,
     append,
+    shortPlays,
 }: {
     set: SceneSet
     width: number | "auto"
     duckAmount: number
     append: (text: string, tone?: LogLine["tone"]) => void
+    shortPlays: boolean
 }) {
     const mixer = useReaderMixer()
     const state = useReaderMixerState()
@@ -231,6 +237,7 @@ function ReaderSimulation({
     const [category, setCategory] = useState(set.categories[0])
     const [chapterScore, setChapterScore] = useState(set.scores[0])
     const battleTurn = useRef(0)
+    const scene = useRef(0)
     const titleFor = (key: string | null) =>
         set.scores.find((score) => `id:${score.track.id}` === key)?.track.title ?? key
 
@@ -260,7 +267,13 @@ function ReaderSimulation({
         }`
     }
     const playScore = (score: ScoreOption, reason: string) => {
-        mixer.playSoundscape(score.track)
+        const duration = SEN_SOUNDSCAPES_VOLUME_1.find(
+            (entry) => entry.id === score.track.id
+        )?.durationSeconds
+        mixer.playSoundscape(score.track, {
+            scene: `workshop-${scene.current}`,
+            ...(shortPlays && duration ? { trimStartMs: Math.max(0, duration - 6) * 1000 } : {}),
+        })
         append(`${reason} → playSoundscape(“${score.track.title}”)`)
     }
     const audibleKey = state.layers.soundscapes.current
@@ -268,6 +281,17 @@ function ReaderSimulation({
     return (
         <>
             <article className="wk-stage-card wk-reader" aria-label="Reader preview">
+                <ReaderMixerNote
+                    style={MIXER_THEME}
+                    onOpenSettings={() => {
+                        const view = document.getElementById(MIXER_VIEW_ID)
+                        view?.scrollIntoView({ block: "start" })
+                        view?.querySelector<HTMLElement>('[role="switch"]')?.focus({
+                            preventScroll: true,
+                        })
+                        append("note → Settings › Audio")
+                    }}
+                />
                 <p className="wk-stage-card__title">Chapter · NarrativeFace + Reader Mixer</p>
                 <p className="wk-reader__text">
                     The NarrativeFace carries the narration. Inside the same ReaderMixerProvider it
@@ -297,6 +321,7 @@ function ReaderSimulation({
                 <ButtonRow>
                     <Button
                         onClick={() => {
+                            scene.current += 1
                             playScore(chapterScore, "chapter opens")
                             mixer.startAtmosphere()
                             append("chapter opens → startAtmosphere()")
@@ -306,12 +331,29 @@ function ReaderSimulation({
                     </Button>
                     <Button
                         onClick={() => {
+                            scene.current += 1
+                            playScore(chapterScore, "new scene, same score")
+                        }}
+                    >
+                        Next scene
+                    </Button>
+                    <Button
+                        onClick={() => {
+                            mixer.notifyChapterEnd()
+                            append("chapter ends → notifyChapterEnd()")
+                        }}
+                    >
+                        End chapter
+                    </Button>
+                    <Button
+                        onClick={() => {
                             const battles = set.scores.filter(
                                 (score) => score.category === set.battleCategory
                             )
                             if (battles.length === 0) return
                             const score = battles[battleTurn.current % battles.length]
                             battleTurn.current += 1
+                            scene.current += 1
                             playScore(score, "battle starts")
                         }}
                     >
@@ -361,6 +403,13 @@ function ReaderSimulation({
                         ["Sliders", state.volumeControl === "level" ? "set loudness" : "on/off"],
                         ["Needs a tap", state.needsGesture ? "yes" : "no"],
                         ["Ducked under narration", `${Math.round(state.duck * 100)}%`],
+                        ["Full plays completed", String(state.soundscapePlays)],
+                        ["Idle pause", state.idle ? "yes" : "no"],
+                        [
+                            "Sleep timer",
+                            `${state.sleepTimer.status}${state.sleepTimer.remainingMs !== null ? ` · ${Math.ceil(state.sleepTimer.remainingMs / 1000)} s` : ""}`,
+                        ],
+                        ["Leveling", state.leveling ? "on" : "off"],
                     ]}
                 />
             </Panel>
@@ -426,6 +475,97 @@ function ReaderSimulation({
     )
 }
 
+/** Host simulation only; these controls are never exported as reader UI. */
+function MixerDeveloperControls({
+    append,
+    duckAmount,
+}: {
+    append: ReturnType<typeof useEventLog>["append"]
+    duckAmount: number
+}) {
+    const mixer = useReaderMixer()
+    const state = useReaderMixerState()
+    const [listen, setListen] = useState(false)
+    const [calibration, setCalibration] = useState("Not checked")
+    useEffect(
+        () =>
+            mixer.subscribeSleep(() => {
+                setListen(false)
+                append("sleep fired → stop host-owned Listen")
+            }),
+        [mixer, append]
+    )
+    useEffect(() => {
+        if (!listen) return
+        const release = mixer.retainActivity()
+        const duck = mixer.retainDuck()
+        duck.setDuck(duckAmount)
+        return () => {
+            release()
+            duck.release()
+        }
+    }, [mixer, listen, duckAmount])
+    if (!state) return null
+    return (
+        <Panel title="Developer · chapter policy">
+            {(Object.keys(LAYER_NAMES) as ReaderMixerLayer[]).map((layer) => (
+                <label className="wk-field" key={layer}>
+                    <input
+                        type="checkbox"
+                        checked={state.availability[layer]}
+                        onChange={(event) =>
+                            mixer.setLayerAvailability({ [layer]: event.target.checked })
+                        }
+                    />{" "}
+                    {LAYER_NAMES[layer]} in use
+                </label>
+            ))}
+            <label className="wk-field">
+                <input
+                    type="checkbox"
+                    checked={state.leveling}
+                    onChange={(event) => mixer.setLeveling(event.target.checked)}
+                />{" "}
+                Automatic loudness leveling
+            </label>
+            <label className="wk-field">
+                <input
+                    type="checkbox"
+                    checked={listen}
+                    onChange={(event) => setListen(event.target.checked)}
+                />{" "}
+                Host Listen speaking (activity + duck)
+            </label>
+            <Button
+                onClick={async () => {
+                    try {
+                        const rate = 48000
+                        const pcm = Float32Array.from({ length: rate * 3 }, (_, i) =>
+                            Math.sin((2 * Math.PI * 997 * i) / rate)
+                        )
+                        const buffer = new OfflineAudioContext(1, pcm.length, rate).createBuffer(
+                            1,
+                            pcm.length,
+                            rate
+                        )
+                        buffer.copyToChannel(pcm, 0)
+                        const browserValue = await measureLoudness(buffer)
+                        const pcmValue = measureLoudnessPcm([pcm], rate)
+                        setCalibration(
+                            `Browser ${browserValue.lufs?.toFixed(4)} LUFS · PCM ${pcmValue.lufs?.toFixed(4)} LUFS · reference −3.01 LUFS`
+                        )
+                    } catch (error) {
+                        setCalibration(error instanceof Error ? error.message : String(error))
+                    }
+                }}
+            >
+                Check loudness calibration
+            </Button>
+            <p role="status">{calibration}</p>
+        </Panel>
+    )
+}
+
 function ResetMixerSettings({ append }: { append: ReturnType<typeof useEventLog>["append"] }) {
     const mixer = useReaderMixer()
     return (
@@ -448,6 +588,8 @@ export function ReaderMixerWorkspace() {
     const [host, setHost] = useState<Host>("seihouse")
     const [stageWidth, setStageWidth] = useState("390")
     const [duckAmount, setDuckAmount] = useState(0.6)
+    const [quickPolicies, setQuickPolicies] = useState(false)
+    const [maxPlays, setMaxPlays] = useState("2")
     const set = SETS[host]
 
     // A new routing or catalog means a new mixer; the old one is disposed.
@@ -458,12 +600,32 @@ export function ReaderMixerWorkspace() {
             initialPreferences: loadReaderMixerPreferences(STORAGE_KEY),
             onPreferencesChange: (preferences) =>
                 saveReaderMixerPreferences(STORAGE_KEY, preferences),
+            sleepTimerChoices: quickPolicies
+                ? [
+                      { id: "off", label: "Off", kind: "off" },
+                      ...[5, 15, 30].map((seconds) => ({
+                          id: `${seconds}-seconds`,
+                          label: `${seconds} seconds (test)`,
+                          kind: "duration" as const,
+                          durationMs: seconds * 1000,
+                      })),
+                      { id: "chapter-end", label: "End of chapter", kind: "chapter-end" },
+                  ]
+                : READER_MIXER_SLEEP_TIMERS,
+            sleepFadeMs: quickPolicies ? 2000 : 20000,
+            idleTimeoutMs: quickPolicies ? 15000 : 600000,
+            idleFadeMs: quickPolicies ? 2000 : 8000,
+            soundscapeRestFadeMs: quickPolicies ? 2000 : 8000,
+            soundscapeMaxPlays: maxPlays === "never" ? null : Number(maxPlays),
         }),
-        [routing, set]
+        [routing, set, quickPolicies, maxPlays]
     )
 
     return (
-        <ReaderMixerProvider key={`${routing}:${host}`} options={options}>
+        <ReaderMixerProvider
+            key={`${routing}:${host}:${quickPolicies}:${maxPlays}`}
+            options={options}
+        >
             <SplitLayout
                 stage={
                     <>
@@ -474,6 +636,7 @@ export function ReaderMixerWorkspace() {
                                 width={parseStageWidth(stageWidth)}
                                 duckAmount={duckAmount}
                                 append={append}
+                                shortPlays={quickPolicies}
                             />
                         </AudioSessionProvider>
                         <Panel
@@ -536,25 +699,45 @@ export function ReaderMixerWorkspace() {
                                 format={(value) => `${Math.round(value * 100)}%`}
                                 onChange={setDuckAmount}
                             />
+                            <label className="wk-field">
+                                <input
+                                    type="checkbox"
+                                    checked={quickPolicies}
+                                    onChange={(event) => setQuickPolicies(event.target.checked)}
+                                />{" "}
+                                Short policy tests (6 s score tails, 15 s idle, 2 s fades)
+                            </label>
+                            <Segmented
+                                label="Plays before music rests"
+                                value={maxPlays}
+                                options={[
+                                    { value: "1", label: "1" },
+                                    { value: "2", label: "2" },
+                                    { value: "3", label: "3" },
+                                    { value: "never", label: "Never" },
+                                ]}
+                                onChange={setMaxPlays}
+                            />
                         </Panel>
+                        <MixerDeveloperControls append={append} duckAmount={duckAmount} />
                         <Note>
-                            Auto (the default) uses Web Audio only where the browser ignores element
-                            volume, as iPhone Safari does, so every slider sets real loudness there.
-                            Element forces plain media elements: on iPhone the sliders then work as
-                            on/off and the view says so. Web Audio routes the score, atmosphere and
-                            cues through their own GainNodes. Voice uses the recorded help lines on
-                            HTML5: desktop volume works; iPhone uses the on/off fallback. TTS files
-                            with CORS can use the narration session&apos;s Web Audio backend for
-                            real iPhone volume.
+                            Auto (the default) uses Web Audio with leveling on, including a summed
+                            safety limiter. With leveling off it uses plain elements where their
+                            volume works, and Web Audio on iPhone. Element forces plain media
+                            elements: on iPhone the sliders then work as on/off and the view says
+                            so. Web Audio routes the score, atmosphere and cues through their own
+                            GainNodes. Voice uses the recorded help lines on HTML5: desktop volume
+                            works; iPhone uses the on/off fallback. TTS files with CORS can use the
+                            narration session&apos;s Web Audio backend for real iPhone volume.
                         </Note>
                         <Note>
                             celestialaudio.seihouse.org and audio.seihouse.org send CORS headers
                             (enabled 2026-10-02), so SEIHouse files play on every route.
                         </Note>
                         <Note>
-                            Hide this tab to see both loops and a playing voice pause; they resume
-                            when it returns. Your levels, switches and atmosphere are saved in this
-                            browser only.
+                            Hide this tab to see both loops and a playing voice pause. They resume
+                            on return unless idle or sleep has stopped them. Your levels, switches
+                            and atmosphere are saved in this browser only; timers are not.
                         </Note>
                     </>
                 }
