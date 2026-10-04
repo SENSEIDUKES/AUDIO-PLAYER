@@ -9,6 +9,7 @@ import type {
 import type { CueManifest } from "./cues/cueTypes"
 import type { ArcAction, ArcCommandHost } from "./menu/arcRouting"
 import type { PlayerMenuProfile } from "./menu/menuProfile"
+import type { LoudnessMeasurement } from "./narrative/loudness"
 
 /**
  * Vault identity category. Drives a row's visual identity (accent color + label)
@@ -67,6 +68,8 @@ export interface FallbackSourceEvent {
 
 /** A single playable track. */
 export interface Track {
+    /** Measured source loudness for ReaderMixer leveling; absent files retain unity gain. */
+    loudness?: LoudnessMeasurement
     /**
      * Stable unique identifier. When provided, the engine uses it (instead of
      * title + audioFile) to distinguish between tracks that share the same URL.

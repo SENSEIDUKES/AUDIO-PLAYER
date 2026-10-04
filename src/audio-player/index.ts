@@ -287,6 +287,18 @@ export type {
 } from "./narrative/ReaderMixer"
 export { ReaderMixerVoice } from "./narrative/ReaderMixerVoice"
 export { READER_MIXER_SLEEP_TIMERS } from "./narrative/ReaderMixerSession"
+export {
+    measureLoudness,
+    measureLoudnessPcm,
+    computeLoudnessGain,
+    DEFAULT_LOUDNESS_LEVELING,
+} from "./narrative/loudness"
+export type {
+    LoudnessMeasurement,
+    LoudnessMeasureOptions,
+    LoudnessLevelingOptions,
+    LoudnessGain,
+} from "./narrative/loudness"
 export type {
     ReaderMixerSleepTimerChoice,
     ReaderMixerSleepTimerState,

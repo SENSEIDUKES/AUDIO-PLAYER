@@ -88,6 +88,7 @@ export class LayerGainGraph<Layer extends string> {
     private readonly ctx: AudioContext
     private readonly buses = new Map<Layer, GainNode>()
     private readonly lease: AudioContextLease
+    private readonly limiter: DynamicsCompressorNode
     private readonly routes = new WeakMap<
         HTMLAudioElement,
         { source: MediaElementAudioSourceNode; gain: GainNode }
@@ -97,9 +98,16 @@ export class LayerGainGraph<Layer extends string> {
     constructor(Ctor: typeof AudioContext, layers: readonly Layer[]) {
         this.lease = retainAudioContext(Ctor)
         this.ctx = this.lease.context
+        this.limiter = this.ctx.createDynamicsCompressor()
+        this.limiter.threshold.value = -1
+        this.limiter.knee.value = 0
+        this.limiter.ratio.value = 20
+        this.limiter.attack.value = 0.001
+        this.limiter.release.value = 0.1
+        this.limiter.connect(this.ctx.destination)
         for (const layer of layers) {
             const bus = this.ctx.createGain()
-            bus.connect(this.ctx.destination)
+            bus.connect(this.limiter)
             this.buses.set(layer, bus)
         }
     }
@@ -187,10 +195,11 @@ export class LayerGainGraph<Layer extends string> {
             }
         }
         this.lease.release()
+        this.limiter.disconnect()
     }
 
     private setParam(param: AudioParam, value: number): void {
-        const target = Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0
+        const target = Number.isFinite(value) ? Math.max(0, value) : 0
         if (this.closed) return
         try {
             if (this.ctx.state === "running") {

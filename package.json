@@ -44,13 +44,15 @@
         "test:docs": "node scripts/check-documentation.mjs && tsc --noEmit -p tsconfig.examples.json",
         "test:package": "npm run build:lib && node scripts/package-smoke-test.mjs",
         "test": "npm run test:repository && npm run lint && npm run format:check && npm run typecheck && npm run test:docs && npm run test:unit && npm run test:package && npm run build && npm run preview:smoke",
-        "skin:import": "node scripts/import-skin.mjs"
+        "skin:import": "node scripts/import-skin.mjs",
+        "measure-loudness": "node scripts/measure-loudness.mjs"
     },
     "peerDependencies": {
         "react": ">=18",
         "react-dom": ">=18"
     },
     "devDependencies": {
+        "@audio/decode": "^3.12.0",
         "@eslint/js": "^9.39.4",
         "@microsoft/api-extractor": "^7.58.9",
         "@testing-library/dom": "^10.4.1",

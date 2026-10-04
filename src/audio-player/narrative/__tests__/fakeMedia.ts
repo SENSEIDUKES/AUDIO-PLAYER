@@ -162,6 +162,15 @@ export class FakeAudioContext {
     currentTime = 0
     readonly destination = { name: "destination" }
     readonly gains: FakeGainNode[] = []
+    readonly compressors: Array<
+        FakeGainNode & {
+            threshold: FakeAudioParam
+            knee: FakeAudioParam
+            ratio: FakeAudioParam
+            attack: FakeAudioParam
+            release: FakeAudioParam
+        }
+    > = []
     readonly routedElements: unknown[] = []
     readonly mediaSources: FakeGainNode[] = []
     readonly sources: FakeBufferSource[] = []
@@ -179,6 +188,18 @@ export class FakeAudioContext {
     createGain(): FakeGainNode {
         const node = new FakeGainNode()
         this.gains.push(node)
+        return node
+    }
+
+    createDynamicsCompressor() {
+        const node = Object.assign(new FakeGainNode(), {
+            threshold: new FakeAudioParam(),
+            knee: new FakeAudioParam(),
+            ratio: new FakeAudioParam(),
+            attack: new FakeAudioParam(),
+            release: new FakeAudioParam(),
+        })
+        this.compressors.push(node)
         return node
     }
 
@@ -248,9 +269,13 @@ export class FakeAudioContext {
         this.listeners.delete(listener)
     }
 
-    /** The layer buses: the first gains created, each connected to the destination. */
+    /** Layer buses feed the mixer limiter (other engines may route straight to the destination). */
     buses(): FakeGainNode[] {
-        return this.gains.filter((node) => node.connections.includes(this.destination))
+        return this.gains.filter(
+            (node) =>
+                node.connections.includes(this.destination) ||
+                this.compressors.some((limiter) => node.connections.includes(limiter))
+        )
     }
 }
 

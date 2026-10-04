@@ -5,6 +5,8 @@ import type { OneShotPlaybackErrorEvent } from "./OneShotEngine"
 import { SCENE_FADE_MS, SceneMixEngine } from "./SceneMixEngine"
 import type { SceneMixAnalysisPolicy, SceneMixStatusSnapshot } from "./SceneMixEngine"
 import { ReaderMixerSession } from "./ReaderMixerSession"
+import { DEFAULT_LOUDNESS_LEVELING } from "./loudness"
+import type { LoudnessLevelingOptions, LoudnessMeasurement } from "./loudness"
 import type {
     ReaderMixerSleepEvent,
     ReaderMixerSleepTimerChoice,
@@ -216,6 +218,8 @@ export function computeReaderMixerGain(
  * and the mixer view only display and play what they are given.
  */
 export interface ReaderAtmosphereOption {
+    /** Integrated measurement of the exact bed source. Overrides track.loudness when supplied. */
+    loudness?: LoudnessMeasurement
     /** Stable id; this is what the preferences store. */
     id: string
     label: string
@@ -293,6 +297,7 @@ export interface ReaderMixerVoiceOutput {
 }
 
 export interface ReaderMixerState {
+    readonly leveling: boolean
     readonly preferences: ReaderMixerPreferences
     readonly availability: ReaderMixerLayerAvailability
     readonly layers: Readonly<Record<ReaderMixerLayer, ReaderMixerLayerState>>
@@ -333,6 +338,8 @@ export type ReaderMixerPreferencesListener = (preferences: ReaderMixerPreference
 /* ------------------------------------------------------------------ */
 
 export interface ReaderMixerOptions {
+    /** Automatic source leveling (on by default). false keeps all sources at unity. */
+    leveling?: boolean | LoudnessLevelingOptions
     /** Session-only timer choices, including their translated labels. */
     sleepTimerChoices?: readonly ReaderMixerSleepTimerChoice[]
     /** Slow fade before sleep stops both beds. Default 20,000 ms. */
@@ -441,6 +448,8 @@ export interface PlaySoundscapeOptions {
 }
 
 export interface PlayCueOptions {
+    /** Momentary maximum of the exact cue source. */
+    loudness?: LoudnessMeasurement
     /** Per-cue volume, multiplied by the Sound Cues level. Defaults to 1. */
     volume?: number
     /** Start position in seconds. */
@@ -506,6 +515,7 @@ const LOOP_STATUS: Record<SceneMixStatusSnapshot["state"], ReaderMixerLayerStatu
  * ```
  */
 export class ReaderMixer {
+    private leveling: LoudnessLevelingOptions
     private readonly session: ReaderMixerSession
     private readonly sleepFadeMs: number
     private readonly idleFadeMs: number
@@ -564,6 +574,12 @@ export class ReaderMixer {
     private voicePausedForVisibility = false
 
     constructor(options: ReaderMixerOptions = {}) {
+        this.leveling = {
+            ...DEFAULT_LOUDNESS_LEVELING,
+            ...(typeof options.leveling === "object"
+                ? options.leveling
+                : { enabled: options.leveling ?? true }),
+        }
         this.sleepFadeMs = Math.max(0, options.sleepFadeMs ?? 20000)
         this.idleFadeMs = Math.max(0, options.idleFadeMs ?? 8000)
         if (options.onSleepTimer) this.sleepListeners.add(options.onSleepTimer)
@@ -631,6 +647,7 @@ export class ReaderMixer {
                 }
             }
         this.soundscapes = new SceneMixEngine({
+            leveling: this.leveling,
             ...recovery,
             loop: true,
             maxPlays: options.soundscapeMaxPlays === undefined ? 2 : options.soundscapeMaxPlays,
@@ -643,6 +660,7 @@ export class ReaderMixer {
             onRoutingFallback: () => this.routingFallback("soundscapes"),
         })
         this.atmosphere = new SceneMixEngine({
+            leveling: this.leveling,
             ...recovery,
             loop: true,
             fadeMs: this.atmosphereFadeMs,
@@ -653,6 +671,7 @@ export class ReaderMixer {
             onRoutingFallback: () => this.routingFallback("atmosphere"),
         })
         this.cues = new OneShotEngine({
+            leveling: this.leveling,
             crossOrigin,
             maxConcurrent: options.maxConcurrentCues ?? 6,
             maxCachedUrls: options.maxCachedCueUrls ?? 8,
@@ -872,6 +891,7 @@ export class ReaderMixer {
         const element = this.cues.playOneShot(url, {
             volume: options.volume,
             startTime: options.startTime,
+            loudness: options.loudness,
         })
         if (!element) return false
         this.session.start()
@@ -981,6 +1001,16 @@ export class ReaderMixer {
     setLayerLevel(layer: ReaderMixerLayer, level: number): void {
         if (this.disposed || !READER_MIXER_LAYERS.includes(layer)) return
         this.updateLayer(layer, { level: clamp01(level) })
+    }
+
+    /** Compare source leveling on/off live; this is host policy, never a saved reader preference. */
+    setLeveling(enabled: boolean): void {
+        if (this.disposed) return
+        this.leveling = { ...this.leveling, enabled }
+        this.soundscapes.setLeveling(this.leveling)
+        this.atmosphere.setLeveling(this.leveling)
+        this.cues.setLeveling(this.leveling)
+        this.refresh()
     }
 
     /** Save a layer's enable switch while retaining its level and selected source. */
@@ -1235,7 +1265,13 @@ export class ReaderMixer {
 
     private resolveOption(option: ReaderAtmosphereOption): { id: string; track: Track } | null {
         if (!option.id) return null
-        if (option.track) return { id: option.id, track: option.track }
+        if (option.track)
+            return {
+                id: option.id,
+                track: option.loudness
+                    ? { ...option.track, loudness: option.loudness }
+                    : option.track,
+            }
         if (!option.sources?.length) return null
         return {
             id: option.id,
@@ -1244,6 +1280,7 @@ export class ReaderMixer {
                 title: option.label,
                 artist: option.group ?? "",
                 sources: [...option.sources],
+                loudness: option.loudness,
             },
         }
     }
@@ -1517,6 +1554,7 @@ export class ReaderMixer {
                 (loopsRequested || this.activeCues > 0) &&
                 !this.pageHidden)
         return Object.freeze({
+            leveling: this.leveling.enabled !== false,
             preferences: this.prefs,
             availability: Object.freeze({
                 soundscapes: this.availabilityInput.soundscapes ?? true,

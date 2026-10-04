@@ -16,7 +16,9 @@ import type {
     ReaderMixerLayer,
     ReaderMixerOptions,
     Track,
+    LoudnessMeasurement,
 } from "../../../audio-player"
+import measurements from "../../readerLoudness.json"
 import { SAMPLE, SEA_THEME, narrationTracks } from "../../data"
 import { SEN_SOUNDSCAPES_VOLUME_1, SEN_SOUNDSCAPE_CATEGORIES } from "../../senSoundscapes"
 import {
@@ -60,7 +62,13 @@ interface SceneSet {
     /** Category "Battle starts" cycles through. */
     battleCategory: string
     atmospheres: ReaderAtmosphereOption[]
-    cues: { id: string; label: string; url: string; volume?: number }[]
+    cues: {
+        id: string
+        label: string
+        url: string
+        volume?: number
+        loudness?: LoudnessMeasurement
+    }[]
 }
 
 const atmosphere = (
@@ -73,6 +81,8 @@ const atmosphere = (
     label,
     group,
     sources: [{ url: `${CELESTIAL}/atmosphere/${path}` }],
+    loudness: measurements.find((entry) => entry.id === id)?.loudness as
+        LoudnessMeasurement | undefined,
 })
 
 const formatLength = (seconds: number) =>
@@ -84,6 +94,7 @@ const SEN_SCORES: ScoreOption[] = SEN_SOUNDSCAPES_VOLUME_1.map((score) => ({
         title: `${score.category} ${score.number} · ${score.title}`,
         artist: "SEN Soundscapes · Volume 1",
         audioFile: score.url,
+        loudness: score.loudness,
     },
     category: score.category,
     detail: `${score.mood} · ${formatLength(score.durationSeconds)}`,
@@ -109,27 +120,37 @@ const SETS: Record<Host, SceneSet> = {
         cues: [
             {
                 id: "growl",
+                loudness: measurements.find((entry) => entry.id === "growl")?.loudness as
+                    LoudnessMeasurement | undefined,
                 label: "Beast growl",
                 url: `${CELESTIAL}/Beasts/Growl/Tiger_Growl_1.mp3`,
             },
             {
                 id: "dragon",
+                loudness: measurements.find((entry) => entry.id === "dragon")?.loudness as
+                    LoudnessMeasurement | undefined,
                 label: "Dragon call",
                 url: `${CELESTIAL}/Beasts/Call/Dragon_Call_1.mp3`,
             },
             {
                 id: "bell",
+                loudness: measurements.find((entry) => entry.id === "bell")?.loudness as
+                    LoudnessMeasurement | undefined,
                 label: "Temple bell",
                 url: `${CELESTIAL}/Locations/Signatures/Temple_Bell_1.mp3`,
             },
             {
                 id: "chime",
+                loudness: measurements.find((entry) => entry.id === "chime")?.loudness as
+                    LoudnessMeasurement | undefined,
                 label: "Magic chime (50%)",
                 url: `${CELESTIAL}/Locations/Signatures/Magic_Chime_1.mp3`,
                 volume: 0.5,
             },
             {
                 id: "magic",
+                loudness: measurements.find((entry) => entry.id === "magic")?.loudness as
+                    LoudnessMeasurement | undefined,
                 label: "Wind magic",
                 url: `${CELESTIAL}/Weapons/Magic/Wind_Magic_1.mp3`,
             },
@@ -313,7 +334,10 @@ function ReaderSimulation({
                             type="button"
                             className="wk-pad"
                             onClick={() => {
-                                const played = mixer.playCue(cue.url, { volume: cue.volume })
+                                const played = mixer.playCue(cue.url, {
+                                    volume: cue.volume,
+                                    loudness: cue.loudness,
+                                })
                                 append(
                                     `cue reached → playCue(“${cue.label}”)${played ? "" : " skipped"}`,
                                     played ? "ok" : "warn"

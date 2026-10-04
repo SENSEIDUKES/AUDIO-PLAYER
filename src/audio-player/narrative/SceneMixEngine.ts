@@ -4,6 +4,7 @@ import { getTrackSources } from "../utils/sources"
 import { ensureSourceAnalysis } from "../automix/silenceAnalysis"
 import { ACTIVATION_EVENTS, isActivationEvent, UnlockedAudioPool } from "./mediaRouting"
 import type { MediaGainSink, MediaGainSinkFactory } from "./mediaRouting"
+import { computeLoudnessGain, type LoudnessLevelingOptions } from "./loudness"
 
 /**
  * Default crossfade length for scene switches. Shorter than the music-player
@@ -83,6 +84,8 @@ type SceneRequest = {
 export type SceneMixAnalysisPolicy = "automatic" | "off"
 
 export interface SceneMixEngineOptions {
+    /** Source leveling is opt-in for standalone SceneMix; ReaderMixer supplies its defaults. */
+    leveling?: LoudnessLevelingOptions
     /** Full plays per request before a rest. null (standalone default) loops indefinitely. */
     maxPlays?: number | null
     /** Fade within the end of the final play. Default 8,000 ms. */
@@ -213,6 +216,7 @@ const MEDIA_ERROR_MESSAGES: Readonly<Record<number, string>> = Object.freeze({
  * volume every tick.
  */
 export class SceneMixEngine {
+    private leveling: LoudnessLevelingOptions
     private readonly maxPlays: number | null
     private readonly restFadeMs: number
     private completedPlays = 0
@@ -261,6 +265,7 @@ export class SceneMixEngine {
     private reportedPlayback = false
 
     constructor(options: SceneMixEngineOptions = {}) {
+        this.leveling = options.leveling ?? { enabled: false }
         this.maxPlays =
             typeof options.maxPlays === "number" && Number.isFinite(options.maxPlays)
                 ? Math.max(1, Math.floor(options.maxPlays))
@@ -336,6 +341,12 @@ export class SceneMixEngine {
 
     getLevel(): number {
         return this.level
+    }
+
+    /** Update source-level gain without changing layer level, transport or fades. */
+    setLeveling(options: LoudnessLevelingOptions): void {
+        this.leveling = options
+        this.applyGains()
     }
 
     /** Mute/unmute without losing playback position or fade state. */
@@ -1600,12 +1611,18 @@ export class SceneMixEngine {
     }
 
     private applyDeckGain(deck: Deck): void {
+        const leveling = computeLoudnessGain(
+            deck.request.track.loudness,
+            "integrated",
+            this.leveling,
+            deck.sink ? "web-audio" : "element"
+        ).gain
         if (deck.sink) {
-            this.writeSinkGain(deck.sink, deck.curveGain * this.level)
+            this.writeSinkGain(deck.sink, deck.curveGain * this.level * leveling)
             return
         }
         if (this.volumeWritesUnsupported) return
-        const target = clamp01(deck.curveGain * this.level)
+        const target = clamp01(deck.curveGain * this.level * leveling)
         try {
             deck.el.volume = target
             if (this.level > 0.1 && Math.abs(deck.el.volume - target) > 0.05) {
@@ -1645,7 +1662,7 @@ export class SceneMixEngine {
 
     private writeSinkGain(sink: MediaGainSink, value: number): void {
         try {
-            sink.setGain(clamp01(value))
+            sink.setGain(Number.isFinite(value) ? Math.max(0, value) : 0)
         } catch {
             // A host sink failure cannot break the fade loop.
         }
