@@ -354,6 +354,25 @@ describe("ReaderMixer", () => {
     })
 
     describe("atmosphere", () => {
+        it("restores the default atmosphere after Off while the reader is open", async () => {
+            const mixer = makeMixer({ defaultPreferences: { atmosphereId: "rain" } })
+            mixer.startAtmosphere({ fadeMs: 0 })
+            await settle()
+            mixer.setAtmosphere(null, { fadeMs: 0 })
+            await settle()
+            mixer.applyPreset("default")
+            await settle(2100)
+            expect(mixer.getPreferences().atmosphereId).toBe("rain")
+            expect(mixer.getState().layers.atmosphere.status).toBe("playing")
+            expect(only("https://a.test/rain.mp3").paused).toBe(false)
+
+            mixer.stopAtmosphere({ fadeMs: 0 })
+            mixer.setPreferences({ atmosphereId: null })
+            mixer.applyPreset("default")
+            await settle()
+            expect(FakeAudio.withSrc("https://a.test/rain.mp3")).toHaveLength(0)
+        })
+
         it("fades out on setAtmosphere(null) and saves Off", async () => {
             const mixer = makeMixer()
             mixer.setAtmosphere(RAIN, { fadeMs: 0 })

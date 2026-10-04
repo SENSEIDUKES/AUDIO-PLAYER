@@ -442,6 +442,8 @@ export class ReaderMixer {
     private pendingPreferences: ReaderMixerPreferences | null = null
     private atmosphereOptions: readonly ReaderAtmosphereOption[]
     private atmosphereActive = false
+    /** Reader lifetime, retained when its selected atmosphere is Off. */
+    private atmosphereStarted = false
     private loopStatus: Record<LoopLayer, SceneMixStatusSnapshot>
     private cueStatus: CueStatus = "idle"
     private cueFailure: string | null = null
@@ -633,6 +635,7 @@ export class ReaderMixer {
         }
         const resolved = this.resolveAtmosphere(atmosphere)
         if (!resolved) return
+        this.atmosphereStarted = true
         this.atmosphereActive = true
         this.updatePreferences({ ...this.prefs, atmosphereId: resolved.id })
         this.atmosphere.crossfadeTo(resolved.track, { fadeMs })
@@ -646,6 +649,7 @@ export class ReaderMixer {
      */
     startAtmosphere(options: ReaderMixerFadeOptions = {}): void {
         if (this.disposed) return
+        this.atmosphereStarted = true
         this.atmosphereActive = true
         const id = this.prefs.atmosphereId
         const resolved = id ? this.resolveAtmosphere(id) : null
@@ -662,6 +666,7 @@ export class ReaderMixer {
     /** Fade the atmosphere out without changing the reader's choice (leaving the reader). */
     stopAtmosphere(options: ReaderMixerFadeOptions = {}): void {
         if (this.disposed) return
+        this.atmosphereStarted = false
         this.atmosphereActive = false
         this.atmosphere.stop(options.fadeMs ?? this.atmosphereFadeMs)
         this.refresh()
@@ -785,9 +790,12 @@ export class ReaderMixer {
         const previousId = this.prefs.atmosphereId
         this.updatePreferences(normalizeReaderMixerPreferences(preferences, this.prefs))
         const nextId = this.prefs.atmosphereId
-        if (nextId === previousId || !this.atmosphereActive) return
-        if (nextId === null) this.atmosphere.stop(this.atmosphereFadeMs)
-        else this.startAtmosphere()
+        if (nextId === previousId || !this.atmosphereStarted) return
+        if (nextId === null) {
+            this.atmosphereActive = false
+            this.atmosphere.stop(this.atmosphereFadeMs)
+            this.refresh()
+        } else this.startAtmosphere()
     }
 
     /** The presets the reader can pick. */

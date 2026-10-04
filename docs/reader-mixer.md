@@ -255,7 +255,12 @@ Presets switch the whole mix in one tap. The built-in `READER_MIXER_PRESETS` are
 | Calm | 15% | 40% | 40% | kept |
 | Focus | off | 30% | off | kept |
 
-Every preset turns the master on. A preset's `preferences` may be partial:
+Every preset turns the master on. Choosing Off keeps the open reader's
+atmosphere lifetime: applying Default can
+start its rain again. After `stopAtmosphere()` or `stopAll()` (leaving the reader),
+presets only change saved settings until the host starts the atmosphere again.
+
+A preset's `preferences` may be partial:
 fields it leaves out keep the reader's current choice. `state.activePresetId`
 names the preset the current mix matches, or `null` for a custom mix, and
 `ReaderMixerPanel` shows the presets as a chip row above the master switch
