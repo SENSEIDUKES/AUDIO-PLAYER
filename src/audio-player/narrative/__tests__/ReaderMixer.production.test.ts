@@ -291,7 +291,7 @@ describe("ReaderMixer production recovery", () => {
             requested: "id:next",
         })
         expect(old.paused).toBe(false)
-        expect(old.volume).toBeCloseTo(0.25)
+        expect(old.volume).toBeCloseTo(1) // Auto routes the per-layer level through Web Audio.
         expect(old.src).toBe(SCORE.audioFile)
     })
 
@@ -307,6 +307,7 @@ describe("ReaderMixer production recovery", () => {
 
     it("recovers failed wanted loops on online without replacing the old score early", async () => {
         const instance = mixer({ loopRetryDelayMs: 10 })
+        instance.startAtmosphere()
         instance.playSoundscape(SCORE)
         await settle()
         const old = latest(SCORE)

@@ -51,23 +51,22 @@ describe("ReaderMixerPanel", () => {
         vi.unstubAllGlobals()
     })
 
-    it("shows a master switch and all four layers in order", () => {
+    it("shows a master switch and the three available soundtrack layers in order", () => {
         renderPanel()
         const switches = screen.getAllByRole("switch")
         expect(
             switches.map((node) => node.textContent || node.getAttribute("aria-labelledby"))
-        ).toHaveLength(5)
+        ).toHaveLength(4)
         expect(screen.getByRole("switch", { name: "Master" })).toBe(switches[0])
         expect(screen.getByRole("switch", { name: "Soundscapes" })).toBe(switches[1])
         expect(screen.getByRole("switch", { name: "Atmosphere" })).toBe(switches[2])
         expect(screen.getByRole("switch", { name: "Sound Cues" })).toBe(switches[3])
-        expect(screen.getByRole("switch", { name: "Voice" })).toBe(switches[4])
+        expect(screen.queryByRole("switch", { name: "Voice" })).toBeNull()
         const sliders = screen.getAllByRole("slider")
         expect(sliders.map((node) => node.getAttribute("aria-label"))).toEqual([
             "Soundscapes volume",
             "Atmosphere volume",
             "Sound Cues volume",
-            "Voice volume",
         ])
         expect(sliders[0]).toHaveAttribute("aria-valuetext", "25%")
         expect(screen.getByText("25%")).toBeInTheDocument()
@@ -107,6 +106,12 @@ describe("ReaderMixerPanel", () => {
 
     it("picks an atmosphere from grouped host options, with Off", () => {
         renderPanel()
+        const summary = screen.getByRole("button", { name: "Atmosphere: Off" })
+        expect(summary).toHaveTextContent("Off")
+        expect(summary).not.toHaveTextContent("Atmosphere")
+        expect(summary).toHaveAttribute("aria-expanded", "false")
+        expect(screen.queryByRole("radio", { name: "Rain" })).toBeNull()
+        fireEvent.click(summary)
         const picker = screen.getByRole("group", { name: "Atmosphere sound" })
         expect(within(picker).getByRole("radio", { name: "Off" })).toBeChecked()
         expect(within(picker).getByRole("group", { name: "Weather" })).toBeInTheDocument()
@@ -133,6 +138,7 @@ describe("ReaderMixerPanel", () => {
             ],
         })
         render(<ReaderMixerPanel mixer={mixer} />)
+        fireEvent.click(screen.getByRole("button", { name: /Atmosphere:/ }))
         expect(screen.getByRole("radio", { name: "Odd" })).toBeInTheDocument()
     })
 
@@ -178,6 +184,7 @@ describe("ReaderMixerPanel", () => {
             "aria-valuetext",
             "75 %"
         )
+        fireEvent.click(screen.getByRole("button", { name: "Atmosphere: Apagado" }))
         expect(screen.getByRole("radio", { name: "Apagado" })).toBeChecked()
         expect(screen.getByRole("group", { name: "Ambiente" })).toBeInTheDocument()
         expect(screen.getByRole("group", { name: "Mezclas" })).toBeInTheDocument()
@@ -236,5 +243,65 @@ describe("ReaderMixerPanel", () => {
         expect(live.getPreferences().masterEnabled).toBe(false)
         unmount()
         expect(live.isDisposed()).toBe(true)
+    })
+
+    it("keeps a dragging or focused row until the reader finishes", () => {
+        renderPanel()
+        const slider = screen.getByRole("slider", { name: "Sound Cues volume" })
+        fireEvent.pointerDown(slider)
+        act(() => mixer!.setLayerAvailability({ cues: false }))
+        expect(slider).toBeInTheDocument()
+        fireEvent.change(slider, { target: { value: "22" } })
+        expect(mixer!.getPreferences().layers.cues.level).toBe(0.22)
+        fireEvent.pointerUp(document)
+        expect(slider).not.toBeInTheDocument()
+        act(() => mixer!.setLayerAvailability({ cues: true }))
+        const focused = screen.getByRole("switch", { name: "Sound Cues" })
+        fireEvent.focus(focused)
+        act(() => mixer!.setLayerAvailability({ cues: false }))
+        expect(focused).toBeInTheDocument()
+        fireEvent.blur(focused, { relatedTarget: document.body })
+        expect(focused).not.toBeInTheDocument()
+    })
+
+    it("shows one host-labelled empty message without unused rows", () => {
+        renderPanel({ labels: { noAudio: "No sounds in this chapter" } })
+        act(() =>
+            mixer!.setLayerAvailability({
+                soundscapes: false,
+                atmosphere: false,
+                cues: false,
+                voice: false,
+            })
+        )
+        expect(screen.getByText("No sounds in this chapter")).toBeInTheDocument()
+        expect(screen.getAllByRole("switch")).toHaveLength(1)
+        expect(screen.queryAllByRole("slider")).toHaveLength(0)
+    })
+
+    it("lets the same timer choice re-arm after it has fired", () => {
+        renderPanel()
+        const select = screen.getByRole("combobox", { name: "Sleep timer" })
+        fireEvent.change(select, { target: { value: "chapter-end" } })
+        act(() => mixer!.notifyChapterEnd())
+        expect(select).toHaveValue("off")
+        fireEvent.change(select, { target: { value: "chapter-end" } })
+        expect(mixer!.getState().sleepTimer.status).toBe("running")
+        expect(select).toHaveValue("chapter-end")
+    })
+
+    it("arms translated timers, reports remaining wall-clock time, and cancels", () => {
+        vi.useFakeTimers()
+        renderPanel({ labels: { sleepTimer: "Stop audio", cancelTimer: "Keep playing" } })
+        fireEvent.change(screen.getByRole("combobox", { name: "Stop audio" }), {
+            target: { value: "30-minutes" },
+        })
+        expect(screen.getByText("Stops in 30 min")).toBeInTheDocument()
+        act(() => vi.advanceTimersByTime(7 * 60000))
+        expect(screen.getByText("Stops in 23 min")).toBeInTheDocument()
+        fireEvent.click(screen.getByRole("button", { name: "Keep playing" }))
+        expect(mixer!.getState().sleepTimer.status).toBe("off")
+        mixer!.dispose()
+        vi.useRealTimers()
     })
 })

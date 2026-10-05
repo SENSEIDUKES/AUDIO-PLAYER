@@ -4,6 +4,7 @@ import { getTrackSources } from "../utils/sources"
 import { ensureSourceAnalysis } from "../automix/silenceAnalysis"
 import { ACTIVATION_EVENTS, isActivationEvent, UnlockedAudioPool } from "./mediaRouting"
 import type { MediaGainSink, MediaGainSinkFactory } from "./mediaRouting"
+import { computeLoudnessGain, type LoudnessLevelingOptions } from "./loudness"
 
 /**
  * Default crossfade length for scene switches. Shorter than the music-player
@@ -83,6 +84,12 @@ type SceneRequest = {
 export type SceneMixAnalysisPolicy = "automatic" | "off"
 
 export interface SceneMixEngineOptions {
+    /** Source leveling is opt-in for standalone SceneMix; ReaderMixer supplies its defaults. */
+    leveling?: LoudnessLevelingOptions
+    /** Full plays per request before a rest. null (standalone default) loops indefinitely. */
+    maxPlays?: number | null
+    /** Fade within the end of the final play. Default 8,000 ms. */
+    restFadeMs?: number
     /** Loop every scene track. Defaults to true — scores are beds, not songs. */
     loop?: boolean
     /** Overlap each finite loop boundary; 0 retains native looping (standalone default). */
@@ -132,6 +139,8 @@ export interface SceneMixEngineOptions {
 }
 
 export interface SceneCrossfadeOptions {
+    /** A changed scene repeats even the same track; equal track/sources/scene is a no-op. */
+    scene?: string
     /** Crossfade length for this switch only. */
     fadeMs?: number
     /**
@@ -142,7 +151,14 @@ export interface SceneCrossfadeOptions {
 }
 
 export type SceneMixTransitionState =
-    "idle" | "loading" | "autoplay-blocked" | "playing" | "paused" | "stopped" | "failed"
+    | "idle"
+    | "loading"
+    | "autoplay-blocked"
+    | "playing"
+    | "paused"
+    | "stopped"
+    | "failed"
+    | "resting"
 
 export type SceneMixFailureReason = "playback-failed" | "media-error"
 
@@ -200,6 +216,11 @@ const MEDIA_ERROR_MESSAGES: Readonly<Record<number, string>> = Object.freeze({
  * volume every tick.
  */
 export class SceneMixEngine {
+    private leveling: LoudnessLevelingOptions
+    private readonly maxPlays: number | null
+    private readonly restFadeMs: number
+    private completedPlays = 0
+    private restingRequest: SceneRequest | null = null
     private decks: Deck[] = []
     private active: Deck | null = null
     private level = 1
@@ -244,6 +265,12 @@ export class SceneMixEngine {
     private reportedPlayback = false
 
     constructor(options: SceneMixEngineOptions = {}) {
+        this.leveling = options.leveling ?? { enabled: false }
+        this.maxPlays =
+            typeof options.maxPlays === "number" && Number.isFinite(options.maxPlays)
+                ? Math.max(1, Math.floor(options.maxPlays))
+                : null
+        this.restFadeMs = Math.max(0, options.restFadeMs ?? 8000)
         this.loop = options.loop ?? true
         this.loopCrossfadeMs = Math.max(0, options.loopCrossfadeMs ?? 0)
         this.defaultFadeMs = Math.max(0, options.fadeMs ?? SCENE_FADE_MS)
@@ -269,6 +296,11 @@ export class SceneMixEngine {
      */
     getCurrentTrackKey(): string | null {
         return this.active?.key ?? null
+    }
+
+    /** Completed repeats, including the final play whose tail is fading into a rest. */
+    getCompletedPlays(): number {
+        return this.completedPlays
     }
 
     /** Immutable current transition status. */
@@ -311,6 +343,12 @@ export class SceneMixEngine {
         return this.level
     }
 
+    /** Update source-level gain without changing layer level, transport or fades. */
+    setLeveling(options: LoudnessLevelingOptions): void {
+        this.leveling = options
+        this.applyGains()
+    }
+
     /** Mute/unmute without losing playback position or fade state. */
     setMuted(muted: boolean): void {
         this.muted = muted
@@ -343,18 +381,26 @@ export class SceneMixEngine {
         if (sources.length === 0) return
         this.failedRequest = null
         const key = trackKey(track)
+        if (
+            this.restingRequest?.key === key &&
+            this.restingRequest.options.scene === options.scene &&
+            sameSources(this.restingRequest.sources, sources)
+        )
+            return
         if (this.paused) {
             this.deferWhilePaused(track, options, key, sources)
             return
         }
         if (
             this.pendingTransition?.request.key === key &&
+            this.pendingTransition.request.options.scene === options.scene &&
             sameSources(this.pendingTransition.request.sources, sources)
         )
             return
         if (
             this.active &&
             this.active.key === key &&
+            this.active.request.options.scene === options.scene &&
             sameSources(this.active.request.sources, sources) &&
             !this.active.retiring
         ) {
@@ -368,6 +414,7 @@ export class SceneMixEngine {
         if (this.pendingTransition) {
             this.rollbackTransition(this.pendingTransition)
         }
+        this.restingRequest = null
 
         const fadeMs = Math.max(0, options.fadeMs ?? this.defaultFadeMs)
         const request: SceneRequest = {
@@ -402,7 +449,7 @@ export class SceneMixEngine {
         const parked = transition.loopOwner ? this.parkedLoopDeck : null
         if (parked) this.parkedLoopDeck = null
         const el = parked?.el ?? this.unlockPool.take()
-        el.loop = this.loop && this.loopCrossfadeMs === 0
+        el.loop = this.loop && this.loopCrossfadeMs === 0 && this.maxPlays === null
         el.preload = "auto"
         // Standalone requests retain their opt-in CORS policy. ReaderMixer
         // supplies a consistent anonymous mode; its emergency fallback opts out.
@@ -477,14 +524,35 @@ export class SceneMixEngine {
             ) {
                 this.scheduleLoop(this.loopTransition)
             }
+            if (
+                this.active === deck &&
+                this.maxPlays !== null &&
+                this.completedPlays + 1 >= this.maxPlays
+            )
+                this.scheduleRest(deck)
         }
         el.addEventListener("timeupdate", retimeLoop, { signal: abort.signal })
         el.addEventListener("seeked", retimeLoop, { signal: abort.signal })
         el.addEventListener(
             "ended",
             () => {
-                if (!this.loop || !this.loopCrossfadeMs || this.active !== deck || this.paused)
+                if (
+                    !this.loop ||
+                    (!this.loopCrossfadeMs && this.maxPlays === null) ||
+                    this.active !== deck ||
+                    this.paused
+                )
                     return
+                this.completedPlays += 1
+                try {
+                    this.onPlaybackChange?.()
+                } catch {
+                    /* Observers cannot break a repeat. */
+                }
+                if (this.maxPlays !== null && this.completedPlays >= this.maxPlays) {
+                    this.rest(deck, 0)
+                    return
+                }
                 // A stalled standby must not end the bed; every restart honors its trim.
                 this.cancelLoop()
                 try {
@@ -571,6 +639,8 @@ export class SceneMixEngine {
 
     /** Fade the whole scene layer to silence and release every deck. */
     stop(fadeMs: number = this.defaultFadeMs): void {
+        this.restingRequest = null
+        this.completedPlays = 0
         this.cancelLoop()
         this.failedRequest = null
         this.deferredRequest = null
@@ -735,6 +805,7 @@ export class SceneMixEngine {
         if (
             this.active &&
             this.active.key === key &&
+            this.active.request.options.scene === options.scene &&
             sameSources(this.active.request.sources, sources) &&
             !this.active.retiring
         ) {
@@ -902,6 +973,12 @@ export class SceneMixEngine {
             deck.rampToGain = 1
             deck.rampMs = this.rampLength(deck.sink, transition.request.fadeMs)
             this.active = deck
+            this.completedPlays += 1
+            try {
+                this.onPlaybackChange?.()
+            } catch {
+                /* Observers cannot break a repeat. */
+            }
             if (!this.pendingTransition && this.statusSnapshot.state !== "failed") {
                 this.publishStatus("playing", deck.key, deck.key)
             }
@@ -912,6 +989,9 @@ export class SceneMixEngine {
         }
 
         this.cancelLoop()
+
+        if (transition.resumeTime === null) this.completedPlays = 0
+        this.restingRequest = null
 
         this.pendingTransition = null
         this.disarmGestureRetry?.()
@@ -1418,6 +1498,10 @@ export class SceneMixEngine {
 
     /** Prepare the other unlocked deck ahead of the next finite boundary. */
     private prepareLoop(deck: Deck): void {
+        if (this.maxPlays !== null && this.completedPlays + 1 >= this.maxPlays) {
+            this.scheduleRest(deck)
+            return
+        }
         if (
             !this.loop ||
             !this.loopCrossfadeMs ||
@@ -1481,6 +1565,41 @@ export class SceneMixEngine {
         this.loopTimer = null
     }
 
+    /** Rest inside the final play's tail, rather than starting one extra repeat for the fade. */
+    private scheduleRest(deck: Deck): void {
+        if (this.active !== deck || this.paused || this.disposed || deck.el.paused) return
+        const remaining = (deck.el.duration - deck.el.currentTime) * 1000
+        if (!Number.isFinite(remaining) || remaining < 0) return
+        this.clearLoopTimer()
+        const fadeMs = Math.min(
+            this.restFadeMs,
+            Math.max(0, deck.el.duration * 1000 - deck.trimStartMs)
+        )
+        this.loopTimer = setTimeout(
+            () => {
+                this.loopTimer = null
+                if (this.active === deck && !this.paused) this.rest(deck, fadeMs)
+            },
+            Math.max(0, remaining - fadeMs)
+        )
+    }
+
+    private rest(deck: Deck, fadeMs: number): void {
+        const request = deck.request
+        const completed = this.maxPlays ?? this.completedPlays
+        // A slow replacement must neither extend the old score indefinitely
+        // nor get cancelled when that score reaches its rest limit.
+        this.cancelLoop()
+        for (const candidate of this.decks) {
+            if (candidate !== this.pendingTransition?.incoming) this.retire(candidate, fadeMs)
+        }
+        this.active = null
+        this.completedPlays = completed
+        this.restingRequest = request
+        this.startTicking()
+        this.publishStatus("resting", request.key, null)
+    }
+
     private cancelLoop(): void {
         this.clearLoopTimer()
         const transition = this.loopTransition
@@ -1497,12 +1616,18 @@ export class SceneMixEngine {
     }
 
     private applyDeckGain(deck: Deck): void {
+        const leveling = computeLoudnessGain(
+            deck.request.track.loudness,
+            "integrated",
+            this.leveling,
+            deck.sink ? "web-audio" : "element"
+        ).gain
         if (deck.sink) {
-            this.writeSinkGain(deck.sink, deck.curveGain * this.level)
+            this.writeSinkGain(deck.sink, deck.curveGain * this.level * leveling)
             return
         }
         if (this.volumeWritesUnsupported) return
-        const target = clamp01(deck.curveGain * this.level)
+        const target = clamp01(deck.curveGain * this.level * leveling)
         try {
             deck.el.volume = target
             if (this.level > 0.1 && Math.abs(deck.el.volume - target) > 0.05) {
@@ -1542,7 +1667,7 @@ export class SceneMixEngine {
 
     private writeSinkGain(sink: MediaGainSink, value: number): void {
         try {
-            sink.setGain(clamp01(value))
+            sink.setGain(Number.isFinite(value) ? Math.max(0, value) : 0)
         } catch {
             // A host sink failure cannot break the fade loop.
         }

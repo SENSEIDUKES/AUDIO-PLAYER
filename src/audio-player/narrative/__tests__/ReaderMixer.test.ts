@@ -187,7 +187,7 @@ describe("ReaderMixer", () => {
             const second = makeMixer({ initialPreferences: saved as ReaderMixerPreferences })
             expect(second.getPreferences()).toEqual(first.getPreferences())
             expect(second.getPreferences()).toEqual({
-                version: 2,
+                version: 3,
                 masterEnabled: false,
                 layers: {
                     soundscapes: { enabled: true, level: 0.33 },
@@ -234,7 +234,7 @@ describe("ReaderMixer", () => {
             const mixer = createReaderMixer()
             mixers.push(mixer)
             expect(mixer.getPreferences()).toEqual({
-                version: 2,
+                version: 3,
                 masterEnabled: true,
                 layers: {
                     soundscapes: { enabled: true, level: 0.25 },
@@ -425,6 +425,7 @@ describe("ReaderMixer", () => {
 
         it("crossfades a changed source under the same catalog id and defers it while hidden", async () => {
             const mixer = makeMixer()
+            mixer.startAtmosphere()
             const rain = { ...RAIN, track: { ...CHAPTER, audioFile: "https://a.test/old.mp3" } }
             mixer.setAtmosphere(rain, { fadeMs: 0 })
             await settle()
@@ -451,6 +452,7 @@ describe("ReaderMixer", () => {
 
         it("silences the bed when new preferences name an unknown atmosphere", async () => {
             const mixer = makeMixer()
+            mixer.startAtmosphere()
             mixer.setAtmosphere(RAIN, { fadeMs: 0 })
             await settle()
             mixer.setPreferences({ atmosphereId: "not-in-catalog" })
@@ -591,11 +593,13 @@ describe("ReaderMixer", () => {
             vi.stubGlobal("AudioContext", FakeAudioContext)
         })
 
-        it("stays on media elements where element volume works, by default", () => {
-            expect(makeMixer().getState().routing).toBe("element")
-            expect(makeMixer({ routing: "auto" }).getState().routing).toBe("element")
+        it("uses Web Audio for default leveling and can retain plain elements with leveling off", () => {
+            expect(makeMixer().getState().routing).toBe("web-audio")
+            expect(makeMixer({ routing: "auto", leveling: false }).getState().routing).toBe(
+                "element"
+            )
             expect(makeMixer({ routing: "element" }).getState().routing).toBe("element")
-            expect(FakeAudioContext.instances).toHaveLength(0)
+            expect(FakeAudioContext.instances).toHaveLength(1)
         })
 
         it("crossfades through per-element gain and resumes the context on a gesture", async () => {
@@ -626,6 +630,7 @@ describe("ReaderMixer", () => {
     describe("page visibility", () => {
         it("pauses both loops while hidden and resumes them after", async () => {
             const mixer = makeMixer()
+            mixer.startAtmosphere()
             mixer.playSoundscape(CHAPTER, { fadeMs: 0 })
             mixer.setAtmosphere(RAIN, { fadeMs: 0 })
             await settle()

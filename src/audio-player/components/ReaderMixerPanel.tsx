@@ -1,4 +1,4 @@
-import { useId, useMemo } from "react"
+import { useEffect, useId, useMemo, useState } from "react"
 import type { CSSProperties, ReactNode } from "react"
 import { READER_MIXER_LAYERS } from "../narrative/ReaderMixer"
 import type {
@@ -22,6 +22,13 @@ export interface ReaderMixerLabels {
     formatPercent: (percent: number) => string
     atmospherePicker: string
     atmosphereOff: string
+    /** Empty chapter message under the master switch. */
+    noAudio: string
+    sleepTimer: string
+    cancelTimer: string
+    sleepStopped: string
+    /** Receives remaining wall-clock milliseconds. */
+    formatRemainingTime: (remainingMs: number) => string
     /** Shown where the browser ignores volume and sliders act as on/off. */
     deviceVolumeHint: string
     /** Row messages for statuses worth telling the reader about. */
@@ -48,12 +55,18 @@ export const DEFAULT_READER_MIXER_LABELS: ReaderMixerLabels = Object.freeze({
     formatPercent: (percent: number) => `${percent}%`,
     atmospherePicker: "Atmosphere sound",
     atmosphereOff: "Off",
+    noAudio: "This chapter has no audio",
+    sleepTimer: "Sleep timer",
+    cancelTimer: "Cancel timer",
+    sleepStopped: "Stopped by sleep timer",
+    formatRemainingTime: (remainingMs: number) => `Stops in ${Math.ceil(remainingMs / 60000)} min`,
     deviceVolumeHint: "Volume is set by your device on this browser",
     status: Object.freeze({
         loading: "Loading…",
         blocked: "Tap anywhere to start audio",
         failed: "This sound couldn’t play",
         paused: "Paused",
+        resting: "Music is resting until the next scene",
     }),
 })
 
@@ -179,6 +192,19 @@ export function ReaderMixerPanel({
     const baseId = useId()
     const options = atmospheres ?? state?.atmosphereOptions
     const groups = useMemo(() => groupAtmospheres(options ?? []), [options])
+    const [pickerOpen, setPickerOpen] = useState(false)
+    const [focusedLayer, setFocusedLayer] = useState<ReaderMixerLayer | null>(null)
+    const [draggingLayer, setDraggingLayer] = useState<ReaderMixerLayer | null>(null)
+    useEffect(() => {
+        if (!draggingLayer) return
+        const release = () => setDraggingLayer(null)
+        document.addEventListener("pointerup", release, true)
+        document.addEventListener("pointercancel", release, true)
+        return () => {
+            document.removeEventListener("pointerup", release, true)
+            document.removeEventListener("pointercancel", release, true)
+        }
+    }, [draggingLayer])
 
     if (!mixer || !state) return null
 
@@ -190,47 +216,40 @@ export function ReaderMixerPanel({
         picker: `${baseId}-atmosphere`,
         presets: `${baseId}-presets`,
         group: (index: number) => `${baseId}-group-${index}`,
+        pickerList: `${baseId}-atmosphere-list`,
     }
 
     const renderPicker = (): ReactNode => {
         if (!showAtmospherePicker) return null
         const selected = preferences.atmosphereId
         return (
-            <fieldset className="sap-reader-mixer__picker">
-                <legend className="sap-reader-mixer__picker-legend">
-                    {labels.atmospherePicker}
-                </legend>
-                <div className="sap-reader-mixer__chips">
-                    <AtmosphereChip
-                        name={ids.picker}
-                        checked={selected === null}
-                        label={labels.atmosphereOff}
-                        onSelect={() => mixer.setAtmosphere(null)}
-                    />
-                    {groups[0]?.name === null &&
-                        groups[0].options.map((option) => (
+            <div className="sap-reader-mixer__atmosphere">
+                <button
+                    type="button"
+                    className="sap-reader-mixer__atmosphere-summary"
+                    aria-expanded={pickerOpen}
+                    aria-controls={ids.pickerList}
+                    aria-label={`${labels.layers.atmosphere}: ${options?.find((option) => option.id === selected)?.label ?? labels.atmosphereOff}`}
+                    onClick={() => setPickerOpen((open) => !open)}
+                >
+                    {options?.find((option) => option.id === selected)?.label ??
+                        labels.atmosphereOff}
+                    <span aria-hidden="true">{pickerOpen ? "⌄" : "›"}</span>
+                </button>
+                {pickerOpen && (
+                    <fieldset className="sap-reader-mixer__picker" id={ids.pickerList}>
+                        <legend className="sap-reader-mixer__picker-legend">
+                            {labels.atmospherePicker}
+                        </legend>
+                        <div className="sap-reader-mixer__chips">
                             <AtmosphereChip
-                                key={option.id}
                                 name={ids.picker}
-                                checked={selected === option.id}
-                                label={option.label}
-                                onSelect={() => mixer.setAtmosphere(option)}
+                                checked={selected === null}
+                                label={labels.atmosphereOff}
+                                onSelect={() => mixer.setAtmosphere(null)}
                             />
-                        ))}
-                </div>
-                {groups.map((group, index) =>
-                    group.name === null ? null : (
-                        <div
-                            key={group.name}
-                            className="sap-reader-mixer__group"
-                            role="group"
-                            aria-labelledby={ids.group(index)}
-                        >
-                            <span className="sap-reader-mixer__group-name" id={ids.group(index)}>
-                                {group.name}
-                            </span>
-                            <div className="sap-reader-mixer__chips">
-                                {group.options.map((option) => (
+                            {groups[0]?.name === null &&
+                                groups[0].options.map((option) => (
                                     <AtmosphereChip
                                         key={option.id}
                                         name={ids.picker}
@@ -239,11 +258,38 @@ export function ReaderMixerPanel({
                                         onSelect={() => mixer.setAtmosphere(option)}
                                     />
                                 ))}
-                            </div>
                         </div>
-                    )
+                        {groups.map((group, index) =>
+                            group.name === null ? null : (
+                                <div
+                                    key={group.name}
+                                    className="sap-reader-mixer__group"
+                                    role="group"
+                                    aria-labelledby={ids.group(index)}
+                                >
+                                    <span
+                                        className="sap-reader-mixer__group-name"
+                                        id={ids.group(index)}
+                                    >
+                                        {group.name}
+                                    </span>
+                                    <div className="sap-reader-mixer__chips">
+                                        {group.options.map((option) => (
+                                            <AtmosphereChip
+                                                key={option.id}
+                                                name={ids.picker}
+                                                checked={selected === option.id}
+                                                label={option.label}
+                                                onSelect={() => mixer.setAtmosphere(option)}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            )
+                        )}
+                    </fieldset>
                 )}
-            </fieldset>
+            </div>
         )
     }
 
@@ -281,13 +327,21 @@ export function ReaderMixerPanel({
                     {labels.master}
                 </span>
                 <MixerSwitch
-                    checked={preferences.masterEnabled}
+                    checked={preferences.masterEnabled && state.sleepTimer.status !== "fired"}
                     labelledBy={ids.master}
                     onChange={(enabled) => mixer.setMasterEnabled(enabled)}
                 />
             </div>
+            {!READER_MIXER_LAYERS.some((layer) => state.availability[layer]) && (
+                <p className="sap-reader-mixer__empty">{labels.noAudio}</p>
+            )}
             <ul className="sap-reader-mixer__layers">
-                {READER_MIXER_LAYERS.map((layer) => {
+                {READER_MIXER_LAYERS.filter(
+                    (layer) =>
+                        state.availability[layer] ||
+                        focusedLayer === layer ||
+                        draggingLayer === layer
+                ).map((layer) => {
                     const preference = preferences.layers[layer]
                     const layerState = state.layers[layer]
                     const percent = Math.round(preference.level * 100)
@@ -303,6 +357,16 @@ export function ReaderMixerPanel({
                             data-layer={layer}
                             data-enabled={preference.enabled ? "true" : "false"}
                             data-status={layerState.status}
+                            onPointerDownCapture={() => setDraggingLayer(layer)}
+                            onFocusCapture={() => setFocusedLayer(layer)}
+                            onBlurCapture={(event) => {
+                                if (
+                                    !event.currentTarget.contains(
+                                        event.relatedTarget as Node | null
+                                    )
+                                )
+                                    setFocusedLayer(null)
+                            }}
                         >
                             <div className="sap-reader-mixer__row">
                                 <span className="sap-reader-mixer__name" id={ids.layer(layer)}>
@@ -348,6 +412,50 @@ export function ReaderMixerPanel({
             {state.volumeControl === "on-off" && (
                 <p className="sap-reader-mixer__hint">{labels.deviceVolumeHint}</p>
             )}
+            <div className="sap-reader-mixer__sleep">
+                <label className="sap-reader-mixer__sleep-label" htmlFor={`${baseId}-sleep`}>
+                    {labels.sleepTimer}
+                </label>
+                <select
+                    className="sap-reader-mixer__sleep-select"
+                    id={`${baseId}-sleep`}
+                    value={
+                        (state.sleepTimer.status === "running"
+                            ? state.sleepTimer.choiceId
+                            : null) ??
+                        state.sleepTimerChoices.find((choice) => choice.kind === "off")?.id ??
+                        ""
+                    }
+                    onChange={(event) => mixer.setSleepTimer(event.target.value)}
+                >
+                    {!state.sleepTimerChoices.some((choice) => choice.kind === "off") && (
+                        <option value="" disabled>
+                            {labels.cancelTimer}
+                        </option>
+                    )}
+                    {state.sleepTimerChoices.map((choice) => (
+                        <option key={choice.id} value={choice.id}>
+                            {choice.label}
+                        </option>
+                    ))}
+                </select>
+                <p className="sap-reader-mixer__status" aria-live="polite">
+                    {state.sleepTimer.status === "fired"
+                        ? labels.sleepStopped
+                        : state.sleepTimer.remainingMs !== null
+                          ? labels.formatRemainingTime(state.sleepTimer.remainingMs)
+                          : ""}
+                </p>
+                {state.sleepTimer.status === "running" && (
+                    <button
+                        className="sap-reader-mixer__sleep-cancel"
+                        type="button"
+                        onClick={() => mixer.cancelSleepTimer()}
+                    >
+                        {labels.cancelTimer}
+                    </button>
+                )}
+            </div>
         </section>
     )
 }

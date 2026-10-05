@@ -1,3 +1,6 @@
+import type { LoudnessMeasurement } from "../audio-player"
+import measurements from "./readerLoudness.json"
+
 /* SEN Soundscapes — Volume 1 (catalog version 1.0.1): the 43 scores from the
    "SEN-Soundscapes-Volume-1.spp" pack. Titles, moods and tags are the pack's
    AI-proposed listening metadata (not human-approved); durations are measured.
@@ -16,6 +19,7 @@ export interface SenSoundscape {
     mood: string
     tags: readonly string[]
     durationSeconds: number
+    loudness: LoudnessMeasurement
     url: string
 }
 
@@ -29,7 +33,7 @@ export const SEN_SOUNDSCAPE_CATEGORIES: readonly SenSoundscapeCategory[] = [
     "War",
 ]
 
-export const SEN_SOUNDSCAPES_VOLUME_1: readonly SenSoundscape[] = [
+const SCORES: readonly Omit<SenSoundscape, "loudness">[] = [
     {
         id: "SEN_VOL1_ADVENTURE_1",
         category: "Adventure",
@@ -547,3 +551,8 @@ export const SEN_SOUNDSCAPES_VOLUME_1: readonly SenSoundscape[] = [
         url: "https://media.seihouse.org/SEN/AUDIO/SOUNDSCAPE/Volumn%201/WAR/3.%20WAR.mp3",
     },
 ]
+
+export const SEN_SOUNDSCAPES_VOLUME_1: readonly SenSoundscape[] = SCORES.map((score) => ({
+    ...score,
+    loudness: measurements.find((entry) => entry.id === score.id)!.loudness as LoudnessMeasurement,
+}))

@@ -263,6 +263,7 @@ export {
 } from "./narrative/ReaderMixer"
 export type {
     ReaderMixerLayer,
+    ReaderMixerLayerAvailability,
     ReaderMixerLayerPreference,
     ReaderMixerPreferences,
     ReaderMixerPreferencesInput,
@@ -285,6 +286,24 @@ export type {
     ReaderMixerPreset,
 } from "./narrative/ReaderMixer"
 export { ReaderMixerVoice } from "./narrative/ReaderMixerVoice"
+export { READER_MIXER_SLEEP_TIMERS } from "./narrative/ReaderMixerSession"
+export {
+    measureLoudness,
+    measureLoudnessPcm,
+    computeLoudnessGain,
+    DEFAULT_LOUDNESS_LEVELING,
+} from "./narrative/loudness"
+export type {
+    LoudnessMeasurement,
+    LoudnessMeasureOptions,
+    LoudnessLevelingOptions,
+    LoudnessGain,
+} from "./narrative/loudness"
+export type {
+    ReaderMixerSleepTimerChoice,
+    ReaderMixerSleepTimerState,
+    ReaderMixerSleepEvent,
+} from "./narrative/ReaderMixerSession"
 export type { ReaderMixerVoiceProps } from "./narrative/ReaderMixerVoice"
 export {
     ReaderMixerProvider,
@@ -294,6 +313,8 @@ export {
 } from "./narrative/ReaderMixerContext"
 export type { ReaderMixerProviderProps } from "./narrative/ReaderMixerContext"
 export { ReaderMixerPanel, DEFAULT_READER_MIXER_LABELS } from "./components/ReaderMixerPanel"
+export { ReaderMixerNote, DEFAULT_READER_MIXER_NOTE_LABELS } from "./components/ReaderMixerNote"
+export type { ReaderMixerNoteProps, ReaderMixerNoteLabels } from "./components/ReaderMixerNote"
 export type {
     ReaderMixerPanelProps,
     ReaderMixerLabels,

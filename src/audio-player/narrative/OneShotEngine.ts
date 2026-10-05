@@ -1,5 +1,10 @@
 import { canPrimeMedia, UnlockedAudioPool } from "./mediaRouting"
 import type { MediaGainSink, MediaGainSinkFactory } from "./mediaRouting"
+import {
+    computeLoudnessGain,
+    type LoudnessLevelingOptions,
+    type LoudnessMeasurement,
+} from "./loudness"
 
 function clamp01(value: number): number {
     if (!Number.isFinite(value)) return 0
@@ -13,6 +18,7 @@ function positiveInteger(value: number | undefined, fallback: number): number {
 }
 
 type PoolEntry = {
+    loudness?: LoudnessMeasurement
     el: HTMLAudioElement
     /** Web Audio gain for this element, when the host routes it; else null. */
     sink: MediaGainSink | null
@@ -37,6 +43,8 @@ type UrlPool = {
 }
 
 export interface OneShotEngineOptions {
+    /** Opt-in for standalone cues; ReaderMixer supplies automatic leveling. */
+    leveling?: LoudnessLevelingOptions
     /** Initial master level for every one-shot, from 0 to 1. Defaults to 1. */
     level?: number
     /** Initial mute state. Defaults to false. */
@@ -90,6 +98,7 @@ export interface OneShotPlaybackErrorEvent {
 }
 
 export interface PlayOneShotOptions {
+    loudness?: LoudnessMeasurement
     /** Per-play gain, multiplied by the engine level. Defaults to 1. */
     volume?: number
     /** Playback start position in seconds. Defaults to the asset start. */
@@ -105,6 +114,7 @@ export interface PlayOneShotOptions {
  * trimmed back to the configured bound as they finish.
  */
 export class OneShotEngine {
+    private leveling: LoudnessLevelingOptions
     private readonly pools = new Map<string, UrlPool>()
     private readonly maxCachedUrls: number
     private readonly maxPoolSizePerUrl: number
@@ -129,6 +139,7 @@ export class OneShotEngine {
     private readonly disconnectIdleSinks: boolean
 
     constructor(options: OneShotEngineOptions = {}) {
+        this.leveling = options.leveling ?? { enabled: false }
         this.level = clamp01(options.level ?? 1)
         this.muted = options.muted ?? false
         this.maxCachedUrls = positiveInteger(options.maxCachedUrls, 32)
@@ -183,6 +194,12 @@ export class OneShotEngine {
         return this.level
     }
 
+    /** Update normalization of active cues independently of their layer and per-call levels. */
+    setLeveling(options: LoudnessLevelingOptions): void {
+        this.leveling = options
+        this.setLevel(this.level)
+    }
+
     setMuted(muted: boolean): void {
         this.muted = muted
         for (const pool of this.pools.values()) {
@@ -230,6 +247,7 @@ export class OneShotEngine {
         const generation = entry.generation
         entry.started = false
         entry.playbackGain = clamp01(options.volume ?? 1)
+        entry.loudness = options.loudness
         entry.el.muted = this.muted
         this.applyVolume(entry)
 
@@ -635,7 +653,13 @@ export class OneShotEngine {
      * instead of repeatedly throwing and corrupting pool state.
      */
     private applyVolume(entry: PoolEntry): void {
-        const target = clamp01(this.level * entry.playbackGain)
+        const gain = computeLoudnessGain(
+            entry.loudness,
+            "momentary-max",
+            this.leveling,
+            entry.sink ? "web-audio" : "element"
+        ).gain
+        const target = this.level * entry.playbackGain * gain
         if (entry.sink) {
             try {
                 entry.sink.setGain(target)
@@ -646,7 +670,7 @@ export class OneShotEngine {
         }
         if (this.volumeWritesUnsupported) return
         try {
-            entry.el.volume = target
+            entry.el.volume = clamp01(target)
             if (target > 0.1 && Math.abs(entry.el.volume - target) > 0.05) {
                 this.volumeWritesUnsupported = true
             }
