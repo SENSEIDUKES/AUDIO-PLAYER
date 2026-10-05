@@ -4,12 +4,15 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { StrictMode } from "react"
 import { ReaderMixerPanel } from "../ReaderMixerPanel"
-import { ReaderMixerProvider, useReaderMixer } from "../../narrative/ReaderMixerContext"
-import { createReaderMixer } from "../../narrative/ReaderMixer"
-import type { ReaderAtmosphereOption, ReaderMixer } from "../../narrative/ReaderMixer"
-import { FakeAudio } from "../../narrative/__tests__/fakeMedia"
+import {
+    ReaderMixerProvider,
+    useReaderMixer,
+} from "../../audio-player/narrative/ReaderMixerContext"
+import { createReaderMixer } from "../../audio-player/narrative/ReaderMixer"
+import type { ReaderAtmosphereOption, ReaderMixer } from "../../audio-player/narrative/ReaderMixer"
+import { FakeAudio } from "../../audio-player/narrative/__tests__/fakeMedia"
 
-vi.mock("../../automix/silenceAnalysis", () => ({
+vi.mock("../../audio-player/automix/silenceAnalysis", () => ({
     ensureSourceAnalysis: vi.fn(() => Promise.resolve(null)),
 }))
 
@@ -63,11 +66,9 @@ describe("ReaderMixerPanel", () => {
         expect(screen.getByRole("switch", { name: "Sound Cues" })).toBe(switches[3])
         expect(screen.queryByRole("switch", { name: "Voice" })).toBeNull()
         const sliders = screen.getAllByRole("slider")
-        expect(sliders.map((node) => node.getAttribute("aria-label"))).toEqual([
-            "Soundscapes volume",
-            "Atmosphere volume",
-            "Sound Cues volume",
-        ])
+        expect(sliders[0]).toHaveAccessibleName("Soundscapes volume")
+        expect(sliders[1]).toHaveAccessibleName("Atmosphere volume")
+        expect(sliders[2]).toHaveAccessibleName("Sound Cues volume")
         expect(sliders[0]).toHaveAttribute("aria-valuetext", "25%")
         expect(screen.getByText("25%")).toBeInTheDocument()
     })
@@ -85,23 +86,48 @@ describe("ReaderMixerPanel", () => {
 
         const cues = screen.getByRole("switch", { name: "Sound Cues" })
         fireEvent.click(cues)
-        expect(cues).toHaveAttribute("aria-checked", "false")
+        expect(cues).not.toBeChecked()
         expect(mixer!.getPreferences().layers.cues.enabled).toBe(false)
 
         const master = screen.getByRole("switch", { name: "Master" })
         fireEvent.click(master)
         expect(mixer!.getPreferences().masterEnabled).toBe(false)
         // The layers keep their own settings.
-        expect(screen.getByRole("switch", { name: "Soundscapes" })).toHaveAttribute(
-            "aria-checked",
-            "true"
-        )
+        expect(screen.getByRole("switch", { name: "Soundscapes" })).toBeChecked()
     })
 
     it("follows changes made elsewhere", () => {
         renderPanel()
         act(() => mixer!.setLayerLevel("soundscapes", 0.9))
         expect(screen.getByRole("slider", { name: "Soundscapes volume" })).toHaveValue("90")
+    })
+
+    it("preserves Enter toggling on the approved native switches", () => {
+        renderPanel()
+        const master = screen.getByRole("switch", { name: "Master" })
+        fireEvent.keyDown(master, { key: "Enter" })
+        expect(master).not.toBeChecked()
+        expect(mixer!.getPreferences().masterEnabled).toBe(false)
+        fireEvent.keyDown(master, { key: "Enter", repeat: true })
+        expect(master).not.toBeChecked()
+        fireEvent.keyDown(master, { key: "Enter" })
+        expect(master).toBeChecked()
+        const cues = screen.getByRole("switch", { name: "Sound Cues" })
+        fireEvent.keyDown(cues, { key: "Enter" })
+        expect(cues).not.toBeChecked()
+        expect(mixer!.getPreferences().layers.cues.enabled).toBe(false)
+    })
+
+    it("does not re-announce an unchanged slider value when the timer changes", () => {
+        renderPanel()
+        const slider = screen.getByRole("slider", { name: "Soundscapes volume" })
+        const updates = vi.spyOn(slider, "setAttribute")
+        act(() => mixer!.setSleepTimer("15-minutes"))
+        expect(slider).toHaveAttribute("aria-valuetext", "25%")
+        expect(updates.mock.calls.filter(([attribute]) => attribute === "aria-valuetext")).toEqual(
+            []
+        )
+        updates.mockRestore()
     })
 
     it("picks an atmosphere from grouped host options, with Off", () => {
@@ -254,6 +280,10 @@ describe("ReaderMixerPanel", () => {
         fireEvent.change(slider, { target: { value: "22" } })
         expect(mixer!.getPreferences().layers.cues.level).toBe(0.22)
         fireEvent.pointerUp(document)
+        // The approved slider focuses its native range on pointer down. Focus
+        // is still an interaction after the drag finishes, so retain that row.
+        expect(slider).toBeInTheDocument()
+        fireEvent.blur(slider, { relatedTarget: document.body })
         expect(slider).not.toBeInTheDocument()
         act(() => mixer!.setLayerAvailability({ cues: true }))
         const focused = screen.getByRole("switch", { name: "Sound Cues" })

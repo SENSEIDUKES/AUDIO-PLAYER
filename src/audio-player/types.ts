@@ -395,7 +395,7 @@ export interface BufferedRange {
 
 /** Everything the UI needs from the engine hook. */
 export interface AudioPlayerEngine {
-    audioRef: React.RefObject<HTMLAudioElement>
+    audioRef: React.RefObject<HTMLAudioElement | null>
 
     // State
     isPlaying: boolean

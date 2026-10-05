@@ -1,0 +1,6 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": { "paths": {} },
+    "include": ["src/reader-ui"],
+    "exclude": ["src/reader-ui/__tests__"]
+}

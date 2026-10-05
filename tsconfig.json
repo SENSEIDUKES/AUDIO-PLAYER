@@ -6,6 +6,11 @@
         "module": "ESNext",
         "skipLibCheck": true,
         "moduleResolution": "bundler",
+        "baseUrl": ".",
+        "paths": {
+            "@seihouse/audio-player": ["src/audio-player/index.ts"],
+            "@seihouse/audio-player/reader-ui": ["src/reader-ui/index.ts"]
+        },
         "allowImportingTsExtensions": true,
         "resolveJsonModule": true,
         "isolatedModules": true,

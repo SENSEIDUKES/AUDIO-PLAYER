@@ -6,7 +6,6 @@ import {
     AudioPlayer,
     AudioSessionProvider,
     NarrativeFace,
-    ReaderMixerPanel,
     ReaderMixerProvider,
     ReaderMixerVoice,
     ReaderMixerNote,
@@ -17,6 +16,7 @@ import {
     useAudioSession,
     useReaderMixer,
 } from "@seihouse/audio-player"
+import { ReaderMixerPanel } from "@seihouse/audio-player/reader-ui"
 import "@seihouse/audio-player/styles.css"
 
 const tracks: Track[] = [
