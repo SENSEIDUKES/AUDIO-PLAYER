@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises"
+import { readFile, stat } from "node:fs/promises"
 import { createHash } from "node:crypto"
 import { fileURLToPath } from "node:url"
 import { transform } from "esbuild"
@@ -33,8 +33,26 @@ if (!entries.length) {
     process.exitCode = 1
 }
 const results = []
+const limit = 256 * 1024 * 1024
+function reportedSource(source) {
+    if (typeof source !== "string" || !/^https?:\/\//i.test(source)) return source
+    try {
+        const url = new URL(source)
+        url.username = ""
+        url.password = ""
+        url.search = ""
+        url.hash = ""
+        return url.href
+    } catch {
+        return "[redacted URL]"
+    }
+}
 for (const entry of entries) {
     const details = entry && typeof entry === "object" && !Array.isArray(entry) ? entry : {}
+    const reportedDetails = {
+        ...details,
+        ...(details.source !== undefined ? { source: reportedSource(details.source) } : {}),
+    }
     try {
         const location = details.source
         if (typeof location !== "string" || !location.trim())
@@ -42,13 +60,12 @@ for (const entry of entries) {
         const kind = details.kind ?? kindArg
         if (!["integrated", "momentary-max"].includes(kind))
             throw new Error("Invalid measurement kind")
-        console.error(`Measuring ${location}`)
+        console.error(`Measuring ${reportedDetails.source}`)
         let bytes
         if (/^https?:\/\//i.test(location)) {
             const response = await fetch(location, { signal: AbortSignal.timeout(60000) })
             if (!response.ok) throw new Error(`HTTP ${response.status}`)
             if (!response.body) throw new Error("Source has no response body")
-            const limit = 256 * 1024 * 1024
             if (Number(response.headers.get("content-length")) > limit)
                 throw new Error("Source exceeds the 256 MiB measurement limit")
             const chunks = []
@@ -59,15 +76,17 @@ for (const entry of entries) {
                 chunks.push(chunk)
             }
             bytes = Buffer.concat(chunks, size)
-        } else
-            bytes = await readFile(
-                location.startsWith("file:") ? fileURLToPath(location) : location
-            )
+        } else {
+            const path = location.startsWith("file:") ? fileURLToPath(location) : location
+            if ((await stat(path)).size > limit)
+                throw new Error("Source exceeds the 256 MiB measurement limit")
+            bytes = await readFile(path)
+        }
         if (!bytes.length) throw new Error("Source is empty")
         const decoded = await decode(bytes)
         const loudness = measureLoudnessPcm(decoded.channelData, decoded.sampleRate, { kind })
         results.push({
-            ...details,
+            ...reportedDetails,
             loudness,
             leveling: computeLoudnessGain(loudness, kind),
             sha256: createHash("sha256").update(bytes).digest("hex"),
@@ -78,7 +97,11 @@ for (const entry of entries) {
             decoder: "@audio/decode 3.12.0",
         })
     } catch (error) {
-        results.push({ ...details, error: error.message })
+        const message =
+            typeof details.source === "string"
+                ? error.message.replaceAll(details.source, String(reportedDetails.source))
+                : error.message
+        results.push({ ...reportedDetails, error: message })
         process.exitCode = 1
     }
 }

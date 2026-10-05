@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process"
-import { mkdtemp, readFile, rmdir, unlink, writeFile } from "node:fs/promises"
+import { mkdtemp, open, readFile, rmdir, unlink, writeFile } from "node:fs/promises"
 import { createServer } from "node:http"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -119,4 +119,46 @@ describe("loudness CLI input failures", () => {
             expect(result.stderr).toContain("Manifest must be an array of sound entries")
         }
     )
+    it("keeps request tokens out of saved results and progress/errors", async () => {
+        const requests = []
+        server = createServer((request, response) => {
+            requests.push(request.url)
+            response.writeHead(200, { "Content-Type": "audio/wav" }).end(sineWav())
+        })
+        await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve))
+        const host = `127.0.0.1:${server.address().port}`
+        const result = await run([
+            { source: `http://${host}/tone.wav?token=secret-query#private-fragment` },
+            {
+                source: `http://private-user:private-password@${host}/tone.wav?token=another-secret`,
+            },
+        ])
+        expect(result.code).toBe(1)
+        expect(requests).toEqual(["/tone.wav?token=secret-query"])
+        expect(result.stdout + result.stderr).not.toMatch(
+            /secret-query|private-fragment|private-user|private-password|another-secret/
+        )
+        const rows = JSON.parse(result.stdout)
+        expect(rows[0].loudness.lufs).toBeTypeOf("number")
+        expect(rows.map((row) => row.source)).toEqual([
+            `http://${host}/tone.wav`,
+            `http://${host}/tone.wav`,
+        ])
+        expect(rows[1].error).toBeTypeOf("string")
+    })
+    it("rejects an oversized local file before decoding and continues the batch", async () => {
+        const source = await fixture("oversized.wav", "")
+        const handle = await open(source, "r+")
+        try {
+            await handle.truncate(256 * 1024 * 1024 + 1)
+        } finally {
+            await handle.close()
+        }
+        const valid = await fixture("tone.wav", sineWav())
+        const result = await run([{ source }, { source: valid }])
+        expect(result.code).toBe(1)
+        const rows = JSON.parse(result.stdout)
+        expect(rows[0].error).toBe("Source exceeds the 256 MiB measurement limit")
+        expect(rows[1].loudness.lufs).toBeTypeOf("number")
+    })
 })
