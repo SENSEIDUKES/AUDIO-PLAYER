@@ -44,6 +44,35 @@ afterEach(() => {
 })
 
 describe("sleep", () => {
+    it("coalesces countdown updates during input bursts without delaying expiration", () => {
+        const mixer = make({
+            sleepFadeMs: 0,
+            sleepTimerChoices: [
+                { id: "quick", label: "Five seconds", kind: "duration", durationMs: 5000 },
+            ],
+        })
+        mixer.setSleepTimer("quick")
+        const startedAt = Date.now()
+        const changed = vi.fn()
+        const fired = vi.fn()
+        mixer.subscribe(() => changed())
+        mixer.subscribeSleep(fired)
+        for (let i = 0; i < 100; i++) {
+            vi.setSystemTime(startedAt + i * 10)
+            document.dispatchEvent(new Event("pointermove"))
+            document.dispatchEvent(new Event("scroll"))
+        }
+        expect(changed).not.toHaveBeenCalled()
+        vi.setSystemTime(startedAt + 1000)
+        document.dispatchEvent(new Event("scroll"))
+        expect(changed).toHaveBeenCalledTimes(1)
+        expect(mixer.getState().sleepTimer.remainingMs).toBe(4000)
+        vi.setSystemTime(startedAt + 5000)
+        document.dispatchEvent(new Event("pointermove"))
+        expect(mixer.getState().sleepTimer.status).toBe("fired")
+        expect(fired).toHaveBeenCalledTimes(1)
+    })
+
     it.each([15, 30, 45, 60])(
         "fires after %i wall-clock minutes without saving preferences",
         async (minutes) => {

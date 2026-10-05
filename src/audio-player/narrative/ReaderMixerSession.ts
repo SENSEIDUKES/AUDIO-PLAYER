@@ -229,8 +229,12 @@ export class ReaderMixerSession {
                 this.fire()
                 return
             }
-            this.sleep = Object.freeze({ ...this.sleep, remainingMs: remaining })
-            this.options.onChange()
+            // Captured scroll/pointer events can arrive many times per frame. Keep
+            // the UI countdown at second precision; endsAt still fires exactly.
+            if (Math.ceil(this.sleep.remainingMs! / 1000) !== Math.ceil(remaining / 1000)) {
+                this.sleep = Object.freeze({ ...this.sleep, remainingMs: remaining })
+                this.options.onChange()
+            }
         }
         const timeout = this.options.idleTimeoutMs
         const canIdle =

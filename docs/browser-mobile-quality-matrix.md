@@ -33,7 +33,7 @@ This matrix documents the officially supported behavior for the SEIHOUSE audio p
 ## Release checklist
 
 Reader mixer 3.0.0 evidence (2026-10-04): the full local `npm test` passes
-**1,022 tests in 109 files**, installed ESM/CommonJS package smoke, type/docs,
+**1,028 tests in 110 files**, installed ESM/CommonJS package smoke, type/docs,
 build and preview checks. `npm audit` reports zero vulnerabilities. Live desktop
 Chrome UI checks on **Windows 11 Home 10.0.22631 (build 22631)** observed
 availability/empty state, bounded outside-chapter atmosphere audition, short

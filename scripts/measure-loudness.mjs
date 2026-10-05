@@ -22,6 +22,10 @@ const manifestArg = args.find((arg) => arg.startsWith("--manifest="))?.slice(11)
 const entries = manifestArg
     ? JSON.parse(await readFile(manifestArg, "utf8"))
     : args.filter((arg) => !arg.startsWith("--")).map((source) => ({ source, kind: kindArg }))
+if (!Array.isArray(entries)) {
+    console.error("Manifest must be an array of sound entries")
+    process.exit(1)
+}
 if (!entries.length) {
     console.error(
         "Usage: npm run measure-loudness -- [--kind=momentary-max] <files or URLs>\n       npm run measure-loudness -- --manifest=path.json (array of {id?, source, kind?})"
@@ -30,9 +34,12 @@ if (!entries.length) {
 }
 const results = []
 for (const entry of entries) {
-    const location = entry.source
+    const details = entry && typeof entry === "object" && !Array.isArray(entry) ? entry : {}
     try {
-        const kind = entry.kind ?? kindArg
+        const location = details.source
+        if (typeof location !== "string" || !location.trim())
+            throw new Error("Source must be a non-empty file path or URL string")
+        const kind = details.kind ?? kindArg
         if (!["integrated", "momentary-max"].includes(kind))
             throw new Error("Invalid measurement kind")
         console.error(`Measuring ${location}`)
@@ -40,6 +47,7 @@ for (const entry of entries) {
         if (/^https?:\/\//i.test(location)) {
             const response = await fetch(location, { signal: AbortSignal.timeout(60000) })
             if (!response.ok) throw new Error(`HTTP ${response.status}`)
+            if (!response.body) throw new Error("Source has no response body")
             const limit = 256 * 1024 * 1024
             if (Number(response.headers.get("content-length")) > limit)
                 throw new Error("Source exceeds the 256 MiB measurement limit")
@@ -55,10 +63,11 @@ for (const entry of entries) {
             bytes = await readFile(
                 location.startsWith("file:") ? fileURLToPath(location) : location
             )
+        if (!bytes.length) throw new Error("Source is empty")
         const decoded = await decode(bytes)
         const loudness = measureLoudnessPcm(decoded.channelData, decoded.sampleRate, { kind })
         results.push({
-            ...entry,
+            ...details,
             loudness,
             leveling: computeLoudnessGain(loudness, kind),
             sha256: createHash("sha256").update(bytes).digest("hex"),
@@ -69,7 +78,7 @@ for (const entry of entries) {
             decoder: "@audio/decode 3.12.0",
         })
     } catch (error) {
-        results.push({ ...entry, error: error.message })
+        results.push({ ...details, error: error.message })
         process.exitCode = 1
     }
 }
