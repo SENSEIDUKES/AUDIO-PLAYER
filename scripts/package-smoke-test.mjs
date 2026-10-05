@@ -12,6 +12,7 @@ if (!npmCli) {
     throw new Error("Package smoke test must be run through npm so npm_execpath is available")
 }
 
+/** Run consumer npm commands with inherited dry-run disabled and propagate failures. */
 function runNpm(args, cwd) {
     const result = spawnSync(process.execPath, [npmCli, ...args], {
         cwd,
@@ -40,6 +41,34 @@ function runNpm(args, cwd) {
     return result.stdout
 }
 
+/** Typecheck a consumer fixture against packed declarations without source aliases. */
+function checkInstalledTypes(consumerDir, label) {
+    const result = spawnSync(
+        process.execPath,
+        [
+            path.join(projectRoot, "node_modules/typescript/bin/tsc"),
+            "--noEmit",
+            "--strict",
+            "--skipLibCheck",
+            "--module",
+            "ESNext",
+            "--moduleResolution",
+            "Bundler",
+            "--target",
+            "ES2020",
+            "smoke.ts",
+        ],
+        { cwd: consumerDir, encoding: "utf8" }
+    )
+    if (result.error || result.status !== 0) {
+        throw (
+            result.error ??
+            new Error(`Installed ${label} types failed: ${result.stdout}${result.stderr}`)
+        )
+    }
+}
+
+/** Supply deterministic decoding/worker fakes and record the constructed worker URLs. */
 function installBrowserFakes(workerUrls) {
     const sampleRate = 44_100
     const samples = new Float32Array(sampleRate * 12).fill(0.25)
@@ -99,6 +128,7 @@ function installBrowserFakes(workerUrls) {
     globalThis.Worker = FakeWorker
 }
 
+/** Verify the installed entry resolves its lazy analysis worker within its own dist. */
 async function exerciseAutomixWorker(moduleExports, label, packageRoot) {
     const workerUrls = []
     installBrowserFakes(workerUrls)
@@ -242,6 +272,10 @@ try {
                 type: "module",
                 dependencies: {
                     "@seihouse/audio-player": pathToFileURL(tarballPath).href,
+                    react: "18.3.1",
+                    "react-dom": "18.3.1",
+                    "@types/react": "^18.3.0",
+                    "@types/react-dom": "^18.3.0",
                 },
             },
             null,
@@ -265,12 +299,20 @@ try {
         path.join(packageRoot, "dist", "audio-player", "narrative", "ReaderMixerVoice.d.ts")
     )
 
-    const forbiddenBrowserMarkers = ["OPENROUTER_API_KEY", "openrouter.ai"]
+    const forbiddenBrowserMarkers = [
+        "OPENROUTER_API_KEY",
+        "openrouter.ai",
+        "@seihouse/ui",
+        "react-aria-components",
+        "reader-ui.js",
+    ]
     for (const bundleName of ["index.js", "index.cjs"]) {
         const bundle = await readFile(path.join(packageRoot, "dist", bundleName), "utf8")
         const exposedMarker = forbiddenBrowserMarkers.find((marker) => bundle.includes(marker))
         if (exposedMarker) {
-            throw new Error(`${bundleName} exposes Agent Scout provider access: ${exposedMarker}`)
+            throw new Error(
+                `${bundleName} contains a forbidden core dependency or browser marker: ${exposedMarker}`
+            )
         }
     }
 
@@ -283,6 +325,32 @@ try {
     }
     exerciseReaderVoice(commonJsExports, "CommonJS")
 
+    if (requireFromConsumer("react/package.json").version !== "18.3.1") {
+        throw new Error("Core-only smoke consumer must run React 18")
+    }
+    for (const peer of Object.keys(sourcePackage.peerDependenciesMeta)) {
+        try {
+            requireFromConsumer.resolve(peer)
+        } catch (error) {
+            if (error.code === "MODULE_NOT_FOUND") continue
+            throw error
+        }
+        throw new Error(`Core-only consumer unexpectedly installed optional reader UI peer ${peer}`)
+    }
+    if ("ReaderMixerPanel" in commonJsExports) {
+        throw new Error("The panel must be isolated in the reader-ui entry")
+    }
+    await writeFile(
+        path.join(consumerDir, "smoke.ts"),
+        `
+import { createReaderMixer } from "@seihouse/audio-player"
+import type { ReaderMixerNoteProps } from "@seihouse/audio-player"
+const note: ReaderMixerNoteProps = { mixer: createReaderMixer(), labels: { mute: "Mute" } }
+note.mixer?.dispose()
+`
+    )
+    checkInstalledTypes(consumerDir, "React 18 core")
+
     const esmFixturePath = path.join(consumerDir, "smoke.mjs")
     await writeFile(esmFixturePath, 'export * from "@seihouse/audio-player"\n')
     const esmExports = await import(`${pathToFileURL(esmFixturePath).href}?package-smoke`)
@@ -290,9 +358,92 @@ try {
     await exerciseAutomixWorker(commonJsExports, "CommonJS", packageRoot)
     await exerciseAutomixWorker(esmExports, "ESM", packageRoot)
 
+    const uiConsumerDir = path.join(temporaryRoot, "reader-ui-consumer")
+    await mkdir(uiConsumerDir)
+    await writeFile(
+        path.join(uiConsumerDir, "package.json"),
+        JSON.stringify(
+            {
+                name: "audio-player-reader-ui-smoke-consumer",
+                private: true,
+                type: "module",
+                dependencies: {
+                    "@seihouse/audio-player": pathToFileURL(tarballPath).href,
+                    ...Object.fromEntries(
+                        Object.keys(sourcePackage.peerDependenciesMeta).map((peer) => [
+                            peer,
+                            sourcePackage.peerDependencies[peer],
+                        ])
+                    ),
+                    "@seihouse/ui": pathToFileURL(
+                        path.join(projectRoot, "vendor/seihouse-ui-0.10.1.tgz")
+                    ).href,
+                    react: "19.2.0",
+                    "react-dom": "19.2.0",
+                    "@types/react": "^19.2.0",
+                    "@types/react-dom": "^19.2.0",
+                },
+            },
+            null,
+            2
+        )
+    )
+    runNpm(["install", "--ignore-scripts", "--package-lock=false"], uiConsumerDir)
+    const uiFixture = path.join(uiConsumerDir, "smoke.mjs")
+    await writeFile(
+        uiFixture,
+        `
+import assert from "node:assert/strict"
+import { createElement } from "react"
+import { renderToStaticMarkup } from "react-dom/server"
+import { createReaderMixer, ReaderMixerProvider } from "@seihouse/audio-player"
+import { ReaderMixerPanel, DEFAULT_READER_MIXER_LABELS } from "@seihouse/audio-player/reader-ui"
+const mixer = createReaderMixer()
+try {
+    const html = renderToStaticMarkup(createElement(ReaderMixerProvider, { mixer }, createElement(ReaderMixerPanel)))
+    assert.ok(html.includes("Soundscapes volume"), "UI entry must share the root provider's context")
+    assert.ok(html.includes('role="switch"'))
+    assert.ok(html.includes('type="range"'))
+    assert.ok(html.includes('aria-valuetext="25%"'), "Server-rendered volume must still describe a percentage")
+    assert.ok(html.includes("Sleep timer"))
+    assert.equal(DEFAULT_READER_MIXER_LABELS.master, "Master")
+    assert.ok(import.meta.resolve("@seihouse/audio-player/reader-ui/styles.css").endsWith("reader-ui.css"))
+} finally { mixer.dispose() }
+`
+    )
+    const uiResult = spawnSync(process.execPath, [uiFixture], {
+        cwd: uiConsumerDir,
+        encoding: "utf8",
+    })
+    if (uiResult.error || uiResult.status !== 0) {
+        throw uiResult.error ?? new Error(`Installed reader UI failed: ${uiResult.stderr}`)
+    }
+    // Compile against the packed declarations, not source aliases. A duplicated
+    // ReaderMixer declaration would make this explicit mixer prop incompatible.
+    await writeFile(
+        path.join(uiConsumerDir, "smoke.ts"),
+        `
+import { createReaderMixer } from "@seihouse/audio-player"
+import type { ReaderMixerPanelProps } from "@seihouse/audio-player/reader-ui"
+const props: ReaderMixerPanelProps = { mixer: createReaderMixer(), labels: { volume: name => name } }
+props.mixer?.dispose()
+`
+    )
+    checkInstalledTypes(uiConsumerDir, "React 19 reader UI")
+    const readerUiBundle = await readFile(
+        path.join(uiConsumerDir, "node_modules/@seihouse/audio-player/dist/reader-ui.js"),
+        "utf8"
+    )
+    if (
+        !readerUiBundle.includes('from "@seihouse/ui"') ||
+        !readerUiBundle.includes('from "@seihouse/audio-player"')
+    ) {
+        throw new Error("Reader UI must use the external approved UI and core entries")
+    }
+
     console.log("Installed package smoke test passed.")
     console.log(
-        "Verified ESM/CommonJS Voice exports and preferences, package-relative Automix workers, and no browser OpenRouter access."
+        "Verified React 18 core without UI peers, React 19 reader UI with the shared provider and packed types, package-relative Automix workers, and no browser OpenRouter access."
     )
 } finally {
     await rm(temporaryRoot, { recursive: true, force: true })

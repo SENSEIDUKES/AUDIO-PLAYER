@@ -1,0 +1,195 @@
+/* Layout only; approved controls and all colors use the host's universal UI tokens. */
+.sap-reader-mixer {
+    --_bg: var(--sap-reader-mixer-bg, var(--sh-surface-elevated));
+    --_muted: var(--sap-reader-mixer-muted, var(--sh-text-subtle));
+    --_border: var(--sap-reader-mixer-border, var(--sh-border));
+    --_focus: var(--sap-reader-mixer-focus, var(--sh-focus-ring));
+    --_radius: var(--sap-reader-mixer-radius, var(--sh-radius-panel));
+    --_gap: var(--sap-reader-mixer-gap, var(--sh-space-4));
+    --_target: max(44px, var(--sap-reader-mixer-target-size, 44px));
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: var(--_gap);
+    width: 100%;
+    min-width: 0;
+    container-type: inline-size;
+    padding: var(--sap-reader-mixer-padding, var(--sh-space-4));
+    border: 1px solid var(--_border);
+    border-radius: var(--_radius);
+    background: var(--_bg);
+    color: var(--sap-reader-mixer-fg, var(--sh-text-primary));
+    font: var(--sap-reader-mixer-font, inherit);
+}
+.sap-reader-mixer *,
+.sap-reader-mixer *::before,
+.sap-reader-mixer *::after {
+    box-sizing: border-box;
+}
+.sap-reader-mixer__title {
+    margin: 0;
+    font-size: var(--sh-text-lg);
+    font-weight: var(--sh-weight-semibold);
+}
+.sap-reader-mixer__picker {
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+    border: 0;
+}
+.sap-reader-mixer__picker-legend,
+.sap-reader-mixer__group-name {
+    display: block;
+    margin-bottom: var(--sh-space-2);
+    color: var(--sh-text-muted);
+    font-size: var(--sh-text-sm);
+    font-weight: var(--sh-weight-semibold);
+}
+.sap-reader-mixer__presets .sap-reader-mixer__choices > div {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sh-space-2);
+}
+.sap-reader-mixer__chip {
+    min-width: 0;
+    min-height: var(--_target);
+    overflow-wrap: anywhere;
+}
+.sap-reader-mixer__chip > span:last-child {
+    min-width: 0;
+}
+.sap-reader-mixer__chips {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sh-space-2);
+}
+.sap-reader-mixer__group {
+    min-width: 0;
+}
+.sap-reader-mixer__layers {
+    display: flex;
+    flex-direction: column;
+    gap: var(--_gap);
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.sap-reader-mixer__layer {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sh-space-1);
+    border-top: 1px solid var(--_border);
+    padding-top: var(--_gap);
+}
+.sap-reader-mixer__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--_gap);
+    min-height: var(--_target);
+}
+.sap-reader-mixer__name {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-size: var(--sh-text-sm);
+    font-weight: var(--sh-weight-medium);
+}
+.sap-reader-mixer__row--master .sap-reader-mixer__name {
+    font-weight: var(--sh-weight-semibold);
+}
+.sap-reader-mixer__switch {
+    min-height: var(--_target);
+    min-width: var(--_target);
+    flex: none;
+}
+.sap-reader-mixer__level {
+    display: flex;
+    align-items: center;
+    gap: var(--sh-space-3);
+    min-width: 0;
+}
+.sap-reader-mixer__slider {
+    flex: 1;
+    min-width: 0;
+    min-height: var(--_target);
+}
+.sap-reader-mixer__slider [data-orientation="horizontal"] {
+    min-height: var(--_target);
+}
+.sap-reader-mixer__percent {
+    flex: none;
+    min-width: 3ch;
+    font-size: var(--sh-text-xs);
+    color: var(--_muted);
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+}
+.sap-reader-mixer__layer[data-enabled="false"] .sap-reader-mixer__level,
+.sap-reader-mixer[data-master="off"]
+    .sap-reader-mixer__layer:not([data-layer="voice"])
+    .sap-reader-mixer__level {
+    opacity: 0.5;
+}
+.sap-reader-mixer__status,
+.sap-reader-mixer__hint,
+.sap-reader-mixer__empty {
+    margin: 0;
+    color: var(--_muted);
+    font-size: var(--sh-text-xs);
+}
+.sap-reader-mixer__status:empty {
+    display: none;
+}
+.sap-reader-mixer__atmosphere-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--_gap);
+    min-height: var(--_target);
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--sh-text-primary);
+    font: inherit;
+    font-size: var(--sh-text-sm);
+    text-align: start;
+    cursor: pointer;
+}
+.sap-reader-mixer__atmosphere-summary:focus-visible,
+.sap-reader-mixer__sleep-cancel:focus-visible {
+    outline: 2px solid var(--_focus);
+    outline-offset: 2px;
+}
+.sap-reader-mixer__sleep {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sh-space-2);
+}
+.sap-reader-mixer__sleep-select {
+    min-height: var(--_target);
+}
+.sap-reader-mixer__sleep-cancel {
+    align-self: start;
+    min-height: var(--_target);
+    padding: var(--sh-space-2) var(--sh-space-3);
+    border: 1px solid var(--sh-field-border);
+    border-radius: var(--sh-radius-control);
+    background: var(--sh-field-surface);
+    color: var(--sh-text-primary);
+    font: inherit;
+    cursor: pointer;
+}
+@container (min-width: 520px) {
+    .sap-reader-mixer__presets .sap-reader-mixer__choices > div {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .sap-reader-mixer *,
+    .sap-reader-mixer *::before,
+    .sap-reader-mixer *::after {
+        animation: none;
+        transition: none;
+    }
+}

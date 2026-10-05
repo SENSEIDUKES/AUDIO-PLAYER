@@ -87,7 +87,14 @@ changes. See the
 [distribution and publishing guide](https://github.com/SENSEIDUKES/AUDIO-PLAYER/blob/main/PUBLISHING_GUIDE.md)
 for those development workflows and the release-owner process.
 
-The **3.0.0** package adds layer availability, atmosphere auditions, sleep timers,
+The **4.0.0** package moves `ReaderMixerPanel` and its label/prop exports to the
+ESM-only `@seihouse/audio-player/reader-ui` entry, rebuilt with the approved
+universal `@seihouse/ui` **0.10.1** used by SEN. Panel hosts need React 19,
+Tailwind and UI peers; the root keeps React >=18 without those optional peers.
+See [reader UI setup and migration](https://github.com/SENSEIDUKES/AUDIO-PLAYER/blob/main/docs/reader-mixer.md#reader-ui-setup-and-400-migration)
+for the exact vendored artifact, dependencies, stylesheet imports and tokens.
+
+The reader mixer includes layer availability, atmosphere auditions, sleep timers,
 music rests, idle pause, automatic loudness leveling and a ghost audio note.
 The master now mutes the soundtrack while Voice stays independent. Old preference
 versions 1/2 migrate to version 3; old master-off saves keep Voice off to preserve
@@ -98,7 +105,7 @@ covers host APIs, measurement, migration and required desktop/iPhone checks.
 
 ### Use it in React
 
-Import only from the package root and import the stylesheet once in the host
+Import the player from the package root and import the stylesheet once in the host
 application:
 
 ```tsx
@@ -153,9 +160,11 @@ their existing declared-URL behavior.
 
 ## Public API and integration boundaries
 
-The package has a large public surface, so integrations should use the root
-entry point (`@seihouse/audio-player`) and the single stylesheet subpath
-(`@seihouse/audio-player/styles.css`). Do not deep-import files from `src/` or
+Use the root entry (`@seihouse/audio-player`) and its stylesheet
+(`@seihouse/audio-player/styles.css`) for the core player. Reader settings use
+`@seihouse/audio-player/reader-ui` and
+`@seihouse/audio-player/reader-ui/styles.css`, with the React 19/Tailwind setup
+described above. Do not deep-import files from `src/` or
 `dist/`; those paths are implementation details and are not package exports.
 
 [The public API map](https://github.com/SENSEIDUKES/AUDIO-PLAYER/blob/main/docs/public-api.md)

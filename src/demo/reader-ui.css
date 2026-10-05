@@ -1,0 +1,5 @@
+/* Tailwind stays in the host. The player root and reader UI CSS add no preflight. */
+@import "tailwindcss/theme.css";
+@import "tailwindcss/utilities.css";
+@import "@seihouse/ui/styles.css";
+@source "../reader-ui";

@@ -7,7 +7,13 @@ import { describe, expect, it } from "vitest"
 
 const HERE = "file:///src/demo/workshop/__tests__/packageBoundary.test.ts"
 const PACKAGE_ROOT = "/src/audio-player"
-const PUBLIC_ENTRY = new Set([PACKAGE_ROOT, `${PACKAGE_ROOT}/index`])
+const READER_UI_ROOT = "/src/reader-ui"
+const PUBLIC_ENTRY = new Set([
+    PACKAGE_ROOT,
+    `${PACKAGE_ROOT}/index`,
+    READER_UI_ROOT,
+    `${READER_UI_ROOT}/index`,
+])
 
 const demoSources = import.meta.glob<string>("../../**/*.{ts,tsx,css}", {
     query: "?raw",
@@ -27,6 +33,7 @@ interface SourceFile {
     imports: { spec: string; resolved: string }[]
 }
 
+/** Resolve relative imports from guarded raw source files into package paths. */
 function files(sources: Record<string, string>): SourceFile[] {
     return Object.entries(sources).map(([key, text]) => {
         const path = new URL(key, HERE).pathname
@@ -40,8 +47,12 @@ function files(sources: Record<string, string>): SourceFile[] {
     })
 }
 
+/** Recognize either public package source region when checking Workshop imports. */
 const inPackage = (resolved: string) =>
-    resolved === PACKAGE_ROOT || resolved.startsWith(`${PACKAGE_ROOT}/`)
+    resolved === PACKAGE_ROOT ||
+    resolved.startsWith(`${PACKAGE_ROOT}/`) ||
+    resolved === READER_UI_ROOT ||
+    resolved.startsWith(`${READER_UI_ROOT}/`)
 
 describe("package boundary", () => {
     const demo = files(demoSources)
@@ -72,5 +83,21 @@ describe("package boundary", () => {
                 .map(({ spec }) => `${file.path} → ${spec}`)
         )
         expect(escapes).toEqual([])
+    })
+
+    it("keeps the core's source independent of the optional reader UI", () => {
+        const uiImports = Object.entries(packageSources)
+            .filter(([file]) => !file.includes("/__tests__/"))
+            .flatMap(([file, source]) =>
+                Array.from(source.matchAll(IMPORT), (match) => match[1])
+                    .filter(
+                        (spec) =>
+                            spec.includes("reader-ui") ||
+                            spec === "@seihouse/ui" ||
+                            spec === "react-aria-components"
+                    )
+                    .map((spec) => `${file} → ${spec}`)
+            )
+        expect(uiImports).toEqual([])
     })
 })

@@ -1,0 +1,14 @@
+{
+    "repository": "https://github.com/SENSEIDUKES/UI",
+    "sourceCommit": "d3c630181b5fb35cbb9be50847c96fff2dbd5e4a",
+    "pullRequest": "https://github.com/SENSEIDUKES/UI/pull/87",
+    "artifacts": {
+        "@seihouse/ui": {
+            "version": "0.10.1",
+            "file": "vendor/seihouse-ui-0.10.1.tgz",
+            "integrity": "sha512-yOKfIvIvZducA3QMSmGBLXbZwyvfNpaNOWEcefNtilkpUiVuZbXSdN56JoDry7qFt4bAGCFH4pAVnl+YHzJSpg==",
+            "sourceCommit": "d3c630181b5fb35cbb9be50847c96fff2dbd5e4a",
+            "pullRequest": "https://github.com/SENSEIDUKES/UI/pull/87"
+        }
+    }
+}

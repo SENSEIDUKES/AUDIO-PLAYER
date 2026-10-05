@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { AudioSessionProvider, useAudioSession } from "../../session/AudioSessionContext"
 import * as AudioSession from "../../session/AudioSessionContext"
 import type { SessionEngine } from "../../types"
-import { ReaderMixerPanel } from "../../components/ReaderMixerPanel"
+import { ReaderMixerPanel } from "@seihouse/audio-player/reader-ui"
 import { NarrativeFace } from "../../skins/NarrativeFace"
 import { ReaderMixerProvider } from "../ReaderMixerContext"
 import { createReaderMixer } from "../ReaderMixer"
@@ -168,10 +168,7 @@ describe("ReaderMixerVoice session connection", () => {
         expect(audio.volume).toBe(0.6)
         expect(mixer.getDuck()).toBe(0.6)
         fireEvent.click(screen.getByRole("button", { name: "Mute" }))
-        expect(screen.getByRole("switch", { name: "Voice" })).toHaveAttribute(
-            "aria-checked",
-            "false"
-        )
+        expect(screen.getByRole("switch", { name: "Voice" })).not.toBeChecked()
         expect(audio.muted).toBe(true)
         expect(mixer.getDuck()).toBe(0)
         fireEvent.click(screen.getByRole("switch", { name: "Voice" }))

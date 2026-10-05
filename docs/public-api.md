@@ -1,25 +1,32 @@
 # Public API map
 
-`@seihouse/audio-player` has one supported JavaScript entry point and one
-supported stylesheet subpath:
+`@seihouse/audio-player` has a core JavaScript entry point and an optional
+reader UI entry, each with its own stylesheet:
 
 ```ts
 import { AudioPlayer } from "@seihouse/audio-player"
 import "@seihouse/audio-player/styles.css"
+// React 19 hosts using the approved settings panel:
+import { ReaderMixerPanel } from "@seihouse/audio-player/reader-ui"
+import "@seihouse/audio-player/reader-ui/styles.css"
 ```
 
 The root entry point is intentionally broad. This guide groups its public
 exports by integration purpose so consumers can start at the right boundary
 without deep-importing implementation files. The authoritative export list and
 TypeScript signatures live in
-[`src/audio-player/index.ts`](../src/audio-player/index.ts).
+[`src/audio-player/index.ts`](../src/audio-player/index.ts) and
+[`src/reader-ui/index.ts`](../src/reader-ui/index.ts).
 
 ## Integration rules
 
-- Import runtime values and types from `@seihouse/audio-player`; use `import
+- Import core runtime values and types from `@seihouse/audio-player`; use `import
   type` for type-only imports.
 - Do not import from `src/`, `dist/`, or a package-internal directory. The
-  package only exports `.` and `./styles.css`.
+  package exports `.`, `./styles.css`, `./reader-ui` and `./reader-ui/styles.css`.
+- Import the panel and its label/prop types from `@seihouse/audio-player/reader-ui`.
+  This ESM-only entry requires React 19, universal UI 0.10.1, Tailwind and the UI
+  peers; the core keeps React >=18 without them. See [Reader UI setup](#reader-ui-entry).
 - Choose one playback ownership model for a screen: standalone `AudioPlayer`,
   a shared `AudioSessionProvider`, or the headless `useAudioPlayer` hook.
   Multiple skins belong under one shared session; do not create multiple
@@ -50,7 +57,8 @@ TypeScript signatures live in
 | Plugins | `PluginManager`, `AudioPlayerPlugin`, `createAutomixPlugin`, `createKeyboardShortcutPlugin`, `createAnalyticsPlugin`, `createLyricsPlugin`, `createSleepTimerPlugin`, `createWaveformPlugin` | Optional lifecycle behavior without changing a skin. See [`PLUGIN_DEVELOPMENT_GUIDE.md`](../PLUGIN_DEVELOPMENT_GUIDE.md). |
 | Cues | `CueManifestPlugin`, `CueRuntime`, `validateCueManifest`, `useNarrativeCueController`, `CueManifest` | Validated, time-based events that coordinate a player with host UI or a narrative experience. See [`CUE_MANIFEST_V1.md`](./CUE_MANIFEST_V1.md). |
 | Narrative engines | `useNarrativeAudio`, `SceneMixEngine`, `createSceneMixEngine`, `OneShotEngine`, `createOneShotEngine`, `MediaGainSink` | Narration, ambience, one-shots, and scene-score transitions independent of a visible player skin. Both engines accept an optional `createGainSink` (Web Audio gain) and an `unlock()` for gesture-unlocked spare elements; `SceneMixEngine` adds `pause()`/`resume()`. |
-| Reader mixer | `createReaderMixer`, `ReaderMixer`, `ReaderMixerProvider`, `useReaderMixer`, `useReaderMixerState`, `ReaderMixerPanel`, `ReaderMixerNote`, `ReaderMixerVoice`, `ReaderMixerVoiceOutput`, `ReaderMixerPreferences`, `computeReaderMixerGain`, `loadReaderMixerPreferences`, `saveReaderMixerPreferences` | Soundscapes, Atmosphere, Sound Cues and caller-owned TTS Voice with per-layer switches and levels, saved preferences, and an inline mixer view. See [`reader-mixer.md`](./reader-mixer.md). |
+| Reader mixer | `createReaderMixer`, `ReaderMixer`, `ReaderMixerProvider`, `useReaderMixer`, `useReaderMixerState`, `ReaderMixerNote`, `ReaderMixerVoice`, `ReaderMixerVoiceOutput`, `ReaderMixerPreferences`, `computeReaderMixerGain`, `loadReaderMixerPreferences`, `saveReaderMixerPreferences` | Core soundtrack/narration engines and chapter note. See [`reader-mixer.md`](./reader-mixer.md). |
+| Reader UI (`/reader-ui`) | `ReaderMixerPanel`, `DEFAULT_READER_MIXER_LABELS`, `ReaderMixerPanelProps`, `ReaderMixerLabels`, `ReaderMixerLabelOverrides` | Approved universal SEIHouse UI controls, isolated from the core. |
 | Loudness measurement | `measureLoudness`, `measureLoudnessPcm`, `computeLoudnessGain`, `DEFAULT_LOUDNESS_LEVELING`, `LoudnessMeasurement`, `LoudnessMeasureOptions`, `LoudnessLevelingOptions`, `LoudnessGain` | Offline browser/PCM measurement, integrated beds and momentary-max cues, sample peak and source gain before reader sliders. |
 | Reader session policies | `READER_MIXER_SLEEP_TIMERS`, `ReaderMixerSleepTimerChoice`, `ReaderMixerSleepTimerState`, `ReaderMixerSleepEvent`, `ReaderMixerLayerAvailability`, `ReaderMixerNoteProps`, `ReaderMixerNoteLabels`, `DEFAULT_READER_MIXER_NOTE_LABELS` | Host-defined use, sleep events, activity holds and accessible chapter note. |
 | Automix and analysis | `createAutomixPlugin`, `ensureTrackAnalysis`, `ensureProTrackAnalysis`, `planTransition`, `bpmCompatibility` | Progressive crossfades with a conservative fallback when analysis is unavailable. See [`automix.md`](./automix.md). |
@@ -221,6 +229,32 @@ the focused guides above for new integrations.
 ### Host-owned Vault workspaces
 
 The `renderWorkspace` prop on `<SAPController renderWorkspace={...} />` supplies host content inside the existing controller shell. Return `undefined` to use the built-in workspace; `null` intentionally leaves the body empty. Hosts own the selected attachment and asynchronous work outside the sheet lifecycle. Existing consumers are unchanged. The opt-in `vault:details` and `vault:route` destinations can be included in a host-provided `VaultRowPlayer.actions` tree; they are not added to the default menu.
+
+## Reader UI entry
+
+Version **4.0.0** moves the panel and its label/prop types from the root to
+`@seihouse/audio-player/reader-ui`. The entry exports `ReaderMixerPanel`,
+`DEFAULT_READER_MIXER_LABELS`, `ReaderMixerPanelProps`, `ReaderMixerLabels` and
+`ReaderMixerLabelOverrides`. It is ESM-only and shares the root mixer/provider;
+it does not create another playback engine. The core remains React >=18 with
+ESM and CommonJS exports.
+
+The optional panel needs React/React DOM **19**, universal `@seihouse/ui`
+**0.10.1**, `@base-ui/react ^1.5.0`, `react-aria-components ^1.18.0`,
+`tailwind-merge ^3.6.0`, `tailwind-variants ^3.2.2`, `vaul ^1.1.2`,
+`clsx ^2.1.1`, `lucide-react ^0.546.0 || ^1.17.0`, and host Tailwind **4.3.3+**
+within major 4. These UI peers are optional in the player manifest so a core-only
+install needs none of the added peers; lucide-react was already a root dependency.
+
+Use the exact `vendor/seihouse-ui-0.10.1.tgz` artifact from UI PR #87, commit
+`d3c630181b5fb35cbb9be50847c96fff2dbd5e4a`, with integrity recorded in
+[`vendor/ui-artifacts.json`](../vendor/ui-artifacts.json). Import
+`@seihouse/ui/styles.css` (which includes its tokens and own Tailwind scan),
+`@seihouse/audio-player/styles.css`, and
+`@seihouse/audio-player/reader-ui/styles.css` into the host's Tailwind stylesheet.
+Scan the shipped reader UI JavaScript as well. Choose `data-experience` and
+`data-theme` on a host ancestor; the controls and root note use universal tokens.
+See the complete [setup and migration example](./reader-mixer.md#reader-ui-setup-and-400-migration).
 
 ## Reader mixer
 

@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import type { CSSProperties } from "react"
 import {
     AudioSessionProvider,
     NarrativeFace,
-    ReaderMixerPanel,
     ReaderMixerProvider,
     ReaderMixerVoice,
     ReaderMixerNote,
@@ -15,6 +13,7 @@ import {
     useReaderMixer,
     useReaderMixerState,
 } from "../../../audio-player"
+import { ReaderMixerPanel } from "../../../reader-ui"
 import type {
     ReaderAtmosphereOption,
     ReaderMixerLayer,
@@ -202,13 +201,6 @@ const SETS: Record<Host, SceneSet> = {
     },
 }
 
-const MIXER_THEME = {
-    "--sap-reader-mixer-accent": "#7c5cff",
-    "--sap-reader-mixer-track": "rgba(255, 255, 255, 0.18)",
-    "--sap-reader-mixer-border": "rgba(255, 255, 255, 0.1)",
-    "--sap-reader-mixer-chip-bg": "rgba(255, 255, 255, 0.06)",
-} as CSSProperties
-
 const LAYER_NAMES: Record<ReaderMixerLayer, string> = {
     soundscapes: "Soundscapes",
     atmosphere: "Atmosphere",
@@ -218,6 +210,7 @@ const LAYER_NAMES: Record<ReaderMixerLayer, string> = {
 
 const MIXER_VIEW_ID = "sen-reader-mixer-view"
 
+/** Show chapter controls, narration and approved settings under one shared mixer. */
 function ReaderSimulation({
     set,
     width,
@@ -280,9 +273,13 @@ function ReaderSimulation({
 
     return (
         <>
-            <article className="wk-stage-card wk-reader" aria-label="Reader preview">
+            <article
+                className="wk-stage-card wk-reader"
+                aria-label="Reader preview"
+                data-experience="sen"
+                data-theme="dark"
+            >
                 <ReaderMixerNote
-                    style={MIXER_THEME}
                     onOpenSettings={() => {
                         const view = document.getElementById(MIXER_VIEW_ID)
                         view?.scrollIntoView({ block: "start" })
@@ -466,8 +463,13 @@ function ReaderSimulation({
                 hint="ReaderMixerPanel, rendered inline the way the reader's Settings menu will place it."
             >
                 <WidthFrame width={width}>
-                    <div className="wk-sen-settings" id={MIXER_VIEW_ID}>
-                        <ReaderMixerPanel style={MIXER_THEME} />
+                    <div
+                        className="wk-sen-settings"
+                        id={MIXER_VIEW_ID}
+                        data-experience="sen"
+                        data-theme="dark"
+                    >
+                        <ReaderMixerPanel />
                     </div>
                 </WidthFrame>
             </Panel>
@@ -582,6 +584,7 @@ function ResetMixerSettings({ append }: { append: ReturnType<typeof useEventLog>
     )
 }
 
+/** Host the reader preview and developer-only routing, sizing and policy controls. */
 export function ReaderMixerWorkspace() {
     const { lines, append, clear } = useEventLog(60)
     const [routing, setRouting] = useState<Routing>("auto")
@@ -684,6 +687,7 @@ export function ReaderMixerWorkspace() {
                                     { value: "320", label: "320" },
                                     { value: "390", label: "390" },
                                     { value: "480", label: "480" },
+                                    { value: "640", label: "Desktop" },
                                 ]}
                                 onChange={setStageWidth}
                             />

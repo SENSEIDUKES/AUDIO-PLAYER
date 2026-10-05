@@ -4,6 +4,19 @@ This matrix documents the officially supported behavior for the SEIHOUSE audio p
 
 ## Support levels
 
+The 4.0.0 reader settings panel is the isolated React 19
+`@seihouse/audio-player/reader-ui` entry using the exact universal UI 0.10.1
+artifact. The core stays React >=18. The owner waived the physical iPhone gate
+for PR #182; automated browser checks do not claim physical iPhone proof.
+
+| Reader UI upgrade | Expected behavior | Verification |
+| --- | --- | --- |
+| 390 px / desktop panel | Token colors, 44 px targets, two preset columns in a narrow panel and four in a wide panel, no horizontal overflow | Workshop Settings width: 390 and Desktop; before/after screenshots in the UI PR |
+| Controls and names | Approved switches, sliders, radios and select keep row names, host text, volume value text and keyboard interaction | Existing panel/Voice unit tests and Chrome keyboard checks |
+| Existing mixer states | Hidden unused rows, protected interacting rows, collapsed grouped Atmosphere picker, presets, timer cancellation, device-volume hint, empty state and polite status messages | Existing panel tests against the new entry |
+| Host skins and reduced motion | Dark/light and experience tokens style all controls; motion is removed under reduced motion; the note keeps its glyph and root entry | Token-based CSS and Chrome visual/computed-style checks |
+| Package separation | React 18 core loads without UI peers; React 19 panel shares the root provider and accepts packed core types | Installed-package smoke test checks both clean consumers and rejects UI imports in the root bundles |
+
 - **Supported** — expected to work and should be verified for every release.
 - **Supported with platform limits** — expected to work except for browser or OS restrictions the player cannot bypass.
 - **Smoke tested** — covered by repository automation, but still needs targeted manual browser checks when related code changes.

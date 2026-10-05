@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client"
 import { WorkshopApp } from "./workshop/WorkshopApp"
 import "./audio-player-lab.css"
 import "./workshop/workshop.css"
+import "./reader-ui.css"
 
 /* SEIHouse Audio Player Workshop — the demo's entry point.
    - The Workshop home groups every piece into Players, Systems, Customization,

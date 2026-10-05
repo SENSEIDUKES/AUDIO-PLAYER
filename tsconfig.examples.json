@@ -5,6 +5,7 @@
         "baseUrl": ".",
         "paths": {
             "@seihouse/audio-player": ["src/audio-player/index.ts"],
+            "@seihouse/audio-player/reader-ui": ["src/reader-ui/index.ts"],
             "@seihouse/audio-player/styles.css": ["src/audio-player/audio-player.css"]
         }
     },

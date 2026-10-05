@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import type { CSSProperties } from "react"
 import type { ReaderMixer } from "../narrative/ReaderMixer"
 import { useOptionalReaderMixer, useReaderMixerState } from "../narrative/ReaderMixerContext"
-import "./reader-mixer.css"
+import "./reader-mixer-note.css"
 
 export interface ReaderMixerNoteLabels {
     mute: string

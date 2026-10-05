@@ -786,7 +786,7 @@ export const WORKSHOP_ENTRIES: readonly WorkshopEntry[] = [
         sources: [
             "src/audio-player/narrative/ReaderMixer.ts",
             "src/audio-player/narrative/ReaderMixerContext.tsx",
-            "src/audio-player/components/ReaderMixerPanel.tsx",
+            "src/reader-ui/ReaderMixerPanel.tsx",
             "src/demo/workspaces/sen/ReaderMixerWorkspace.tsx",
             "src/demo/senSoundscapes.ts",
         ],
