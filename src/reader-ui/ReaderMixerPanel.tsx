@@ -93,6 +93,7 @@ export interface ReaderMixerPanelProps {
     style?: CSSProperties
 }
 
+/** Merge host wording while retaining unspecified layer labels and statuses. */
 function mergeLabels(overrides: ReaderMixerLabelOverrides | undefined): ReaderMixerLabels {
     if (!overrides) return DEFAULT_READER_MIXER_LABELS
     return {
@@ -103,6 +104,7 @@ function mergeLabels(overrides: ReaderMixerLabelOverrides | undefined): ReaderMi
     }
 }
 
+/** Apply mixer selection to the approved switch, retaining its Enter shortcut. */
 function MixerSwitch({
     checked,
     labelledBy,
@@ -132,6 +134,7 @@ function MixerSwitch({
 type AtmosphereGroup = { name: string | null; options: ReaderAtmosphereOption[] }
 const VOLUME_FORMAT = { style: "unit", unit: "percent", unitDisplay: "narrow" } as const
 
+/** Keep percentage volume and host spoken wording on the approved native range. */
 function MixerSlider({
     percent,
     label,
@@ -170,6 +173,7 @@ function MixerSlider({
     )
 }
 
+/** Group host choices in catalog order, placing ungrouped choices before named groups. */
 function groupAtmospheres(options: readonly ReaderAtmosphereOption[]): AtmosphereGroup[] {
     const groups: AtmosphereGroup[] = []
     for (const option of options) {
@@ -187,6 +191,7 @@ function groupAtmospheres(options: readonly ReaderAtmosphereOption[]): Atmospher
     return groups
 }
 
+/** Render a preset or encoded atmosphere choice through the approved radio. */
 function AtmosphereChip({ value, label }: { value: string; label: string }) {
     return (
         <SEIRadio className="sap-reader-mixer__chip" value={value}>
@@ -197,7 +202,7 @@ function AtmosphereChip({ value, label }: { value: string; label: string }) {
 
 /**
  * Inline controls for a {@link ReaderMixer}: a master switch, then one row
- * per layer (Soundscapes, Atmosphere, Sound Cues) with a switch, a volume
+ * per layer (Soundscapes, Atmosphere, Sound Cues and connected Voice) with a switch, a volume
  * slider and its percentage, and an atmosphere picker under Atmosphere.
  *
  * It renders in normal flow (never fixed or floating) so a host can place it

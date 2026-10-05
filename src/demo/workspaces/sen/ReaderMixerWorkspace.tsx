@@ -210,6 +210,7 @@ const LAYER_NAMES: Record<ReaderMixerLayer, string> = {
 
 const MIXER_VIEW_ID = "sen-reader-mixer-view"
 
+/** Show chapter controls, narration and approved settings under one shared mixer. */
 function ReaderSimulation({
     set,
     width,
@@ -583,6 +584,7 @@ function ResetMixerSettings({ append }: { append: ReturnType<typeof useEventLog>
     )
 }
 
+/** Host the reader preview and developer-only routing, sizing and policy controls. */
 export function ReaderMixerWorkspace() {
     const { lines, append, clear } = useEventLog(60)
     const [routing, setRouting] = useState<Routing>("auto")

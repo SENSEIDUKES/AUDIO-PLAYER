@@ -33,6 +33,7 @@ interface SourceFile {
     imports: { spec: string; resolved: string }[]
 }
 
+/** Resolve relative imports from guarded raw source files into package paths. */
 function files(sources: Record<string, string>): SourceFile[] {
     return Object.entries(sources).map(([key, text]) => {
         const path = new URL(key, HERE).pathname
@@ -46,6 +47,7 @@ function files(sources: Record<string, string>): SourceFile[] {
     })
 }
 
+/** Recognize either public package source region when checking Workshop imports. */
 const inPackage = (resolved: string) =>
     resolved === PACKAGE_ROOT ||
     resolved.startsWith(`${PACKAGE_ROOT}/`) ||

@@ -47,7 +47,7 @@ installation does not install them. Using the settings panel requires **React
 | `tailwind-variants` | `^3.2.2` |
 | `vaul` | `^1.1.2` |
 | `clsx` | `^2.1.1` |
-| `lucide-react` | `^0.546.0 || ^1.17.0` (already a player dependency) |
+| `lucide-react` | `^0.546.0 \|\| ^1.17.0` (already a player dependency) |
 | `tailwindcss` | `^4.3.3`, with the host's Tailwind integration |
 
 This repository vendors `vendor/seihouse-ui-0.10.1.tgz`, copied from the

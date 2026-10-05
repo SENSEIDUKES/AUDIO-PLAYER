@@ -21,6 +21,7 @@ const requiredPaths = [
 
 const alternatePackageManagerLocks = ["bun.lock", "bun.lockb", "pnpm-lock.yaml", "yarn.lock"]
 
+/** Check required and forbidden paths relative to the repository, independent of cwd. */
 async function pathExists(relativePath) {
     try {
         await access(path.join(projectRoot, relativePath))

@@ -12,6 +12,7 @@ if (!npmCli) {
     throw new Error("Package smoke test must be run through npm so npm_execpath is available")
 }
 
+/** Run consumer npm commands with inherited dry-run disabled and propagate failures. */
 function runNpm(args, cwd) {
     const result = spawnSync(process.execPath, [npmCli, ...args], {
         cwd,
@@ -40,6 +41,7 @@ function runNpm(args, cwd) {
     return result.stdout
 }
 
+/** Typecheck a consumer fixture against packed declarations without source aliases. */
 function checkInstalledTypes(consumerDir, label) {
     const result = spawnSync(
         process.execPath,
@@ -66,6 +68,7 @@ function checkInstalledTypes(consumerDir, label) {
     }
 }
 
+/** Supply deterministic decoding/worker fakes and record the constructed worker URLs. */
 function installBrowserFakes(workerUrls) {
     const sampleRate = 44_100
     const samples = new Float32Array(sampleRate * 12).fill(0.25)
@@ -125,6 +128,7 @@ function installBrowserFakes(workerUrls) {
     globalThis.Worker = FakeWorker
 }
 
+/** Verify the installed entry resolves its lazy analysis worker within its own dist. */
 async function exerciseAutomixWorker(moduleExports, label, packageRoot) {
     const workerUrls = []
     installBrowserFakes(workerUrls)
