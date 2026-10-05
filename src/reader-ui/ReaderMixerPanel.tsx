@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useId, useMemo, useRef, useState } from "react"
 import type { CSSProperties, ReactNode } from "react"
 import { SEIField, SEIRadio, SEIRadioGroup, SEISelect, SEISlider, SEISwitch } from "@seihouse/ui"
 import {
@@ -146,15 +146,15 @@ function MixerSlider({
     const control = useRef<HTMLDivElement>(null)
     // SEISlider owns the native range and all interaction. Its number formatter
     // cannot express the host's arbitrary wording, so preserve that public hook
-    // on the range's spoken value after each render.
-    useLayoutEffect(() => {
+    // on the range's spoken value when the value or host wording changes.
+    useEffect(() => {
         const input = control.current?.querySelector('input[type="range"]')
         const valueText = formatPercent(percent)
         // Timer/status updates must not repeatedly announce an unchanged value.
         if (input && input.getAttribute("aria-valuetext") !== valueText) {
             input.setAttribute("aria-valuetext", valueText)
         }
-    })
+    }, [percent, formatPercent])
     return (
         <div ref={control} className="sap-reader-mixer__slider">
             <SEISlider
