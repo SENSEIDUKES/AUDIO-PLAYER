@@ -400,6 +400,7 @@ try {
     assert.ok(html.includes("Soundscapes volume"), "UI entry must share the root provider's context")
     assert.ok(html.includes('role="switch"'))
     assert.ok(html.includes('type="range"'))
+    assert.ok(html.includes('aria-valuetext="25%"'), "Server-rendered volume must still describe a percentage")
     assert.ok(html.includes("Sleep timer"))
     assert.equal(DEFAULT_READER_MIXER_LABELS.master, "Master")
     assert.ok(import.meta.resolve("@seihouse/audio-player/reader-ui/styles.css").endsWith("reader-ui.css"))

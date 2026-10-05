@@ -130,6 +130,7 @@ function MixerSwitch({
 }
 
 type AtmosphereGroup = { name: string | null; options: ReaderAtmosphereOption[] }
+const VOLUME_FORMAT = { style: "unit", unit: "percent", unitDisplay: "narrow" } as const
 
 function MixerSlider({
     percent,
@@ -161,6 +162,7 @@ function MixerSlider({
                 maxValue={100}
                 step={1}
                 value={percent}
+                formatOptions={VOLUME_FORMAT}
                 aria-label={label}
                 onChange={onChange}
             />
