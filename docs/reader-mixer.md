@@ -22,17 +22,89 @@ instead. The mixer does not generate speech or create a second narration player.
 Browser `speechSynthesis` is not connected: use recorded/generated audio files
 for the supported TTS path. Stand-alone `NarrativeFace` still works without a mixer.
 
+## Reader UI setup and 4.0.0 migration
+
+The approved settings panel lives in the **ESM-only**
+`@seihouse/audio-player/reader-ui` entry. Import `ReaderMixerPanel`,
+`DEFAULT_READER_MIXER_LABELS`, `ReaderMixerPanelProps`, `ReaderMixerLabels` and
+`ReaderMixerLabelOverrides` from that entry instead of the package root. This
+import change is the reason for the **4.0.0 major release**. Mixer behavior,
+panel props, labels and saved preference version 3 stay the same.
+
+The root entry keeps `react >= 18` / `react-dom >= 18`, including
+`ReaderMixerProvider`, `ReaderMixerVoice` and `ReaderMixerNote`. It never imports
+the UI package or its peers. They are optional peers of the player; a core-only
+installation does not install them. Using the settings panel requires **React
+19** and the following host dependencies:
+
+| Dependency | Version |
+| --- | --- |
+| `@seihouse/ui` | **0.10.1**, exact vendored artifact |
+| `react` / `react-dom` | `^19.0.0` |
+| `@base-ui/react` | `^1.5.0` |
+| `react-aria-components` | `^1.18.0` |
+| `tailwind-merge` | `^3.6.0` |
+| `tailwind-variants` | `^3.2.2` |
+| `vaul` | `^1.1.2` |
+| `clsx` | `^2.1.1` |
+| `lucide-react` | `^0.546.0 || ^1.17.0` (already a player dependency) |
+| `tailwindcss` | `^4.3.3`, with the host's Tailwind integration |
+
+This repository vendors `vendor/seihouse-ui-0.10.1.tgz`, copied from the
+development repository. It is the universal UI package from [UI PR #87](https://github.com/SENSEIDUKES/UI/pull/87),
+source commit `d3c630181b5fb35cbb9be50847c96fff2dbd5e4a`. Its source and SHA-512
+integrity are recorded in [`vendor/ui-artifacts.json`](../vendor/ui-artifacts.json)
+and checked against the tarball and lockfile by `npm test`. No Library-specific
+skin is included.
+
+For an npm consumer, copy that exact tarball into its own `vendor/` directory
+and install the panel dependencies:
+
+```bash
+npm install react@^19 react-dom@^19 ./vendor/seihouse-ui-0.10.1.tgz \
+  @base-ui/react@^1.5.0 react-aria-components@^1.18.0 \
+  tailwind-merge@^3.6.0 tailwind-variants@^3.2.2 vaul@^1.1.2 \
+  clsx@^2.1.1 lucide-react@^1.17.0 tailwindcss@^4.3.3
+```
+
+The host owns Tailwind and imports the styles once. In a stylesheet under
+`src/`, for example:
+
+```css
+@import "tailwindcss";
+@import "@seihouse/ui/styles.css";
+@import "@seihouse/audio-player/styles.css";
+@import "@seihouse/audio-player/reader-ui/styles.css";
+@source "../node_modules/@seihouse/audio-player/dist/reader-ui.js";
+```
+
+Adjust the `@source` path relative to the host stylesheet. UI's `styles.css`
+imports `tokens.css` and registers its own shipped JavaScript for Tailwind's
+scan. Neither player stylesheet adds Tailwind preflight. If the host already
+imports Tailwind/UI, add just the player styles and source registration.
+The Workshop imports theme/utilities without preflight so its existing pages
+keep their layout.
+
+Choose the host's skin with `data-experience="default"`, `"sea"` or `"sen"`,
+and contrast with `data-theme="dark"` or `"light"` on an ancestor. Every
+control color comes from universal `--sh-*` tokens. The panel uses `SEISwitch`,
+`SEISlider`, `SEISelect`, `SEIRadioGroup` / `SEIRadio`, and `SEIField`; local CSS
+supplies layout and touch target sizing. The note keeps its root entry and glyph
+and reads the same tokens when available, with inherited-color fallbacks for
+core-only hosts.
+
 ## Host example
 
 ```tsx
 import {
-    ReaderMixerPanel,
     ReaderMixerProvider,
     useReaderMixer,
     type ReaderAtmosphereOption,
     type ReaderMixerPreferences,
 } from "@seihouse/audio-player"
+import { ReaderMixerPanel } from "@seihouse/audio-player/reader-ui"
 import "@seihouse/audio-player/styles.css"
+// Include reader-ui styles and Tailwind/UI setup as shown above.
 
 const ATMOSPHERES: ReaderAtmosphereOption[] = [
     { id: "rain", label: "Rain", group: "Weather", sources: [{ url: rainUrl }] },
@@ -704,22 +776,24 @@ radios with Off first and the host's options grouped by `group`.
 
     | Property | Default |
     | --- | --- |
-    | `--sap-reader-mixer-accent` | `#8b7cf6` |
-    | `--sap-reader-mixer-accent-contrast` | `#ffffff` |
-    | `--sap-reader-mixer-fg` / `--sap-reader-mixer-muted` | inherited text color |
-    | `--sap-reader-mixer-bg` | `transparent` |
-    | `--sap-reader-mixer-track` / `--sap-reader-mixer-border` / `--sap-reader-mixer-chip-bg` | translucent greys |
-    | `--sap-reader-mixer-focus` | the accent |
-    | `--sap-reader-mixer-radius` / `--sap-reader-mixer-gap` / `--sap-reader-mixer-padding` | `12px` / `12px` / `0` |
-    | `--sap-reader-mixer-target-size` | `44px` |
+    | `--sap-reader-mixer-fg` / `--sap-reader-mixer-muted` | `--sh-text-primary` / `--sh-text-subtle` |
+    | `--sap-reader-mixer-bg` | `--sh-surface-elevated` |
+    | `--sap-reader-mixer-border` | `--sh-border` |
+    | `--sap-reader-mixer-focus` | `--sh-focus-ring` |
+    | `--sap-reader-mixer-radius` / `--sap-reader-mixer-gap` / `--sap-reader-mixer-padding` | `--sh-radius-panel` / `--sh-space-4` / `--sh-space-4` |
+    | `--sap-reader-mixer-target-size` | `44px`, with a 44px minimum |
     | `--sap-reader-mixer-font` | inherited |
 
 - **Mobile first.** Designed for 390px, with every switch, slider and chip at least 44px tall.
-- **Accessible.** Switches are `role="switch"` buttons named by their row;
+- **Accessible.** Switches are native inputs with `role="switch"` named by their row;
   sliders are native range inputs named "Soundscapes volume" and so on, with the
   percentage as their value text; the picker is a native radio group in a
   `fieldset`; row status messages are polite live regions. Transitions are
   removed under `prefers-reduced-motion: reduce`.
+- **Tokens.** Style switch, slider, select and radio colors through universal
+  `--sh-*` tokens such as `--sh-interactive-primary`, `--sh-progress-track`,
+  `--sh-field-surface` and `--sh-field-border`. The previous custom accent,
+  track and chip color variables no longer style the approved controls.
 - `titleAs` sets the heading element (default `h3`); `showTitle={false}` and
   `showAtmospherePicker={false}` hide those parts.
 
