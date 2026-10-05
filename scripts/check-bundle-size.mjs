@@ -6,8 +6,9 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 // These budgets stay below the measured unminified outputs while leaving room
 // for incremental library growth.
 const bundleLimits = {
-    // Voice/session controls and ownership add ~7 KiB to the 554 KiB reader baseline.
-    "dist/index.js": 570 * 1024,
+    // Reader policies, note and loudness measurement bring the measured ESM to 590 KiB.
+    // Keep ~15 KiB of explicit headroom; the CJS budget remains unchanged.
+    "dist/index.js": 605 * 1024,
     "dist/index.cjs": 500 * 1024,
 }
 

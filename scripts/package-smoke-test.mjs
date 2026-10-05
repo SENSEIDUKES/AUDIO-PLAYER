@@ -136,6 +136,19 @@ async function exerciseAutomixWorker(moduleExports, label, packageRoot) {
 
 /** Verify installed Voice exports, preference migration, and independent master/cleanup gates. */
 function exerciseReaderVoice(moduleExports, label) {
+    for (const name of [
+        "ReaderMixerNote",
+        "measureLoudness",
+        "measureLoudnessPcm",
+        "computeLoudnessGain",
+    ]) {
+        if (typeof moduleExports[name] !== "function") {
+            throw new Error(`${label} package export is missing ${name}`)
+        }
+    }
+    if (moduleExports.READER_MIXER_SLEEP_TIMERS.length !== 6) {
+        throw new Error(`${label} package export is missing the default reader timer choices`)
+    }
     if (typeof moduleExports.ReaderMixerVoice !== "function") {
         throw new Error(`${label} package export is missing ReaderMixerVoice`)
     }
@@ -157,6 +170,30 @@ function exerciseReaderVoice(moduleExports, label) {
         resume: () => {},
     })
     try {
+        mixer.setLayerAvailability({ soundscapes: false, cues: false, atmosphere: false })
+        if (!mixer.getState().availability.voice || mixer.getState().availability.soundscapes) {
+            throw new Error(`${label} installed mixer did not expose host availability`)
+        }
+        mixer.setSleepTimer("chapter-end")
+        mixer.notifyChapterEnd()
+        if (mixer.getState().sleepTimer.status !== "fired") {
+            throw new Error(`${label} installed mixer did not expose sleep firing`)
+        }
+        mixer.resumeAudio()
+        const pcm = Float32Array.from({ length: 48000 }, (_, index) =>
+            Math.sin((2 * Math.PI * 997 * index) / 48000)
+        )
+        const loudness = moduleExports.measureLoudnessPcm([pcm], 48000)
+        if (Math.abs(loudness.lufs + 3.01) > 0.01) {
+            throw new Error(`${label} installed measurement lost 997 Hz calibration`)
+        }
+        const gain = moduleExports.computeLoudnessGain(
+            { lufs: -10, peakDb: 0, kind: "integrated" },
+            "integrated"
+        )
+        if (Math.abs(gain.appliedGainDb + 10) > 0.001) {
+            throw new Error(`${label} installed leveling gain did not attenuate loud loops`)
+        }
         if (level !== 0.4 || mixer.getPreferences().version !== 3) {
             throw new Error(`${label} installed mixer did not migrate/apply Voice preferences`)
         }

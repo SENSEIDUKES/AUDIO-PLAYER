@@ -1,11 +1,12 @@
 # Reader mixer
 
 `createReaderMixer` controls a story reader's audio as four independent layers,
-each with its own on/off switch and volume, under one master switch:
+each with its own on/off switch and volume. The master is the soundtrack switch:
+it gates Soundscapes, Atmosphere and Sound Cues, while Voice stays independent.
 
 | Layer | What it is | Chosen by | Behavior |
 | --- | --- | --- | --- |
-| **Soundscapes** | The music score | The app (per chapter, or mid-chapter when the story turns) | Loops; crossfades (about 2 s) when the track changes; repeating the current track does nothing. |
+| **Soundscapes** | The music score | The app (per chapter, or mid-chapter when the story turns) | Crossfades (about 2 s); rests after 2 plays. Same track and scene does nothing; a new scene restarts it. |
 | **Atmosphere** | An ambient bed: rain, wind, waves, crowd, city | The reader, as a personal preference shared by every story | Loops under everything until the reader changes it or picks Off. |
 | **Sound Cues** | Short one-shot effects placed on words: a growl, a chime | The app | Play over the other layers without pausing or ducking them; cues may overlap. |
 | **Voice** | Recorded or AI-generated TTS audio | The host's narration session | Shares its existing transport, queue and playback speed; the mixer controls volume and on/off. Never ducked. |
@@ -57,9 +58,11 @@ function ChapterView({ chapter }: { chapter: Chapter }) {
 
     // A chapter opens → its score crossfades in, and the reader's atmosphere starts.
     useEffect(() => {
-        mixer.playSoundscape(chapter.score)
+        mixer.setLayerAvailability({ soundscapes: !!chapter.score, atmosphere: true, cues: chapter.cues.length > 0 })
+        if (chapter.score) mixer.playSoundscape(chapter.score, { scene: chapter.id })
+        else mixer.stopSoundscape()
         mixer.startAtmosphere()
-    }, [mixer, chapter.score])
+    }, [mixer, chapter.id, chapter.score, chapter.cues])
 
     // Warm the chapter's short cues before their words are reached.
     useEffect(() => {
@@ -74,7 +77,7 @@ function ChapterView({ chapter }: { chapter: Chapter }) {
         mixer.playCue(cue.url, { volume: cue.volume })
 
     // The story turns → switch the score mid-chapter.
-    const onBattleStarts = () => mixer.playSoundscape(chapter.battleScore)
+    const onBattleStarts = () => mixer.playSoundscape(chapter.battleScore, { scene: `${chapter.id}:battle` })
 
     return <ChapterText onCueReached={onCueReached} onBattleStarts={onBattleStarts} />
 }
@@ -89,10 +92,14 @@ Without React:
 
 ```ts
 const mixer = createReaderMixer({ atmospheres: ATMOSPHERES, initialPreferences: saved })
-mixer.playSoundscape(chapterScore) // a chapter opens
+mixer.setLayerAvailability({ soundscapes: true, cues: chapterCueUrls.length > 0 })
+mixer.playSoundscape(chapterScore, { scene: chapterId }) // a chapter opens
+mixer.startAtmosphere()
 mixer.setAtmosphere("rain")        // the reader picks rain (an option, its id, or a Track)
 mixer.preloadCues(chapterCueUrls)   // warm the bounded chapter cache ahead of the words
 mixer.playCue(growlUrl)            // a cue is reached
+mixer.notifyChapterEnd()           // host signals the actual chapter end
+mixer.stopAll()                    // required when leaving the reader
 mixer.dispose()                    // release everything
 ```
 
@@ -100,14 +107,21 @@ mixer.dispose()                    // release everything
 
 | Member | Purpose |
 | --- | --- |
-| `playSoundscape(track, { fadeMs?, trimStartMs? })` | Crossfade the score to `track` (default `SCENE_FADE_MS`, 2 s). The same track again does nothing. |
+| `setLayerAvailability(partial)` | Declare rows in use; merged with the previous declaration, independent of playback and saved on/off. Read `state.availability`. |
+| `setSleepTimer(id)` / `cancelSleepTimer()` | Choose a session-only timer or cancel a running timer. A new choice explicitly resumes audio stopped by sleep. |
+| `notifyChapterEnd()` | Fire a running End of chapter timer; the host owns this signal. |
+| `subscribeSleep(fn)` | Observe `{ choiceId, firedAt }`; stop host-owned browser Listen when it fires. `onSleepTimer` is the options callback form. |
+| `retainActivity()` | Hold activity while Listen speaks; returns an idempotent release function. Playing connected Voice holds activity automatically. |
+| `resumeAudio()` | Explicitly clear the sleep latch, turn the soundtrack on and unlock. Activity and scrolling never call it. |
+| `setLeveling(on)` | Compare automatic source leveling on/off without changing saved preferences. |
+| `playSoundscape(track, { scene?, fadeMs?, trimStartMs? })` | Crossfade the score to `track` (default `SCENE_FADE_MS`, 2 s). The same track in the same scene does nothing, including while resting. |
 | `stopSoundscape({ fadeMs? })` | Fade the score out. |
 | `setAtmosphere(option \| id \| track \| null, { fadeMs? })` | Choose and play the reader's atmosphere and save it in the preferences. `null` saves Off and fades it out. |
 | `startAtmosphere()` / `stopAtmosphere()` | Start the saved atmosphere (entering the reader) or fade it out without changing the choice (leaving). |
 | `setAtmosphereOptions(options)` | Replace the catalog. A pending saved choice starts when it arrives; a removed choice fades out, and changed sources crossfade even under the same id. The saved choice is retained. |
-| `playCue(url, { volume?, startTime? })` | Play a one-shot over the loops. Returns `false` when skipped: cues or master off, zero per-cue volume, a hidden page, the concurrency cap (`maxConcurrentCues`, default 6), or no audio. |
+| `playCue(url, { loudness?, volume?, startTime? })` | Play a one-shot over the loops. Returns `false` when skipped: cues or master off, zero per-cue volume, a hidden page, sleep stopped, the concurrency cap (`maxConcurrentCues`, default 6), or no audio. |
 | `preloadCues(urls)` | Warm up to `maxCachedCueUrls` unique chapter cue URLs (default 8). No playback, active slot, gain sink or audio-session demand. Later triggers reuse loaded elements and keep their original 1.5 s start deadline. |
-| `stopAll({ fadeMs? })` | Fade both loops out and pause connected Voice; preferences are untouched and cues finish on their own. |
+| `stopAll({ fadeMs? })` | Required on leaving the reader: fade both loops out, pause connected Voice, and cancel sleep, idle and rest state. Preferences are untouched; existing cues finish on their own. |
 | `connectVoice(output)` | Connect one `ReaderMixerVoiceOutput`; returns an idempotent cleanup. Replacing an output pauses and detaches the old one. Cleanup releases the mixer gate and subscription; the host owns the audio source and transport. |
 | `setDuck(0..1, { fadeMs? })`, `getDuck()` | Temporarily lower Soundscapes and Atmosphere (for example under narration) without touching preferences. Cues and Voice are never ducked. `NarrativeFace` drives this for you. |
 | `retainDuck()` | Get an independent `setDuck` / `release` owner. The strongest active duck wins; removing one narration control preserves the others. |
@@ -127,19 +141,208 @@ and renders its children once it exists. Discarded renders create no listeners o
 contexts; StrictMode disposes its first effect instance before replacing it.
 A supplied `mixer` is available immediately and remains caller-owned.
 
+## Availability and atmosphere auditions
+
+The host declares use, for example
+`setLayerAvailability({ soundscapes: !!chapter.score, cues: chapter.cues.length > 0, atmosphere: true })`.
+Undeclared soundtrack layers default to true; undeclared Voice follows its output
+connection. Explicit values remain until changed. A disabled layer is still in
+use and keeps its row. Availability affects presentation; it does not stop audio
+or overwrite preferences. Presets apply to hidden layers too.
+
+The panel retains an unavailable row while a control in it has focus or while
+its pointer interaction is in progress. Once the interaction ends the row can
+disappear. If every layer is unused, `labels.noAudio` supplies the short empty
+line under the master. The note also disappears.
+
+Only Atmosphere has an audition path. `startAtmosphere()` marks the reading
+lifetime, including when Off is selected. Within that lifetime a choice loops
+immediately. Before it starts or after `stopAtmosphere()`/`stopAll()`, selecting a
+choice saves it and plays a **10 second** preview with **1 second** fades at both
+ends, then returns to silence. Changing choice replaces the preview; Off,
+page hiding and disposal cancel it. `atmospherePreviewMs` and
+`atmospherePreviewFadeMs` override those durations. Preview does not open a
+chapter. The collapsed choice button expands the native grouped radio picker.
+Reader-facing UI contains no score/cue/voice preview or catalog.
+
+## Sleep, music rests and activity
+
+`READER_MIXER_SLEEP_TIMERS` contains Off, 15/30/45/60 minutes and End of chapter.
+Supply `sleepTimerChoices` with `{ id, label, kind, durationMs? }` to replace it
+or translate labels. Kinds are `off`, `duration` and `chapter-end`; a duration
+must be positive and finite. Timers are never persisted. `state.sleepTimer`
+reports `status`, `choiceId`, `endsAt` and `remainingMs`; the panel rounds the
+remaining wall-clock time up to minutes and provides Cancel.
+
+When sleep fires, both beds fade for **20 seconds** (`sleepFadeMs`) and stop,
+connected Voice pauses, and new cues are skipped. Preferences remain intact.
+The event tells the host to stop its own Listen. Input, chapter changes and
+visibility return cannot restart the audio. The note, the panel's master or a
+new timer choice resumes it deliberately. Voice resumes only if sleep paused
+an active/pending output; a previously paused voice stays paused. Timer expiry is
+checked against `Date.now()` before visibility resume even if timers were
+throttled while hidden. Cancel removes a running timer without stopping audio.
+
+Scores rest after **2 plays** (`soundscapeMaxPlays`, or `null` for never rest),
+with an **8 second** fade in the final play's tail (`soundscapeRestFadeMs`,
+bounded by the playable duration). Overlapped loop boundaries count as plays;
+the final tail fades without adding an extra repeat. Rest leaves Atmosphere
+playing. `state.soundscapePlays` records the completed count and Soundscapes
+reports `resting`. Same track/sources and same `scene` remains resting; a new
+scene or another track starts a fresh count. Use a stable chapter/scene id;
+omitting it retains the same-track no-op behavior.
+
+Idle stops after **10 minutes** without input (`idleTimeoutMs: 600000`, or
+`null` to disable). Both beds fade for **8 seconds** (`idleFadeMs`), then pause
+in place; Voice pauses. Passive document capture listeners observe scroll,
+wheel, touch, pointer and key input, including nested scroll containers. Input
+resumes idle-paused beds at their positions, unless hidden or sleep-stopped.
+A refused resume reports `blocked` and retries on the next activation. Playing
+Voice holds activity; `retainActivity()` holds it for external Listen. Releasing
+the last hold starts a fresh idle timeout. `state.idle` is separate from sleep.
+
+The host **must call `stopAll()` when leaving the reader**. It cancels sleep,
+idle scheduling and rest counts as well as stopping the beds and pausing Voice.
+Release host activity/duck leases when Listen stops or unmounts.
+
+```tsx
+useEffect(() => {
+    if (!listenSpeaking) return
+    const releaseActivity = mixer.retainActivity()
+    const duck = mixer.retainDuck()
+    duck.setDuck(0.6)
+    return () => { releaseActivity(); duck.release() }
+}, [mixer, listenSpeaking])
+useEffect(() => mixer.subscribeSleep(stopListen), [mixer, stopListen])
+// Actual chapter-end signal: mixer.notifyChapterEnd()
+// Reader cleanup: mixer.stopAll()
+```
+
+The checked `ReaderChapterAudioExample` in [USAGE_EXAMPLE.tsx](../USAGE_EXAMPLE.tsx)
+combines chapter availability, scene ids, atmosphere, cue warm-up, Listen holds,
+sleep events, chapter end, the note and required reader cleanup.
+
+## Automatic loudness leveling
+
+`Track.loudness`, `ReaderAtmosphereOption.loudness` and
+`playCue(url, { loudness })` accept `LoudnessMeasurement`:
+`{ lufs, peakDb, kind }`. Use `integrated` for loops and `momentary-max` for cues.
+Values belong to the exact decoded source; remeasure after replacing a file.
+Missing, invalid or mismatched measurements play at unity. Digital silence uses
+JSON-safe nulls and is never boosted. Voice stays on its host-owned output and
+is outside this soundtrack leveling/limiter graph.
+
+`leveling` defaults to on. Reference levels are **−20 LUFS integrated** for beds
+and **−14 LUFS momentary maximum** for cues, with **+12 dB** maximum boost and
+**−1 dBFS** sample-peak headroom. Supply a `LoudnessLevelingOptions` object to
+override them. The requested gain in dB is reference minus measurement; applied
+gain is capped by boost and sample-peak headroom, then converted with
+`10 ** (dB / 20)`. Source gain is before fades, cue volume and reader sliders.
+`computeLoudnessGain(measurement, kind, options?, route?)` exports the same math
+and reports requested/applied gain plus `tooQuietToLevel`.
+
+Web Audio supports attenuation and boost. The three layer buses sum into one
+`DynamicsCompressorNode` safety limiter (threshold −1 dB, knee 0, ratio 20:1,
+attack 1 ms, release 100 ms). This is a compressor limiter, not an oversampled
+true-peak brick wall; the measured peak is a sample peak. Keep adequate headroom
+when listening to stacked layers. Element routing can only attenuate because
+`volume` cannot exceed 1. On volume-locked iPhone element fallback it cannot
+apply leveling at all; the UI reports on/off output. Preset numbers are unchanged
+so the owner can retune them by ear with leveling on.
+
+### Measuring browser buffers and pack files
+
+`measureLoudness(bytesOrAudioBuffer, { kind?, channelWeights? })` decodes encoded
+bytes through `OfflineAudioContext` and renders two K-weighting Biquads: high-pass
+38.13 Hz, linear Q 0.5003, then high-shelf 1681.97 Hz, +4 dB. Web Audio expresses
+high-pass Q in dB, so the implementation converts the linear Q. It uses 400 ms
+blocks, a 100 ms hop, the −70 LUFS absolute gate and −10 LU relative gate for
+integrated measurement. Cues take the loudest block; a cue under 400 ms is padded
+with silence. Surround-channel weights follow BS.1770 (LFE zero); unusual layouts
+require explicit `channelWeights`.
+
+The requested generic Biquads approximate the ITU reference IIR coefficients.
+Their response is calibrated at 997 Hz to **−3.01 LUFS** for a full-scale
+single-channel sine, per sample rate. Measurements are identified as
+`calibrated-w3c-k-biquads/bs1770-gates/v1`; they are not claimed bit-identical to
+a laboratory meter using the exact ITU coefficient tables. See the
+[Web Audio Biquad definitions](https://www.w3.org/TR/webaudio-1.0/#BiquadFilterNode)
+and [BS.1770-4](https://www.itu.int/dms_pubrec/itu-r/rec/bs/R-REC-BS.1770-4-201510-S!!PDF-E.pdf).
+
+`measureLoudnessPcm(channels, sampleRate, options?)` provides the equivalent
+dependency-free filter and gated integration for already decoded PCM. The Node
+CLI uses the dev-only `@audio/decode` decoder; it adds no package runtime import.
+
+```sh
+npm run measure-loudness -- score.wav https://example.com/rain.mp3
+npm run measure-loudness -- --kind=momentary-max cue.mp3
+npm run measure-loudness -- --manifest=measurements-input.json
+```
+
+A manifest is an array of `{ id?, source, kind? }`. JSON output records source,
+SHA-256, decoder, sample rate, channels, duration, measurement and leveling gain.
+Decode differences between Node and a browser can affect sample peaks; remeasure
+with the browser function when exact browser-decoder output matters. The
+Workshop calibration control compares browser and PCM filters directly.
+
+The demo catalog stores measured values for all **43 SEN Volume 1 scores**, ten
+atmosphere beds and five Workshop cues, with provenance in
+[readerLoudness.json](../src/demo/readerLoudness.json). This is not a measurement
+of all 147 cues in the external SEN library. The default boost cap flags this
+short re-export list:
+
+| Atmosphere file | Integrated LUFS | Boost requested |
+| --- | --- | --- |
+| `Wind/Gentle_Wind_1.mp3` | −41.92 | +21.92 dB |
+| `Noise/Forest_1.mp3` | −46.89 | +26.89 dB |
+| `Noise/Village_1.mp3` | −38.99 | +18.99 dB |
+
+These remain playable with capped gain. Other files can be peak-limited below
+the reference without being above the boost cap. Measurements are metadata;
+the script does not modify or re-export the owner's files.
+
+## Ghost audio note
+
+Place `ReaderMixerNote` in normal chapter flow and keep `ReaderMixerPanel` in
+Settings. They share `preferences.masterEnabled`, the **soundtrack** switch.
+Tapping never mutes narration. A needed-tap state unlocks without muting; a
+sleep-stopped state explicitly resumes. The note is hidden when no layer is in
+use, shows a clock indicator while a timer runs, and uses different glyphs and
+labels for on, muted, blocked and sleep-stopped states.
+
+```tsx
+<ReaderMixerNote onOpenSettings={openAudioSettings} />
+// In the host's Audio settings:
+<ReaderMixerPanel labels={{ master: "Story audio", noAudio: "This chapter has no audio" }} />
+```
+
+The native button has a 44 px target, a 24 px glyph, `aria-pressed` reflecting
+mute, overridable labels and a polite state announcement. Enter/Space activate
+it. Long-press (600 ms, `longPressMs` override) and desktop context menu call
+`onOpenSettings`. Settings remain accessible through the host menu. Captured
+scroll lowers opacity, restoring it after 2 seconds or pointer/focus approach;
+layout never moves. Reduced motion removes the opacity transition.
+
+Theme with `--sap-reader-mixer-*` and the note's matching
+`--sap-reader-mixer-note-glyph-size`, `--sap-reader-mixer-note-ghost-opacity` and
+`--sap-reader-mixer-note-bg`. Class names and `data-state`, `data-scrolling` and
+`data-reduced-motion` expose the visual hooks; there is no fixed positioning.
+
 ### Level math
 
-A layer plays at `master on/off × layer on/off × layer level`, and a cue also
+A soundtrack layer plays at `master on/off × layer on/off × layer level`;
+Voice plays at `voice on/off × voice level`. A cue also
 multiplies its per-call `volume`. `computeReaderMixerGain(preferences, layer,
 volume?)` is the same formula as a pure function. Turning the master off and on
-again restores every layer exactly, because the layers' own switches and levels
+again restores the soundtrack exactly, because the layers' own switches and levels
 are never changed by the master.
 
 ### Layer status
 
 Each layer reports `idle`, `loading`, `playing`, `blocked` (the browser wants a
 tap; the next one retries), `failed` (with a `failure` message) or `paused`
-(the page is hidden or the system paused its media element). A loop that is silent only because its switch, level or
+(the page is hidden or the system paused its media element). A score can also be
+`resting` after its play limit; activity alone does not restart a resting score. A loop that is silent only because its switch, level or
 the master is off still reports `playing`.
 
 ## NarrativeFace as a companion
@@ -150,7 +353,8 @@ with the mixer. Render it inside the same `ReaderMixerProvider`, or pass
 
 - **One Voice control.** With `ReaderMixerVoice` connected, the face's voice
   slider and mute button share the saved Voice level and switch with the mixer.
-  The master switch gates narration without changing the session's user mute,
+  The soundtrack master leaves narration audible. Voice's own switch gates
+  narration without changing the session's user mute,
   saved level, queue or playback position. Other session volume controls also
   update the saved Voice level.
 - **Narration ducks the reader's music and atmosphere.** While the voice plays, the
@@ -198,7 +402,7 @@ avoids that on iPhone.
 
 ```json
 {
-    "version": 2,
+    "version": 3,
     "masterEnabled": true,
     "layers": {
         "soundscapes": { "enabled": true, "level": 0.25 },
@@ -222,12 +426,14 @@ immediate callback timing, or call `flushPreferences()` on an explicit commit.
 Pagehide and dispose flush pending changes once. Asynchronous server writes still
 belong to the host; flushing invokes the callback and cannot await a network save.
 
-Version 1 saves migrate to version 2 without changing their three existing
-layers, master switch or atmosphere. Voice defaults to enabled at 100%, or the
-host's `defaultPreferences.layers.voice`. New snapshots always use version 2.
-The package's 2.0.0 release expands the typed `ReaderMixerLayer` union and layer
-records: update exhaustive host labels/maps to include `voice`, and normalize
-stored JSON rather than casting a version 1 object as `ReaderMixerPreferences`.
+Version 1 and 2 saves normalize to version 3. The three soundtrack switches,
+levels, master and atmosphere choice are retained. Old saves with master off
+also migrate Voice to off, preserving the previously silent output; the reader
+can enable Voice independently afterwards. Otherwise Voice keeps its setting
+(or defaults to 100% for version 1). Always normalize saved JSON rather than
+casting old records. Package **3.0.0** changes the master's meaning and defaults
+Auto to Web Audio when leveling is enabled. Update exhaustive status maps for
+`resting` as well as the fourth `voice` layer.
 
 ## Loop boundaries and cue resources
 
@@ -236,12 +442,14 @@ It preloads the silent standby, starts it at the selected `trimStartMs` on every
 repeat, and fades before the outgoing asset ends to cover encoder padding and
 restart gaps. The two unlocked elements are reused on successive repeats. Scene
 switches stay transactional: an old bed can keep repeating while its requested
-replacement loads. Pause, stop and dispose cancel boundary work. A failed standby
+replacement loads, within its own rest limit. Reaching that limit never cancels
+the pending replacement. Pause, stop and dispose cancel boundary work. A failed standby
 uses bounded retries; if it still misses the boundary, the current element
 restarts at its trim rather than ending the bed. That recovery can have a gap.
 
 `loopCrossfadeMs` defaults to 250 in the mixer, is capped to half the playable bed
-length, and can be set to 0 to restore native looping. Standalone SceneMixEngine
+length, and can be set to 0 to remove boundary overlap. Unlimited loops then use native
+looping; a finite score still counts ended events to enforce its rest limit. Standalone SceneMixEngine
 keeps native looping by default; opt in with its additive `loopCrossfadeMs`
 option. Browser timers and seek precision can affect boundaries. On an iPhone
 element fallback that ignores volume, the overlap becomes a hard swap. **Listening
@@ -292,6 +500,7 @@ Every preset turns the master on. Choosing Off keeps the open reader's
 atmosphere lifetime: applying Default can
 start its rain again. After `stopAtmosphere()` or `stopAll()` (leaving the reader),
 presets only change saved settings until the host starts the atmosphere again.
+Selecting an atmosphere outside that lifetime starts a bounded audition instead.
 
 A preset's `preferences` may be partial:
 fields it leaves out keep the reader's current choice. `state.activePresetId`
@@ -307,13 +516,13 @@ routes for its loops and cues, chosen with `routing`:
 
 | `routing` | How audio plays | Sliders on iPhone | File host needs CORS |
 | --- | --- | --- | --- |
-| `"auto"` (default) | Web Audio only where element volume is ignored (iOS), plain elements elsewhere | Real loudness; on/off for a layer that falls back | Yes, by default |
+| `"auto"` (default) | Web Audio with leveling on, or where element volume is ignored; plain elements elsewhere when leveling is off | Real loudness; on/off for a layer that falls back | Yes, by default |
 | `"element"` | Plain media elements everywhere | On/off: above 0 plays at the device volume, 0 silences | Yes by default; opt out with `crossOrigin: null` |
 | `"web-audio"` | Web Audio everywhere | Real loudness | Yes, everywhere |
 
 The Web Audio route sends each element through `MediaElementAudioSourceNode →
-element gain → layer GainNode → destination`. Crossfades and per-cue volume use
-the element gain; the layer GainNode carries the reader's layer level.
+element gain → layer GainNode → summed safety limiter → destination`. Crossfades and per-cue volume use
+the element gain, including source loudness leveling; the layer GainNode carries the reader's layer level.
 All mixer media, including plain elements and cues, now load with
 `crossOrigin="anonymous"`. Consistent request modes prevent a plain mixer request
 from caching a response that later breaks the iPhone route. For non-CORS hosts,
@@ -336,8 +545,8 @@ does not downgrade. A failed replacement still leaves the previous mix playing.
 audio files, including iPhone. That backend downloads/decodes complete files and
 requires CORS; it does not stream a live TTS response. HTML5 can play compatible
 streams and non-CORS sources. Its volume works on browsers that honor element
-volume, and falls back to on/off on iPhone. Voice zero, switch off and master off
-still silence HTML5 output through its mute gate. `state.layers.voice.routing`
+volume, and falls back to on/off on iPhone. Voice zero and its own switch off
+silence HTML5 output through its mute gate. The soundtrack master leaves Voice alone. `state.layers.voice.routing`
 reports the session's active route; mixer `routing` does not change it.
 
 ### CORS on the SEIHouse audio hosts
@@ -465,10 +674,11 @@ chapter with `stopAll()` cancels any automatic Voice resume.
 
 ## Mixer view
 
-`ReaderMixerPanel` renders a master switch, then one row per layer
-(Soundscapes, Atmosphere, Sound Cues, Voice), each with an on/off switch, a 0–100
+`ReaderMixerPanel` renders a soundtrack master switch, then one row per layer in use
+(Soundscapes, Atmosphere, Sound Cues, connected Voice), each with an on/off switch, a 0–100
 slider and its percentage. An atmosphere picker sits under the Atmosphere row,
-with Off first and the host's options grouped by `group`.
+collapsed by default to a current-choice button. Expanding it reveals native
+radios with Off first and the host's options grouped by `group`.
 
 - **Inline only.** Normal document flow, no fixed positioning, so it fits in
   the Audio section of a settings menu.
@@ -536,7 +746,8 @@ mixer view. Before shipping a change to this path:
 10. **Voice/TTS on a physical iPhone (still required):** play a CORS-enabled
     generated/recorded TTS file with the narration session's Web Audio backend.
     Move the Voice slider, mute Voice, toggle master and restore each; confirm
-    both actual loudness and unchanged playback position/queue/rate. Repeat
+    both actual loudness and unchanged playback position/queue/rate. The soundtrack
+    master must leave narration audible; use Voice off to silence narration. Repeat
     with the ring switch on and silent, after backgrounding, and after a phone
     call. Test HTML5 separately: its zero/off gates must silence narration even
     when intermediate levels are controlled by the device. A slider test double
@@ -545,4 +756,23 @@ mixer view. Before shipping a change to this path:
     try Off → Default for Atmosphere, and reset settings during a slider drag.
     Reload and confirm the saved defaults, including Voice, are restored.
 
-Record browser and OS versions in the pull request.
+12. Enable **Short policy tests**. Verify the note's mute/unmute, unlock and sleep
+    resume states, timer indicator, keyboard activation, right-click and long-press
+    Settings callback, scroll fade and reduced motion. Hide every availability row;
+    the note disappears, the empty label appears and preferences remain intact.
+13. Select each short timer and End of chapter. Observe fades, silence and skipped
+    cues; scroll and background/return must not restart sleep-stopped audio. Resume
+    explicitly with the note, master or a new timer choice. Cancel a running timer.
+14. Let the 6 s score tail play twice and rest, with Atmosphere continuing. Repeat
+    the same scene, then mark Next scene: only the new scene restarts the score.
+    Leave inputs alone for the 15 s idle timeout and observe a fade and pause;
+    scroll inside the chapter to resume in place. Simulated Listen and playing
+    Voice must hold activity. Repeat after backgrounding.
+15. Compare leveling on/off for score, heavy rain, gentle rain and a cue. Check
+    **Check loudness calibration** for −3.01 LUFS in both browser and PCM paths.
+    On iPhone Element fallback, confirm the documented lack of leveling and the
+    on/off volume hint rather than claiming audible normalization.
+
+Record browser and OS versions and listening results in the PR. Desktop Chrome
+and physical iPhone Safari (ring on and silent) are separate evidence. A responsive
+Chrome viewport does not satisfy the physical-device gate.

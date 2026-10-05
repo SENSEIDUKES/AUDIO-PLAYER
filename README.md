@@ -87,13 +87,14 @@ changes. See the
 [distribution and publishing guide](https://github.com/SENSEIDUKES/AUDIO-PLAYER/blob/main/PUBLISHING_GUIDE.md)
 for those development workflows and the release-owner process.
 
-The 2.0.0 package adds the reader mixer's Voice slot. Connect narration once with
-`ReaderMixerVoice` under both `ReaderMixerProvider` and `AudioSessionProvider`;
-use `audioBackend="webaudio"` for volume on TTS audio files, including iPhone.
-Existing version 1 mixer saves normalize to version 2 with their original
-settings and Voice enabled at 100%. Update exhaustive layer maps to include
-`voice`. The [reader mixer guide](https://github.com/SENSEIDUKES/AUDIO-PLAYER/blob/main/docs/reader-mixer.md)
-includes integration, migration, streaming limits and device checks.
+The **3.0.0** package adds layer availability, atmosphere auditions, sleep timers,
+music rests, idle pause, automatic loudness leveling and a ghost audio note.
+The master now mutes the soundtrack while Voice stays independent. Old preference
+versions 1/2 migrate to version 3; old master-off saves keep Voice off to preserve
+silence. Auto now uses Web Audio with leveling enabled, including a safety limiter.
+Presets keep their existing values. This version is prepared here; npm publishing
+is an owner action. The [reader mixer guide](https://github.com/SENSEIDUKES/AUDIO-PLAYER/blob/main/docs/reader-mixer.md)
+covers host APIs, measurement, migration and required desktop/iPhone checks.
 
 ### Use it in React
 

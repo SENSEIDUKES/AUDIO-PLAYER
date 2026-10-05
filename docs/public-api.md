@@ -37,7 +37,7 @@ TypeScript signatures live in
 | Fully custom controls | `useAudioPlayer` or `useSAPPropGetters` | Use `useAudioPlayer` for a standalone engine, or the prop getters over an existing session. |
 | Extensible lifecycle behavior | `createAutomixPlugin`, `createKeyboardShortcutPlugin`, or `AudioPlayerPlugin` | Pass a memoized plugin array to `AudioPlayer` or `AudioSessionProvider`. |
 | Timed scene or reader audio | `CueManifestPlugin`, `CueRuntime`, `useNarrativeAudio`, or `SceneMixEngine` | Use the cue/narrative contracts instead of manipulating a skin's internals. |
-| A story reader's music, atmosphere, sound cues and voice together | `createReaderMixer`, `ReaderMixerProvider`, `ReaderMixerPanel`, `ReaderMixerVoice` | Four layers with their own switches and levels under a master switch. See [`reader-mixer.md`](./reader-mixer.md). |
+| A story reader's music, atmosphere, sound cues and voice together | `createReaderMixer`, `ReaderMixerProvider`, `ReaderMixerPanel`, `ReaderMixerVoice`, `ReaderMixerNote` | Four layers with availability, soundtrack master, source leveling and session stop policies. See [`reader-mixer.md`](./reader-mixer.md). |
 
 ## API families
 
@@ -50,7 +50,9 @@ TypeScript signatures live in
 | Plugins | `PluginManager`, `AudioPlayerPlugin`, `createAutomixPlugin`, `createKeyboardShortcutPlugin`, `createAnalyticsPlugin`, `createLyricsPlugin`, `createSleepTimerPlugin`, `createWaveformPlugin` | Optional lifecycle behavior without changing a skin. See [`PLUGIN_DEVELOPMENT_GUIDE.md`](../PLUGIN_DEVELOPMENT_GUIDE.md). |
 | Cues | `CueManifestPlugin`, `CueRuntime`, `validateCueManifest`, `useNarrativeCueController`, `CueManifest` | Validated, time-based events that coordinate a player with host UI or a narrative experience. See [`CUE_MANIFEST_V1.md`](./CUE_MANIFEST_V1.md). |
 | Narrative engines | `useNarrativeAudio`, `SceneMixEngine`, `createSceneMixEngine`, `OneShotEngine`, `createOneShotEngine`, `MediaGainSink` | Narration, ambience, one-shots, and scene-score transitions independent of a visible player skin. Both engines accept an optional `createGainSink` (Web Audio gain) and an `unlock()` for gesture-unlocked spare elements; `SceneMixEngine` adds `pause()`/`resume()`. |
-| Reader mixer | `createReaderMixer`, `ReaderMixer`, `ReaderMixerProvider`, `useReaderMixer`, `useReaderMixerState`, `ReaderMixerPanel`, `ReaderMixerVoice`, `ReaderMixerVoiceOutput`, `ReaderMixerPreferences`, `computeReaderMixerGain`, `loadReaderMixerPreferences`, `saveReaderMixerPreferences` | Soundscapes, Atmosphere, Sound Cues and caller-owned TTS Voice with per-layer switches and levels, saved preferences, and an inline mixer view. See [`reader-mixer.md`](./reader-mixer.md). |
+| Reader mixer | `createReaderMixer`, `ReaderMixer`, `ReaderMixerProvider`, `useReaderMixer`, `useReaderMixerState`, `ReaderMixerPanel`, `ReaderMixerNote`, `ReaderMixerVoice`, `ReaderMixerVoiceOutput`, `ReaderMixerPreferences`, `computeReaderMixerGain`, `loadReaderMixerPreferences`, `saveReaderMixerPreferences` | Soundscapes, Atmosphere, Sound Cues and caller-owned TTS Voice with per-layer switches and levels, saved preferences, and an inline mixer view. See [`reader-mixer.md`](./reader-mixer.md). |
+| Loudness measurement | `measureLoudness`, `measureLoudnessPcm`, `computeLoudnessGain`, `DEFAULT_LOUDNESS_LEVELING`, `LoudnessMeasurement`, `LoudnessMeasureOptions`, `LoudnessLevelingOptions`, `LoudnessGain` | Offline browser/PCM measurement, integrated beds and momentary-max cues, sample peak and source gain before reader sliders. |
+| Reader session policies | `READER_MIXER_SLEEP_TIMERS`, `ReaderMixerSleepTimerChoice`, `ReaderMixerSleepTimerState`, `ReaderMixerSleepEvent`, `ReaderMixerLayerAvailability`, `ReaderMixerNoteProps`, `ReaderMixerNoteLabels`, `DEFAULT_READER_MIXER_NOTE_LABELS` | Host-defined use, sleep events, activity holds and accessible chapter note. |
 | Automix and analysis | `createAutomixPlugin`, `ensureTrackAnalysis`, `ensureProTrackAnalysis`, `planTransition`, `bpmCompatibility` | Progressive crossfades with a conservative fallback when analysis is unavailable. See [`automix.md`](./automix.md). |
 | Headless, surfaces, and visual slots | `useSAPPropGetters`, `useMediaSessionObserver`, `usePlayerSurface`, `VisualSlotsProvider`, `registerVisualComponent`, `PROPERTY_REGISTRY` | Custom controls, canvas/render zones, visual extensions, and editable surface properties. |
 | Player actions and menus | `resolvePlayerMenu`, `PlayerMenuProfile`, `buildVaultTrackArcActions`, `buildStandardTrackArcActions`, `buildCanonicalPlayerActions`, `ArcActionButton`, `SAPController`, `routeArcAction` | Host-owned menu composition over SAP's shared routing. See [Menu architecture](#menu-architecture). |
@@ -207,7 +209,7 @@ host needs registry-managed plugins.
 - [Plugin development](../PLUGIN_DEVELOPMENT_GUIDE.md)
 - [Automix behavior and limits](./automix.md)
 - [CueManifest v1](./CUE_MANIFEST_V1.md)
-- [Reader mixer: three-layer reader audio](./reader-mixer.md)
+- [Reader mixer: soundtrack, Voice and reading policies](./reader-mixer.md)
 - [Playback resilience and Media Session behavior](./playback-resilience-and-media-session.md)
 - [Browser and mobile quality matrix](./browser-mobile-quality-matrix.md)
 - [Visual-slot importing](../src/audio-player/visual-slots/IMPORTING.md)
@@ -222,32 +224,58 @@ The `renderWorkspace` prop on `<SAPController renderWorkspace={...} />` supplies
 
 ## Reader mixer
 
-`createReaderMixer()` controls four layers for a story reader: **Soundscapes**
-(the app's looping score, crossfaded per chapter), **Atmosphere** (the reader's
-looping ambient bed), **Sound Cues** (the app's overlapping one-shots) and
-**Voice** (recorded/generated TTS on the caller's narration session). Each
-layer has an on/off switch and a level under one master switch; a layer plays at
-master × switch × level, and a cue also multiplies its per-call volume.
+`createReaderMixer()` coordinates **Soundscapes**, **Atmosphere**, **Sound Cues**
+and caller-owned **Voice**. Package 3.0.0 makes the master the soundtrack switch:
+it gates the first three layers and leaves narration to its own Voice row.
+Saved preference versions 1/2 normalize to version 3; an old master-off save also
+migrates Voice to off so its previously silent output stays silent.
 
 ```ts
 const mixer = createReaderMixer({ atmospheres, initialPreferences: saved, onPreferencesChange: save })
-mixer.playSoundscape(chapterScore) // a chapter opens
-mixer.setAtmosphere("rain")        // the reader picks rain
-mixer.playCue(growlUrl)            // a cue is reached
+mixer.setLayerAvailability({ soundscapes: !!chapterScore, atmosphere: true, cues: chapterCueUrls.length > 0 })
+if (chapterScore) mixer.playSoundscape(chapterScore, { scene: chapterId })
+mixer.startAtmosphere()
+mixer.playCue(growlUrl, { loudness: growlMeasurement })
+mixer.setSleepTimer("chapter-end")
+mixer.notifyChapterEnd() // actual host chapter-end signal
+mixer.stopAll() // required when leaving the reader
 ```
 
-The reader's settings are one plain `ReaderMixerPreferences` object that the
-host saves per user. `ReaderMixerProvider` shares one mixer across a React app,
-and `ReaderMixerPanel` is the inline view for a settings menu (master, four
-rows, an atmosphere picker; labels and `--sap-reader-mixer-*` theme variables are
-host-overridable). `NarrativeFace` is its companion: inside the same provider,
-narration ducks the mixer's music and atmosphere and the face's Ambience slider
-sets the reader's Atmosphere level. Mount one `ReaderMixerVoice` inside both
-providers to connect Voice; the face and mixer then share its level and switch.
-Version 1 saves normalize to version 2 with Voice at 100%; exhaustive layer maps
-must add `voice`. Voice routing follows the session's `audioBackend`, with
-`"webaudio"` providing reliable volume for decoded TTS files. By default (`routing: "auto"`) loops and cues play through plain
-media elements, adding per-layer Web Audio gain only on browsers that ignore
-element volume (iOS Safari); that route needs CORS headers on the audio host,
-which the SEIHouse hosts send. See [`reader-mixer.md`](./reader-mixer.md) for the
-full contract, the iPhone notes and the CORS setup.
+`ReaderMixerProvider`, `useReaderMixer`, `useOptionalReaderMixer` and
+`useReaderMixerState` share one instance. `ReaderMixerPanel` shows only layers
+in use, preserves an interacting row, and exposes a collapsed native Atmosphere
+picker and sleep controls. `ReaderMixerNote` is the small host-placed soundtrack
+button; it shares master state, handles unlock/sleep resume, scroll opacity,
+long-press Settings and accessible mute announcements. Labels and CSS variables
+are host-overridable. Only Atmosphere can be auditioned; outside the reading
+lifetime its saved selection previews for 10 seconds with fades.
+
+Session methods are `setLayerAvailability`, `setSleepTimer`, `cancelSleepTimer`,
+`notifyChapterEnd`, `subscribeSleep`, `retainActivity` and `resumeAudio`.
+`getState()` includes `availability`, `sleepTimer`, `idle`, `soundscapePlays`,
+`atmospherePreviewing` and `leveling`. Scores report `resting` after two plays
+and restart on a new scene. Idle pauses after ten minutes without activity and
+resumes in place on input. Sleep fades for twenty seconds and stays stopped
+until explicit intent. These policies change no saved layer settings.
+
+`NarrativeFace` shares the mixer's atmosphere and Voice settings and ducks beds
+while audible narration plays. Connect one `ReaderMixerVoice` inside both
+providers or `connectVoice(output)` headlessly. Voice uses the session's own
+backend; decoded TTS files can use `audioBackend="webaudio"` for real iPhone
+volume. Browser speech cannot be routed through the mixer: Listen uses
+`retainActivity()`, `retainDuck()` and a sleep-event subscription instead.
+
+Optional `loudness` metadata is supported on `Track`, `ReaderAtmosphereOption`
+and `PlayCueOptions`. `measureLoudness` and `measureLoudnessPcm` export browser
+and decoded-PCM measurement; `computeLoudnessGain` exports capped source gain.
+Loops target −20 LUFS integrated and cues −14 LUFS momentary maximum, capped at
++12 dB and −1 dBFS sample peak. The browser filters are calibrated generic
+K-weighting Biquads with BS.1770 gates; see the focused guide for their accuracy
+boundary. `leveling` defaults on and `setLeveling()` changes it live. Auto uses
+Web Audio while leveling is on, with a summed safety limiter; element routing
+only attenuates and volume-locked iPhone fallback cannot level.
+
+See [reader-mixer.md](./reader-mixer.md) for the API, configurable policies,
+measurement CLI, defaults, migrations, source provenance and physical-device
+checklist. The SEN import, note placement, Listen generation and publishing
+remain host/owner work.

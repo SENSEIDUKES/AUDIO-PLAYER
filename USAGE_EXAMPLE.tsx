@@ -1,7 +1,7 @@
 // Copy-paste examples for a consuming React application.
 // This file is type-checked by `npm run test:docs`.
 
-import { useMemo } from "react"
+import { useEffect, useMemo } from "react"
 import {
     AudioPlayer,
     AudioSessionProvider,
@@ -9,11 +9,13 @@ import {
     ReaderMixerPanel,
     ReaderMixerProvider,
     ReaderMixerVoice,
+    ReaderMixerNote,
     createAutomixPlugin,
     createKeyboardShortcutPlugin,
     StickyBottomPlayer,
     type Track,
     useAudioSession,
+    useReaderMixer,
 } from "@seihouse/audio-player"
 import "@seihouse/audio-player/styles.css"
 
@@ -54,6 +56,54 @@ export function ReaderMixerExample({ narration }: { narration: Track[] }) {
                 <ReaderMixerPanel />
             </AudioSessionProvider>
         </ReaderMixerProvider>
+    )
+}
+
+// Host policy stays in SEN. Settings and note placement are host-owned.
+export function ReaderChapterAudioExample({
+    chapter,
+    listenSpeaking,
+    stopListen,
+    openAudioSettings,
+}: {
+    chapter: { id: string; score: Track | null; cues: { url: string }[] }
+    listenSpeaking: boolean
+    stopListen: () => void
+    openAudioSettings: () => void
+}) {
+    const mixer = useReaderMixer()
+    useEffect(() => {
+        mixer.setLayerAvailability({
+            soundscapes: !!chapter.score,
+            cues: chapter.cues.length > 0,
+            atmosphere: true,
+        })
+        if (chapter.score) mixer.playSoundscape(chapter.score, { scene: chapter.id })
+        else mixer.stopSoundscape()
+        mixer.startAtmosphere()
+        mixer.preloadCues(chapter.cues.map((cue) => cue.url))
+    }, [mixer, chapter])
+    // Required: leaving the reader cancels sleep, idle and rest state too.
+    useEffect(() => () => mixer.stopAll(), [mixer])
+    useEffect(() => mixer.subscribeSleep(stopListen), [mixer, stopListen])
+    useEffect(() => {
+        if (!listenSpeaking) return
+        const releaseActivity = mixer.retainActivity()
+        const duck = mixer.retainDuck()
+        duck.setDuck(0.6)
+        return () => {
+            releaseActivity()
+            duck.release()
+        }
+    }, [mixer, listenSpeaking])
+    return (
+        <>
+            <ReaderMixerNote onOpenSettings={openAudioSettings} />
+            {/* The host's chapter-end callback makes this same call. */}
+            <button type="button" onClick={() => mixer.notifyChapterEnd()}>
+                Chapter ended
+            </button>
+        </>
     )
 }
 
