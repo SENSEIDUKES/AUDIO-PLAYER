@@ -106,7 +106,9 @@ describe("ReaderMixerPanel", () => {
 
     it("picks an atmosphere from grouped host options, with Off", () => {
         renderPanel()
-        const summary = screen.getByRole("button", { name: "Atmosphere · Off" })
+        const summary = screen.getByRole("button", { name: "Atmosphere: Off" })
+        expect(summary).toHaveTextContent("Off")
+        expect(summary).not.toHaveTextContent("Atmosphere")
         expect(summary).toHaveAttribute("aria-expanded", "false")
         expect(screen.queryByRole("radio", { name: "Rain" })).toBeNull()
         fireEvent.click(summary)
@@ -136,7 +138,7 @@ describe("ReaderMixerPanel", () => {
             ],
         })
         render(<ReaderMixerPanel mixer={mixer} />)
-        fireEvent.click(screen.getByRole("button", { name: /Atmosphere ·/ }))
+        fireEvent.click(screen.getByRole("button", { name: /Atmosphere:/ }))
         expect(screen.getByRole("radio", { name: "Odd" })).toBeInTheDocument()
     })
 
@@ -182,7 +184,7 @@ describe("ReaderMixerPanel", () => {
             "aria-valuetext",
             "75 %"
         )
-        fireEvent.click(screen.getByRole("button", { name: "Atmosphere · Apagado" }))
+        fireEvent.click(screen.getByRole("button", { name: "Atmosphere: Apagado" }))
         expect(screen.getByRole("radio", { name: "Apagado" })).toBeChecked()
         expect(screen.getByRole("group", { name: "Ambiente" })).toBeInTheDocument()
         expect(screen.getByRole("group", { name: "Mezclas" })).toBeInTheDocument()
@@ -275,6 +277,17 @@ describe("ReaderMixerPanel", () => {
         expect(screen.getByText("No sounds in this chapter")).toBeInTheDocument()
         expect(screen.getAllByRole("switch")).toHaveLength(1)
         expect(screen.queryAllByRole("slider")).toHaveLength(0)
+    })
+
+    it("lets the same timer choice re-arm after it has fired", () => {
+        renderPanel()
+        const select = screen.getByRole("combobox", { name: "Sleep timer" })
+        fireEvent.change(select, { target: { value: "chapter-end" } })
+        act(() => mixer!.notifyChapterEnd())
+        expect(select).toHaveValue("off")
+        fireEvent.change(select, { target: { value: "chapter-end" } })
+        expect(mixer!.getState().sleepTimer.status).toBe("running")
+        expect(select).toHaveValue("chapter-end")
     })
 
     it("arms translated timers, reports remaining wall-clock time, and cancels", () => {

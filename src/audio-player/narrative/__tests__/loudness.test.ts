@@ -23,15 +23,32 @@ describe("source leveling", () => {
         expect(result.requestedGainDb).toBeCloseTo(27.1)
         expect(result.appliedGainDb).toBe(12)
         expect(result.tooQuietToLevel).toBe(true)
+        expect(result.shortfallLu).toBeCloseTo(15.1)
+        expect(result.limitedBy).toEqual(["boost-cap"])
         expect(result.gain).toBeCloseTo(3.9810717)
     })
     it("caps by sample-peak headroom, including decoded peaks above zero", () => {
+        const rain = computeLoudnessGain(measurement(-31, -8.2), "integrated")
+        expect(rain.tooQuietToLevel).toBe(true)
+        expect(rain.shortfallLu).toBeCloseTo(3.8)
+        expect(rain.limitedBy).toEqual(["peak-ceiling"])
         expect(computeLoudnessGain(measurement(-31, -8.2), "integrated").appliedGainDb).toBeCloseTo(
             7.2
         )
         expect(computeLoudnessGain(measurement(-24, 0.7), "integrated").appliedGainDb).toBeCloseTo(
             -1.7
         )
+    })
+    it("flags only shortfalls over one LU and reports every binding limit", () => {
+        expect(computeLoudnessGain(measurement(-33), "integrated").tooQuietToLevel).toBe(false)
+        expect(computeLoudnessGain(measurement(-33.01), "integrated").tooQuietToLevel).toBe(true)
+        expect(computeLoudnessGain(measurement(-34, -13), "integrated").limitedBy).toEqual([
+            "boost-cap",
+            "peak-ceiling",
+        ])
+        const element = computeLoudnessGain(measurement(-25), "integrated", {}, "element")
+        expect(element.shortfallLu).toBe(5)
+        expect(element.limitedBy).toEqual(["element-volume"])
     })
     it("plays missing, mismatched, disabled and invalid values at unity", () => {
         expect(computeLoudnessGain(undefined, "integrated").gain).toBe(1)

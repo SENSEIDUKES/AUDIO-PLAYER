@@ -36,14 +36,15 @@ it("is a labelled native button, announces mute/unmute and never gates narration
     fireEvent.click(screen.getByRole("button", { name: "Mute story audio" }))
     expect(mixer.getPreferences().masterEnabled).toBe(false)
     expect(setEnabled).toHaveBeenLastCalledWith(true)
-    expect(screen.getByRole("button", { name: "Unmute story audio" })).toHaveAttribute(
-        "aria-pressed",
-        "true"
+    expect(screen.getByRole("button", { name: "Unmute story audio" })).not.toHaveAttribute(
+        "aria-pressed"
     )
     expect(view.container.querySelector(".sap-reader-mixer-note__slash")).toBeInTheDocument()
     expect(screen.getByRole("status")).toHaveTextContent("Story audio muted")
     fireEvent.click(screen.getByRole("button"))
-    expect(screen.getByRole("button")).toHaveAttribute("aria-pressed", "false")
+    expect(screen.getByRole("button", { name: "Mute story audio" })).not.toHaveAttribute(
+        "aria-pressed"
+    )
     expect(screen.queryByRole("slider")).toBeNull()
 })
 
@@ -54,9 +55,8 @@ it("unlocks a wanted blocked layer without muting it", async () => {
         mixer.playSoundscape({ title: "S", artist: "", audioFile: "https://a.test/s.mp3" })
         await flushMicrotasks()
     })
-    expect(screen.getByRole("button", { name: "Tap to start story audio" })).toHaveAttribute(
-        "aria-pressed",
-        "false"
+    expect(screen.getByRole("button", { name: "Tap to start story audio" })).not.toHaveAttribute(
+        "aria-pressed"
     )
     const unlock = vi.spyOn(mixer, "unlock")
     FakeAudio.playBehavior = "resolve"
@@ -75,6 +75,7 @@ it("shows a running timer indicator, then resumes sleep-stopped audio on tap", a
     act(() => mixer.notifyChapterEnd())
     expect(screen.queryByRole("img")).toBeNull()
     expect(screen.getByRole("button", { name: "Resume story audio" })).toBeInTheDocument()
+    expect(screen.getByRole("button")).not.toHaveAttribute("aria-pressed")
     fireEvent.click(screen.getByRole("button"))
     await act(async () => {
         await flushMicrotasks()

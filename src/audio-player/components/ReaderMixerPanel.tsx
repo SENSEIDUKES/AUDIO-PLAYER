@@ -229,9 +229,9 @@ export function ReaderMixerPanel({
                     className="sap-reader-mixer__atmosphere-summary"
                     aria-expanded={pickerOpen}
                     aria-controls={ids.pickerList}
+                    aria-label={`${labels.layers.atmosphere}: ${options?.find((option) => option.id === selected)?.label ?? labels.atmosphereOff}`}
                     onClick={() => setPickerOpen((open) => !open)}
                 >
-                    {labels.layers.atmosphere} ·{" "}
                     {options?.find((option) => option.id === selected)?.label ??
                         labels.atmosphereOff}
                     <span aria-hidden="true">{pickerOpen ? "⌄" : "›"}</span>
@@ -420,7 +420,9 @@ export function ReaderMixerPanel({
                     className="sap-reader-mixer__sleep-select"
                     id={`${baseId}-sleep`}
                     value={
-                        state.sleepTimer.choiceId ??
+                        (state.sleepTimer.status === "running"
+                            ? state.sleepTimer.choiceId
+                            : null) ??
                         state.sleepTimerChoices.find((choice) => choice.kind === "off")?.id ??
                         ""
                     }

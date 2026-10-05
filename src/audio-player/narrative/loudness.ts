@@ -23,7 +23,11 @@ export interface LoudnessGain {
     readonly gain: number
     readonly requestedGainDb: number
     readonly appliedGainDb: number
-    /** The reference would require more than the configured boost cap. */
+    /** Reference minus the loudness reached with the applied source gain, in LU. */
+    readonly shortfallLu: number
+    /** Limits binding the applied gain. Reporting never changes playback gain. */
+    readonly limitedBy: readonly ("boost-cap" | "peak-ceiling" | "element-volume")[]
+    /** Applied gain leaves this source more than 1 LU below its reference. */
     readonly tooQuietToLevel: boolean
 }
 
@@ -51,7 +55,14 @@ export function computeLoudnessGain(
         measurement.peakDb === null ||
         !Number.isFinite(measurement.peakDb)
     ) {
-        return { gain: 1, requestedGainDb: 0, appliedGainDb: 0, tooQuietToLevel: false }
+        return {
+            gain: 1,
+            requestedGainDb: 0,
+            appliedGainDb: 0,
+            shortfallLu: 0,
+            limitedBy: [],
+            tooQuietToLevel: false,
+        }
     }
     const finite = (value: number | undefined, fallback: number) =>
         typeof value === "number" && Number.isFinite(value) ? value : fallback
@@ -61,17 +72,22 @@ export function computeLoudnessGain(
             : finite(options.cueReferenceLufs, -14)
     const cap = Math.max(0, finite(options.maxBoostDb, 12))
     const requestedGainDb = reference - measurement.lufs
-    const appliedGainDb = Math.min(
-        requestedGainDb,
-        cap,
-        finite(options.peakHeadroomDb, -1) - measurement.peakDb,
-        routing === "element" ? 0 : Infinity
-    )
+    const limits = [
+        ["boost-cap", cap],
+        ["peak-ceiling", finite(options.peakHeadroomDb, -1) - measurement.peakDb],
+        ["element-volume", routing === "element" ? 0 : Infinity],
+    ] as const
+    const appliedGainDb = Math.min(requestedGainDb, ...limits.map(([, limit]) => limit))
+    const shortfallLu = Math.max(0, requestedGainDb - appliedGainDb)
     return {
         gain: Math.pow(10, appliedGainDb / 20),
         requestedGainDb,
         appliedGainDb,
-        tooQuietToLevel: requestedGainDb > cap,
+        shortfallLu,
+        limitedBy: limits
+            .filter(([, limit]) => limit === appliedGainDb && shortfallLu > 0)
+            .map(([reason]) => reason),
+        tooQuietToLevel: shortfallLu > 1,
     }
 }
 

@@ -127,7 +127,6 @@ export function ReaderMixerNote({
                 type="button"
                 className="sap-reader-mixer-note__button"
                 aria-label={label}
-                aria-pressed={muted}
                 onFocus={becomeVisible}
                 onClick={(event) => {
                     if (suppressClick.current) {

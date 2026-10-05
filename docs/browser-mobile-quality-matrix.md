@@ -33,7 +33,7 @@ This matrix documents the officially supported behavior for the SEIHOUSE audio p
 ## Release checklist
 
 Reader mixer 3.0.0 evidence (2026-10-04): the full local `npm test` passes
-**1,028 tests in 110 files**, installed ESM/CommonJS package smoke, type/docs,
+**1,033 tests in 111 files**, installed ESM/CommonJS package smoke, type/docs,
 build and preview checks. `npm audit` reports zero vulnerabilities. Live desktop
 Chrome UI checks on **Windows 11 Home 10.0.22631 (build 22631)** observed
 availability/empty state, bounded outside-chapter atmosphere audition, short
@@ -44,10 +44,10 @@ targets at 44 px; it is responsive evidence only. Browser and PCM calibration
 both read **−3.0103 LUFS**. These are UI/transport and measurement observations,
 not physical listening results.
 
-**Pending before merge:** record the exact desktop Chrome version and listening
-results, then physical iPhone Safari/iOS versions and ring-on/silent results for
-the note, sleep, rest, idle and leveling checklist. Keep the PR draft while this
-device gate remains open. No physical iPhone result is claimed by automation.
+**Owner merge decision:** physical iPhone verification is waived for PR #182.
+Exact desktop Chrome version/listening results and physical iPhone Safari/iOS
+ring-on/silent results remain recommended release checks for the note, sleep,
+rest, idle and leveling. No physical iPhone result is claimed by automation.
 
 1. Run `npm test` from the repository root.
 2. Manually verify any row above that matches the changed code path.

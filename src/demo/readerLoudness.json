@@ -12,6 +12,8 @@
             "gain": 0.3835440241339358,
             "requestedGainDb": -8.323695589131367,
             "appliedGainDb": -8.323695589131367,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "171914a21f26756056c55de61afc303495c834094f1fe96414de58ac6234fa8b",
@@ -34,6 +36,8 @@
             "gain": 0.36245097392407827,
             "requestedGainDb": -8.815014578779293,
             "appliedGainDb": -8.815014578779293,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "11e4ba679e4adeb568326639aa2686a169393863a626feb3a53d85e97d9eb7a4",
@@ -56,6 +60,8 @@
             "gain": 0.3667075553591736,
             "requestedGainDb": -8.713602841584484,
             "appliedGainDb": -8.713602841584484,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "241512ea35495ac2b4655a7bc4166b4eebc8768c9ec2b76877b6762ad9073804",
@@ -78,6 +84,8 @@
             "gain": 0.3487867556448659,
             "requestedGainDb": -9.148800294718198,
             "appliedGainDb": -9.148800294718198,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "34a7d219f996b2aebe962d683bf20eb86559a60f31775c9a4dcbeec5861690f7",
@@ -100,6 +108,8 @@
             "gain": 0.31662417079986194,
             "requestedGainDb": -9.989118691285135,
             "appliedGainDb": -9.989118691285135,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "ae771906fcf5897bcb72c01ebe1d8438c828dd61c9fc9efdd4bf230c5db529ab",
@@ -122,6 +132,8 @@
             "gain": 0.35303276045774556,
             "requestedGainDb": -9.043699828455544,
             "appliedGainDb": -9.043699828455544,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "ad4c707e5ea991d23ec605e066afc1cc278e4f1338d3e92858bc1d0dc951e089",
@@ -144,6 +156,8 @@
             "gain": 0.3557873908894501,
             "requestedGainDb": -8.976188947648302,
             "appliedGainDb": -8.976188947648302,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "54d6c2b9ead4f578f4995a9d5e515cb5f2c3ea05b86f0f47407ad0b3e0a56c9c",
@@ -166,6 +180,8 @@
             "gain": 0.38309408419295976,
             "requestedGainDb": -8.333891088356745,
             "appliedGainDb": -8.333891088356745,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "539c43c3853cb9bcf7098e838ba90364b9712a33ad4580cafaa316282e4c68a4",
@@ -188,6 +204,8 @@
             "gain": 0.3873762821885092,
             "requestedGainDb": -8.237339465315992,
             "appliedGainDb": -8.237339465315992,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "e254148d408b9697fd4a5c2518ca0255379edaf7af4e0e96cb73227a03e788b9",
@@ -210,6 +228,8 @@
             "gain": 0.3679237476339825,
             "requestedGainDb": -8.684843594638759,
             "appliedGainDb": -8.684843594638759,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "b0fdcf1499491e7cc835c442d317d77aea9eda83f63197c26ef32aee1126f63f",
@@ -232,6 +252,8 @@
             "gain": 0.3316120405658683,
             "requestedGainDb": -9.587394179058846,
             "appliedGainDb": -9.587394179058846,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "f54247730313b0089015cc600f76f72998afffc457a2c1cdc6776fcd4eec370f",
@@ -254,6 +276,8 @@
             "gain": 0.3663393991013714,
             "requestedGainDb": -8.722327425662582,
             "appliedGainDb": -8.722327425662582,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "0d510db5f5ffec413c1266f27d81f49e2c8385bf405b363fde675542f8f7882d",
@@ -276,6 +300,8 @@
             "gain": 0.3616997907935292,
             "requestedGainDb": -8.833034848668193,
             "appliedGainDb": -8.833034848668193,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "c8836720b5600b490686f5387691690a0ea9e9a5a034cc0799d10e6fd9f34313",
@@ -298,6 +324,8 @@
             "gain": 0.35598348605357805,
             "requestedGainDb": -8.971402966506217,
             "appliedGainDb": -8.971402966506217,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "4e3ab6e66ed5692b8a6f5ca8958c0d7d7da0d82ac36e0374b33bda73e4debedf",
@@ -320,6 +348,8 @@
             "gain": 0.34089543757983454,
             "requestedGainDb": -9.347576223422253,
             "appliedGainDb": -9.347576223422253,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "603cf14aa2d34a44cf52094d0c588961a5ab2865027377c3eb233f860e9a3645",
@@ -342,6 +372,8 @@
             "gain": 0.36094096959095856,
             "requestedGainDb": -8.851276387215126,
             "appliedGainDb": -8.851276387215126,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "4e5e037c439b8d16e0224845886e8f0ce6a8bd8e2e91dd49f8675ca17d04c779",
@@ -364,6 +396,8 @@
             "gain": 0.35138666204999436,
             "requestedGainDb": -9.084294549929092,
             "appliedGainDb": -9.084294549929092,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "39cf8799a1e61a9029dcee540ddde6587db99d99f066820ad675643d1ec5748d",
@@ -386,6 +420,8 @@
             "gain": 0.3461803073681998,
             "requestedGainDb": -9.213952816131856,
             "appliedGainDb": -9.213952816131856,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "0272bb8f2e35c7bcf304c693ace9be02a434b248846bf3f233e92e0267466ebe",
@@ -408,6 +444,8 @@
             "gain": 0.36980804679804063,
             "requestedGainDb": -8.640472861808158,
             "appliedGainDb": -8.640472861808158,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "b07461f8fc8d99305f5833fd1e074fc6e9cc2cc0876a14bfc68ec5db76378a85",
@@ -430,6 +468,8 @@
             "gain": 0.3793932362516609,
             "requestedGainDb": -8.418208317906783,
             "appliedGainDb": -8.418208317906783,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "5a99ef100e870afc302f7ce8a74883fb90bef91cf2fadbb70842a0a0861d3ef4",
@@ -452,6 +492,8 @@
             "gain": 0.34442732722991887,
             "requestedGainDb": -9.258047969319191,
             "appliedGainDb": -9.258047969319191,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "94c91e20eb3648ab2cc13efdc54efc482a752cfeeddc5256404c150790ebd0a0",
@@ -474,6 +516,8 @@
             "gain": 0.36001249341384745,
             "requestedGainDb": -8.87364855540161,
             "appliedGainDb": -8.87364855540161,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "63fb392484db45a64d8ba2e5d3e016f030b447a8910eb585bfbfa38c84f6ddcf",
@@ -496,6 +540,8 @@
             "gain": 0.3585162021421446,
             "requestedGainDb": -8.909824256440862,
             "appliedGainDb": -8.909824256440862,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "204e3eb692f463f46a896192f1563c4dc1a48eb60a2937387198e4ee7e272b33",
@@ -518,6 +564,8 @@
             "gain": 0.40304025179434105,
             "requestedGainDb": -7.893031570516964,
             "appliedGainDb": -7.893031570516964,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "c1263886719e9f1f9b0d9db01a5ef1ded5d228b3f698f3c958fd40e83c835e70",
@@ -540,6 +588,8 @@
             "gain": 0.3586499659441011,
             "requestedGainDb": -8.906584121346548,
             "appliedGainDb": -8.906584121346548,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "6c2520b2c37dd95ab720608bfc2a80a82a049016b4c5355c5a35964832bfd276",
@@ -562,6 +612,8 @@
             "gain": 0.3638626082888666,
             "requestedGainDb": -8.781251432829986,
             "appliedGainDb": -8.781251432829986,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "65670a2ce71a7428c5e4d6ab00ab0d13110ed552c9e8f1173a0084bd02e3095a",
@@ -584,6 +636,8 @@
             "gain": 0.3687879768243555,
             "requestedGainDb": -8.66446492394915,
             "appliedGainDb": -8.66446492394915,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "bd47a99fe341a37c50ace64498c489f24da2eb02f8015472985667b39f5a5ed8",
@@ -606,6 +660,8 @@
             "gain": 0.3569225713312388,
             "requestedGainDb": -8.948519738861153,
             "appliedGainDb": -8.948519738861153,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "625f96bb6a2f150089c61ab523e1c113c9e50d475bf38ccbfbe2a91f8da7b779",
@@ -628,6 +684,8 @@
             "gain": 0.3925363486102814,
             "requestedGainDb": -8.122402433408418,
             "appliedGainDb": -8.122402433408418,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "6f81c2588a42ad28231961c1fd580cfd66957c8e7e79355351775b01d4a6be07",
@@ -650,6 +708,8 @@
             "gain": 0.3730202422590637,
             "requestedGainDb": -8.5653520038863,
             "appliedGainDb": -8.5653520038863,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "b6079edd7a9758187a2fbe24d170a7255a1f12df57e6a856d5abdaee1332ff86",
@@ -672,6 +732,8 @@
             "gain": 0.36618101752968524,
             "requestedGainDb": -8.726083457146684,
             "appliedGainDb": -8.726083457146684,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "7039a3d4d326059420db46961b103a22977cd1c49645e2f2f1ea2b4e2d28c32f",
@@ -694,6 +756,8 @@
             "gain": 0.36672429978019117,
             "requestedGainDb": -8.713206239795188,
             "appliedGainDb": -8.713206239795188,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "c5be1ddd7496523631698c348f3cb51b21888aba5b39318162211054f95cb88e",
@@ -716,6 +780,8 @@
             "gain": 0.3709754101598438,
             "requestedGainDb": -8.613097526610971,
             "appliedGainDb": -8.613097526610971,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "87050ceff16b68906839de153bb6549c6db8453cc0b5e94895562bd403ff1bf8",
@@ -738,6 +804,8 @@
             "gain": 0.3686740745411214,
             "requestedGainDb": -8.667148025181898,
             "appliedGainDb": -8.667148025181898,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "99f24335cc737421829b5aeea68dec03ad28b71b6a5892579f1424480ccac588",
@@ -760,6 +828,8 @@
             "gain": 0.37100456207221605,
             "requestedGainDb": -8.612415000658222,
             "appliedGainDb": -8.612415000658222,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "c624e374a3c5e8bdaf88745cf2d76f56c2bf7fec148f1afe34aaa2ee885b9f37",
@@ -782,6 +852,8 @@
             "gain": 0.42355434681241516,
             "requestedGainDb": -7.461817137294009,
             "appliedGainDb": -7.461817137294009,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "7d8c77a833478a0a2abbb916ed00926eb309ce2c8296f173596c302e0fec9c1c",
@@ -804,6 +876,8 @@
             "gain": 0.41352741195294984,
             "requestedGainDb": -7.66991393188672,
             "appliedGainDb": -7.66991393188672,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "badcc54052dd6f7aeee9df733cbdf4098c2f76920728f8b58d8c951e43344f71",
@@ -826,6 +900,8 @@
             "gain": 0.3998696161565449,
             "requestedGainDb": -7.961631884164582,
             "appliedGainDb": -7.961631884164582,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "2f685db781b59aaac820d998db1f1ed44db0933c7e3cd4d31b585d464d17356d",
@@ -848,6 +924,8 @@
             "gain": 0.3703975617557829,
             "requestedGainDb": -8.626637616880592,
             "appliedGainDb": -8.626637616880592,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "eda7315e8aef19dd3db34cede1bc03880a72d74a5bcac1e4b765db13f8a7c2c4",
@@ -870,6 +948,8 @@
             "gain": 0.3846808243353398,
             "requestedGainDb": -8.297989239442611,
             "appliedGainDb": -8.297989239442611,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "c7f5042c8a4cdf35ee383c5dd1c70371c120647e1836123c375dce5d122ba13b",
@@ -892,6 +972,8 @@
             "gain": 0.38746602981045425,
             "requestedGainDb": -8.235327345092541,
             "appliedGainDb": -8.235327345092541,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "ca4388e6ad89b2cfffe8cffc582d2610a2229c6c099623e642d692929beb28f4",
@@ -914,6 +996,8 @@
             "gain": 0.38694295537983847,
             "requestedGainDb": -8.247061112532366,
             "appliedGainDb": -8.247061112532366,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "75398d70347def3c594842a7a83df66d1e4ec1f28ea17ecc7034b3cc2e6da18f",
@@ -936,6 +1020,8 @@
             "gain": 0.35131036229045276,
             "requestedGainDb": -9.086180800391064,
             "appliedGainDb": -9.086180800391064,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "be8b02515db6bcb79d1d98d93fdb607355cfcc38dab7bfbbba3e9088ce903242",
@@ -959,7 +1045,9 @@
             "gain": 2.281444354787508,
             "requestedGainDb": 10.790264017545681,
             "appliedGainDb": 7.164197612921427,
-            "tooQuietToLevel": false
+            "shortfallLu": 3.626066404624254,
+            "limitedBy": ["peak-ceiling"],
+            "tooQuietToLevel": true
         },
         "sha256": "51685e8bdc2b0529827e84788b6f0b54f0ef64a352b2d07ab02a99af2312fc6e",
         "sampleRate": 48000,
@@ -982,6 +1070,8 @@
             "gain": 0.24631415230997047,
             "requestedGainDb": -12.170212689441898,
             "appliedGainDb": -12.170212689441898,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "4d94d2d4abbb8d0db8612bd0e300720fdd824390d9bae136449b079507238a3b",
@@ -1005,6 +1095,8 @@
             "gain": 3.9810717055349722,
             "requestedGainDb": 21.917325626619977,
             "appliedGainDb": 12,
+            "shortfallLu": 9.917325626619977,
+            "limitedBy": ["boost-cap"],
             "tooQuietToLevel": true
         },
         "sha256": "4315f59cabf26104bbc586d5c2005343f0011479d607050c9cab5ec0f715ef11",
@@ -1028,7 +1120,9 @@
             "gain": 0.9096414313538916,
             "requestedGainDb": 5.121417866303634,
             "appliedGainDb": -0.8225953419870256,
-            "tooQuietToLevel": false
+            "shortfallLu": 5.944013208290659,
+            "limitedBy": ["peak-ceiling"],
+            "tooQuietToLevel": true
         },
         "sha256": "12d4a36880812ab1f60ba9e96e03239a695a1589e4a21fda227aa116b6f41191",
         "sampleRate": 44100,
@@ -1051,7 +1145,9 @@
             "gain": 0.9021262127189227,
             "requestedGainDb": 0.8738833887172888,
             "appliedGainDb": -0.8946539575240922,
-            "tooQuietToLevel": false
+            "shortfallLu": 1.768537346241381,
+            "limitedBy": ["peak-ceiling"],
+            "tooQuietToLevel": true
         },
         "sha256": "9a7976216674e724af13cf6b2526d7364c28464ae467cc0f59bc52206f7d6b16",
         "sampleRate": 44100,
@@ -1074,6 +1170,8 @@
             "gain": 3.9810717055349722,
             "requestedGainDb": 26.891348783228786,
             "appliedGainDb": 12,
+            "shortfallLu": 14.891348783228786,
+            "limitedBy": ["boost-cap"],
             "tooQuietToLevel": true
         },
         "sha256": "a7d8dc48e52cbb8274bcf5f5e9adc378ca5fa06153d264bba5e5761708cdc649",
@@ -1097,6 +1195,8 @@
             "gain": 3.9810717055349722,
             "requestedGainDb": 18.994449090682835,
             "appliedGainDb": 12,
+            "shortfallLu": 6.994449090682835,
+            "limitedBy": ["boost-cap"],
             "tooQuietToLevel": true
         },
         "sha256": "6a4bf445b3b1d13c1f1690d923e63b033dd8980f7bf55e5d1f9051f8bd640a1c",
@@ -1120,7 +1220,9 @@
             "gain": 1.225524039873251,
             "requestedGainDb": 2.791697339925726,
             "appliedGainDb": 1.7664366957994475,
-            "tooQuietToLevel": false
+            "shortfallLu": 1.0252606441262784,
+            "limitedBy": ["peak-ceiling"],
+            "tooQuietToLevel": true
         },
         "sha256": "2f4dd48a794d3b4259994e2cbbc5ef1f87132741fbd9ccd7e9e45fc315d68a66",
         "sampleRate": 44100,
@@ -1143,6 +1245,8 @@
             "gain": 1.0812905801612862,
             "requestedGainDb": 0.6788483915968477,
             "appliedGainDb": 0.6788483915968477,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "ce6a73d4cd7206d59e0fb84bd13ebf8659c9a1035948c03938672b2ec1d35da0",
@@ -1166,6 +1270,8 @@
             "gain": 1.6620019227812057,
             "requestedGainDb": 4.4126304377318135,
             "appliedGainDb": 4.4126304377318135,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "330db5077c9d6cbd9ad01634447f36b53782b347b0b452b94f0d6a213afedf65",
@@ -1189,6 +1295,8 @@
             "gain": 1.0879085434767939,
             "requestedGainDb": 0.7318477467131768,
             "appliedGainDb": 0.7318477467131768,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "d2a4b07ffd0f7c8fd76e9b45a81e3cb45be5f900ff044bd88ff1d0711f8b6e61",
@@ -1212,6 +1320,8 @@
             "gain": 0.7095398096775136,
             "requestedGainDb": -2.9804646570336875,
             "appliedGainDb": -2.9804646570336875,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "91b7333489c261b0f46470d9b7a392049a5086254565c9c6e814e77793f5c5ff",
@@ -1235,6 +1345,8 @@
             "gain": 2.9755815527753513,
             "requestedGainDb": 9.471437152409202,
             "appliedGainDb": 9.471437152409202,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "5de1f07825e9424e57ae01935ad67827aac3a351df104fb458b4344edce53ada",
@@ -1258,6 +1370,8 @@
             "gain": 0.6466199833264495,
             "requestedGainDb": -3.787017559156684,
             "appliedGainDb": -3.787017559156684,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "db7734a67955743e59caeb5e559908467debe0773946c99b62577be99b4016f5",
@@ -1281,6 +1395,8 @@
             "gain": 0.3346859008524116,
             "requestedGainDb": -9.507251651318882,
             "appliedGainDb": -9.507251651318882,
+            "shortfallLu": 0,
+            "limitedBy": [],
             "tooQuietToLevel": false
         },
         "sha256": "a5f8db337ef9c29ad56cdddba2d705353122fd5db09099ef97e891e579aa04cf",

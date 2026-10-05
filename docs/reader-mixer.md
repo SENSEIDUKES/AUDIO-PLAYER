@@ -239,7 +239,10 @@ override them. The requested gain in dB is reference minus measurement; applied
 gain is capped by boost and sample-peak headroom, then converted with
 `10 ** (dB / 20)`. Source gain is before fades, cue volume and reader sliders.
 `computeLoudnessGain(measurement, kind, options?, route?)` exports the same math
-and reports requested/applied gain plus `tooQuietToLevel`.
+and reports requested/applied gain, `shortfallLu` and the binding `limitedBy`
+limits (`boost-cap`, `peak-ceiling`, or `element-volume`). `tooQuietToLevel`
+flags every measured source left **more than 1 LU** below its reference. These
+reporting fields do not change the applied playback gain.
 
 Web Audio supports attenuation and boost. The three layer buses sum into one
 `DynamicsCompressorNode` safety limiter (threshold −1 dB, knee 0, ratio 20:1,
@@ -281,6 +284,9 @@ npm run measure-loudness -- --manifest=measurements-input.json
 
 A manifest is an array of `{ id?, source, kind? }`. JSON output records source,
 SHA-256, decoder, sample rate, channels, duration, measurement and leveling gain.
+HTTP URL credentials, queries and fragments are redacted in progress and JSON
+reports; fetching still uses the original URL. Files and downloads share a
+256 MiB limit, and invalid entries produce errors without stopping later files.
 Decode differences between Node and a browser can affect sample peaks; remeasure
 with the browser function when exact browser-decoder output matters. The
 Workshop calibration control compares browser and PCM filters directly.
@@ -288,17 +294,24 @@ Workshop calibration control compares browser and PCM filters directly.
 The demo catalog stores measured values for all **43 SEN Volume 1 scores**, ten
 atmosphere beds and five Workshop cues, with provenance in
 [readerLoudness.json](../src/demo/readerLoudness.json). This is not a measurement
-of all 147 cues in the external SEN library. The default boost cap flags this
-short re-export list:
+of all 147 cues in the external SEN library. The complete owner re-export list
+below includes both boost-cap and peak-ceiling shortfalls at the default
+−20 LUFS loop reference, +12 dB cap and −1 dBFS sample-peak ceiling:
 
-| Atmosphere file | Integrated LUFS | Boost requested |
+| Atmosphere file | Shortfall below reference | Limiting reason |
 | --- | --- | --- |
-| `Wind/Gentle_Wind_1.mp3` | −41.92 | +21.92 dB |
-| `Noise/Forest_1.mp3` | −46.89 | +26.89 dB |
-| `Noise/Village_1.mp3` | −38.99 | +18.99 dB |
+| `Noise/Forest_1.mp3` | 14.89 LU | +12 dB boost cap |
+| `Wind/Gentle_Wind_1.mp3` | 9.92 LU | +12 dB boost cap |
+| `Noise/Village_1.mp3` | 6.99 LU | +12 dB boost cap |
+| `Wind/Strong_Wind_2.mp3` | 5.94 LU | −1 dBFS peak ceiling |
+| `Rain/Gentle_Rain_1.mp3` (default) | 3.63 LU | −1 dBFS peak ceiling |
+| `Waves/Gentle_Waves_1.mp3` | 1.77 LU | −1 dBFS peak ceiling |
+| `Noise/Cave_1.mp3` | 1.03 LU | −1 dBFS peak ceiling |
 
-These remain playable with capped gain. Other files can be peak-limited below
-the reference without being above the boost cap. Measurements are metadata;
+All paths are under `https://celestialaudio.seihouse.org/DEFAULT/atmosphere/`.
+These remain playable with exactly the previous gain. The Cave value rounds
+to 1.0 LU at one decimal but is above the strict 1 LU threshold. No measured
+score or Workshop cue exceeds this threshold. Measurements are metadata;
 the script does not modify or re-export the owner's files.
 
 ## Ghost audio note
@@ -316,8 +329,9 @@ labels for on, muted, blocked and sleep-stopped states.
 <ReaderMixerPanel labels={{ master: "Story audio", noAudio: "This chapter has no audio" }} />
 ```
 
-The native button has a 44 px target, a 24 px glyph, `aria-pressed` reflecting
-mute, overridable labels and a polite state announcement. Enter/Space activate
+The native button has a 44 px target, a 24 px glyph, overridable action labels
+and a polite state announcement. Its label describes mute, unmute, start or
+resume; it does not also expose `aria-pressed`. Enter/Space activate
 it. Long-press (600 ms, `longPressMs` override) and desktop context menu call
 `onOpenSettings`. Settings remain accessible through the host menu. Captured
 scroll lowers opacity, restoring it after 2 seconds or pointer/focus approach;

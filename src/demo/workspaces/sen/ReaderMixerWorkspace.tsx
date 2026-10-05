@@ -509,7 +509,7 @@ function MixerDeveloperControls({
     return (
         <Panel title="Developer · chapter policy">
             {(Object.keys(LAYER_NAMES) as ReaderMixerLayer[]).map((layer) => (
-                <label className="wk-field" key={layer}>
+                <label className="wk-field wk-field--checkbox" key={layer}>
                     <input
                         type="checkbox"
                         checked={state.availability[layer]}
@@ -520,7 +520,7 @@ function MixerDeveloperControls({
                     {LAYER_NAMES[layer]} in use
                 </label>
             ))}
-            <label className="wk-field">
+            <label className="wk-field wk-field--checkbox">
                 <input
                     type="checkbox"
                     checked={state.leveling}
@@ -528,7 +528,7 @@ function MixerDeveloperControls({
                 />{" "}
                 Automatic loudness leveling
             </label>
-            <label className="wk-field">
+            <label className="wk-field wk-field--checkbox">
                 <input
                     type="checkbox"
                     checked={listen}
