@@ -94,6 +94,7 @@ export function ReaderMixerNote({
     const visible = state && Object.values(state.availability).some(Boolean)
     if (!mixer || !state || !visible) return null
     const independentMute = muteMode === "soundtrack-mute"
+    if (independentMute && !state.preferences.masterEnabled) return null
     const muted = independentMute
         ? Boolean(state.preferences.masterMuted) || state.preferences.masterLevel === 0
         : !state.preferences.masterEnabled ||
@@ -151,8 +152,10 @@ export function ReaderMixerNote({
                         } else if (stopped) mixer.resumeAudio()
                         else if (needsTap) mixer.unlock()
                         else mixer.setMasterMuted(true)
-                    } else if (stopped) mixer.resumeAudio()
-                    else if (needsTap) {
+                    } else if (stopped) {
+                        if (muted) mixer.setMasterMuted(false)
+                        mixer.resumeAudio()
+                    } else if (needsTap) {
                         if (muted) {
                             mixer.setMasterEnabled(true)
                             mixer.setMasterMuted(false)
