@@ -66,15 +66,23 @@ describe("ReaderMixerPanel", () => {
         expect(screen.getByRole("switch", { name: "Sound Cues" })).toBe(switches[3])
         expect(screen.queryByRole("switch", { name: "Voice" })).toBeNull()
         const sliders = screen.getAllByRole("slider")
-        expect(sliders[0]).toHaveAccessibleName("Soundscapes volume")
-        expect(sliders[1]).toHaveAccessibleName("Atmosphere volume")
-        expect(sliders[2]).toHaveAccessibleName("Sound Cues volume")
-        expect(sliders[0]).toHaveAttribute("aria-valuetext", "25%")
+        expect(sliders[0]).toHaveAccessibleName("Master volume")
+        expect(sliders[1]).toHaveAccessibleName("Soundscapes volume")
+        expect(sliders[2]).toHaveAccessibleName("Atmosphere volume")
+        expect(sliders[3]).toHaveAccessibleName("Sound Cues volume")
+        expect(sliders[1]).toHaveAttribute("aria-valuetext", "25%")
         expect(screen.getByText("25%")).toBeInTheDocument()
     })
 
     it("drives the mixer from its switches and sliders", () => {
         renderPanel()
+        const layers = mixer!.getPreferences().layers
+        fireEvent.change(screen.getByRole("slider", { name: "Master volume" }), {
+            target: { value: "0" },
+        })
+        expect(mixer!.getPreferences().masterLevel).toBe(0)
+        expect(mixer!.getPreferences().layers).toEqual(layers)
+        expect(screen.getByRole("switch", { name: "Master" })).toBeChecked()
         fireEvent.change(screen.getByRole("slider", { name: "Atmosphere volume" }), {
             target: { value: "25" },
         })
@@ -306,7 +314,7 @@ describe("ReaderMixerPanel", () => {
         )
         expect(screen.getByText("No sounds in this chapter")).toBeInTheDocument()
         expect(screen.getAllByRole("switch")).toHaveLength(1)
-        expect(screen.queryAllByRole("slider")).toHaveLength(0)
+        expect(screen.queryAllByRole("slider")).toHaveLength(1)
     })
 
     it("lets the same timer choice re-arm after it has fired", () => {

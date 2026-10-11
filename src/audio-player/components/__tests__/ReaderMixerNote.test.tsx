@@ -22,6 +22,73 @@ afterEach(() => {
     vi.unstubAllGlobals()
 })
 
+it("independently mutes without turning Master off or losing volume", () => {
+    mixer.setMasterLevel(0.4)
+    render(<ReaderMixerNote mixer={mixer} muteMode="soundtrack-mute" />)
+    fireEvent.click(screen.getByRole("button", { name: "Mute story audio" }))
+    expect(mixer.getPreferences()).toMatchObject({
+        masterEnabled: true,
+        masterMuted: true,
+        masterLevel: 0.4,
+    })
+    expect(mixer.getState().layers.soundscapes.effectiveLevel).toBe(0)
+    fireEvent.click(screen.getByRole("button", { name: "Unmute story audio" }))
+    expect(mixer.getPreferences()).toMatchObject({
+        masterEnabled: true,
+        masterMuted: false,
+        masterLevel: 0.4,
+    })
+    act(() => mixer.setMasterLevel(0))
+    expect(screen.getByRole("button", { name: "Unmute story audio" })).toBeInTheDocument()
+    expect(mixer.getPreferences().masterEnabled).toBe(true)
+    fireEvent.click(screen.getByRole("button", { name: "Unmute story audio" }))
+    expect(mixer.getPreferences()).toMatchObject({
+        masterLevel: 0.4,
+        masterRestoreLevel: 0.4,
+        masterEnabled: true,
+    })
+})
+
+it("legacy host notes can restore an independent Reader mute", () => {
+    mixer.setMasterMuted(true)
+    render(<ReaderMixerNote mixer={mixer} />)
+    fireEvent.click(screen.getByRole("button", { name: "Unmute story audio" }))
+    expect(mixer.getPreferences()).toMatchObject({ masterEnabled: true, masterMuted: false })
+    fireEvent.click(screen.getByRole("button", { name: "Mute story audio" }))
+    expect(mixer.getPreferences().masterEnabled).toBe(false)
+})
+
+it("independent notes hide only when Settings disables Master", () => {
+    render(<ReaderMixerNote mixer={mixer} muteMode="soundtrack-mute" />)
+    act(() => mixer.setMasterLevel(0))
+    expect(screen.getByRole("button")).toBeInTheDocument()
+    act(() => mixer.setMasterEnabled(false))
+    expect(screen.queryByRole("button")).toBeNull()
+    act(() => mixer.setMasterEnabled(true))
+    expect(screen.getByRole("button", { name: "Unmute story audio" })).toBeInTheDocument()
+})
+
+it("legacy notes restore saved volume when resuming sleep-stopped muted audio", async () => {
+    mixer.setMasterLevel(0.37)
+    mixer.setMasterLevel(0)
+    mixer.setMasterMuted(true)
+    render(<ReaderMixerNote mixer={mixer} />)
+    act(() => {
+        mixer.setSleepTimer("chapter-end")
+        mixer.notifyChapterEnd()
+    })
+    fireEvent.click(screen.getByRole("button", { name: "Resume story audio" }))
+    await act(async () => {
+        await flushMicrotasks()
+    })
+    expect(mixer.getState().sleepTimer.status).toBe("off")
+    expect(mixer.getPreferences()).toMatchObject({
+        masterEnabled: true,
+        masterMuted: false,
+        masterLevel: 0.37,
+    })
+})
+
 it("is a labelled native button, announces mute/unmute and never gates narration", () => {
     const setEnabled = vi.fn()
     mixer.connectVoice({

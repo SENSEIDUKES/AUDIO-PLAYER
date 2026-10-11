@@ -36,6 +36,8 @@ export interface ReaderMixerNoteProps {
     longPressMs?: number
     className?: string
     style?: CSSProperties
+    /** Opt-in independent mute; Master off is controlled by the host's Settings switch. */
+    muteMode?: "master-switch" | "soundtrack-mute"
 }
 
 /** Small soundtrack switch in host-owned placement. Narration keeps its own switch. */
@@ -46,6 +48,7 @@ export function ReaderMixerNote({
     longPressMs = 600,
     className,
     style,
+    muteMode = "master-switch",
 }: ReaderMixerNoteProps) {
     const context = useOptionalReaderMixer()
     const mixer = mixerProp ?? context
@@ -90,7 +93,13 @@ export function ReaderMixerNote({
 
     const visible = state && Object.values(state.availability).some(Boolean)
     if (!mixer || !state || !visible) return null
-    const muted = !state.preferences.masterEnabled
+    const independentMute = muteMode === "soundtrack-mute"
+    if (independentMute && !state.preferences.masterEnabled) return null
+    const muted = independentMute
+        ? Boolean(state.preferences.masterMuted) || state.preferences.masterLevel === 0
+        : !state.preferences.masterEnabled ||
+          Boolean(state.preferences.masterMuted) ||
+          state.preferences.masterLevel === 0
     const stopped = state.sleepTimer.status === "fired"
     const needsTap =
         !stopped &&
@@ -135,13 +144,29 @@ export function ReaderMixerNote({
                         event.preventDefault()
                         return
                     }
-                    if (stopped) mixer.resumeAudio()
-                    else if (needsTap) {
-                        if (muted) mixer.setMasterEnabled(true)
+                    if (independentMute) {
+                        if (muted) {
+                            mixer.setMasterMuted(false)
+                            if (stopped) mixer.resumeAudio()
+                            mixer.unlock()
+                        } else if (stopped) mixer.resumeAudio()
+                        else if (needsTap) mixer.unlock()
+                        else mixer.setMasterMuted(true)
+                    } else if (stopped) {
+                        if (muted) mixer.setMasterMuted(false)
+                        mixer.resumeAudio()
+                    } else if (needsTap) {
+                        if (muted) {
+                            mixer.setMasterEnabled(true)
+                            mixer.setMasterMuted(false)
+                        }
                         mixer.unlock()
                     } else {
                         mixer.setMasterEnabled(muted)
-                        if (muted) mixer.unlock()
+                        if (muted) {
+                            mixer.setMasterMuted(false)
+                            mixer.unlock()
+                        }
                     }
                 }}
                 onPointerDown={(event) => {
