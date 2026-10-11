@@ -384,6 +384,17 @@ export function ReaderMixerPanel({
                     onChange={(enabled) => mixer.setMasterEnabled(enabled)}
                 />
             </div>
+            <div className="sap-reader-mixer__level">
+                <MixerSlider
+                    percent={Math.round((preferences.masterLevel ?? 1) * 100)}
+                    label={labels.volume(labels.master)}
+                    formatPercent={labels.formatPercent}
+                    onChange={(value) => mixer.setMasterLevel(value / 100)}
+                />
+                <span className="sap-reader-mixer__percent" aria-hidden="true">
+                    {labels.formatPercent(Math.round((preferences.masterLevel ?? 1) * 100))}
+                </span>
+            </div>
             {!READER_MIXER_LAYERS.some((layer) => state.availability[layer]) && (
                 <p className="sap-reader-mixer__empty">{labels.noAudio}</p>
             )}

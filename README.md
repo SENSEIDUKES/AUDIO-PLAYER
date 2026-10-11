@@ -416,3 +416,11 @@ Until a new license is published, no usage rights are granted.
 Created by **SEIHouse Productions LLC**.
 
 Built for the **SEA expanded music ecosystem** by **SENSEI / SEIHouse**.
+
+### 2026-10-10 — Reader soundtrack master fader
+
+Reader Mixer adds an independent 0–100% Master volume slider and setMasterLevel(level). Saved masterLevel defaults to 1 for older preferences, scales Soundscapes, Atmosphere and Sound Cues, and leaves the layer balance and Master switch unchanged. Voice retains its existing independent control. At zero the switch remains on; hosts can keep the Reader note visible. Physical iPhone listening remains to be verified: check gain on music, atmosphere and cues, zero then restore, Master off/on, background playback, and device-volume fallback.
+
+### 2026-10-10 — Independent floating-note mute
+
+ReaderMixerNote supports opt-in muteMode=soundtrack-mute. Tapping sets masterMuted without changing masterEnabled or masterLevel; unmuting restores the retained level. At zero, setMasterMuted(false) restores the saved last nonzero masterRestoreLevel, including after preferences reload; older preferences default to 100% when no earlier level exists. Changing Master volume clears the tap mute and leaves the enable switch untouched, including at zero. Legacy note consumers retain their existing master-switch mode. Hosts own the mini slider presentation through the note hold callback and use setMasterLevel for the same state as the Settings Master fader.

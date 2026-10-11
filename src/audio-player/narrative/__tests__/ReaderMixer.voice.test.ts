@@ -79,6 +79,9 @@ describe("Voice mixer slot", () => {
         expect(migrated).toEqual({
             ...legacy,
             version: 3,
+            masterLevel: 1,
+            masterMuted: false,
+            masterRestoreLevel: 1,
             layers: { ...legacy.layers, voice: { enabled: false, level: 1 } },
         })
         const mixer = makeMixer()

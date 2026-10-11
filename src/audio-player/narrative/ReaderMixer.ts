@@ -59,6 +59,12 @@ export interface ReaderMixerLayerPreference {
 export interface ReaderMixerPreferences {
     readonly version: 3
     readonly masterEnabled: boolean
+    /** Soundtrack gain, 0..1; omitted legacy preferences mean 100%. Independent of the switch. */
+    readonly masterLevel?: number
+    /** Temporary soundtrack mute chosen by the note; independent of Master enabled. */
+    readonly masterMuted?: boolean
+    /** Last nonzero soundtrack volume, used when unmuting from zero. */
+    readonly masterRestoreLevel?: number
     readonly layers: Readonly<Record<ReaderMixerLayer, ReaderMixerLayerPreference>>
     /** Id of the chosen atmosphere, or `null` for Off. */
     readonly atmosphereId: string | null
@@ -68,6 +74,9 @@ export interface ReaderMixerPreferences {
 export interface ReaderMixerPreferencesInput {
     version?: number
     masterEnabled?: boolean
+    masterLevel?: number
+    masterMuted?: boolean
+    masterRestoreLevel?: number
     layers?: Partial<Record<ReaderMixerLayer, Partial<ReaderMixerLayerPreference>>>
     atmosphereId?: string | null
 }
@@ -81,6 +90,9 @@ export interface ReaderMixerPreferencesInput {
 export const DEFAULT_READER_MIXER_PREFERENCES: ReaderMixerPreferences = Object.freeze({
     version: 3,
     masterEnabled: true,
+    masterLevel: 1,
+    masterMuted: false,
+    masterRestoreLevel: 1,
     layers: Object.freeze({
         soundscapes: Object.freeze({ enabled: true, level: 0.25 }),
         atmosphere: Object.freeze({ enabled: true, level: 0.3 }),
@@ -185,13 +197,38 @@ export function normalizeReaderMixerPreferences(
         version: 3,
         masterEnabled:
             typeof source.masterEnabled === "boolean" ? source.masterEnabled : base.masterEnabled,
+        masterLevel:
+            typeof source.masterLevel === "number" && Number.isFinite(source.masterLevel)
+                ? clamp01(source.masterLevel)
+                : (base.masterLevel ?? 1),
+        masterMuted:
+            typeof source.masterMuted === "boolean"
+                ? source.masterMuted
+                : (base.masterMuted ?? false),
+        masterRestoreLevel:
+            typeof source.masterRestoreLevel === "number" &&
+            Number.isFinite(source.masterRestoreLevel) &&
+            source.masterRestoreLevel > 0
+                ? clamp01(source.masterRestoreLevel)
+                : typeof source.masterLevel === "number" &&
+                    Number.isFinite(source.masterLevel) &&
+                    source.masterLevel > 0
+                  ? clamp01(source.masterLevel)
+                  : (base.masterRestoreLevel ?? 1),
         layers: Object.freeze(layers),
         atmosphereId,
     })
 }
 
 function samePreferences(a: ReaderMixerPreferences, b: ReaderMixerPreferences): boolean {
-    if (a.masterEnabled !== b.masterEnabled || a.atmosphereId !== b.atmosphereId) return false
+    if ((a.masterMuted ?? false) !== (b.masterMuted ?? false)) return false
+    if ((a.masterRestoreLevel ?? 1) !== (b.masterRestoreLevel ?? 1)) return false
+    if (
+        a.masterEnabled !== b.masterEnabled ||
+        (a.masterLevel ?? 1) !== (b.masterLevel ?? 1) ||
+        a.atmosphereId !== b.atmosphereId
+    )
+        return false
     return READER_MIXER_LAYERS.every(
         (layer) =>
             a.layers[layer].enabled === b.layers[layer].enabled &&
@@ -201,7 +238,8 @@ function samePreferences(a: ReaderMixerPreferences, b: ReaderMixerPreferences): 
 
 /**
  * The gain a layer actually plays at:
- * master on/off × layer on/off × layer level × per-call volume.
+ * soundtrack master on/off × master level × layer on/off × layer level × per-call volume.
+ * Voice keeps its independent switch and level.
  */
 export function computeReaderMixerGain(
     preferences: ReaderMixerPreferences,
@@ -209,9 +247,11 @@ export function computeReaderMixerGain(
     volume = 1
 ): number {
     if (layer !== "voice" && !preferences.masterEnabled) return 0
+    if (layer !== "voice" && preferences.masterMuted) return 0
     const layerPreference = preferences.layers[layer]
     if (!layerPreference.enabled) return 0
-    return clamp01(layerPreference.level) * clamp01(volume)
+    const masterLevel = layer === "voice" ? 1 : (preferences.masterLevel ?? 1)
+    return clamp01(masterLevel) * clamp01(layerPreference.level) * clamp01(volume)
 }
 
 /* ------------------------------------------------------------------ */
@@ -1038,6 +1078,31 @@ export class ReaderMixer {
         if (this.disposed) return
         if (enabled) this.session.resume()
         this.updatePreferences({ ...this.prefs, masterEnabled: Boolean(enabled) })
+    }
+
+    /** Save soundtrack master gain without changing its switch or individual layer levels. */
+    setMasterLevel(level: number): void {
+        if (this.disposed || !Number.isFinite(level)) return
+        const next = clamp01(level)
+        this.updatePreferences({
+            ...this.prefs,
+            masterLevel: next,
+            masterMuted: false,
+            masterRestoreLevel: next > 0 ? next : (this.prefs.masterRestoreLevel ?? 1),
+        })
+    }
+
+    /** Mute from a floating note without disabling Master or losing its volume. */
+    setMasterMuted(muted: boolean): void {
+        if (this.disposed) return
+        this.updatePreferences({
+            ...this.prefs,
+            masterMuted: Boolean(muted),
+            masterLevel:
+                !muted && this.prefs.masterLevel === 0
+                    ? (this.prefs.masterRestoreLevel ?? 1)
+                    : this.prefs.masterLevel,
+        })
     }
 
     /* ----------------------------- Preferences -------------------------- */

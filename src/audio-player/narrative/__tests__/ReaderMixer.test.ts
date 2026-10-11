@@ -95,6 +95,30 @@ describe("ReaderMixer", () => {
     })
 
     describe("level math", () => {
+        it("applies master gain live without changing switches or layer levels", async () => {
+            const mixer = makeMixer()
+            mixer.playSoundscape(CHAPTER, { fadeMs: 0 })
+            mixer.setAtmosphere(RAIN, { fadeMs: 0 })
+            await settle()
+            const layers = mixer.getPreferences().layers
+            mixer.setMasterLevel(0.5)
+            expect(only("https://a.test/ch1.mp3").volume).toBeCloseTo(0.25)
+            expect(only("https://a.test/rain.mp3").volume).toBeCloseTo(0.2)
+            expect(mixer.playCue(GROWL, { volume: 0.5 })).toBe(true)
+            expect(only(GROWL).volume).toBeCloseTo(0.2)
+            mixer.setMasterLevel(0)
+            expect(mixer.getPreferences().masterEnabled).toBe(true)
+            expect(mixer.getPreferences().layers).toEqual(layers)
+            expect(mixer.getState().layers.soundscapes.effectiveLevel).toBe(0)
+            mixer.setMasterEnabled(false)
+            mixer.setMasterLevel(0.8)
+            expect(mixer.getPreferences().masterEnabled).toBe(false)
+            mixer.setMasterEnabled(true)
+            expect(only("https://a.test/ch1.mp3").volume).toBeCloseTo(0.4)
+            expect(normalizeReaderMixerPreferences({ masterLevel: 2 }).masterLevel).toBe(1)
+            expect(normalizeReaderMixerPreferences({ masterLevel: -1 }).masterLevel).toBe(0)
+            expect(normalizeReaderMixerPreferences({ version: 3 }).masterLevel).toBe(1)
+        })
         it("multiplies master × switch × level × per-call volume", () => {
             expect(computeReaderMixerGain(PREFS, "soundscapes")).toBe(0.5)
             expect(computeReaderMixerGain(PREFS, "cues", 0.5)).toBeCloseTo(0.4)
@@ -189,6 +213,9 @@ describe("ReaderMixer", () => {
             expect(second.getPreferences()).toEqual({
                 version: 3,
                 masterEnabled: false,
+                masterLevel: 1,
+                masterMuted: false,
+                masterRestoreLevel: 1,
                 layers: {
                     soundscapes: { enabled: true, level: 0.33 },
                     atmosphere: { enabled: true, level: 0.4 },
@@ -236,6 +263,9 @@ describe("ReaderMixer", () => {
             expect(mixer.getPreferences()).toEqual({
                 version: 3,
                 masterEnabled: true,
+                masterLevel: 1,
+                masterMuted: false,
+                masterRestoreLevel: 1,
                 layers: {
                     soundscapes: { enabled: true, level: 0.25 },
                     atmosphere: { enabled: true, level: 0.3 },
