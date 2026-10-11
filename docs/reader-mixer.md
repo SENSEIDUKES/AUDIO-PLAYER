@@ -184,6 +184,7 @@ mixer.dispose()                    // release everything
 | `notifyChapterEnd()` | Fire a running End of chapter timer; the host owns this signal. |
 | `subscribeSleep(fn)` | Observe `{ choiceId, firedAt }`; stop host-owned browser Listen when it fires. `onSleepTimer` is the options callback form. |
 | `retainActivity()` | Hold activity while Listen speaks; returns an idempotent release function. Playing connected Voice holds activity automatically. |
+| `retryFailed()` | Retry wanted loops that gave up after their retries. The note calls it from its failed state; the browser's `online` event calls it too. |
 | `resumeAudio()` | Explicitly clear the sleep latch, turn the soundtrack on and unlock. Activity and scrolling never call it. |
 | `setLeveling(on)` | Compare automatic source leveling on/off without changing saved preferences. |
 | `playSoundscape(track, { scene?, fadeMs?, trimStartMs? })` | Crossfade the score to `track` (default `SCENE_FADE_MS`, 2 s). The same track in the same scene does nothing, including while resting. |
@@ -391,9 +392,14 @@ the script does not modify or re-export the owner's files.
 Place `ReaderMixerNote` in normal chapter flow and keep `ReaderMixerPanel` in
 Settings. They share `preferences.masterEnabled`, the **soundtrack** switch.
 Tapping never mutes narration. A needed-tap state unlocks without muting; a
-sleep-stopped state explicitly resumes. The note is hidden when no layer is in
-use, shows a clock indicator while a timer runs, and uses different glyphs and
-labels for on, muted, blocked and sleep-stopped states.
+sleep-stopped state explicitly resumes; a failed state (a wanted Soundscapes or
+Atmosphere loop gave up after its retries) unlocks and calls `retryFailed()`.
+The note is hidden when no layer is in use, shows a clock indicator while a
+timer runs, and has labels for on, muted, needs-tap, failed and sleep-stopped
+states. `data-state` carries the state for styling: needs-tap dims the same
+note (`--sap-reader-mixer-note-pending-opacity`, default 0.45) and failed turns
+it red (`--sap-reader-mixer-note-alert-fg`, default `#ff4d4f`). Muted adds a
+slash and sleep-stopped adds pause bars.
 
 ```tsx
 <ReaderMixerNote onOpenSettings={openAudioSettings} />

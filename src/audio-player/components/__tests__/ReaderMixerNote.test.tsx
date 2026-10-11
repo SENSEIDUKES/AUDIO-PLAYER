@@ -125,7 +125,7 @@ it("unlocks a wanted blocked layer without muting it", async () => {
     expect(screen.getByRole("button", { name: "Tap to start story audio" })).not.toHaveAttribute(
         "aria-pressed"
     )
-    // Waiting for a tap colors the same note (CSS on data-state); it adds no mark.
+    // Waiting for a tap dims the same note (CSS on data-state); it adds no mark.
     const note = document.querySelector(".sap-reader-mixer-note")!
     expect(note).toHaveAttribute("data-state", "needs-tap")
     expect(note.querySelectorAll(".sap-reader-mixer-note__glyph path")).toHaveLength(1)
@@ -137,6 +137,33 @@ it("unlocks a wanted blocked layer without muting it", async () => {
     })
     expect(unlock).toHaveBeenCalled()
     expect(mixer.getPreferences().masterEnabled).toBe(true)
+})
+
+it("marks a wanted loop that failed to play and retries it on tap", async () => {
+    mixer.dispose()
+    mixer = createReaderMixer({ sleepFadeMs: 0, loopMaxRetries: 0, fadeMs: 0 })
+    FakeAudio.playBehavior = "reject"
+    render(<ReaderMixerNote mixer={mixer} muteMode="soundtrack-mute" />)
+    await act(async () => {
+        mixer.playSoundscape({ title: "S", artist: "", audioFile: "https://a.test/s.mp3" })
+        await flushMicrotasks()
+        await vi.advanceTimersByTimeAsync(100)
+    })
+    expect(mixer.getState().layers.soundscapes.status).toBe("failed")
+    const note = document.querySelector(".sap-reader-mixer-note")!
+    expect(note).toHaveAttribute("data-state", "failed")
+    expect(note.querySelectorAll(".sap-reader-mixer-note__glyph path")).toHaveLength(1)
+    const retry = vi.spyOn(mixer, "retryFailed")
+    FakeAudio.playBehavior = "resolve"
+    fireEvent.click(screen.getByRole("button", { name: "Retry story audio" }))
+    await act(async () => {
+        await flushMicrotasks()
+        await vi.advanceTimersByTimeAsync(100)
+    })
+    expect(retry).toHaveBeenCalled()
+    expect(mixer.getPreferences().masterMuted).toBe(false)
+    expect(mixer.getState().layers.soundscapes.status).toBe("playing")
+    expect(note).toHaveAttribute("data-state", "on")
 })
 
 it("shows a running timer indicator, then resumes sleep-stopped audio on tap", async () => {

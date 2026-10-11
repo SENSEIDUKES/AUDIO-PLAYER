@@ -775,10 +775,7 @@ export class ReaderMixer {
         this.armGestures()
         if (options.pauseWhenHidden ?? true) this.followVisibility()
         if (typeof window !== "undefined") {
-            const online = () => {
-                this.soundscapes.retryFailed()
-                if (this.atmosphereActive) this.atmosphere.retryFailed()
-            }
+            const online = () => this.retryFailed()
             window.addEventListener("online", online)
             this.cleanups.push(() => window.removeEventListener("online", online))
             const pagehide = () => this.flushPreferences()
@@ -1280,6 +1277,13 @@ export class ReaderMixer {
             this.cueFailure = null
         }
         this.refresh()
+    }
+
+    /** Retry wanted loops that gave up after their retries, for example from the note. */
+    retryFailed(): void {
+        if (this.disposed) return
+        this.soundscapes.retryFailed()
+        if (this.atmosphereActive) this.atmosphere.retryFailed()
     }
 
     isDisposed(): boolean {
