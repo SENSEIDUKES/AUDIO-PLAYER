@@ -37,4 +37,23 @@ describe("shared audio session type", () => {
         releaseMusic()
         expect(session.type).toBe("ambient")
     })
+
+    it("never rewrites a type the session already has", () => {
+        const writes: string[] = []
+        let current = "playback"
+        navigatorSession.audioSession = {
+            get type() {
+                return current
+            },
+            set type(value: string) {
+                writes.push(value)
+                current = value
+            },
+        }
+        const releaseMusic = applyAudioSessionType("playback")
+        const releaseVoice = applyAudioSessionType("playback")
+        releaseVoice()
+        releaseMusic()
+        expect(writes).toEqual([])
+    })
 })

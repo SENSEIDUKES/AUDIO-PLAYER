@@ -12,6 +12,10 @@ export interface ReaderMixerNoteLabels {
     soundOn: string
     muted: string
     blocked: string
+    /** Button label while a wanted loop has failed to play. */
+    retry: string
+    /** Announced when a wanted loop has failed to play. */
+    failed: string
     sleepStopped: string
     timerRunning: string
 }
@@ -24,6 +28,8 @@ export const DEFAULT_READER_MIXER_NOTE_LABELS: ReaderMixerNoteLabels = Object.fr
     soundOn: "Story audio on",
     muted: "Story audio muted",
     blocked: "Story audio needs a tap",
+    retry: "Retry story audio",
+    failed: "Story audio could not play",
     sleepStopped: "Story audio stopped by sleep timer",
     timerRunning: "Sleep timer running",
 })
@@ -107,21 +113,40 @@ export function ReaderMixerNote({
             Object.values(state.layers).some(
                 (layer) => layer.status === "blocked" && layer.effectiveLevel > 0
             ))
-    const status = stopped ? "sleep-stopped" : needsTap ? "needs-tap" : muted ? "muted" : "on"
+    // A real problem, not a tap: a wanted loop gave up after its retries.
+    const failed =
+        !stopped &&
+        (["soundscapes", "atmosphere"] as const).some(
+            (layer) =>
+                state.layers[layer].status === "failed" && state.layers[layer].effectiveLevel > 0
+        )
+    const status = stopped
+        ? "sleep-stopped"
+        : failed
+          ? "failed"
+          : needsTap
+            ? "needs-tap"
+            : muted
+              ? "muted"
+              : "on"
     const label = stopped
         ? labels.resume
-        : needsTap
-          ? labels.needsTap
-          : muted
-            ? labels.unmute
-            : labels.mute
+        : failed
+          ? labels.retry
+          : needsTap
+            ? labels.needsTap
+            : muted
+              ? labels.unmute
+              : labels.mute
     const announcement = stopped
         ? labels.sleepStopped
-        : needsTap
-          ? labels.blocked
-          : muted
-            ? labels.muted
-            : labels.soundOn
+        : failed
+          ? labels.failed
+          : needsTap
+            ? labels.blocked
+            : muted
+              ? labels.muted
+              : labels.soundOn
     return (
         <span
             className={["sap-reader-mixer-note", className].filter(Boolean).join(" ")}
@@ -150,17 +175,20 @@ export function ReaderMixerNote({
                             if (stopped) mixer.resumeAudio()
                             mixer.unlock()
                         } else if (stopped) mixer.resumeAudio()
-                        else if (needsTap) mixer.unlock()
-                        else mixer.setMasterMuted(true)
+                        else if (failed || needsTap) {
+                            mixer.unlock()
+                            if (failed) mixer.retryFailed()
+                        } else mixer.setMasterMuted(true)
                     } else if (stopped) {
                         if (muted) mixer.setMasterMuted(false)
                         mixer.resumeAudio()
-                    } else if (needsTap) {
+                    } else if (failed || needsTap) {
                         if (muted) {
                             mixer.setMasterEnabled(true)
                             mixer.setMasterMuted(false)
                         }
                         mixer.unlock()
+                        if (failed) mixer.retryFailed()
                     } else {
                         mixer.setMasterEnabled(muted)
                         if (muted) {
@@ -217,7 +245,6 @@ export function ReaderMixerNote({
                             strokeWidth="2.5"
                         />
                     )}
-                    {needsTap && <path d="M3 5v5m0 3v.5" />}
                     {stopped && <path d="M3 4v7m3-7v7" />}
                 </svg>
                 {state.sleepTimer.status === "running" && (

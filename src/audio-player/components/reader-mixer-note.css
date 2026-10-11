@@ -10,6 +10,16 @@
     transition: opacity var(--sap-reader-mixer-note-fade-ms, 180ms) ease;
 }
 
+/* Waiting for a tap is ordinary: the same note, dimmed. */
+.sap-reader-mixer-note[data-state="needs-tap"] .sap-reader-mixer-note__glyph {
+    opacity: var(--sap-reader-mixer-note-pending-opacity, 0.45);
+}
+
+/* Red only when audio actually failed to play. */
+.sap-reader-mixer-note[data-state="failed"] {
+    color: var(--sap-reader-mixer-note-alert-fg, #ff4d4f);
+}
+
 .sap-reader-mixer-note[data-scrolling="true"] {
     opacity: var(--sap-reader-mixer-note-ghost-opacity, 0.3);
 }
