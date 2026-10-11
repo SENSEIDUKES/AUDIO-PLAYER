@@ -462,10 +462,11 @@ export interface ReaderMixerOptions {
      */
     pauseWhenHidden?: boolean
     /**
-     * Safari Audio Session type applied only while Web Audio output is audible.
-     * Defaults to `"playback"` so the iPhone silent switch does not mute the
-     * mixer. Restores the previous type when idle. Pass `null` to leave the
-     * page's session untouched.
+     * Safari Audio Session type held while the mixer routes through Web Audio,
+     * set before its AudioContext is created and restored on dispose. Defaults
+     * to `"playback"` so the iPhone silent switch does not mute the mixer. It is
+     * never switched while audio plays: iOS can retune a live context and shift
+     * its pitch. Pass `null` to leave the page's session untouched.
      */
     audioSessionType?: string | null
     /** All mixer requests default to anonymous CORS. Use null with element routing for non-CORS hosts. */
@@ -648,12 +649,21 @@ export class ReaderMixer {
         this.atmosphereFadeMs = Math.max(0, options.atmosphereFadeMs ?? SCENE_FADE_MS)
         this.elementVolumeWorks = probeElementVolumeWrites()
 
-        this.graph = this.createGraph(
-            options.crossOrigin === null ? "element" : (options.routing ?? "auto")
-        )
-        const crossOrigin = options.crossOrigin === undefined ? "anonymous" : options.crossOrigin
         this.audioSessionType =
             options.audioSessionType === undefined ? "playback" : options.audioSessionType
+        const routing = options.crossOrigin === null ? "element" : (options.routing ?? "auto")
+        // Choose the session before the context exists and keep it: iOS fixes a
+        // context's sample rate at creation, and switching the session category
+        // under a live context can retune the hardware so every routed layer
+        // plays sharp or flat until reload.
+        if (routing !== "element")
+            this.restoreAudioSession = applyAudioSessionType(this.audioSessionType)
+        this.graph = this.createGraph(routing)
+        if (!this.graph) {
+            this.restoreAudioSession?.()
+            this.restoreAudioSession = null
+        }
+        const crossOrigin = options.crossOrigin === undefined ? "anonymous" : options.crossOrigin
         if (this.graph) {
             this.cleanups.push(
                 this.graph.onStateChange(() => {
@@ -1458,23 +1468,6 @@ export class ReaderMixer {
         if (!this.ready || this.disposed || !this.graph) return
         if (!this.pageHidden && this.graphWanted()) this.graph.resume()
         else this.graph.suspend()
-
-        const audible =
-            !this.pageHidden &&
-            this.graph.state === "running" &&
-            OWNED_LAYERS.some(
-                (layer) =>
-                    this.layerGain(layer) > 0 &&
-                    (layer === "cues"
-                        ? this.cues.hasRoutedDemand(true)
-                        : this[layer].hasRoutedDemand())
-            )
-        if (audible && !this.restoreAudioSession) {
-            this.restoreAudioSession = applyAudioSessionType(this.audioSessionType)
-        } else if (!audible && this.restoreAudioSession) {
-            this.restoreAudioSession()
-            this.restoreAudioSession = null
-        }
     }
 
     private graphWanted(): boolean {

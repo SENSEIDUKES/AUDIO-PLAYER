@@ -679,12 +679,18 @@ WAV scores. Pass `analysisPolicy: "automatic"` to trim leading silence, or
 ### The ring/silent switch
 
 On iPhone, Web Audio follows the ring/silent switch (it is muted on silent) while
-plain media elements keep playing. While Web Audio output is audible, the mixer
-sets Safari's Audio Session API, `navigator.audioSession.type = "playback"`
-(where the browser has it), so the reader's audio keeps playing on silent like other media.
+plain media elements keep playing. A mixer that routes through Web Audio sets
+Safari's Audio Session API, `navigator.audioSession.type = "playback"` (where the
+browser has it), before it creates its AudioContext and holds it until it is
+disposed, so the reader's audio keeps playing on silent like other media. Voice
+holds the same type while it is routed through Web Audio. The type is never
+switched while audio plays: iOS fixes a context's sample rate when it is created,
+and changing the session category under a live context can retune the hardware so
+every routed layer plays sharp or flat. Writes that would not change the type are
+skipped for the same reason.
 The context suspends when no enabled loop is wanted and no enabled cue is active,
-when the master is off, and while hidden under the default visibility policy.
-An idle tap primes spares without resuming the context or claiming the session.
+when the master is off or muted, and while hidden under the default visibility policy.
+An idle tap primes spares without resuming the context.
 The previous session type is restored when all mixer/Voice owners release it,
 so stopping one does not undo another's playback session. The mixer does not force an idle type: a host using mixable `"ambient"`
 gets it back, and a host using `"auto"` gets that back. Pass `audioSessionType: null`

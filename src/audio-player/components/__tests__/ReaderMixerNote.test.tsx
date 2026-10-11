@@ -125,6 +125,10 @@ it("unlocks a wanted blocked layer without muting it", async () => {
     expect(screen.getByRole("button", { name: "Tap to start story audio" })).not.toHaveAttribute(
         "aria-pressed"
     )
+    // Waiting for a tap colors the same note (CSS on data-state); it adds no mark.
+    const note = document.querySelector(".sap-reader-mixer-note")!
+    expect(note).toHaveAttribute("data-state", "needs-tap")
+    expect(note.querySelectorAll(".sap-reader-mixer-note__glyph path")).toHaveLength(1)
     const unlock = vi.spyOn(mixer, "unlock")
     FakeAudio.playBehavior = "resolve"
     fireEvent.click(screen.getByRole("button"))

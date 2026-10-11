@@ -217,7 +217,6 @@ export function ReaderMixerNote({
                             strokeWidth="2.5"
                         />
                     )}
-                    {needsTap && <path d="M3 5v5m0 3v.5" />}
                     {stopped && <path d="M3 4v7m3-7v7" />}
                 </svg>
                 {state.sleepTimer.status === "running" && (

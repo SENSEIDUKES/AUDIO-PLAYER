@@ -53,7 +53,8 @@ export function applyAudioSessionType(type: string | null | undefined): () => vo
     const owner = {}
     try {
         if (!entry) entry = { previous: session.type, owners: new Map() }
-        session.type = type
+        // Rewriting the same type can still reconfigure the iOS session.
+        if (session.type !== type) session.type = type
     } catch {
         return () => {}
     }
@@ -68,7 +69,7 @@ export function applyAudioSessionType(type: string | null | undefined): () => vo
         const nextType = remaining[remaining.length - 1] ?? entry.previous
         if (entry.owners.size === 0) sessionOwners.delete(session)
         try {
-            if (session.type === currentType) session.type = nextType
+            if (session.type === currentType && currentType !== nextType) session.type = nextType
         } catch {
             // Restoring is best effort.
         }

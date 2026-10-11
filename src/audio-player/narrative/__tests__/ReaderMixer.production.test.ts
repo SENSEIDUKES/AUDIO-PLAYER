@@ -416,29 +416,47 @@ describe("ReaderMixer production recovery", () => {
         expect(ctx.state).toBe("suspended")
     })
 
-    it("suspends idle or muted output and only owns the session while audible", async () => {
+    it("suspends idle or muted output without switching the session under it", async () => {
         const session = { type: "ambient" }
         Object.defineProperty(navigator, "audioSession", { configurable: true, value: session })
+        const typeAtCreation: string[] = []
+        class RecordingContext extends FakeAudioContext {
+            constructor() {
+                super()
+                typeAtCreation.push(session.type)
+            }
+        }
+        vi.stubGlobal("AudioContext", RecordingContext)
         const instance = mixer({ routing: "web-audio" })
         const ctx = FakeAudioContext.instances[0]
-        expect(session.type).toBe("ambient")
+        // iOS fixes the context's sample rate at creation, so the session comes first.
+        expect(typeAtCreation).toEqual(["playback"])
+        const writes: string[] = []
+        Object.defineProperty(session, "type", {
+            configurable: true,
+            get: () => "playback",
+            set: (value: string) => writes.push(value),
+        })
         document.dispatchEvent(new Event("click"))
         expect(ctx.resumeCalls).toBe(0)
         instance.setMasterEnabled(false)
         instance.playSoundscape(SCORE)
         await settle()
         expect(ctx.resumeCalls).toBe(0)
-        expect(session.type).toBe("ambient")
         instance.setMasterEnabled(true)
         await settle()
         expect(ctx.state).toBe("running")
-        expect(session.type).toBe("playback")
         instance.setMasterEnabled(false)
         await flushMicrotasks()
         expect(ctx.state).toBe("suspended")
-        expect(session.type).toBe("ambient")
         instance.setMasterEnabled(true)
         await settle()
+        instance.setMasterMuted(true)
+        await flushMicrotasks()
+        expect(ctx.state).toBe("suspended")
+        instance.setMasterMuted(false)
+        await settle()
+        expect(ctx.state).toBe("running")
         instance.stopAll({ fadeMs: 0 })
         await settle()
         expect(instance.getState().layers.soundscapes).toMatchObject({
@@ -447,6 +465,19 @@ describe("ReaderMixer production recovery", () => {
         })
         expect(elements(SCORE)).toHaveLength(0)
         expect(ctx.state).toBe("suspended")
+        expect(writes).toEqual([])
+        instance.dispose()
+        expect(writes).toEqual(["ambient"])
+    })
+
+    it("leaves the session alone on the element route", async () => {
+        const session = { type: "ambient" }
+        Object.defineProperty(navigator, "audioSession", { configurable: true, value: session })
+        const instance = mixer({ routing: "element" })
+        instance.playSoundscape(SCORE)
+        await settle()
+        expect(session.type).toBe("ambient")
+        instance.dispose()
         expect(session.type).toBe("ambient")
     })
 

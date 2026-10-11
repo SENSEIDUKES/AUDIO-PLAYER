@@ -1,14 +1,14 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react"
 import { useAudioSession } from "../session/AudioSessionContext"
 import { trackKey } from "../utils/trackKey"
-import { useOptionalReaderMixer, useReaderMixerState } from "./ReaderMixerContext"
+import { useOptionalReaderMixer } from "./ReaderMixerContext"
 import type { ReaderMixer, ReaderMixerVoiceOutput } from "./ReaderMixer"
 import { applyAudioSessionType, probeElementVolumeWrites } from "./layerGainGraph"
 
 export interface ReaderMixerVoiceProps {
     /** Defaults to the surrounding ReaderMixerProvider. Connect once per narration session. */
     mixer?: ReaderMixer
-    /** Safari audio session type while narration is audible. Defaults to playback. */
+    /** Safari audio session type held while narration is routed through Web Audio. Defaults to playback. */
     audioSessionType?: string | null
 }
 
@@ -19,7 +19,6 @@ export function ReaderMixerVoice({
 }: ReaderMixerVoiceProps) {
     const contextMixer = useOptionalReaderMixer()
     const mixer = mixerProp ?? contextMixer
-    const state = useReaderMixerState(mixer)
     const session = useAudioSession()
     const sessionRef = useRef(session)
     useLayoutEffect(() => {
@@ -118,10 +117,10 @@ export function ReaderMixerVoice({
         session.volumeUnsupported,
     ])
     const routed = session.getBackendInfo().active === "webaudio"
-    const audible =
-        session.isPlaying && !session.isMuted && (state?.layers.voice.effectiveLevel ?? 0) > 0
+    // Held while Voice is routed, not toggled with each play or pause: switching
+    // the iOS session under a live context can shift the pitch of all audio.
     useEffect(() => {
-        if (routed && audible) return applyAudioSessionType(audioSessionType)
-    }, [routed, audible, audioSessionType])
+        if (routed) return applyAudioSessionType(audioSessionType)
+    }, [routed, audioSessionType])
     return null
 }
