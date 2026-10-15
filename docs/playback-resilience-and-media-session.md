@@ -12,8 +12,7 @@ platform media integration.
 |---|---|---|
 | Headless engine | `src/audio-player/useAudioPlayer.ts` | Owns a single hidden `<audio>`, manages playback, error recovery, buffering, volume, and a rAF-driven time-update loop. |
 | Session provider | `src/audio-player/session/AudioSessionContext.tsx` | Wraps the headless engine with a queue, shuffle, repeat, and automix management so multiple skins share one audio element. |
-| Player component | `src/audio-player/AudioPlayer.tsx` | Wires the engine into the presentational UI: transport, progress, volume, track info, error banners, keyboard shortcuts, and Media Session API. |
-| Skins | `src/audio-player/skins/*.tsx` | Alternative visual surfaces (FullCard, StickyBottom, MiniSidebar, VaultRow, SeaCard) that accept an engine or session as props. |
+| Faces | `src/audio-player/skins/NarrativeFace.tsx` | The narrator face. The v4 music faces (`AudioPlayer`, FullCard, StickyBottom, MiniSidebar, VaultRow, SeaCard) were archived in 5.0.0 under `archive/faces-v4/` while one new face is designed. |
 
 The core principle: **the engine drives state; the UI reads state and calls
 actions** — it never touches the `<audio>` element directly.
@@ -98,9 +97,12 @@ including mobile Chrome and Safari).
 
 ### Implementation location
 
-The integration lives in `src/audio-player/AudioPlayer.tsx` inside
-`AudioPlayerInner`. It is not in the headless engine because metadata comes
-from the consumer-level track object, not the raw audio URL.
+The integration is the exported `useMediaSessionObserver` hook
+(`src/audio-player/headless/useMediaSessionObserver.ts`). It is not in the
+headless engine because metadata comes from the consumer-level track object,
+not the raw audio URL. In v4 the archived `AudioPlayer` and `FullCardPlayer`
+faces called it; since 5.0.0 no bundled face does, so the new player face (or a
+host) must call it for lock-screen controls to appear.
 
 ### Metadata set
 

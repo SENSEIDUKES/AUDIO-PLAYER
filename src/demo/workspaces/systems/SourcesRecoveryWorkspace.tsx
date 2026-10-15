@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react"
 import {
     AudioSessionProvider,
-    FullCardPlayer,
     checkCodecSupport,
     useAudioSession,
     validateTrackSource,
@@ -12,7 +11,7 @@ import type {
     TrackErrorPolicy,
     TrackSourceResolver,
 } from "../../../audio-player"
-import { BROKEN, SAMPLE, SEA_THEME, narrationTracks, noLuckTracks } from "../../data"
+import { BROKEN, SAMPLE, narrationTracks, noLuckTracks } from "../../data"
 import { useWorkspaceParam } from "../../workshop/routing"
 import {
     Button,
@@ -27,6 +26,7 @@ import {
 } from "../../workshop/ui"
 import type { LogLine } from "../../workshop/ui"
 import { SessionEventFeed, SessionReadout } from "../shared/session"
+import { TestControls } from "../shared/TestControls"
 
 /* How the engine survives bad sources. The queue below walks through each
    recovery path in order; the controls switch the session-wide policy and add
@@ -196,7 +196,7 @@ export function SourcesRecoveryWorkspace() {
                 stage={
                     <>
                         <div className="wk-stage-card">
-                            <FullCardPlayer {...SEA_THEME} />
+                            <TestControls />
                         </div>
                         <Panel
                             title="Recovery cases"

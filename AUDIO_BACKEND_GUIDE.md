@@ -36,20 +36,11 @@ changes, or working volume on iOS matter more than time-to-first-sound.
 
 ## Enabling the Web Audio backend
 
-All three entry points accept the `audioBackend` option (default `"html5"`):
-
-```tsx
-<AudioPlayer
-  title="DJ Set"
-  artist="SEIHouse"
-  audioFile="/track.mp3"
-  audioBackend="webaudio"
-/>
-```
+Both entry points accept the `audioBackend` option (default `"html5"`):
 
 ```tsx
 <AudioSessionProvider initialQueue={tracks} audioBackend="webaudio">
-  <AppSkins />
+  <AppControls />
 </AudioSessionProvider>
 ```
 
@@ -60,11 +51,13 @@ const engine = useAudioPlayer({
 })
 ```
 
-The backend is **fixed at mount**. To switch at runtime, remount the player —
+The backend is **fixed at mount**. To switch at runtime, remount the session —
 for example with a React `key`:
 
 ```tsx
-<AudioPlayer key={backend} audioBackend={backend} ... />
+<AudioSessionProvider key={backend} audioBackend={backend} initialQueue={tracks}>
+  <AppControls />
+</AudioSessionProvider>
 ```
 
 ---

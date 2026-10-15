@@ -9,7 +9,7 @@ import type { ReaderMixer } from "../narrative/ReaderMixer"
 import { useOptionalReaderMixer } from "../narrative/ReaderMixerContext"
 import { buildThemeVars } from "./themeVars"
 import { PauseIcon, PlayIcon, SpinnerIcon, DotsIcon } from "./icons"
-import "./skins.css"
+import "./narrative-face.css"
 
 export type { NarrationState } from "../narrative/useNarrativeAudio"
 

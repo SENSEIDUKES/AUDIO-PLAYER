@@ -1,11 +1,12 @@
 import { useState } from "react"
-import { AudioSessionProvider, StickyBottomPlayer } from "../../../audio-player"
+import { AudioSessionProvider } from "../../../audio-player"
 import type { WorkspaceRoute } from "../../../audio-player"
 import { SEA_THEME, TRACK_SETS, TRACK_SET_OPTIONS, isTrackSetId } from "../../data"
 import { useWorkspaceParam } from "../../workshop/routing"
 import { Button, Note, Panel, SelectField, SplitLayout, StatusBadge } from "../../workshop/ui"
 import { ROUTE_STATUS } from "../shared/routes"
 import { SessionController, SessionReadout } from "../shared/session"
+import { TestControls } from "../shared/TestControls"
 
 /* Agent Scout: the Agents arm's destinations. The browser decodes and measures
    the current track, then posts bounded evidence to the same-origin
@@ -63,7 +64,7 @@ export function AgentScoutWorkspace() {
                     <>
                         <div className="wk-stage-card">
                             <p className="wk-stage-card__title">Track under review</p>
-                            <StickyBottomPlayer fixed={false} {...SEA_THEME} />
+                            <TestControls />
                         </div>
                         <Panel
                             title="Agent destinations"

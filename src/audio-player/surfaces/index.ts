@@ -1,3 +1,5 @@
+import "./surfaces.css"
+
 export {
     PLAYER_FACE_CAPABILITIES,
     FAMILY_DEFAULTS,

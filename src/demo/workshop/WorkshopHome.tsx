@@ -6,52 +6,28 @@ import type { WorkshopCategoryId, WorkshopEntry } from "./catalog"
 import { handleLinkClick, homeHref, navigate, workspaceHref } from "./routing"
 import { StatusBadge } from "./ui"
 
-/* The Workshop entry point: five navigation categories, each a grid of cards.
-   A card opens one dedicated workspace; roadmap records stay visible but open
-   nothing. Tabs write `?category=` so every category is linkable. */
+/* The Workshop entry point: three tabs, each a grid of cards. A card opens one
+   dedicated workspace. Tabs write `?category=` so every tab is linkable. */
 
 function EntryCard({ entry }: { entry: WorkshopEntry }) {
-    const target = entryTarget(entry)
-    const body = (
-        <>
-            <CardArt id={entry.id} category={entry.category} />
-            <div className="wk-card__body">
-                <div className="wk-card__meta">
-                    <StatusBadge status={entry.status} />
-                    {entry.opens && <span className="wk-card__via">Opens in Mix &amp; Match</span>}
-                </div>
-                <h2 className="wk-card__title">{entry.title}</h2>
-                <p className="wk-card__summary">{entry.summary}</p>
-                <ul className="wk-tags" aria-label="Tags">
-                    {entry.tags.map((tag) => (
-                        <li key={tag} className="wk-tag">
-                            {tag}
-                        </li>
-                    ))}
-                </ul>
-                <span className="wk-card__open" aria-hidden="true">
-                    {target ? "Open workspace →" : "Nothing to open yet"}
-                </span>
-            </div>
-        </>
-    )
-
-    if (!target) {
-        return (
-            <article className="wk-card wk-card--roadmap" aria-label={`${entry.title} (not built)`}>
-                {body}
-            </article>
-        )
-    }
-
-    const href = workspaceHref(target)
+    const href = workspaceHref(entryTarget(entry))
     return (
         <a
             className={`wk-card wk-card--${entry.status}`}
             href={href}
             onClick={(event) => handleLinkClick(event, href)}
         >
-            {body}
+            <CardArt id={entry.id} category={entry.category} />
+            <div className="wk-card__body">
+                <div className="wk-card__meta">
+                    <StatusBadge status={entry.status} />
+                </div>
+                <h2 className="wk-card__title">{entry.title}</h2>
+                <p className="wk-card__summary">{entry.summary}</p>
+                <span className="wk-card__open" aria-hidden="true">
+                    Open →
+                </span>
+            </div>
         </a>
     )
 }
@@ -150,9 +126,8 @@ export function WorkshopHome({ category }: { category: WorkshopCategoryId }) {
 
             <footer className="wk-footer">
                 <p>
-                    Every workspace runs the real package source through its public entry. Leaving a
-                    workspace stops its audio, and inside a page, starting one player pauses the
-                    others.
+                    Every page runs the real player engine. Leaving a page stops its audio. The old
+                    player faces are kept in archive/faces-v4.
                 </p>
             </footer>
         </div>

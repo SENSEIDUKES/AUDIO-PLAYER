@@ -3,7 +3,6 @@ import {
     AudioSessionProvider,
     QueueDrawer,
     QueueSurface,
-    StickyBottomPlayer,
     useAudioSession,
 } from "../../../audio-player"
 import type { Track, WorkspaceRoute } from "../../../audio-player"
@@ -21,6 +20,7 @@ import {
 import type { LogLine } from "../../workshop/ui"
 import { ROUTE_STATUS } from "../shared/routes"
 import { SessionController, SessionEventFeed, SessionReadout } from "../shared/session"
+import { TestControls } from "../shared/TestControls"
 
 /* The shared queue and every surface that reads it: the inline Up Next list,
    the drag-and-drop Queue Drawer, and the controller's Up Next workspace. */
@@ -221,7 +221,7 @@ export function QueueWorkspace() {
                     <>
                         <div className="wk-stage-card">
                             <p className="wk-stage-card__title">Transport</p>
-                            <StickyBottomPlayer fixed={false} {...SEA_THEME} />
+                            <TestControls />
                         </div>
                         <div className="wk-stage-grid">
                             <Panel

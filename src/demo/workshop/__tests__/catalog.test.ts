@@ -9,20 +9,24 @@ import {
 import { WORKSPACES } from "../registry"
 
 describe("Workshop catalog", () => {
-    it("has exactly the five navigation categories, in order", () => {
+    it("has exactly the three tabs, in order", () => {
         expect(WORKSHOP_CATEGORIES.map((c) => c.label)).toEqual([
-            "Players",
-            "Systems",
-            "Customization",
-            "Testing Lab",
-            "SEN",
+            "Player",
+            "Novels (SEN)",
+            "Engine",
         ])
     })
 
-    it("opens the Reader Mixer from the SEN tab", () => {
-        const [first] = entriesForCategory("sen")
+    it("leads the Player tab with the blank New player stage", () => {
+        const [first, second] = entriesForCategory("player")
+        expect(first.id).toBe("new-player")
+        expect(entryTarget(first)).toEqual({ workspace: "new-player" })
+        expect(second.id).toBe("narrative-face")
+    })
+
+    it("opens the Reader mixer from the Novels tab", () => {
+        const [first] = entriesForCategory("novels")
         expect(first.id).toBe("reader-mixer")
-        expect(entryTarget(first)).toEqual({ workspace: "reader-mixer" })
         expect(WORKSPACES["reader-mixer"]).toBeDefined()
     })
 
@@ -33,53 +37,42 @@ describe("Workshop catalog", () => {
         for (const entry of WORKSHOP_ENTRIES) expect(categories.has(entry.category)).toBe(true)
     })
 
-    it("shows cards in every category", () => {
+    it("shows cards in every tab", () => {
         for (const category of WORKSHOP_CATEGORIES) {
             expect(entriesForCategory(category.id).length).toBeGreaterThan(0)
         }
     })
 
-    it("registers exactly one workspace per workspace entry", () => {
+    it("registers exactly one workspace per entry", () => {
         const entryIds = workspaceEntries()
             .map((e) => e.id)
             .sort()
         expect(Object.keys(WORKSPACES).sort()).toEqual(entryIds)
     })
 
-    it("leads Players with New Face, a blank surface of its own", () => {
-        const [first] = entriesForCategory("players")
-        expect(first.id).toBe("new-face")
-        expect(entryTarget(first)).toEqual({ workspace: "new-face" })
-        expect(WORKSPACES["new-face"]).toBeDefined()
-    })
-
-    it("points scenario cards at the Mix & Match Lab", () => {
-        const scenarioCards = WORKSHOP_ENTRIES.filter((e) => e.opens)
-        expect(scenarioCards.length).toBeGreaterThan(0)
-        for (const card of scenarioCards) {
-            expect(card.category).toBe("testing-lab")
-            expect(card.opens?.workspace).toBe("testing-lab")
-            expect(card.opens?.params?.scenario).toBeTruthy()
+    it("no longer lists any archived v4 face or tool", () => {
+        const ids = new Set(WORKSHOP_ENTRIES.map((e) => e.id))
+        for (const archived of [
+            "new-face",
+            "portable-player",
+            "full-card",
+            "sea-card",
+            "sticky-bottom",
+            "mini-sidebar",
+            "vault-row",
+            "testing-lab",
+            "themes",
+        ]) {
+            expect(ids.has(archived)).toBe(false)
         }
     })
 
-    it("never lets a roadmap record open a workspace", () => {
-        const roadmap = WORKSHOP_ENTRIES.filter((e) => e.status === "roadmap")
-        expect(roadmap.map((e) => e.id).sort()).toEqual(["canvas-mode", "queue-row"])
-        for (const entry of roadmap) {
-            expect(entryTarget(entry)).toBeNull()
-            expect(WORKSPACES[entry.id]).toBeUndefined()
-        }
-    })
-
-    it("names the placeholders for every partial or unbuilt piece", () => {
+    it("names what isn't working for every partial or unbuilt piece", () => {
         for (const entry of WORKSHOP_ENTRIES) {
-            if (entry.status === "partial" || entry.status === "roadmap") {
+            if (entry.status !== "live") {
                 expect(entry.placeholders?.length ?? 0).toBeGreaterThan(0)
             }
-            if (!entry.opens && entry.status !== "roadmap") {
-                expect(entry.working.length).toBeGreaterThan(0)
-            }
+            expect(entry.working.length).toBeGreaterThan(0)
         }
     })
 })

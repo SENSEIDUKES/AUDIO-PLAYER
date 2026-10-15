@@ -1,4 +1,3 @@
-export { AudioPlayer, default } from "./AudioPlayer"
 export { useAudioPlayer } from "./useAudioPlayer"
 export { PluginManager, type PluginManagerOptions } from "./core/plugins/PluginManager"
 export { usePluginManager } from "./core/plugins/usePluginManager"
@@ -204,17 +203,12 @@ export type {
     UseMediaSessionObserverOptions,
 } from "./headless"
 
-// Global session (one <audio> element + shared queue) and the UI skins that
-// read from it.
+// Global session (one <audio> element + shared queue) and the narrator face
+// that reads from it. The v4 music faces live in archive/faces-v4.
 export { AudioSessionProvider, useAudioSession, useAudioTime } from "./session/AudioSessionContext"
 export type { AudioTimeValue } from "./session/AudioSessionContext"
 export { serializeSession, deserializeSession } from "./session/sessionSerializer"
 export type { SerializedSession } from "./session/sessionSerializer"
-export { FullCardPlayer } from "./skins/FullCardPlayer"
-export { VaultRowPlayer } from "./skins/VaultRowPlayer"
-export { StickyBottomPlayer } from "./skins/StickyBottomPlayer"
-export { MiniSidebarPlayer } from "./skins/MiniSidebarPlayer"
-export { SeaCardPlayer } from "./skins/SeaCardPlayer"
 export { NarrativeFace } from "./skins/NarrativeFace"
 // Narrative family: the headless layer orchestrator behind NarrativeFace,
 // exposed so reader apps can drive narration/ambience/FX without the UI.
@@ -565,9 +559,4 @@ export type {
     SpatialAudioOptions,
     SpatialAudioState,
 } from "./types"
-export type { FullCardPlayerProps } from "./skins/FullCardPlayer"
-export type { VaultRowPlayerProps } from "./skins/VaultRowPlayer"
-export type { StickyBottomPlayerProps } from "./skins/StickyBottomPlayer"
-export type { MiniSidebarPlayerProps } from "./skins/MiniSidebarPlayer"
-export type { SeaCardPlayerProps } from "./skins/SeaCardPlayer"
 export type { NarrativeFaceProps } from "./skins/NarrativeFace"

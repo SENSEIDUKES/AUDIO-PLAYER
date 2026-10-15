@@ -73,7 +73,7 @@ describe("package boundary", () => {
         const entryUsers = demo.filter((file) =>
             file.imports.some(({ resolved }) => PUBLIC_ENTRY.has(resolved))
         )
-        expect(entryUsers.length).toBeGreaterThan(20)
+        expect(entryUsers.length).toBeGreaterThan(10)
     })
 
     it("keeps the package self-contained", () => {

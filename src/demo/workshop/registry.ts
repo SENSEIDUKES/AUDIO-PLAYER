@@ -12,29 +12,32 @@ function load<M>(importer: () => Promise<M>, pick: (module: M) => ComponentType)
     return lazy(() => importer().then((module) => ({ default: pick(module) })))
 }
 
-const players = () => import("../workspaces/players/FaceWorkspace")
-
 export const WORKSPACES: Readonly<Record<string, Workspace>> = {
-    /* Players */
-    "new-face": load(
-        () => import("../workspaces/players/NewFaceWorkspace"),
-        (m) => m.NewFaceWorkspace
-    ),
-    "portable-player": load(players, (m) => m.PortablePlayerWorkspace),
-    "full-card": load(players, (m) => m.FullCardWorkspace),
-    "sea-card": load(players, (m) => m.SeaCardWorkspace),
-    "sticky-bottom": load(players, (m) => m.StickyBottomWorkspace),
-    "mini-sidebar": load(players, (m) => m.MiniSidebarWorkspace),
-    "vault-row": load(
-        () => import("../workspaces/players/VaultRowWorkspace"),
-        (m) => m.VaultRowWorkspace
+    /* Player */
+    "new-player": load(
+        () => import("../workspaces/players/NewPlayerWorkspace"),
+        (m) => m.NewPlayerWorkspace
     ),
     "narrative-face": load(
         () => import("../workspaces/players/NarrativeFaceWorkspace"),
         (m) => m.NarrativeFaceWorkspace
     ),
 
-    /* Systems */
+    /* Novels (SEN) */
+    "reader-mixer": load(
+        () => import("../workspaces/sen/ReaderMixerWorkspace"),
+        (m) => m.ReaderMixerWorkspace
+    ),
+    "narrative-engines": load(
+        () => import("../workspaces/systems/NarrativeEnginesWorkspace"),
+        (m) => m.NarrativeEnginesWorkspace
+    ),
+    cues: load(
+        () => import("../workspaces/systems/CuesWorkspace"),
+        (m) => m.CuesWorkspace
+    ),
+
+    /* Engine */
     "playback-session": load(
         () => import("../workspaces/systems/PlaybackSessionWorkspace"),
         (m) => m.PlaybackSessionWorkspace
@@ -47,10 +50,6 @@ export const WORKSPACES: Readonly<Record<string, Workspace>> = {
         () => import("../workspaces/systems/SourcesRecoveryWorkspace"),
         (m) => m.SourcesRecoveryWorkspace
     ),
-    "menus-controller": load(
-        () => import("../workspaces/systems/MenusControllerWorkspace"),
-        (m) => m.MenusControllerWorkspace
-    ),
     queue: load(
         () => import("../workspaces/systems/QueueWorkspace"),
         (m) => m.QueueWorkspace
@@ -59,14 +58,6 @@ export const WORKSPACES: Readonly<Record<string, Workspace>> = {
         () => import("../workspaces/systems/AutomixWorkspace"),
         (m) => m.AutomixWorkspace
     ),
-    cues: load(
-        () => import("../workspaces/systems/CuesWorkspace"),
-        (m) => m.CuesWorkspace
-    ),
-    "narrative-engines": load(
-        () => import("../workspaces/systems/NarrativeEnginesWorkspace"),
-        (m) => m.NarrativeEnginesWorkspace
-    ),
     "agent-scout": load(
         () => import("../workspaces/systems/AgentScoutWorkspace"),
         (m) => m.AgentScoutWorkspace
@@ -74,59 +65,5 @@ export const WORKSPACES: Readonly<Record<string, Workspace>> = {
     "activity-log": load(
         () => import("../workspaces/systems/ActivityLogWorkspace"),
         (m) => m.ActivityLogWorkspace
-    ),
-    headless: load(
-        () => import("../workspaces/systems/HeadlessWorkspace"),
-        (m) => m.HeadlessWorkspace
-    ),
-
-    /* Customization */
-    plugins: load(
-        () => import("../workspaces/customization/PluginsWorkspace"),
-        (m) => m.PluginsWorkspace
-    ),
-    themes: load(
-        () => import("../workspaces/customization/ThemesWorkspace"),
-        (m) => m.ThemesWorkspace
-    ),
-    "face-presets": load(
-        () => import("../workspaces/customization/FacePresetsWorkspace"),
-        (m) => m.FacePresetsWorkspace
-    ),
-    scrubbers: load(
-        () => import("../workspaces/customization/ScrubbersWorkspace"),
-        (m) => m.ScrubbersWorkspace
-    ),
-    waveforms: load(
-        () => import("../workspaces/customization/WaveformsWorkspace"),
-        (m) => m.WaveformsWorkspace
-    ),
-    visuals: load(
-        () => import("../workspaces/customization/VisualsWorkspace"),
-        (m) => m.VisualsWorkspace
-    ),
-    "artwork-media": load(
-        () => import("../workspaces/customization/ArtworkWorkspace"),
-        (m) => m.ArtworkWorkspace
-    ),
-    "typography-metadata": load(
-        () => import("../workspaces/customization/TypographyWorkspace"),
-        (m) => m.TypographyWorkspace
-    ),
-
-    /* SEN */
-    "reader-mixer": load(
-        () => import("../workspaces/sen/ReaderMixerWorkspace"),
-        (m) => m.ReaderMixerWorkspace
-    ),
-
-    /* Testing Lab */
-    "testing-lab": load(
-        () => import("../workspaces/testing-lab/TestingLabWorkspace"),
-        (m) => m.TestingLabWorkspace
-    ),
-    "showcase-fixture": load(
-        () => import("../workspaces/fixtures/ShowcaseFixtureWorkspace"),
-        (m) => m.ShowcaseFixtureWorkspace
     ),
 }

@@ -2,7 +2,6 @@ import { useMemo, useState } from "react"
 import {
     AUTOMIX_FADE_MS,
     AudioSessionProvider,
-    FullCardPlayer,
     createAutomixPlugin,
     ensureProTrackAnalysis,
     ensureTrackAnalysis,
@@ -13,7 +12,7 @@ import {
     useAudioTime,
 } from "../../../audio-player"
 import type { AudioPlayerPlugin, Track, TrackAnalysis } from "../../../audio-player"
-import { SEA_THEME, TRACK_SETS, isTrackSetId } from "../../data"
+import { TRACK_SETS, isTrackSetId } from "../../data"
 import { useWorkspaceParam } from "../../workshop/routing"
 import {
     Button,
@@ -29,6 +28,7 @@ import {
 } from "../../workshop/ui"
 import type { LogLine } from "../../workshop/ui"
 import { SessionEventFeed, SessionReadout, useTicker } from "../shared/session"
+import { TestControls } from "../shared/TestControls"
 
 /* Automix: crossfades between queue tracks. Lite is the session's own switch
    (silence-trimmed equal-power fades); Pro is the plugin, which adds essentia
@@ -210,7 +210,7 @@ export function AutomixWorkspace() {
                                       : "Automix off"}
                                 {transitioning ? " · crossfading…" : ""}
                             </p>
-                            <FullCardPlayer {...SEA_THEME} />
+                            <TestControls />
                         </div>
                         <Panel
                             title="Per-track analysis"

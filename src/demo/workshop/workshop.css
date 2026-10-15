@@ -8,7 +8,6 @@
     --wk-players: #7c5cff;
     --wk-systems: #22d3a6;
     --wk-customization: #f4b860;
-    --wk-testing-lab: #38bdf8;
     --wk-sen: #f472b6;
     --wk-live: #22d3a6;
     --wk-partial: #f4b860;
@@ -205,13 +204,6 @@ a.wk-card:hover {
     border-color: var(--lab-border-strong);
     box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
 }
-.wk-card--roadmap {
-    border-style: dashed;
-    background: rgba(20, 20, 28, 0.35);
-}
-.wk-card--roadmap .wk-card-art {
-    opacity: 0.45;
-}
 
 .wk-card-art {
     position: relative;
@@ -229,16 +221,10 @@ a.wk-card:hover {
         linear-gradient(160deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0));
     border-bottom: 1px solid var(--lab-border);
 }
-.wk-card-art--systems {
+.wk-card-art--engine {
     --wk-tint: var(--wk-systems);
 }
-.wk-card-art--customization {
-    --wk-tint: var(--wk-customization);
-}
-.wk-card-art--testing-lab {
-    --wk-tint: var(--wk-testing-lab);
-}
-.wk-card-art--sen {
+.wk-card-art--novels {
     --wk-tint: var(--wk-sen);
 }
 
@@ -276,10 +262,6 @@ a.wk-card:hover {
     align-items: center;
     gap: 8px;
 }
-.wk-card__via {
-    font-size: 11px;
-    color: var(--lab-text-faint);
-}
 .wk-card__title {
     margin: 2px 0 0;
     font-size: 19px;
@@ -302,22 +284,6 @@ a.wk-card:hover {
 }
 a.wk-card:hover .wk-card__open {
     color: var(--lab-text);
-}
-
-.wk-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin: 2px 0 0;
-    padding: 0;
-    list-style: none;
-}
-.wk-tag {
-    font-size: 11px;
-    padding: 2px 8px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.06);
-    color: var(--lab-text-dim);
 }
 
 .wk-status {
@@ -346,10 +312,6 @@ a.wk-card:hover .wk-card__open {
 }
 .wk-status--placeholder {
     color: var(--wk-placeholder);
-    border-style: dashed;
-}
-.wk-status--roadmap {
-    color: var(--wk-roadmap);
     border-style: dashed;
 }
 
@@ -1548,4 +1510,78 @@ body.lab-frame-body {
     width: 100%;
     max-width: 340px;
     margin: 0 auto 12px;
+}
+
+/* Plain test controls: an undesigned transport that drives the engine on a
+   workspace while the new player face is being designed. */
+.wk-test-controls {
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+    border: 1px dashed var(--lab-border);
+    border-radius: 12px;
+}
+.wk-test-controls__head {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+.wk-test-controls__label {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.6;
+}
+.wk-test-controls__track {
+    margin: 0;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.wk-test-controls__status {
+    margin: 0;
+    font-size: 13px;
+    opacity: 0.75;
+}
+.wk-test-controls__row,
+.wk-test-controls__seek {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.wk-test-controls__seek input,
+.wk-test-controls__row input {
+    flex: 1 1 120px;
+    min-width: 0;
+}
+.wk-test-controls__time {
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+/* The empty stage on the New player page. */
+.wk-face-slot {
+    display: grid;
+    place-content: center;
+    gap: 6px;
+    min-height: 220px;
+    padding: 24px;
+    text-align: center;
+    border: 2px dashed var(--lab-border);
+    border-radius: 16px;
+}
+.wk-face-slot__title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+.wk-face-slot__hint {
+    margin: 0;
+    max-width: 36ch;
+    opacity: 0.7;
 }

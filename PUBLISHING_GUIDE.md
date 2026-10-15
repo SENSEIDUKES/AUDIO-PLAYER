@@ -92,7 +92,7 @@ finished, then reinstall its declared dependency.
 ## Import contract
 
 ```tsx
-import { AudioPlayer, type Track } from "@seihouse/audio-player"
+import { AudioSessionProvider, type Track } from "@seihouse/audio-player"
 import "@seihouse/audio-player/styles.css"
 
 const tracks: Track[] = [
@@ -105,7 +105,7 @@ const tracks: Track[] = [
 ]
 
 export function App() {
-  return <AudioPlayer tracks={tracks} />
+  return <AudioSessionProvider initialQueue={tracks}>{/* your controls */}</AudioSessionProvider>
 }
 ```
 

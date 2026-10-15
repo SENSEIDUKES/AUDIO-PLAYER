@@ -31,7 +31,7 @@ afterEach(() => {
 describe("WorkspaceFrame", () => {
     it("contains a crashing workspace and goes back without reloading the page", () => {
         const entry = getEntry("queue")
-        if (!entry) throw new Error("The Queue entry is missing from the catalog")
+        if (!entry) throw new Error("The Up next entry is missing from the catalog")
         window.history.replaceState(null, "", "/?workspace=queue")
         render(
             <WorkspaceFrame entry={entry}>
@@ -42,11 +42,11 @@ describe("WorkspaceFrame", () => {
         const alert = screen.getByRole("alert")
         expect(alert).toHaveTextContent("This workspace hit an error.")
         expect(alert).toHaveTextContent("engine exploded")
-        expect(screen.getByRole("heading", { level: 1, name: "Queue" })).toBeInTheDocument()
+        expect(screen.getByRole("heading", { level: 1, name: "Up next" })).toBeInTheDocument()
 
         const back = screen.getByRole("link", { name: "Back to the Workshop" })
         // fireEvent returns false when the click's default (a full page load) was prevented.
         expect(fireEvent.click(back)).toBe(false)
-        expect(window.location.search).toBe("?category=systems")
+        expect(window.location.search).toBe("?category=engine")
     })
 })
