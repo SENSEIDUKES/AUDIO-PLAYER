@@ -8,7 +8,7 @@ export function TestControls({ label = "Test controls" }: { label?: string }) {
     const s = useAudioSession()
     const { currentTime, duration } = useAudioTime()
     const status = s.hasError
-        ? `Can't play: ${s.errorMessage}`
+        ? `Can't play: ${s.errorMessage || "unknown error"}`
         : s.isBuffering
           ? "Loading…"
           : s.isPlaying
@@ -49,7 +49,7 @@ export function TestControls({ label = "Test controls" }: { label?: string }) {
                     Next
                 </button>
             </div>
-            <label className="wk-test-controls__seek">
+            <div className="wk-test-controls__seek">
                 <span className="wk-test-controls__time">{formatTime(currentTime)}</span>
                 <input
                     type="range"
@@ -62,7 +62,7 @@ export function TestControls({ label = "Test controls" }: { label?: string }) {
                     aria-label="Position"
                 />
                 <span className="wk-test-controls__time">{formatTime(duration)}</span>
-            </label>
+            </div>
             <div className="wk-test-controls__row">
                 <button type="button" className="wk-btn" onClick={s.toggleMute}>
                     {s.isMuted ? "Unmute" : "Mute"}
