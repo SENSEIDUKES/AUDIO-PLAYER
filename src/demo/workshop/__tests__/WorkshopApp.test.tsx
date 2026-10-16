@@ -40,100 +40,76 @@ afterEach(() => {
 })
 
 describe("Workshop home", () => {
-    it("is the entry point, with the five categories as tabs", () => {
+    it("is the entry point, with the three tabs", () => {
         openAt("")
         const tabs = within(screen.getByRole("tablist", { name: "Workshop categories" }))
             .getAllByRole("tab")
             .map((tab) => tab.firstChild?.textContent)
-        expect(tabs).toEqual(["Players", "Systems", "Customization", "Testing Lab", "SEN"])
-        expect(screen.getByRole("heading", { level: 1, name: "Players" })).toBeInTheDocument()
-        expect(screen.getByRole("tab", { selected: true })).toHaveTextContent("Players")
+        expect(tabs).toEqual(["Player", "Novels (SEN)", "Engine"])
+        expect(screen.getByRole("heading", { level: 1, name: "Player" })).toBeInTheDocument()
+        expect(screen.getByRole("tab", { selected: true })).toHaveTextContent("Player")
+        expect(cardFor("New player")).toHaveAttribute("href", "?workspace=new-player")
     })
 
-    it("switches category through the URL", () => {
+    it("switches tab through the URL", () => {
         openAt("")
-        fireEvent.click(screen.getByRole("tab", { name: /Systems/ }))
-        expect(window.location.search).toBe("?category=systems")
-        expect(screen.getByRole("heading", { level: 1, name: "Systems" })).toBeInTheDocument()
+        fireEvent.click(screen.getByRole("tab", { name: /Engine/ }))
+        expect(window.location.search).toBe("?category=engine")
+        expect(screen.getByRole("heading", { level: 1, name: "Engine" })).toBeInTheDocument()
         expect(cardFor("Automix")).toHaveAttribute("href", "?workspace=automix")
     })
 
     it("moves between tabs with the arrow keys", () => {
-        openAt("?category=customization")
+        openAt("?category=player")
         fireEvent.keyDown(screen.getByRole("tab", { selected: true }), { key: "ArrowRight" })
-        expect(window.location.search).toBe("?category=testing-lab")
-        expect(screen.getByRole("tab", { selected: true })).toHaveTextContent("Testing Lab")
-    })
-
-    it("opens the SEN tab and its Reader Mixer card", () => {
-        openAt("?category=testing-lab")
-        fireEvent.keyDown(screen.getByRole("tab", { selected: true }), { key: "ArrowRight" })
-        expect(window.location.search).toBe("?category=sen")
-        expect(screen.getByRole("heading", { level: 1, name: "SEN" })).toBeInTheDocument()
-        expect(cardFor("Reader Mixer")).toHaveAttribute("href", "?workspace=reader-mixer")
-    })
-
-    it("shows roadmap pieces honestly, as records that open nothing", () => {
-        openAt("?category=players")
-        const roadmap = cardFor("QueueRowPlayer")
-        expect(roadmap.tagName).toBe("ARTICLE")
-        expect(roadmap).toHaveAccessibleName("QueueRowPlayer (not built)")
-        expect(within(roadmap).getByText("Nothing to open yet")).toBeInTheDocument()
-        expect(cardFor("FullCardPlayer").tagName).toBe("A")
-    })
-
-    it("sends scenario cards to a Mix & Match Lab preset", () => {
-        openAt("?category=testing-lab")
-        expect(cardFor("Mobile checks")).toHaveAttribute(
-            "href",
-            "?workspace=testing-lab&scenario=mobile"
-        )
-        expect(cardFor("Showcase fixture")).toHaveAttribute("href", "?workspace=showcase-fixture")
+        expect(window.location.search).toBe("?category=novels")
+        expect(screen.getByRole("heading", { level: 1, name: "Novels (SEN)" })).toBeInTheDocument()
+        expect(cardFor("Reader mixer")).toHaveAttribute("href", "?workspace=reader-mixer")
     })
 })
 
 describe("Workspaces", () => {
-    it("opens a card as its own workspace and comes back to the same category", async () => {
-        openAt("?category=systems")
-        fireEvent.click(cardFor("Queue"))
+    it("opens a card as its own workspace and comes back to the same tab", async () => {
+        openAt("?category=engine")
+        fireEvent.click(cardFor("Up next"))
         expect(window.location.search).toBe("?workspace=queue")
-        await workspaceLoaded("Queue")
+        await workspaceLoaded("Up next")
         expect(screen.getByRole("navigation", { name: "Breadcrumb" })).toHaveTextContent(
-            "Systems/Queue"
+            "Engine/Up next"
         )
 
         fireEvent.click(screen.getByRole("link", { name: "Workshop" }))
-        expect(window.location.search).toBe("?category=systems")
-        expect(screen.getByRole("heading", { level: 1, name: "Systems" })).toBeInTheDocument()
+        expect(window.location.search).toBe("?category=engine")
+        expect(screen.getByRole("heading", { level: 1, name: "Engine" })).toBeInTheDocument()
     })
 
-    it("opens directly from a link, with its working list and placeholders", async () => {
-        openAt("?workspace=vault-row")
-        await workspaceLoaded("VaultRowPlayer")
-        expect(screen.getByRole("heading", { name: "Working here" })).toBeInTheDocument()
-        expect(screen.getByRole("heading", { name: "Placeholders & limits" })).toBeInTheDocument()
-        expect(document.title).toBe("VaultRowPlayer · Audio Player Workshop")
+    it("opens directly from a link, with what works and what doesn't yet", async () => {
+        openAt("?workspace=narrative-face")
+        await workspaceLoaded("Narrator face")
+        expect(screen.getByRole("heading", { name: "What you can do here" })).toBeInTheDocument()
+        expect(screen.getByRole("heading", { name: "Not working yet" })).toBeInTheDocument()
+        expect(document.title).toBe("Narrator face · Audio Player Workshop")
     })
 
     it("stops its audio when you leave", async () => {
-        openAt("?workspace=full-card")
-        await workspaceLoaded("FullCardPlayer")
+        openAt("?workspace=new-player")
+        await workspaceLoaded("New player")
         await vi.waitFor(() => expect(document.querySelectorAll("audio").length).toBeGreaterThan(0))
 
         fireEvent.click(screen.getByRole("link", { name: "Workshop" }))
-        expect(screen.getByRole("heading", { level: 1, name: "Players" })).toBeInTheDocument()
+        expect(screen.getByRole("heading", { level: 1, name: "Player" })).toBeInTheDocument()
         expect(document.querySelectorAll("audio")).toHaveLength(0)
     })
 
     it("follows the browser's back button", async () => {
-        openAt("?category=customization")
-        fireEvent.click(cardFor("Themes"))
-        await workspaceLoaded("Themes")
+        openAt("?category=engine")
+        fireEvent.click(cardFor("Playback"))
+        await workspaceLoaded("Playback")
         act(() => {
-            window.history.replaceState(null, "", "/?category=customization")
+            window.history.replaceState(null, "", "/?category=engine")
             window.dispatchEvent(new PopStateEvent("popstate"))
         })
-        expect(screen.getByRole("heading", { level: 1, name: "Customization" })).toBeInTheDocument()
+        expect(screen.getByRole("heading", { level: 1, name: "Engine" })).toBeInTheDocument()
     })
 
     it("explains an unknown workspace link and offers a way back", () => {
@@ -143,18 +119,12 @@ describe("Workspaces", () => {
         ).toBeInTheDocument()
         expect(screen.getByRole("link", { name: "Back to the Workshop" })).toHaveAttribute(
             "href",
-            "?category=players"
+            "?category=player"
         )
     })
 
-    it("never opens a roadmap record from a typed link", () => {
-        openAt("?workspace=canvas-mode")
+    it("treats a link to an archived v4 face as unknown", () => {
+        openAt("?workspace=full-card")
         expect(screen.getByRole("heading", { name: /No workspace called/ })).toBeInTheDocument()
-    })
-
-    it("redirects a scenario card's own id to its Lab preset", async () => {
-        openAt("?workspace=lab-errors")
-        await workspaceLoaded("Mix & Match Lab")
-        expect(window.location.search).toBe("?workspace=testing-lab&scenario=errors")
     })
 })

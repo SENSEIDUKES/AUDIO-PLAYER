@@ -3,7 +3,6 @@
 
 import { useEffect, useMemo } from "react"
 import {
-    AudioPlayer,
     AudioSessionProvider,
     NarrativeFace,
     ReaderMixerProvider,
@@ -11,7 +10,6 @@ import {
     ReaderMixerNote,
     createAutomixPlugin,
     createKeyboardShortcutPlugin,
-    StickyBottomPlayer,
     type Track,
     useAudioSession,
     useReaderMixer,
@@ -29,18 +27,12 @@ const tracks: Track[] = [
     },
 ]
 
-// One self-contained player. AudioPlayer owns its session internally.
-export function StandalonePlayerExample() {
-    return <AudioPlayer tracks={tracks} accentColor="#6366f1" backgroundColor="#0f172a" />
-}
-
-// One shared queue with custom controls and a skin. Every child uses the same
-// audio element, playback state, and queue from AudioSessionProvider.
+// One shared queue with custom controls. Every child uses the same audio
+// element, playback state, and queue from AudioSessionProvider.
 export function SharedSessionExample() {
     return (
         <AudioSessionProvider initialQueue={tracks}>
             <CustomPlayerControls />
-            <StickyBottomPlayer />
         </AudioSessionProvider>
     )
 }
@@ -140,5 +132,9 @@ export function PluginExample() {
         []
     )
 
-    return <AudioPlayer tracks={tracks} plugins={plugins} />
+    return (
+        <AudioSessionProvider initialQueue={tracks} plugins={plugins}>
+            <CustomPlayerControls />
+        </AudioSessionProvider>
+    )
 }

@@ -1,0 +1,149 @@
+/* NarrativeFace styles. Shared control styling (ap-btn, ap-icon-btn, ap-volume,
+   ap-tap, ...) comes from the base stylesheet; we import it so a page that uses
+   only the narrator face still gets it. The face sets the same --ap-* theme
+   tokens on its root (see themeVars.ts), so the reused VolumeControl inherits
+   the right colors. */
+@import "../audio-player.css";
+
+/* =====================================================================
+   NarrativeFace (narrative family) — a faceless story/reader surface.
+   Minimal by design: a soundscape indicator, play/pause, mute + voice
+   level, ambience level, and an optional expand control. No artwork,
+   scrubber, or music chrome. Themed via the shared --ap-* vars.
+   ===================================================================== */
+.ap-nf {
+    box-sizing: border-box;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 14px;
+    border-radius: 12px;
+    background-color: var(--ap-bg);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--ap-text);
+    font-family:
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        sans-serif;
+}
+.ap-nf *,
+.ap-nf *::before,
+.ap-nf *::after {
+    box-sizing: border-box;
+}
+.ap-nf--embedded {
+    position: fixed;
+    left: 50%;
+    bottom: 16px;
+    transform: translateX(-50%);
+    width: min(560px, calc(100% - 24px));
+    z-index: 50;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+}
+
+/* Soundscape indicator — a quiet pulse dot + mood label. */
+.ap-nf__scape {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex: 0 1 auto;
+}
+.ap-nf__dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--ap-accent);
+    opacity: 0.35;
+    flex: none;
+}
+.ap-nf--ambient .ap-nf__dot {
+    opacity: 0.7;
+}
+.ap-nf--narrating .ap-nf__dot {
+    opacity: 1;
+    animation: ap-nf-pulse 1.8s ease-in-out infinite;
+}
+@keyframes ap-nf-pulse {
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 0.55;
+    }
+    50% {
+        transform: scale(1.35);
+        opacity: 1;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .ap-nf--narrating .ap-nf__dot {
+        animation: none;
+    }
+}
+.ap-nf__mood {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    text-transform: capitalize;
+    opacity: 0.85;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 120px;
+}
+
+.ap-nf__play {
+    flex: none;
+}
+
+/* Volume blocks — a small label sitting above the reused control/slider. */
+.ap-nf__vol {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+.ap-nf__vol--narration {
+    flex: 1 1 auto;
+}
+.ap-nf__vol--ambience {
+    flex: 1 1 auto;
+}
+.ap-nf__vol-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    opacity: 0.55;
+    flex: none;
+}
+.ap-nf__range {
+    width: 100%;
+    min-width: 60px;
+    accent-color: var(--ap-accent);
+    cursor: pointer;
+}
+.ap-nf__range:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+.ap-nf__expand {
+    flex: none;
+}
+
+/* Stack the two level controls on narrow embeds. */
+@media (max-width: 460px) {
+    .ap-nf {
+        flex-wrap: wrap;
+        gap: 8px 12px;
+    }
+    .ap-nf__vol--narration,
+    .ap-nf__vol--ambience {
+        flex: 1 1 100%;
+    }
+}

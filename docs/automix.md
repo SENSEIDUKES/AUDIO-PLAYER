@@ -78,12 +78,16 @@ metadata steers timing only — it does not time-stretch or beatmatch.
 
 ```tsx
 import { useMemo } from "react"
-import { AudioPlayer, createAutomixPlugin } from "@seihouse/audio-player"
+import { AudioSessionProvider, createAutomixPlugin } from "@seihouse/audio-player"
 
-function PlaylistPlayer() {
+function PlaylistPlayer({ children }: { children: React.ReactNode }) {
   const plugins = useMemo(() => [createAutomixPlugin()], [])
 
-  return <AudioPlayer tracks={tracks} plugins={plugins} />
+  return (
+    <AudioSessionProvider initialQueue={tracks} plugins={plugins}>
+      {children}
+    </AudioSessionProvider>
+  )
 }
 ```
 
@@ -110,7 +114,7 @@ session, and shows each track's analysis and the planned transition.
 | essentia.js worker + client | `src/audio-player/automix/rhythmWorker.ts`, `rhythmClient.ts` |
 | Pure transition math (unit-tested) | `src/audio-player/automix/transitionPlanner.ts` |
 | IndexedDB analysis cache | `src/audio-player/automix/analysisStore.ts` |
-| Built-in `automix` prop/menu → internal plugin wiring | `AudioPlayer.tsx`, `session/AudioSessionContext.tsx`, `plugins/automixIntegration.ts` |
+| Built-in `automix` prop → internal plugin wiring | `session/AudioSessionContext.tsx`, `plugins/automixIntegration.ts` |
 
 The `AutomixPlugin` always attempts rich analysis (`usePro()` is on except where
 fades are impossible); per-pair confidence in `planTransition` decides whether a

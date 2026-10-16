@@ -33,14 +33,19 @@ describe("every workspace opens from a direct link", () => {
             expect(
                 await screen.findByRole("heading", { level: 1, name: title })
             ).toBeInTheDocument()
-            await vi.waitFor(() => expect(screen.queryByText("Loading workspace…")).toBeNull(), {
-                timeout: 15_000,
-            })
+            // Wait for the live view itself, below the shared header. The loading
+            // fallback is not always in the DOM while a large workspace chunk
+            // resolves, so its absence alone does not mean the view is there.
+            await vi.waitFor(
+                () => {
+                    expect(screen.queryByText("Loading workspace…")).toBeNull()
+                    expect(
+                        screen.getByRole("main").querySelector(":scope > .wk-ws-head ~ *")
+                    ).not.toBeNull()
+                },
+                { timeout: 15_000 }
+            )
             expect(screen.queryByText("This workspace hit an error.")).toBeNull()
-            // The live view renders below the shared header.
-            expect(
-                screen.getByRole("main").querySelector(":scope > .wk-ws-head ~ *")
-            ).not.toBeNull()
             expect(screen.getByRole("link", { name: "Workshop" })).toHaveAttribute(
                 "href",
                 expect.stringMatching(/^\?category=/)

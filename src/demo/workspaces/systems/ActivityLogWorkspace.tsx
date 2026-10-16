@@ -3,7 +3,6 @@ import {
     ActivityLogPanel,
     ActivityLogProvider,
     AudioSessionProvider,
-    FullCardPlayer,
     useActivityLog,
     useActivityLogRecording,
     useAudioSession,
@@ -20,6 +19,7 @@ import {
     TextField,
 } from "../../workshop/ui"
 import { SessionController } from "../shared/session"
+import { TestControls } from "../shared/TestControls"
 
 /* Diagnostics: the Activity Log records lifecycle events from anywhere in the
    player. The host mounts ActivityLogProvider and (optionally) the recording
@@ -118,7 +118,7 @@ export function ActivityLogWorkspace() {
                     stage={
                         <>
                             <div className="wk-stage-card">
-                                <FullCardPlayer {...SEA_THEME} />
+                                <TestControls />
                             </div>
                             <Panel
                                 title="Make something happen"

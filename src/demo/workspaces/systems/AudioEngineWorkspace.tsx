@@ -1,12 +1,7 @@
 import { useEffect, useRef, useState } from "react"
-import {
-    AudioSessionProvider,
-    StickyBottomPlayer,
-    createAudioBackend,
-    useAudioSession,
-} from "../../../audio-player"
+import { AudioSessionProvider, createAudioBackend, useAudioSession } from "../../../audio-player"
 import type { AudioBackend, AudioBackendKind } from "../../../audio-player"
-import { SAMPLE, SEA_THEME, TRACK_SETS, TRACK_SET_OPTIONS, isTrackSetId } from "../../data"
+import { SAMPLE, TRACK_SETS, TRACK_SET_OPTIONS, isTrackSetId } from "../../data"
 import { useWorkspaceParam } from "../../workshop/routing"
 import {
     Button,
@@ -24,6 +19,7 @@ import {
 } from "../../workshop/ui"
 import type { LogLine } from "../../workshop/ui"
 import { SessionEventFeed, SessionReadout, useTicker } from "../shared/session"
+import { TestControls } from "../shared/TestControls"
 
 /* The engine underneath every face (useAudioPlayer) on either backend. The
    session exposes the whole engine API, so this workspace drives it directly:
@@ -288,7 +284,7 @@ export function AudioEngineWorkspace() {
                                 Transport · {backendKind === "webaudio" ? "Web Audio" : "HTML5"}{" "}
                                 backend
                             </p>
-                            <StickyBottomPlayer fixed={false} {...SEA_THEME} />
+                            <TestControls />
                         </div>
                         <Note>
                             HTML5 streams progressively. Web Audio downloads and decodes the whole

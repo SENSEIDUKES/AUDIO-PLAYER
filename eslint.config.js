@@ -7,7 +7,7 @@ import globals from "globals"
 export default tseslint.config(
     {
         // Build output, deps, coverage and type declarations are never linted.
-        ignores: ["dist/**", "node_modules/**", "coverage/**", "**/*.d.ts"],
+        ignores: ["dist/**", "node_modules/**", "coverage/**", "archive/**", "**/*.d.ts"],
     },
     js.configs.recommended,
     ...tseslint.configs.recommended,

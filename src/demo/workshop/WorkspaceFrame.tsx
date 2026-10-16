@@ -7,8 +7,8 @@ import { handleLinkClick, homeHref } from "./routing"
 import { StatusBadge } from "./ui"
 
 /* The chrome every workspace shares: a way back, where you are, how finished
-   the piece is, and an honest list of what works and what is still a
-   placeholder. The workspace itself renders below it. */
+   the piece is, and an honest list of what works and what doesn't yet. The
+   workspace itself renders below it. */
 
 function CopyLinkButton() {
     const [copied, setCopied] = useState(false)
@@ -115,7 +115,7 @@ export function WorkspaceFrame({ entry, children }: { entry: WorkshopEntry; chil
                     <div className="wk-ws-head__facts">
                         {entry.working.length > 0 && (
                             <div className="wk-facts wk-facts--working">
-                                <h2 className="wk-facts__title">Working here</h2>
+                                <h2 className="wk-facts__title">What you can do here</h2>
                                 <ul>
                                     {entry.working.map((item) => (
                                         <li key={item}>{item}</li>
@@ -125,7 +125,7 @@ export function WorkspaceFrame({ entry, children }: { entry: WorkshopEntry; chil
                         )}
                         {entry.placeholders && entry.placeholders.length > 0 && (
                             <div className="wk-facts wk-facts--placeholder">
-                                <h2 className="wk-facts__title">Placeholders &amp; limits</h2>
+                                <h2 className="wk-facts__title">Not working yet</h2>
                                 <ul>
                                     {entry.placeholders.map((item) => (
                                         <li key={item}>{item}</li>

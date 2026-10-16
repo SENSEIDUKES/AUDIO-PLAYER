@@ -320,8 +320,25 @@ try {
     // remain safe for Node and SSR tooling.
     const requireFromConsumer = createRequire(path.join(consumerDir, "smoke.cjs"))
     const commonJsExports = requireFromConsumer("@seihouse/audio-player")
-    if (typeof commonJsExports.AudioPlayer !== "function") {
-        throw new Error("CommonJS package export did not load the audio player")
+    if (typeof commonJsExports.AudioSessionProvider !== "function") {
+        throw new Error("CommonJS package export did not load the audio session")
+    }
+    if (typeof commonJsExports.NarrativeFace !== "function") {
+        throw new Error("CommonJS package export did not load the narrator face")
+    }
+    // The v4 music faces are archived (archive/faces-v4) and must not ship.
+    for (const archived of [
+        "AudioPlayer",
+        "default",
+        "FullCardPlayer",
+        "SeaCardPlayer",
+        "StickyBottomPlayer",
+        "MiniSidebarPlayer",
+        "VaultRowPlayer",
+    ]) {
+        if (archived in commonJsExports) {
+            throw new Error(`Archived face ${archived} is still exported`)
+        }
     }
     exerciseReaderVoice(commonJsExports, "CommonJS")
 

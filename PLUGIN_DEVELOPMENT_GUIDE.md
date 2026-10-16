@@ -20,7 +20,6 @@ The plugin system is intentionally additive:
 
 ```ts
 import {
-  AudioPlayer,
   AudioSessionProvider,
   createKeyboardShortcutPlugin,
   createAnalyticsPlugin,
@@ -30,27 +29,14 @@ import {
 } from "@seihouse/audio-player"
 ```
 
-Both standalone and shared-session entry points accept plugins:
-
-```tsx
-<AudioPlayer
-  title="Plugin Demo"
-  artist="SEIHouse"
-  audioFile="/track.mp3"
-  plugins={[
-    createKeyboardShortcutPlugin(),
-    createAnalyticsPlugin({ send: console.log }),
-    createSleepTimerPlugin(),
-  ]}
-/>
-```
+The shared session (and the standalone `useAudioPlayer` hook) accepts plugins:
 
 ```tsx
 <AudioSessionProvider
   initialQueue={tracks}
   plugins={[createKeyboardShortcutPlugin({ scope: "document" })]}
 >
-  <AppSkins />
+  <AppControls />
 </AudioSessionProvider>
 ```
 

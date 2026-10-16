@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react"
 import {
     AudioSessionProvider,
     NarrativeFace,
-    StickyBottomPlayer,
     createCueManifestPlugin,
     formatTime,
     useAudioSession,
@@ -23,6 +22,7 @@ import {
 } from "../../workshop/ui"
 import type { LogLine } from "../../workshop/ui"
 import { SessionEventFeed } from "../shared/session"
+import { TestControls } from "../shared/TestControls"
 
 /* Cue Manifest v1: time- and story-triggered actions attached to a track.
    The CueManifestPlugin runs them against the session; narrative actions are
@@ -260,7 +260,7 @@ export function CuesWorkspace() {
                     <>
                         <div className="wk-stage-card">
                             <p className="wk-stage-card__title">Transport</p>
-                            <StickyBottomPlayer fixed={false} {...SEA_THEME} />
+                            <TestControls />
                             <CueTimeline manifest={manifest} />
                             <Note>Markers are time cues; tap one to jump just before it.</Note>
                         </div>

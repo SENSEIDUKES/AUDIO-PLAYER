@@ -41,7 +41,8 @@ The player currently supports:
 - Loading, buffering, and playback-state handling.
 - Browser and mobile quality checks documented in the repo.
 - Opt-in **Automix Lite** transitions with conservative silence trimming.
-- Multiple player surfaces, including standalone/full-card and sticky bottom player contexts.
+- One shared session (one audio element, one queue) that any player face reads through public hooks.
+- The narrator face (`NarrativeFace`) for reading apps. The v4 music faces are archived while one new face is designed from scratch.
 - A four-layer **reader mixer** (music score, ambient atmosphere, sound cues, recorded/generated TTS voice) with per-layer switches and volume and an inline mixer view.
 
 ---
@@ -87,6 +88,14 @@ changes. See the
 [distribution and publishing guide](https://github.com/SENSEIDUKES/AUDIO-PLAYER/blob/main/PUBLISHING_GUIDE.md)
 for those development workflows and the release-owner process.
 
+The **5.0.0** package archives the v4 music faces so one new player face can be
+designed from scratch on the same engine. The root no longer exports
+`AudioPlayer` (or a default export), `FullCardPlayer`, `SeaCardPlayer`,
+`StickyBottomPlayer`, `MiniSidebarPlayer`, or `VaultRowPlayer`, nor their prop
+types. The engine, `AudioSessionProvider` and its hooks, plugins, cues, the
+narrative engines, the reader mixer, and `NarrativeFace` are unchanged. Until
+the new face ships, build controls on `useAudioSession` as shown below.
+
 The **4.0.0** package moves `ReaderMixerPanel` and its label/prop exports to the
 ESM-only `@seihouse/audio-player/reader-ui` entry, rebuilt with the approved
 universal `@seihouse/ui` **0.10.1** used by SEN. Panel hosts need React 19,
@@ -105,11 +114,12 @@ covers host APIs, measurement, migration and required desktop/iPhone checks.
 
 ### Use it in React
 
-Import the player from the package root and import the stylesheet once in the host
-application:
+Import from the package root and import the stylesheet once in the host
+application. One `AudioSessionProvider` owns the audio element and queue; any
+controls inside it read and drive that session:
 
 ```tsx
-import { AudioPlayer, type Track } from "@seihouse/audio-player"
+import { AudioSessionProvider, useAudioSession, type Track } from "@seihouse/audio-player"
 import "@seihouse/audio-player/styles.css"
 
 const tracks: Track[] = [
@@ -122,8 +132,21 @@ const tracks: Track[] = [
   },
 ]
 
+function Controls() {
+  const session = useAudioSession()
+  return (
+    <button type="button" onClick={session.toggle}>
+      {session.isPlaying ? "Pause" : "Play"} {session.currentTrack?.title}
+    </button>
+  )
+}
+
 export function PlayerExample() {
-  return <AudioPlayer tracks={tracks} />
+  return (
+    <AudioSessionProvider initialQueue={tracks}>
+      <Controls />
+    </AudioSessionProvider>
+  )
 }
 ```
 
@@ -132,7 +155,7 @@ stable `id` whenever possible so the player can reliably distinguish tracks.
 
 ### Managed offline or private sources
 
-`AudioPlayer`, `useAudioPlayer`, and `AudioSessionProvider` accept an optional
+`useAudioPlayer` and `AudioSessionProvider` accept an optional
 `sourceResolver`. It runs before the active URL reaches the playback backend and
 receives the declared `TrackSource` plus an `AbortSignal`. Return a URL string,
 or return `{ url, release }` when the URL owns a resource such as an object URL:
@@ -179,9 +202,8 @@ point for a new integration.
 
 This repo is still in active development. Planned and ongoing directions include:
 
-- A compact Vault-ready player for large song libraries.
-- A persistent bottom-screen global player for SEIHouse apps.
-- More robust shared session state: one audio source, many UI skins.
+- One new player face, designed from scratch, with its variations (compact bar, card, library row) as settings on that one face rather than separate players.
+- More robust shared session state: one audio source behind every face.
 - Improved waveform/scrubber behavior.
 - SEA Portal and tap-card integration.
 - Arc Notes-aware playback.
@@ -199,12 +221,13 @@ This repo is still in active development. Planned and ongoing directions include
 Primary source locations:
 
 - Public package entry point: `src/audio-player/index.ts`
-- Standalone component: `src/audio-player/AudioPlayer.tsx`
+- Narrator face: `src/audio-player/skins/NarrativeFace.tsx`
+- Archived v4 faces and Workshop tools (not built or published): `archive/faces-v4/`
 - Hook / audio engine: `src/audio-player/useAudioPlayer.ts`
 - Development Workshop (demo only, never published): `src/demo/main.tsx`, with the
   home, routing, and card catalog in `src/demo/workshop/` and one workspace per
   piece in `src/demo/workspaces/`
-- Demo styling: `src/demo/audio-player-lab.css` (faces and fixtures) and
+- Demo styling: `src/demo/audio-player-lab.css` (shared lab styles) and
   `src/demo/workshop/workshop.css` (Workshop chrome)
 
 The intended architecture is:
@@ -214,7 +237,7 @@ Audio engine / session state
         ↓
 Reusable player logic
         ↓
-Multiple UI surfaces / skins
+One player face (with variations) + the narrator face
         ↓
 SEA Portal, Vault, Arc Notes, Vault Radio, artist pages, and future SEA apps
 ```
@@ -225,13 +248,13 @@ This allows SEIHouse to keep the playback behavior consistent while designing di
 
 ## Playback modes
 
-`AudioPlayer` supports sequential playback by default plus richer playlist controls:
+`AudioSessionProvider` (and `useAudioPlayer`) support sequential playback by default plus richer playlist controls:
 
 - `shuffle` — starts playlist mode with a shuffled playback order while keeping the active track anchored.
 - `repeatMode="off"` — stops advancing at the end of the current playback order.
 - `repeatMode="all"` — wraps from the end of the playback order back to the beginning.
 - `repeatMode="one"` — loops the active track without advancing.
-- `loop` — legacy compatibility prop; when `repeatMode` is omitted, `loop={true}` initializes repeat-one behavior.
+- `loop` — legacy `useAudioPlayer` option for single-source playback; it loops the one source.
 
 ---
 
@@ -244,12 +267,8 @@ fade timing and length from that metadata — otherwise every transition degrade
 gracefully to **light mode** (a conservative, silence-trimmed equal-power fade).
 
 The built-in light-mode crossfade is also available without the plugin via the
-`automix` prop, and can be toggled from:
-
-- the standalone player's ellipsis menu in playlist mode,
-- the `FullCardPlayer` transport row,
-- the `StickyBottomPlayer` transport row,
-- or programmatically through `SessionEngine.toggleAutomix()` / the `automix` props.
+`automix` prop on `AudioSessionProvider`, and can be toggled programmatically
+through `SessionEngine.toggleAutomix()`.
 
 With Automix off, normal playback behavior is unchanged.
 

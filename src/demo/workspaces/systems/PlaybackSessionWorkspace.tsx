@@ -1,17 +1,13 @@
 import { useState } from "react"
 import {
     AudioSessionProvider,
-    FullCardPlayer,
-    MiniSidebarPlayer,
-    StickyBottomPlayer,
-    VaultRowPlayer,
     deserializeSession,
     serializeSession,
     useAudioSession,
     useAudioTime,
 } from "../../../audio-player"
 import type { AudioSessionProviderProps, SerializedSession } from "../../../audio-player"
-import { NO_LUCK_ART, SEA_THEME, TRACK_SETS, TRACK_SET_OPTIONS, isTrackSetId } from "../../data"
+import { TRACK_SETS, TRACK_SET_OPTIONS, isTrackSetId } from "../../data"
 import { useWorkspaceParam } from "../../workshop/routing"
 import {
     Button,
@@ -27,10 +23,11 @@ import {
 } from "../../workshop/ui"
 import type { LogLine } from "../../workshop/ui"
 import { SessionEventFeed, SessionReadout, useTicker } from "../shared/session"
+import { TestControls } from "../shared/TestControls"
 
-/* The shared session: one <audio> element and one queue behind every face on
-   this page. Play, seek, or skip in any face and the others follow, because
-   they all read the same AudioSessionProvider. */
+/* The shared session: one <audio> element and one queue behind everything on
+   this page. Play, seek, or skip in either set of controls and the other
+   follows, because they both read the same AudioSessionProvider. */
 
 type PreloadStrategy = "none" | "next" | "aggressive"
 
@@ -188,7 +185,6 @@ export function PlaybackSessionWorkspace() {
         : { initialQueue: TRACK_SETS[trackSetId].tracks }
 
     const sessionKey = `${trackSetId}:${preload}:${restorePoint?.token ?? 0}`
-    const queue = providerProps.initialQueue ?? []
 
     return (
         <AudioSessionProvider
@@ -200,31 +196,14 @@ export function PlaybackSessionWorkspace() {
             <SplitLayout
                 stage={
                     <>
-                        <div className="wk-stage-card">
-                            <p className="wk-stage-card__title">FullCardPlayer</p>
-                            <FullCardPlayer {...SEA_THEME} />
-                        </div>
                         <div className="wk-stage-grid">
-                            <div className="wk-stage-card">
-                                <p className="wk-stage-card__title">MiniSidebarPlayer</p>
-                                <MiniSidebarPlayer art={NO_LUCK_ART} {...SEA_THEME} />
-                            </div>
-                            <div className="wk-stage-card">
-                                <p className="wk-stage-card__title">VaultRowPlayer rows</p>
-                                {queue.slice(0, 3).map((track, index) => (
-                                    <VaultRowPlayer
-                                        key={track.id ?? track.title}
-                                        track={track}
-                                        number={index + 1}
-                                        {...SEA_THEME}
-                                    />
-                                ))}
-                            </div>
+                            <TestControls label="Controls A" />
+                            <TestControls label="Controls B" />
                         </div>
-                        <div className="wk-stage-card">
-                            <p className="wk-stage-card__title">StickyBottomPlayer (inline)</p>
-                            <StickyBottomPlayer fixed={false} {...SEA_THEME} />
-                        </div>
+                        <Note>
+                            Both sets of controls read the same session. Play, seek, or skip in one
+                            and the other follows.
+                        </Note>
                         <Panel
                             title="Events"
                             hint="Everything the session reports through subscribe()."
