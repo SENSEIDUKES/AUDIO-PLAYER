@@ -93,20 +93,22 @@ export const WORKSHOP_ENTRIES: readonly WorkshopEntry[] = [
         category: "player",
         title: "Narrator face",
         summary:
-            "The small reading face: narration with background ambience that dips under the voice and changes with the scene.",
-        status: "partial",
+            "The face SEN's reader ships: a floating music note over the chapter, and the Reader Settings it opens, with the real Audio menu.",
+        status: "live",
         working: [
-            "Narration plays through the engine",
-            "Ambience dips under narration and crossfades between scene moods",
-            "Voice and ambience levels, shown inline or as a bottom overlay",
-            "Works with the Reader mixer when both are on the page",
+            "Tap the note to mute the story audio; Master stays on",
+            "Hold the note (or press ↑) for the quick master volume",
+            "The gear opens Reader Settings: Text, Audio, Narration",
+            "The Audio tab is the real menu: Master and each layer, sleep timer, preset pills",
+            "Narration ducks the music through the mixer's Voice layer",
         ],
         placeholders: [
-            "There are no real ambience packs yet, so short clips from the sample track stand in.",
+            "Text and Narration settings belong to SEN's reader, so those tabs only say so here.",
         ],
         sources: [
-            "src/audio-player/skins/NarrativeFace.tsx",
-            "src/audio-player/narrative/useNarrativeAudio.ts",
+            "src/audio-player/components/ReaderNoteFace.tsx",
+            "src/reader-ui/ReaderSettingsAudio.tsx",
+            "src/demo/workspaces/players/ReaderFaceWorkspace.tsx",
         ],
     },
 
@@ -123,7 +125,8 @@ export const WORKSHOP_ENTRIES: readonly WorkshopEntry[] = [
             "Atmosphere previews, and sound effects that play over the music without pausing it",
             "Presets (Default, Cinematic, Calm, Focus), sleep timers, idle pause and automatic loudness leveling",
             "A soundtrack master that leaves Voice on its own volume",
-            "Pairs with the Narrator face: its voice and ambience controls share the mixer's levels",
+            "The Settings › Audio page exactly as SEN's reader shows it, in its colors",
+            "The narrator face (the music note) shares the mixer's master level and mute",
         ],
         placeholders: [
             "iPhone behavior (silent switch, unlocking audio) needs a real device; this page can't prove it",
@@ -133,6 +136,7 @@ export const WORKSHOP_ENTRIES: readonly WorkshopEntry[] = [
             "src/audio-player/narrative/ReaderMixer.ts",
             "src/audio-player/narrative/ReaderMixerContext.tsx",
             "src/reader-ui/ReaderMixerPanel.tsx",
+            "src/reader-ui/ReaderSettingsAudio.tsx",
             "src/demo/workspaces/sen/ReaderMixerWorkspace.tsx",
             "src/demo/senSoundscapes.ts",
         ],
@@ -159,12 +163,12 @@ export const WORKSHOP_ENTRIES: readonly WorkshopEntry[] = [
         category: "novels",
         title: "Story cues",
         summary:
-            "A list of moments in a story (a time, a scene, a chapter) that trigger sounds or the Narrator face. Load one, play it, and watch each cue fire.",
+            "A list of moments in a story (a time, a scene, a chapter) that trigger sounds or scene changes. Load one, play it, and watch each cue fire.",
         status: "live",
         working: [
             "Check a cue list and apply it",
             "Time cues fire during playback; story cues fire by scene, tension or chapter",
-            "Cues drive a live Narrator face",
+            "Cues drive a live NarrativeFace bar (the older narrator face, kept for this test)",
             "Sound-effect cues play from a stand-in sound pack (on the built site)",
         ],
         placeholders: [

@@ -229,12 +229,24 @@ a.wk-card:hover {
 }
 
 /* SEN: a stand-in for the reader's Settings menu around the mixer view. */
+/* SEN's Reader Settings sheet (Reader blue glass) around the shared Audio page. */
 .wk-sen-settings {
+    --sap-reader-settings-border: #d6bd872e;
+    --sap-reader-settings-group-bg: linear-gradient(145deg, #b9dbe50a, #07142624);
     padding: 16px;
-    border: 1px solid var(--lab-border);
+    border: 1px solid #d6bd8766;
     border-radius: var(--wk-radius);
-    background: var(--wk-surface-strong);
-    color: var(--lab-text);
+    background: linear-gradient(145deg, #203a4a, #0c1c32);
+}
+.wk-reader--sen {
+    background: #050505;
+}
+.wk-reader__actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 12px;
 }
 .wk-card-art__ring {
     position: absolute;

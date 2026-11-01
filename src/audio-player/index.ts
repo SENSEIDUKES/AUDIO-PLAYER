@@ -308,6 +308,9 @@ export {
 export type { ReaderMixerProviderProps } from "./narrative/ReaderMixerContext"
 export { ReaderMixerNote, DEFAULT_READER_MIXER_NOTE_LABELS } from "./components/ReaderMixerNote"
 export type { ReaderMixerNoteProps, ReaderMixerNoteLabels } from "./components/ReaderMixerNote"
+// The narrator face SEN's reader ships: the note plus a hold-to-open quick volume.
+export { ReaderNoteFace, DEFAULT_READER_NOTE_FACE_LABELS } from "./components/ReaderNoteFace"
+export type { ReaderNoteFaceProps, ReaderNoteFaceLabels } from "./components/ReaderNoteFace"
 export {
     VAULT_CATEGORY_META,
     getVaultCategoryMeta,

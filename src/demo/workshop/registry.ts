@@ -19,8 +19,8 @@ export const WORKSPACES: Readonly<Record<string, Workspace>> = {
         (m) => m.NewPlayerWorkspace
     ),
     "narrative-face": load(
-        () => import("../workspaces/players/NarrativeFaceWorkspace"),
-        (m) => m.NarrativeFaceWorkspace
+        () => import("../workspaces/players/ReaderFaceWorkspace"),
+        (m) => m.ReaderFaceWorkspace
     ),
 
     /* Novels (SEN) */

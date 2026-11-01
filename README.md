@@ -88,6 +88,14 @@ changes. See the
 [distribution and publishing guide](https://github.com/SENSEIDUKES/AUDIO-PLAYER/blob/main/PUBLISHING_GUIDE.md)
 for those development workflows and the release-owner process.
 
+The **5.1.0** package brings in the reader audio UI SEN actually ships. The root
+adds `ReaderNoteFace`, the narrator face: a music note that mutes the story
+audio on tap and opens a quick master volume on hold. The `/reader-ui` entry
+adds `ReaderSettingsAudio`, the Reader Settings › Audio page (levels, sleep
+timer, preset pills) in SEN's colors, and `ReaderAudioPresets`. `NarrativeFace`
+is deprecated (no reader uses it) but still exported. See
+[the reader mixer guide](https://github.com/SENSEIDUKES/AUDIO-PLAYER/blob/main/docs/reader-mixer.md#the-narrator-face-sen-ships-readernoteface).
+
 The **5.0.0** package archives the v4 music faces so one new player face can be
 designed from scratch on the same engine. The root no longer exports
 `AudioPlayer` (or a default export), `FullCardPlayer`, `SeaCardPlayer`,

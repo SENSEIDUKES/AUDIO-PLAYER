@@ -193,3 +193,172 @@
         transition: none;
     }
 }
+
+/*
+ * Opt-in reader Settings theme: the look SEN's reader ships (teal controls on
+ * a dark sheet). A host puts `.sap-reader-settings` on its Settings sheet, or
+ * uses `ReaderSettingsAudio`, which carries it. Every color is a
+ * `--sap-reader-settings-*` variable defaulting to the SEN reader's roles.
+ */
+.sap-reader-settings {
+    --_rs-light: var(--sap-reader-settings-light, #fff);
+    --_rs-shade: var(--sap-reader-settings-shade, #000);
+    --_rs-text: var(--sap-reader-settings-text, oklch(97% 0 none));
+    --_rs-text-bright: var(--sap-reader-settings-text-bright, oklch(98.5% 0 none));
+    --_rs-text-soft: var(--sap-reader-settings-text-soft, oklch(92.2% 0 none));
+    --_rs-text-muted: var(--sap-reader-settings-text-muted, oklch(87% 0 none));
+    --_rs-muted: var(--sap-reader-settings-muted, #a3a3a3);
+    --_rs-accent: var(--sap-reader-settings-accent, oklch(91.7% 0.08 205.041));
+    --_rs-control: var(--sap-reader-settings-control, #67d4e3);
+    --_rs-field: var(--sap-reader-settings-field, #202020);
+    --_rs-track: var(--sap-reader-settings-track, #303030);
+    --_rs-border: var(
+        --sap-reader-settings-border,
+        color-mix(in srgb, var(--_rs-light) 10%, transparent)
+    );
+    color: var(--_rs-text);
+    color-scheme: dark;
+}
+.sap-reader-settings-audio {
+    display: block;
+    min-width: 0;
+    font:
+        14px/1.5 var(--font-sans, system-ui),
+        sans-serif;
+}
+.sap-reader-settings__help {
+    margin: 0 0 12px;
+    color: var(--_rs-muted);
+    font-size: 12px;
+    line-height: 1.6;
+}
+.sap-reader-settings__group {
+    margin-bottom: 16px;
+    padding: 0 14px;
+    border: 1px solid var(--_rs-border);
+    border-radius: 16px;
+    background: var(
+        --sap-reader-settings-group-bg,
+        color-mix(in srgb, var(--_rs-light) 2.5%, transparent)
+    );
+}
+.sap-reader-settings__field {
+    min-width: 0;
+    margin: 0;
+    padding: 16px 0;
+    border: 0;
+}
+.sap-reader-settings__label {
+    float: left;
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 0;
+    color: var(--_rs-text-soft);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 20px;
+}
+.sap-reader-settings__options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+    clear: both;
+    gap: 6px;
+}
+.sap-reader-settings__options--two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.sap-reader-settings__option {
+    position: relative;
+    min-width: 0;
+    cursor: pointer;
+}
+.sap-reader-settings__radio {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+.sap-reader-settings__choice {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    min-height: 44px;
+    height: 100%;
+    padding: 8px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--_rs-light) 4%, transparent);
+    color: color-mix(in srgb, var(--_rs-text-muted) 73%, var(--_rs-muted));
+    font-size: 13px;
+    line-height: 20px;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+.sap-reader-settings__choice:hover {
+    background: color-mix(in srgb, var(--_rs-light) 12%, transparent);
+}
+.sap-reader-settings__radio:checked + .sap-reader-settings__choice {
+    border-color: color-mix(in srgb, var(--_rs-accent) 45%, transparent);
+    background: color-mix(in srgb, var(--_rs-light) 11%, transparent);
+    color: var(--_rs-text-bright);
+}
+.sap-reader-settings__radio:focus-visible + .sap-reader-settings__choice {
+    outline: 2px solid var(--_rs-accent);
+    outline-offset: 2px;
+}
+
+/* The approved mixer controls, painted with the same roles; the mixer still owns all audio state. */
+.sap-reader-settings .sap-reader-mixer {
+    --sap-reader-mixer-bg: var(
+        --sap-reader-settings-group-bg,
+        color-mix(in srgb, var(--_rs-light) 2.5%, transparent)
+    );
+    --sap-reader-mixer-fg: var(--_rs-text);
+    --sap-reader-mixer-muted: var(--_rs-muted);
+    --sap-reader-mixer-border: var(--_rs-border);
+    --sap-reader-mixer-focus: var(--_rs-accent);
+    --sap-reader-mixer-radius: 16px;
+    --sap-reader-mixer-padding: 14px;
+    --sap-reader-mixer-gap: 10px;
+    --sap-reader-mixer-font: 14px/1.5 var(--font-sans, system-ui), sans-serif;
+    --sh-accent: var(--_rs-accent);
+    --sh-interactive-primary: var(--_rs-control);
+    --sh-interactive-primary-hover: var(--_rs-accent);
+    --sh-progress-track: var(--_rs-track);
+    --sh-control-thumb: var(--_rs-text);
+    --sh-control-thumb-border: color-mix(in srgb, var(--_rs-shade) 12%, transparent);
+    --sh-text-primary: var(--_rs-text);
+    --sh-text-muted: var(--_rs-muted);
+    --sh-field-surface: var(--_rs-field);
+    --sh-field-border: var(--_rs-border);
+    --sh-focus-ring: var(--_rs-accent);
+    margin-bottom: 16px;
+}
+.sap-reader-settings .sap-reader-mixer__sleep {
+    padding-top: 14px;
+    border-top: 1px solid var(--_rs-border);
+}
+.sap-reader-settings .sap-reader-mixer__name {
+    font-size: 14px;
+}
+.sap-reader-settings .sap-reader-mixer__level {
+    margin-top: -6px;
+}
+.sap-reader-settings .sap-reader-mixer__sleep-select {
+    border-radius: 10px;
+    font-size: 13px;
+}
+@media (prefers-reduced-motion: no-preference) {
+    .sap-reader-settings__choice {
+        transition:
+            color 150ms,
+            background-color 150ms,
+            border-color 150ms;
+    }
+}

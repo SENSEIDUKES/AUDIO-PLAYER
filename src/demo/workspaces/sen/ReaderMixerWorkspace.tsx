@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
     AudioSessionProvider,
-    NarrativeFace,
     ReaderMixerProvider,
     ReaderMixerVoice,
-    ReaderMixerNote,
+    ReaderNoteFace,
     READER_MIXER_SLEEP_TIMERS,
     measureLoudness,
     measureLoudnessPcm,
     loadReaderMixerPreferences,
     saveReaderMixerPreferences,
+    useAudioSession,
     useReaderMixer,
     useReaderMixerState,
 } from "../../../audio-player"
-import { ReaderMixerPanel } from "../../../reader-ui"
+import { ReaderSettingsAudio } from "../../../reader-ui"
 import type {
     ReaderAtmosphereOption,
     ReaderMixerLayer,
@@ -22,7 +22,7 @@ import type {
     LoudnessMeasurement,
 } from "../../../audio-player"
 import measurements from "../../readerLoudness.json"
-import { SAMPLE, SEA_THEME, narrationTracks } from "../../data"
+import { SAMPLE, narrationTracks } from "../../data"
 import { SEN_SOUNDSCAPES_VOLUME_1, SEN_SOUNDSCAPE_CATEGORIES } from "../../senSoundscapes"
 import {
     Button,
@@ -226,7 +226,16 @@ function ReaderSimulation({
 }) {
     const mixer = useReaderMixer()
     const state = useReaderMixerState()
+    const session = useAudioSession()
     const previous = useRef(state)
+
+    // Narration ducks the music and atmosphere while it speaks, as the reader does.
+    useEffect(() => {
+        if (!session.isPlaying) return undefined
+        const duck = mixer.retainDuck()
+        duck.setDuck(duckAmount)
+        return () => duck.release()
+    }, [mixer, session.isPlaying, duckAmount])
     const [category, setCategory] = useState(set.categories[0])
     const [chapterScore, setChapterScore] = useState(set.scores[0])
     const battleTurn = useRef(0)
@@ -273,43 +282,25 @@ function ReaderSimulation({
 
     return (
         <>
-            <article
-                className="wk-stage-card wk-reader"
-                aria-label="Reader preview"
-                data-experience="sen"
-                data-theme="dark"
-            >
-                <ReaderMixerNote
-                    onOpenSettings={() => {
-                        const view = document.getElementById(MIXER_VIEW_ID)
-                        view?.scrollIntoView({ block: "start" })
-                        view?.querySelector<HTMLElement>('[role="switch"]')?.focus({
-                            preventScroll: true,
-                        })
-                        append("note → Settings › Audio")
-                    }}
-                />
-                <p className="wk-stage-card__title">Chapter · NarrativeFace + Reader Mixer</p>
+            <article className="wk-stage-card wk-reader wk-reader--sen" aria-label="Reader preview">
+                <p className="wk-stage-card__title">Chapter · the narrator face + Reader mixer</p>
                 <p className="wk-reader__text">
-                    The NarrativeFace carries the narration. Inside the same ReaderMixerProvider it
-                    becomes the mixer&apos;s companion: its Ambience slider is the reader&apos;s
-                    Atmosphere level, its mood shows the chosen atmosphere, and while the voice
-                    plays the music and atmosphere step back under it. Voice volume and mute agree
-                    with the mixer&apos;s fourth slot. Cues stay at full level.
+                    The music note is the narrator face SEN&apos;s reader ships. A tap mutes the
+                    story audio and leaves Master on; a hold opens the quick master volume. While
+                    the narration speaks, the music and atmosphere step back under it. Voice keeps
+                    its own volume in the mixer&apos;s fourth slot, and cues stay at full level.
                 </p>
-                <NarrativeFace
-                    duckAmount={duckAmount}
-                    showExpand
-                    onExpand={() => {
-                        const view = document.getElementById(MIXER_VIEW_ID)
-                        view?.scrollIntoView({ behavior: "smooth", block: "start" })
-                        view?.querySelector<HTMLElement>('[role="switch"]')?.focus({
-                            preventScroll: true,
-                        })
-                        append("face → open Settings › Audio (the mixer view)")
-                    }}
-                    {...SEA_THEME}
-                />
+                <div className="wk-reader__actions">
+                    <Button
+                        onClick={() => {
+                            session.toggle()
+                            append(session.isPlaying ? "narration paused" : "narration speaks")
+                        }}
+                    >
+                        {session.isPlaying ? "Pause narration" : "Play narration"}
+                    </Button>
+                    <ReaderNoteFace />
+                </div>
             </article>
             <Panel
                 title="Reader · what the app does"
@@ -460,16 +451,11 @@ function ReaderSimulation({
             </Panel>
             <Panel
                 title="Settings › Audio · the mixer view"
-                hint="ReaderMixerPanel, rendered inline the way the reader's Settings menu will place it."
+                hint="ReaderSettingsAudio: the Audio tab of SEN's Reader Settings, exactly as the reader shows it."
             >
                 <WidthFrame width={width}>
-                    <div
-                        className="wk-sen-settings"
-                        id={MIXER_VIEW_ID}
-                        data-experience="sen"
-                        data-theme="dark"
-                    >
-                        <ReaderMixerPanel />
+                    <div className="wk-sen-settings" id={MIXER_VIEW_ID}>
+                        <ReaderSettingsAudio />
                     </div>
                 </WidthFrame>
             </Panel>

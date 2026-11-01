@@ -420,6 +420,29 @@ Theme with `--sap-reader-mixer-*` and the note's matching
 `--sap-reader-mixer-note-bg`. Class names and `data-state`, `data-scrolling` and
 `data-reduced-motion` expose the visual hooks; there is no fixed positioning.
 
+### The narrator face SEN ships: `ReaderNoteFace`
+
+`ReaderNoteFace` (root entry, 5.1.0) is the face SEN's reader actually puts over
+the chapter. It wraps `ReaderMixerNote` with `muteMode="soundtrack-mute"`:
+
+- **Tap** mutes or unmutes the story audio. Master stays on; only the host's
+  Settings switch turns Master off, and while it is off the face is hidden.
+- **Hold** (600 ms, `longPressMs` override), or **↑/↓** with the note focused,
+  opens a vertical quick master volume above the note. It sets
+  `mixer.setMasterLevel`. Escape closes it and returns focus to the note; a
+  press anywhere outside also closes it.
+- Mute reads by dimming, without the slash.
+
+```tsx
+<ReaderNoteFace labels={{ mute: "Quiet the story" }} />
+```
+
+The host places it (SEN floats it above the bottom bar's rightmost action).
+Colors are `--sap-reader-note-*` variables whose defaults are the SEN reader's
+own: `fg`, `surface`, `border`, `shade`, `meter`, `meter-track`, `meter-thumb`
+and `focus`. A host maps its color roles onto them one to one. Labels extend
+the note's with `quickVolume` (default "Quick master volume").
+
 ### Level math
 
 A soundtrack layer plays at `master on/off × layer on/off × layer level`;
@@ -438,6 +461,13 @@ tap; the next one retries), `failed` (with a `failure` message) or `paused`
 the master is off still reports `playing`.
 
 ## NarrativeFace as a companion
+
+> **Deprecated in 5.1.0.** No SEIHouse reader uses `NarrativeFace`. SEN's reader
+> ships [`ReaderNoteFace`](#the-narrator-face-sen-ships-readernoteface) and the
+> [Settings › Audio page](#settings--audio-as-sen-ships-it-readersettingsaudio)
+> instead, and drives narration ducking itself with `mixer.retainDuck()`. The
+> export stays so existing hosts keep building; its Workshop page is archived
+> under `archive/narrative-face/`.
 
 `NarrativeFace` (narration on the shared `AudioSessionProvider` session) pairs
 with the mixer. Render it inside the same `ReaderMixerProvider`, or pass
@@ -808,6 +838,39 @@ radios with Off first and the host's options grouped by `group`.
   track and chip color variables no longer style the approved controls.
 - `titleAs` sets the heading element (default `h3`); `showTitle={false}` and
   `showAtmospherePicker={false}` hide those parts.
+
+### Settings › Audio as SEN ships it: `ReaderSettingsAudio`
+
+`ReaderSettingsAudio` (reader-ui entry, 5.1.0) is the Audio tab of SEN's Reader
+Settings in one piece: a help line, then `ReaderMixerPanel` without its title or
+radio presets, then `ReaderAudioPresets` (the presets as two columns of 44px
+pills, placed under the levels so they stay secondary to them), then any
+`children` the host adds, such as SEN's scene and soundtrack chooser.
+
+```tsx
+<ReaderSettingsAudio showAtmospherePicker={!hostPicksAtmosphere}>
+    <SceneChooser />
+</ReaderSettingsAudio>
+```
+
+Props: `mixer`, `atmospheres`, `labels` (the panel's; `presets` also names the
+pills), `help` (`null` hides it), `showAtmospherePicker`, `showPresets`,
+`className` and `style`. `ReaderAudioPresets` is exported on its own too.
+
+Its root carries the opt-in `.sap-reader-settings` theme: teal switches and
+slider fills on a dark sheet, as in SEN's reader. A host can also put that
+class on its whole Settings sheet. Every color is a `--sap-reader-settings-*`
+variable defaulting to the SEN reader's roles: `light`, `shade`, `text`,
+`text-bright`, `text-soft`, `text-muted`, `muted`, `accent`, `control`
+(`#67d4e3`), `field`, `track`, `border` and `group-bg`. The Library's Reader blue
+glass sets `border` to `#d6bd872e` and `group-bg` to its sheet-group gradient.
+
+**Moving SEN onto these.** SEN still carries its own copies, built on the
+4.0.0 package: `ReaderAudioNote` (now `ReaderNoteFace`) and the `AudioPresets`
+pills plus the mixer theming in `ReaderSettingsSheet` (now
+`ReaderSettingsAudio`). Once SEN re-vendors 5.1.0, it can swap those for the
+package pieces and map its `--reader-*` color roles onto the
+`--sap-reader-note-*` and `--sap-reader-settings-*` variables.
 
 ## Not included
 

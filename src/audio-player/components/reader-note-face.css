@@ -1,0 +1,134 @@
+/*
+ * The narrator face SEN's reader ships. Every color is a `--sap-reader-note-*`
+ * variable whose default is the Reader's own neutral face, so a host maps its
+ * own color roles onto these names one to one.
+ */
+.sap-reader-note-face {
+    --_fg: var(--sap-reader-note-fg, #fff);
+    --_surface: var(--sap-reader-note-surface, #171717);
+    --_border: var(--sap-reader-note-border, color-mix(in srgb, var(--_fg) 15%, transparent));
+    --_shade: var(--sap-reader-note-shade, #000);
+    --_meter: var(--sap-reader-note-meter, #e2f4ff);
+    --_meter-track: var(--sap-reader-note-meter-track, #b1c4d238);
+    --_meter-thumb: var(--sap-reader-note-meter-thumb, #eef7ff);
+    --_focus: var(--sap-reader-note-focus, #96ddf9);
+    position: relative;
+    isolation: isolate;
+    display: inline-flex;
+}
+
+/* Keep the shared note's interactions and scroll signal; only skin it. */
+.sap-reader-mixer-note.sap-reader-note-face__note {
+    position: relative;
+    z-index: 1;
+    --sap-reader-mixer-note-fg: var(--_fg);
+    --sap-reader-mixer-note-opacity: 1;
+    --sap-reader-mixer-note-ghost-opacity: 0.35;
+    --sap-reader-mixer-focus: var(--_focus);
+}
+
+/* Mute reads by dimming, without a crossed-out note. */
+.sap-reader-note-face__note .sap-reader-mixer-note__slash {
+    display: none;
+}
+.sap-reader-mixer-note.sap-reader-note-face__note:has(.sap-reader-mixer-note__slash),
+.sap-reader-mixer-note.sap-reader-note-face__note[data-scrolling="true"] {
+    opacity: 0.35;
+}
+
+.sap-reader-note-face__volume {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    z-index: 0;
+    transform: translateX(-50%);
+    display: grid;
+    place-items: center;
+    box-sizing: border-box;
+    width: 48px;
+    padding: 12px 1px 48px;
+    border: 1px solid var(--_border);
+    border-radius: 999px;
+    background: var(--_surface);
+    color: var(--_fg);
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--_shade) 40%, transparent);
+}
+.sap-reader-note-face__volume input {
+    appearance: none;
+    -webkit-appearance: none;
+    writing-mode: vertical-lr;
+    direction: rtl;
+    width: 44px;
+    height: 120px;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    cursor: pointer;
+    touch-action: none;
+    --_track: linear-gradient(
+        to top,
+        var(--_meter) var(--sap-reader-note-level),
+        var(--_meter-track) var(--sap-reader-note-level)
+    );
+}
+.sap-reader-note-face__volume input::-webkit-slider-runnable-track {
+    width: 4px;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--_track);
+}
+.sap-reader-note-face__volume input::-moz-range-track {
+    width: 4px;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--_track);
+}
+.sap-reader-note-face__volume input::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    margin-left: -6px;
+    border: 1px solid color-mix(in srgb, var(--_fg) 60%, transparent);
+    border-radius: 50%;
+    background: var(--_meter-thumb);
+    box-shadow: 0 1px 4px #020b2044;
+}
+.sap-reader-note-face__volume input::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border: 1px solid color-mix(in srgb, var(--_fg) 60%, transparent);
+    border-radius: 50%;
+    background: var(--_meter-thumb);
+    box-shadow: 0 1px 4px #020b2044;
+}
+.sap-reader-note-face__volume input:focus {
+    outline: none;
+}
+.sap-reader-note-face__volume input:focus-visible {
+    outline: 2px solid var(--_focus);
+    outline-offset: 1px;
+    border-radius: 999px;
+}
+
+@keyframes sap-reader-note-face-reveal {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(4px) scale(0.94);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%);
+    }
+}
+@media (prefers-reduced-motion: no-preference) {
+    .sap-reader-note-face__volume {
+        transform-origin: bottom center;
+        animation: sap-reader-note-face-reveal 140ms ease-out;
+    }
+}
+@media (forced-colors: active) {
+    .sap-reader-note-face__volume input {
+        appearance: auto;
+        -webkit-appearance: auto;
+    }
+}

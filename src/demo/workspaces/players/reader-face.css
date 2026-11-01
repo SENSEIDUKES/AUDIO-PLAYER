@@ -1,0 +1,182 @@
+/* SEN's reader frame and its Reader blue glass, imitated for the Workshop.
+   The shared pieces (ReaderNoteFace, ReaderSettingsAudio) carry their own
+   styles; this file only paints the host around them. */
+.wk-rf {
+    position: relative;
+    display: flex;
+    min-height: 620px;
+    overflow: hidden;
+    border: 1px solid #ffffff14;
+    border-radius: 18px;
+    background: #050505;
+    color: oklch(97% 0 none);
+    font-family: var(--font-sans, system-ui), sans-serif;
+}
+.wk-rf__reader {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+.wk-rf__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    background: linear-gradient(145deg, #203a4a, #0c1c32);
+    box-shadow: inset 0 -1px 0 #d6bd8766;
+}
+.wk-rf__chapter {
+    min-width: 0;
+    overflow: hidden;
+    color: #e3f6ffcc;
+    font-size: 14px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.wk-rf__page {
+    flex: 1;
+    max-width: 38rem;
+    padding: 40px 24px 120px;
+    font-size: 19px;
+    line-height: 2.2;
+}
+.wk-rf__page p {
+    margin: 0 0 1.4em;
+}
+.wk-rf__page p:last-child {
+    color: #a3a3a3;
+    font-size: 14px;
+    line-height: 1.7;
+}
+/* SEN floats the note above the bottom bar's rightmost action. */
+.wk-rf__note {
+    position: absolute;
+    right: 22px;
+    bottom: 22px;
+    display: grid;
+    place-items: center;
+    width: 64px;
+    height: 64px;
+    border: 1px solid #b9dbe529;
+    border-radius: 50%;
+    background: linear-gradient(145deg, #29495aeb, #0c1c32eb);
+    box-shadow: 0 8px 24px #0006;
+}
+.wk-rf__note .sap-reader-note-face {
+    --sap-reader-note-surface: #142638;
+    --sap-reader-note-border: #d6bd872e;
+}
+.wk-rf-icon {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border: 1px solid #b9dbe529;
+    border-radius: 50%;
+    background: linear-gradient(145deg, #b9dbe51c, #29495a1a);
+    color: oklch(97% 0 none);
+    font: inherit;
+    font-size: 20px;
+    cursor: pointer;
+}
+.wk-rf-icon:hover {
+    background: #ffffff1f;
+}
+.wk-rf-icon:focus-visible {
+    outline: 2px solid #96ddf9;
+    outline-offset: 2px;
+}
+
+/* Reader Settings: beside the chapter when there is room, over it otherwise. */
+.wk-rf-sheet {
+    --sap-reader-settings-border: #d6bd872e;
+    --sap-reader-settings-group-bg: linear-gradient(145deg, #b9dbe50a, #07142624);
+    width: min(400px, 100%);
+    flex: none;
+    border-left: 1px solid #d6bd8766;
+    background: linear-gradient(145deg, #203a4a, #0c1c32);
+}
+.wk-rf-sheet__panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    max-height: 760px;
+}
+.wk-rf-sheet__header {
+    flex: none;
+    padding: 12px 16px 16px;
+    border-bottom: 1px solid #d6bd872e;
+}
+.wk-rf-sheet__heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.wk-rf-sheet__heading h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+}
+.wk-rf-sheet .wk-rf-tabs {
+    display: flex;
+    width: 100%;
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid #d6bd872e;
+    border-radius: 14px;
+    background: #ffffff09;
+}
+.wk-rf-sheet .wk-rf-tab {
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    justify-content: center;
+    padding: 8px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: #a3a3a3;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: none;
+}
+.wk-rf-sheet .wk-rf-tab[aria-selected="true"] {
+    background: #ffffff1a;
+    color: oklch(98.5% 0 none);
+}
+.wk-rf-sheet__body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+.wk-rf-sheet .wk-rf-page {
+    margin: 0;
+    padding: 0;
+}
+.wk-rf-saved {
+    padding-top: 16px;
+}
+@container (max-width: 640px) {
+    .wk-rf-sheet {
+        position: absolute;
+        inset: auto 0 0 0;
+        width: 100%;
+        max-height: 85%;
+        border-top: 1px solid #d6bd8766;
+        border-left: 0;
+        border-radius: 18px 18px 0 0;
+        overflow: hidden;
+    }
+}
+.wk-rf-frame {
+    container-type: inline-size;
+}

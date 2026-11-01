@@ -12,7 +12,7 @@ platform media integration.
 |---|---|---|
 | Headless engine | `src/audio-player/useAudioPlayer.ts` | Owns a single hidden `<audio>`, manages playback, error recovery, buffering, volume, and a rAF-driven time-update loop. |
 | Session provider | `src/audio-player/session/AudioSessionContext.tsx` | Wraps the headless engine with a queue, shuffle, repeat, and automix management so multiple skins share one audio element. |
-| Faces | `src/audio-player/skins/NarrativeFace.tsx` | The narrator face. The v4 music faces (`AudioPlayer`, FullCard, StickyBottom, MiniSidebar, VaultRow, SeaCard) were archived in 5.0.0 under `archive/faces-v4/` while one new face is designed. |
+| Faces | `src/audio-player/components/ReaderNoteFace.tsx` | The narrator face SEN's reader ships (`NarrativeFace` is deprecated since 5.1.0). The v4 music faces (`AudioPlayer`, FullCard, StickyBottom, MiniSidebar, VaultRow, SeaCard) were archived in 5.0.0 under `archive/faces-v4/` while one new face is designed. |
 
 The core principle: **the engine drives state; the UI reads state and calls
 actions** — it never touches the `<audio>` element directly.
