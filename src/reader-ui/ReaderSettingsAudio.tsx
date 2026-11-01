@@ -48,7 +48,7 @@ export function ReaderSettingsAudio({
     style,
 }: ReaderSettingsAudioProps) {
     const context = useOptionalReaderMixer()
-    const mixer = mixerProp ?? context ?? undefined
+    const mixer = mixerProp ?? context
     if (!mixer) return null
     return (
         <section

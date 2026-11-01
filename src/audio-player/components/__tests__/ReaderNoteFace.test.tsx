@@ -68,6 +68,24 @@ it("Escape and an outside press close the quick volume", () => {
     expect(screen.queryByRole("slider")).not.toBeInTheDocument()
 })
 
+it("closes the quick volume when focus leaves it, but not when it returns to the note", () => {
+    render(
+        <>
+            <ReaderNoteFace mixer={mixer} />
+            <button type="button">Next page</button>
+        </>
+    )
+    const note = screen.getByRole("button", { name: "Mute story audio" })
+    fireEvent.keyDown(note, { key: "ArrowUp" })
+    const slider = screen.getByRole("slider")
+    fireEvent.blur(slider, { relatedTarget: note })
+    expect(screen.getByRole("slider")).toBeInTheDocument()
+    fireEvent.blur(screen.getByRole("slider"), {
+        relatedTarget: screen.getByRole("button", { name: "Next page" }),
+    })
+    expect(screen.queryByRole("slider")).not.toBeInTheDocument()
+})
+
 it("is hidden while Settings has Master off, and uses the provider's mixer", () => {
     render(
         <ReaderMixerProvider mixer={mixer}>
