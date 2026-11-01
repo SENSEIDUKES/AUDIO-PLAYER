@@ -69,6 +69,12 @@ export interface NarrativeFaceProps extends AudioPlayerTheme {
  * a reader. Scene metadata (`sceneMood`, `ambientProfile`, `intensity`, …) is
  * accepted as props so a host like the Light Novels app can feed scenes in
  * without the UI changing.
+ *
+ * @deprecated No SEIHouse reader uses this face. SEN's reader ships
+ * `ReaderNoteFace` (the music note with a hold-to-open quick volume) and
+ * the reader-ui `ReaderSettingsAudio` menu instead; the Workshop page for this
+ * face is archived under `archive/narrative-face/`. The export stays so
+ * existing hosts keep building.
  */
 export function NarrativeFace({
     chapterId,

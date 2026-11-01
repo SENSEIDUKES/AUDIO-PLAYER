@@ -43,7 +43,7 @@ TypeScript signatures live in
 | Fully custom controls | `useAudioPlayer` or `useSAPPropGetters` | Use `useAudioPlayer` for a standalone engine, or the prop getters over an existing session. |
 | Extensible lifecycle behavior | `createAutomixPlugin`, `createKeyboardShortcutPlugin`, or `AudioPlayerPlugin` | Pass a memoized plugin array to `AudioSessionProvider` (or `useAudioPlayer`). |
 | Timed scene or reader audio | `CueManifestPlugin`, `CueRuntime`, `useNarrativeAudio`, or `SceneMixEngine` | Use the cue/narrative contracts instead of manipulating a skin's internals. |
-| A story reader's music, atmosphere, sound cues and voice together | `createReaderMixer`, `ReaderMixerProvider`, `ReaderMixerPanel`, `ReaderMixerVoice`, `ReaderMixerNote` | Four layers with availability, soundtrack master, source leveling and session stop policies. See [`reader-mixer.md`](./reader-mixer.md). |
+| A story reader's music, atmosphere, sound cues and voice together | `createReaderMixer`, `ReaderMixerProvider`, `ReaderSettingsAudio`, `ReaderMixerPanel`, `ReaderMixerVoice`, `ReaderNoteFace`, `ReaderMixerNote` | Four layers with availability, soundtrack master, source leveling and session stop policies. See [`reader-mixer.md`](./reader-mixer.md). |
 
 ## API families
 
@@ -52,12 +52,12 @@ TypeScript signatures live in
 | Playback and track data | `useAudioPlayer`, `Track`, `TrackSource`, `AudioPlayerEngine`, `AudioPlayerProps` | Standard playback, source fallback, private-source resolution, and UI state. |
 | Backends and advanced playback | `createAudioBackend`, `AudioBackend`, `HTML5AudioBackend`, `WebAudioBackend`, `AudioSpriteEngine` | Custom backend integrations, codec checks, sprites, and low-level capability work. [`AUDIO_BACKEND_GUIDE.md`](../AUDIO_BACKEND_GUIDE.md) explains the supported backend choices. |
 | Shared sessions | `AudioSessionProvider`, `useAudioSession`, `useAudioTime`, `SessionEngine`, `serializeSession`, `deserializeSession` | A single queue and audio element shared by multiple React surfaces. |
-| Skins and reusable UI | `NarrativeFace` | The narrator face, driven by an existing shared session. The v4 music faces (`AudioPlayer`, `FullCardPlayer`, `StickyBottomPlayer`, `VaultRowPlayer`, `MiniSidebarPlayer`, `SeaCardPlayer`) were archived in 5.0.0 while one new player face is designed. |
+| Skins and reusable UI | `ReaderNoteFace`, `NarrativeFace` (deprecated) | `ReaderNoteFace` is the narrator face SEN's reader ships: a music note that mutes on tap and opens a quick master volume on hold. `NarrativeFace` is deprecated in 5.1.0; no reader uses it. The v4 music faces (`AudioPlayer`, `FullCardPlayer`, `StickyBottomPlayer`, `VaultRowPlayer`, `MiniSidebarPlayer`, `SeaCardPlayer`) were archived in 5.0.0 while one new player face is designed. |
 | Plugins | `PluginManager`, `AudioPlayerPlugin`, `createAutomixPlugin`, `createKeyboardShortcutPlugin`, `createAnalyticsPlugin`, `createLyricsPlugin`, `createSleepTimerPlugin`, `createWaveformPlugin` | Optional lifecycle behavior without changing a skin. See [`PLUGIN_DEVELOPMENT_GUIDE.md`](../PLUGIN_DEVELOPMENT_GUIDE.md). |
 | Cues | `CueManifestPlugin`, `CueRuntime`, `validateCueManifest`, `useNarrativeCueController`, `CueManifest` | Validated, time-based events that coordinate a player with host UI or a narrative experience. See [`CUE_MANIFEST_V1.md`](./CUE_MANIFEST_V1.md). |
 | Narrative engines | `useNarrativeAudio`, `SceneMixEngine`, `createSceneMixEngine`, `OneShotEngine`, `createOneShotEngine`, `MediaGainSink` | Narration, ambience, one-shots, and scene-score transitions independent of a visible player skin. Both engines accept an optional `createGainSink` (Web Audio gain) and an `unlock()` for gesture-unlocked spare elements; `SceneMixEngine` adds `pause()`/`resume()`. |
-| Reader mixer | `createReaderMixer`, `ReaderMixer`, `ReaderMixerProvider`, `useReaderMixer`, `useReaderMixerState`, `ReaderMixerNote`, `ReaderMixerVoice`, `ReaderMixerVoiceOutput`, `ReaderMixerPreferences`, `computeReaderMixerGain`, `loadReaderMixerPreferences`, `saveReaderMixerPreferences` | Core soundtrack/narration engines and chapter note. See [`reader-mixer.md`](./reader-mixer.md). |
-| Reader UI (`/reader-ui`) | `ReaderMixerPanel`, `DEFAULT_READER_MIXER_LABELS`, `ReaderMixerPanelProps`, `ReaderMixerLabels`, `ReaderMixerLabelOverrides` | Approved universal SEIHouse UI controls, isolated from the core. |
+| Reader mixer | `createReaderMixer`, `ReaderMixer`, `ReaderMixerProvider`, `useReaderMixer`, `useReaderMixerState`, `ReaderNoteFace`, `ReaderMixerNote`, `ReaderMixerVoice`, `ReaderMixerVoiceOutput`, `ReaderMixerPreferences`, `computeReaderMixerGain`, `loadReaderMixerPreferences`, `saveReaderMixerPreferences` | Core soundtrack/narration engines and chapter note. See [`reader-mixer.md`](./reader-mixer.md). |
+| Reader UI (`/reader-ui`) | `ReaderSettingsAudio`, `ReaderAudioPresets`, `ReaderMixerPanel`, `DEFAULT_READER_MIXER_LABELS`, `ReaderSettingsAudioProps`, `ReaderAudioPresetsProps`, `ReaderMixerPanelProps`, `ReaderMixerLabels`, `ReaderMixerLabelOverrides` | Approved universal SEIHouse UI controls, isolated from the core. `ReaderSettingsAudio` is SEN's Settings › Audio page as the reader ships it. |
 | Loudness measurement | `measureLoudness`, `measureLoudnessPcm`, `computeLoudnessGain`, `DEFAULT_LOUDNESS_LEVELING`, `LoudnessMeasurement`, `LoudnessMeasureOptions`, `LoudnessLevelingOptions`, `LoudnessGain` | Offline browser/PCM measurement, integrated beds and momentary-max cues, sample peak and source gain before reader sliders. |
 | Reader session policies | `READER_MIXER_SLEEP_TIMERS`, `ReaderMixerSleepTimerChoice`, `ReaderMixerSleepTimerState`, `ReaderMixerSleepEvent`, `ReaderMixerLayerAvailability`, `ReaderMixerNoteProps`, `ReaderMixerNoteLabels`, `DEFAULT_READER_MIXER_NOTE_LABELS` | Host-defined use, sleep events, activity holds and accessible chapter note. |
 | Automix and analysis | `createAutomixPlugin`, `ensureTrackAnalysis`, `ensureProTrackAnalysis`, `planTransition`, `bpmCompatibility` | Progressive crossfades with a conservative fallback when analysis is unavailable. See [`automix.md`](./automix.md). |
@@ -228,7 +228,8 @@ The `renderWorkspace` prop on `<SAPController renderWorkspace={...} />` supplies
 Version **4.0.0** moves the panel and its label/prop types from the root to
 `@seihouse/audio-player/reader-ui`. The entry exports `ReaderMixerPanel`,
 `DEFAULT_READER_MIXER_LABELS`, `ReaderMixerPanelProps`, `ReaderMixerLabels` and
-`ReaderMixerLabelOverrides`. It is ESM-only and shares the root mixer/provider;
+`ReaderMixerLabelOverrides`; 5.1.0 adds `ReaderSettingsAudio` and
+`ReaderAudioPresets` with their prop types. It is ESM-only and shares the root mixer/provider;
 it does not create another playback engine. The core remains React >=18 with
 ESM and CommonJS exports.
 

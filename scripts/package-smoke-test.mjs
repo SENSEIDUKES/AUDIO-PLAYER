@@ -168,6 +168,7 @@ async function exerciseAutomixWorker(moduleExports, label, packageRoot) {
 function exerciseReaderVoice(moduleExports, label) {
     for (const name of [
         "ReaderMixerNote",
+        "ReaderNoteFace",
         "measureLoudness",
         "measureLoudnessPcm",
         "computeLoudnessGain",
@@ -361,9 +362,10 @@ try {
         path.join(consumerDir, "smoke.ts"),
         `
 import { createReaderMixer } from "@seihouse/audio-player"
-import type { ReaderMixerNoteProps } from "@seihouse/audio-player"
+import type { ReaderMixerNoteProps, ReaderNoteFaceProps } from "@seihouse/audio-player"
 const note: ReaderMixerNoteProps = { mixer: createReaderMixer(), labels: { mute: "Mute" } }
-note.mixer?.dispose()
+const face: ReaderNoteFaceProps = { mixer: note.mixer, labels: { quickVolume: "Volume" } }
+face.mixer?.dispose()
 `
     )
     checkInstalledTypes(consumerDir, "React 18 core")
@@ -414,9 +416,12 @@ import assert from "node:assert/strict"
 import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { createReaderMixer, ReaderMixerProvider } from "@seihouse/audio-player"
-import { ReaderMixerPanel, DEFAULT_READER_MIXER_LABELS } from "@seihouse/audio-player/reader-ui"
+import { ReaderMixerPanel, ReaderSettingsAudio, DEFAULT_READER_MIXER_LABELS } from "@seihouse/audio-player/reader-ui"
 const mixer = createReaderMixer()
 try {
+    const audio = renderToStaticMarkup(createElement(ReaderMixerProvider, { mixer }, createElement(ReaderSettingsAudio)))
+    assert.ok(audio.includes("sap-reader-settings"), "The Settings › Audio page must carry its theme")
+    assert.ok(audio.includes("Cinematic"), "The Settings › Audio page must show the preset pills")
     const html = renderToStaticMarkup(createElement(ReaderMixerProvider, { mixer }, createElement(ReaderMixerPanel)))
     assert.ok(html.includes("Soundscapes volume"), "UI entry must share the root provider's context")
     assert.ok(html.includes('role="switch"'))
@@ -441,9 +446,10 @@ try {
         path.join(uiConsumerDir, "smoke.ts"),
         `
 import { createReaderMixer } from "@seihouse/audio-player"
-import type { ReaderMixerPanelProps } from "@seihouse/audio-player/reader-ui"
+import type { ReaderMixerPanelProps, ReaderSettingsAudioProps } from "@seihouse/audio-player/reader-ui"
 const props: ReaderMixerPanelProps = { mixer: createReaderMixer(), labels: { volume: name => name } }
-props.mixer?.dispose()
+const audio: ReaderSettingsAudioProps = { mixer: props.mixer, showAtmospherePicker: false }
+audio.mixer?.dispose()
 `
     )
     checkInstalledTypes(uiConsumerDir, "React 19 reader UI")
