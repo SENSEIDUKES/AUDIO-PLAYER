@@ -966,8 +966,8 @@ export class ReaderMixer {
         if (this.disposed) return
         this.cueStatus = "idle"
         this.cueFailure = null
-        this.lastCue = null
         this.cues.stopAll()
+        this.lastCue = null
         this.refresh()
     }
 

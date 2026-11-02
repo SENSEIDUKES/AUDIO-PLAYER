@@ -533,6 +533,7 @@ describe("ReaderMixer", () => {
             const bell = only("https://a.test/bell.mp3")
             expect(growl.paused).toBe(false)
             expect(mixer.getState().activeCues).toBe(2)
+            listener.mockClear()
 
             mixer.stopCues()
             mixer.stopCues()
@@ -543,6 +544,11 @@ describe("ReaderMixer", () => {
             expect(mixer.getState().activeCues).toBe(0)
             expect(mixer.getState().layers.cues).toMatchObject({ status: "idle", current: null })
             expect(listener.mock.lastCall?.[0].activeCues).toBe(0)
+            for (const [snapshot] of listener.mock.calls) {
+                if (snapshot.layers.cues.status === "playing") {
+                    expect(snapshot.layers.cues.current).not.toBeNull()
+                }
+            }
             expect(music.paused).toBe(false)
             expect(rain.paused).toBe(false)
             expect(mixer.getPreferences()).toBe(saved)
