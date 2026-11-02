@@ -957,6 +957,20 @@ export class ReaderMixer {
         return true
     }
 
+    /**
+     * Stop all playing or loading Sound Cues immediately. A late media start
+     * cannot revive them. Loops, Voice, session timers and preferences stay as
+     * they are; the next explicit playCue call can play normally.
+     */
+    stopCues(): void {
+        if (this.disposed) return
+        this.cueStatus = "idle"
+        this.cueFailure = null
+        this.cues.stopAll()
+        this.lastCue = null
+        this.refresh()
+    }
+
     /** Fade both loops and pause connected narration. Preferences stay; cues finish on their own. */
     stopAll(options: ReaderMixerFadeOptions = {}): void {
         if (this.disposed) return

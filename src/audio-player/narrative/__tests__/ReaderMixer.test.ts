@@ -514,6 +514,71 @@ describe("ReaderMixer", () => {
     })
 
     describe("cues", () => {
+        it("stops sounding cues without stopping loops or changing preferences, then permits another tap", async () => {
+            const onPreferencesChange = vi.fn()
+            const mixer = makeMixer({ onPreferencesChange })
+            mixer.playSoundscape(CHAPTER, { fadeMs: 0 })
+            mixer.setAtmosphere(RAIN, { fadeMs: 0 })
+            await settle(400)
+            const music = only("https://a.test/ch1.mp3")
+            const rain = only("https://a.test/rain.mp3")
+            const saved = mixer.getPreferences()
+            const listener = vi.fn()
+            mixer.subscribe(listener)
+            onPreferencesChange.mockClear()
+            mixer.playCue(GROWL)
+            mixer.playCue("https://a.test/bell.mp3")
+            await settle()
+            const growl = only(GROWL)
+            const bell = only("https://a.test/bell.mp3")
+            expect(growl.paused).toBe(false)
+            expect(mixer.getState().activeCues).toBe(2)
+            listener.mockClear()
+
+            mixer.stopCues()
+            mixer.stopCues()
+            await settle(400)
+            expect(growl.paused).toBe(true)
+            expect(bell.paused).toBe(true)
+            expect(growl.src).toBe("")
+            expect(mixer.getState().activeCues).toBe(0)
+            expect(mixer.getState().layers.cues).toMatchObject({ status: "idle", current: null })
+            expect(listener.mock.lastCall?.[0].activeCues).toBe(0)
+            for (const [snapshot] of listener.mock.calls) {
+                if (snapshot.layers.cues.status === "playing") {
+                    expect(snapshot.layers.cues.current).not.toBeNull()
+                }
+            }
+            expect(music.paused).toBe(false)
+            expect(rain.paused).toBe(false)
+            expect(mixer.getPreferences()).toBe(saved)
+            expect(onPreferencesChange).not.toHaveBeenCalled()
+            expect(mixer.playCue(GROWL)).toBe(true)
+            await settle()
+            expect(only(GROWL).paused).toBe(false)
+            mixer.dispose()
+            expect(() => mixer.stopCues()).not.toThrow()
+        })
+
+        it("cancels a loading cue even when play resolves after it was stopped", async () => {
+            let resolve!: () => void
+            FakeAudio.playBehavior = () =>
+                new Promise<void>((done) => {
+                    resolve = done
+                })
+            const mixer = makeMixer()
+            expect(mixer.playCue(GROWL)).toBe(true)
+            const loading = only(GROWL)
+            expect(mixer.getState().activeCues).toBe(1)
+            mixer.stopCues()
+            resolve()
+            await settle(2000)
+            expect(loading.paused).toBe(true)
+            expect(loading.src).toBe("")
+            expect(mixer.getState().activeCues).toBe(0)
+            expect(mixer.getState().layers.cues.status).toBe("idle")
+        })
+
         it("overlap without stopping or ducking the loops", async () => {
             const mixer = makeMixer()
             mixer.playSoundscape(CHAPTER, { fadeMs: 0 })

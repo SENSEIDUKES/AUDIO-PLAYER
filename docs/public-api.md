@@ -264,6 +264,7 @@ mixer.setLayerAvailability({ soundscapes: !!chapterScore, atmosphere: true, cues
 if (chapterScore) mixer.playSoundscape(chapterScore, { scene: chapterId })
 mixer.startAtmosphere()
 mixer.playCue(growlUrl, { loudness: growlMeasurement })
+mixer.stopCues() // cancel playing/loading cues on narration pause or seek (5.2.0)
 mixer.setSleepTimer("chapter-end")
 mixer.notifyChapterEnd() // actual host chapter-end signal
 mixer.stopAll() // required when leaving the reader
