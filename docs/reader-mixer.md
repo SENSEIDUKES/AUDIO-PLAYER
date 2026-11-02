@@ -559,6 +559,13 @@ Auto to Web Audio when leveling is enabled. Update exhaustive status maps for
 
 ## Loop boundaries and cue resources
 
+Since 5.2.0 (2026-11-02), `mixer.stopCues()` immediately cancels all playing
+and loading Sound Cues. Use it when narration pauses or seeks, or a chapter
+closes. Late-loading audio cannot start after cancellation, and the next
+`playCue()` call still works. Music, atmosphere, Voice, sleep timers and saved
+settings are unchanged. `stopAll()` keeps its existing behavior: cues finish
+on their own unless the host also calls `stopCues()`.
+
 ReaderMixer overlaps two media decks for the last 250 ms of a finite looping bed.
 It preloads the silent standby, starts it at the selected `trimStartMs` on every
 repeat, and fades before the outgoing asset ends to cover encoder padding and
