@@ -223,44 +223,9 @@ describe("ReaderMixerPanel", () => {
         expect(screen.getByRole("combobox", { name: "Narrator" })).toHaveValue("n1")
         expect(screen.getByRole("combobox", { name: "Atmosphere sound" })).toBeInTheDocument()
 
-        // Each row sits under its own channel.
+        // Each sound choice sits in its own channel's row, beside its controls.
         const cues = screen.getByRole("switch", { name: "Sound Cues" }).closest("li")!
         expect(within(cues).getByRole("combobox", { name: "Cue sound" })).toBe(cue)
-    })
-
-    it("folds every sound choice away to leave only the sliders", () => {
-        const changes: boolean[] = []
-        renderPanel({
-            sounds: {
-                cues: {
-                    choices: [{ id: "bell", label: "Temple bell" }],
-                    value: "bell",
-                    onChange: () => {},
-                },
-            },
-            onSoundsOpenChange: (open) => changes.push(open),
-        })
-        const toggle = screen.getByRole("button", { name: "Hide sounds" })
-        expect(toggle).toHaveAttribute("aria-expanded", "true")
-        fireEvent.click(toggle)
-        expect(screen.queryAllByRole("combobox", { name: /sound/i })).toHaveLength(0)
-        expect(screen.getAllByRole("slider")).toHaveLength(4)
-        expect(screen.getByRole("combobox", { name: "Sleep timer" })).toBeInTheDocument()
-        expect(screen.getByRole("button", { name: "Show sounds" })).toHaveAttribute(
-            "aria-expanded",
-            "false"
-        )
-        fireEvent.click(screen.getByRole("button", { name: "Show sounds" }))
-        expect(screen.getByRole("combobox", { name: "Cue sound" })).toBeInTheDocument()
-        expect(changes).toEqual([false, true])
-    })
-
-    it("lets the host control whether the sound choices show", () => {
-        renderPanel({ soundsOpen: false })
-        expect(screen.queryByRole("combobox", { name: "Atmosphere sound" })).toBeNull()
-        // Controlled: a click reports the wish but the host decides.
-        fireEvent.click(screen.getByRole("button", { name: "Show sounds" }))
-        expect(screen.queryByRole("combobox", { name: "Atmosphere sound" })).toBeNull()
     })
 
     it("tolerates a non-string group from untyped host data", () => {

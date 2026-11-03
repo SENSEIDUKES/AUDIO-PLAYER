@@ -810,37 +810,30 @@ chapter with `stopAll()` cancels any automatic Voice resume.
 ## Mixer view
 
 `ReaderMixerPanel` is an **options table** laid out mobile first, so a phone sees
-the whole mixer on one screen without scrolling. Every setting is one strip, its
-name on the left and its control on the right; the strip in use gets an accent
-frame. Nothing expands: choices step in place, so the menu keeps its height.
+the whole mixer on one screen without scrolling. Every setting is one strip and
+the strip in use gets an accent frame. Nothing expands: choices step in place,
+so the menu keeps its height.
 
-- **Channels.** Master and each layer in use (Soundscapes, Atmosphere, Sound
-  Cues, connected Voice) is one line: name, on/off switch, 0–100 slider and
-  percentage. Fixed columns keep every slider aligned; a row's status message
-  sits under it.
-- **Choice rows.** The atmosphere sound (a quieter sub-row of the Atmosphere
-  strip) and the sleep timer are `name ◀ value ▶` rows. ◀ and ▶ step through
-  the choices and dim at either end; the value between them is a native
-  select, so a tap opens the device's own picker for a direct jump. The
-  atmosphere picker lists Off first, then the host's options in `<optgroup>`s
-  by `group`. While a timer runs, its countdown and Cancel sit under its row,
+- **Split rows.** A channel with a choice beside it has two halves: on the
+  left its name and percentage over its on/off switch and 0–100 slider, on the
+  right the choice's caption over a `◀ value ▶` control. ◀ and ▶ step through
+  the choices and dim at either end; the value is a native select, so a tap
+  opens the device's own picker for a direct jump. Every row has both halves:
+  one the host gives nothing to choose shows a quiet dash, so the layout never
+  changes shape.
+- **Master and the sleep timer.** The sleep timer is Master's choice, beside
+  it. While a timer runs, its countdown and a compact Cancel sit under Master,
   and the select is described by the countdown.
-- **A sound for every channel.** Under each channel sits its sound choice
-  row: Atmosphere's comes from the mixer's catalog, and the host supplies the
-  others through `sounds`, one `{ choices, value, onChange }` per channel
-  (`soundscapes`, `cues`, `voice`). Each choice is `{ id, label, group? }`;
-  groups become `<optgroup>`s. What a pick means is the host's: a scene score,
-  a cue set, a narrator. Until something is chosen the row shows
-  `labels.noSound`, and a row comes and goes with its channel.
-- **Fold the sounds away.** A **Hide sounds / Show sounds** control in the
-  panel's top row folds every sound choice row away, leaving only the sliders,
-  timer and presets. It is uncontrolled by default (`defaultSoundsOpen`,
-  `true`); pass `soundsOpen` and `onSoundsOpenChange` to control or remember
-  it. `lead` puts host content (`ReaderSettingsAudio`'s help line) at the start
-  of that row.
-- **Narrow phones.** In a container narrower than 340px every row stays one
-  line: the name column narrows and the percentage hides (the slider still
-  announces its value).
+- **A sound for every layer.** Atmosphere's choice comes from the mixer's
+  catalog (Off first, then the host's options in `<optgroup>`s by `group`). The
+  host supplies the others through `sounds`, one `{ choices, value, onChange }`
+  per layer (`soundscapes`, `cues`, `voice`); each choice is
+  `{ id, label, group? }`. What a pick means is the host's: a scene score, a
+  cue set, a narrator. Until something is chosen the control shows
+  `labels.noSound`, and a choice comes and goes with its layer.
+- **Narrow phones.** In a container narrower than 340px the percentage hides
+  (the slider still announces its value) and the choices drop their arrows so
+  the value stays readable; a tap still opens the device's picker.
 
 - **Inline only.** Normal document flow, no fixed positioning, so it fits in
   the Audio section of a settings menu.
@@ -848,8 +841,7 @@ frame. Nothing expands: choices step in place, so the menu keeps its height.
 - **Labels.** `labels` overrides every string, including `volume(layerLabel)`,
   `formatPercent(percent)`, row status messages, the device-volume hint and the
   ◀/▶ button names `previous(rowLabel)` and `next(rowLabel)`, the sound rows'
-  names `channelSounds` (`Score`, `Cue sound`, `Narrator`), `noSound`, and the
-  fold control's `showSounds` / `hideSounds`.
+  captions `channelSounds` (`Score`, `Cue sound`, `Narrator`) and `noSound`.
   `DEFAULT_READER_MIXER_LABELS` lists them all.
 - **Theme.** Set these custom properties on the panel (via `style` or CSS):
 
@@ -862,16 +854,15 @@ frame. Nothing expands: choices step in place, so the menu keeps its height.
     | `--sap-reader-mixer-radius` / `--sap-reader-mixer-gap` / `--sap-reader-mixer-padding` | `--sh-radius-panel` / `--sh-space-4` / `--sh-space-4` |
     | `--sap-reader-mixer-target-size` | `44px`, with a 44px minimum |
     | `--sap-reader-mixer-column-gap` | `10px` |
-    | `--sap-reader-mixer-name-width` / `--sap-reader-mixer-percent-width` | `6.75rem` / `3.25rem` |
-    | `--sap-reader-mixer-name-width-narrow` | `5.75rem`, under 340px |
     | `--sap-reader-mixer-row-bg` / `--sap-reader-mixer-row-radius` | 5% of the text color / `10px` |
     | `--sap-reader-mixer-row-gap` / `--sap-reader-mixer-row-padding` | `3px` / `10px` |
+    | `--sap-reader-mixer-sound-share` | `2.4fr`, the choice half's share of a row against the controls' `1fr` |
     | `--sap-reader-mixer-font` | inherited |
 
 - **Mobile first.** Designed for 390px, with every switch, slider, arrow and
-  pill at least 44px tall. With the sounds folded, the whole Settings › Audio
-  page (Master, four layers, the timer and the presets) is about 420px tall;
-  each open sound row adds 44px.
+  pill at least 44px tall. The whole Settings › Audio page (Master with the
+  sleep timer, four layers each with its sound, and the presets) is about
+  385px tall.
 - **Accessible.** Switches are native inputs with `role="switch"` named by their row;
   sliders are native range inputs named "Soundscapes volume" and so on, with the
   percentage as their value text; the atmosphere and sleep timer choices are
@@ -904,9 +895,8 @@ hairlines instead, so there is never a card inside the sheet's card.
 ```
 
 Props: `mixer`, `atmospheres`, `labels` (the panel's; `presets` also names the
-pills), `help` (`null` hides it; it shares the top row with the fold control),
-`showAtmospherePicker`, `showPresets`, `sounds`, `soundsOpen`,
-`defaultSoundsOpen`, `onSoundsOpenChange`, `className` and `style`. `ReaderAudioPresets` is exported on its own too.
+pills), `help` (`null` hides it),
+`showAtmospherePicker`, `showPresets`, `sounds`, `className` and `style`. `ReaderAudioPresets` is exported on its own too.
 
 Its root carries the opt-in `.sap-reader-settings` theme: teal switches and
 slider fills on a dark sheet, as in SEN's reader. A host can also put that

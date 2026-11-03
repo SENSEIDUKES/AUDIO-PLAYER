@@ -24,11 +24,6 @@ export interface ReaderSettingsAudioProps {
     showPresets?: boolean
     /** Sound choices for Soundscapes, Sound Cues and Voice; see `ReaderMixerPanel`. */
     sounds?: ReaderMixerPanelProps["sounds"]
-    /** Whether the sound choice rows show (controlled); hidden leaves only the sliders. */
-    soundsOpen?: boolean
-    /** Initial state when uncontrolled. Defaults to true. */
-    defaultSoundsOpen?: boolean
-    onSoundsOpenChange?: (open: boolean) => void
     /** Host-owned pieces below the presets, such as SEN's scene and soundtrack chooser. */
     children?: ReactNode
     className?: string
@@ -51,9 +46,6 @@ export function ReaderSettingsAudio({
     showAtmospherePicker = true,
     showPresets = true,
     sounds,
-    soundsOpen,
-    defaultSoundsOpen,
-    onSoundsOpenChange,
     children,
     className,
     style,
@@ -69,7 +61,7 @@ export function ReaderSettingsAudio({
                 .join(" ")}
             style={style}
         >
-            {/* The help line shares the panel's top row with its show/hide sounds control. */}
+            {help !== null && <p className="sap-reader-settings__help">{help}</p>}
             <ReaderMixerPanel
                 mixer={mixer}
                 atmospheres={atmospheres}
@@ -78,10 +70,6 @@ export function ReaderSettingsAudio({
                 showPresets={false}
                 showAtmospherePicker={showAtmospherePicker}
                 sounds={sounds}
-                soundsOpen={soundsOpen}
-                defaultSoundsOpen={defaultSoundsOpen}
-                onSoundsOpenChange={onSoundsOpenChange}
-                lead={help !== null ? <p className="sap-reader-settings__help">{help}</p> : null}
             />
             {showPresets && <ReaderAudioPresets mixer={mixer} legend={labels?.presets} />}
             {children}

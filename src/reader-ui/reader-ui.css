@@ -8,13 +8,13 @@
     --_gap: var(--sap-reader-mixer-gap, var(--sh-space-4));
     --_target: max(44px, var(--sap-reader-mixer-target-size, 44px));
     --_col-gap: var(--sap-reader-mixer-column-gap, 10px);
-    /* Fixed columns keep every channel's slider aligned. */
-    --_name: var(--sap-reader-mixer-name-width, 6.75rem);
-    --_percent: var(--sap-reader-mixer-percent-width, 3.25rem);
     --_row-bg: var(--sap-reader-mixer-row-bg, color-mix(in srgb, currentColor 5%, transparent));
     --_row-radius: var(--sap-reader-mixer-row-radius, 10px);
     --_row-gap: var(--sap-reader-mixer-row-gap, 3px);
     --_row-pad: var(--sap-reader-mixer-row-padding, 10px);
+    /* The sound half's share of a split row, against the controls' 1fr. */
+    --_sound-share: var(--sap-reader-mixer-sound-share, 2.4fr);
+    --_split-percent: 2.75rem;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
@@ -109,55 +109,10 @@
     box-shadow: none;
 }
 
-/* Top row: the host's lead (the help line) and the control that folds every
-   sound choice away, leaving only the sliders. */
-.sap-reader-mixer__toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--_col-gap);
-    min-height: var(--_target);
-}
-.sap-reader-mixer__lead {
-    min-width: 0;
-}
-.sap-reader-mixer__lead > * {
-    margin: 0;
-}
-.sap-reader-mixer__sounds-toggle {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    gap: 6px;
-    min-height: var(--_target);
-    margin-inline-start: auto;
-    padding: 0 var(--sh-space-3);
-    border: 1px solid var(--_border);
-    border-radius: 999px;
-    background: none;
-    color: var(--sh-interactive-primary);
-    font: inherit;
-    font-size: var(--sh-text-xs);
-    font-weight: var(--sh-weight-semibold);
-    cursor: pointer;
-}
-.sap-reader-mixer__sounds-toggle[aria-expanded="true"] {
-    color: var(--_muted);
-}
-.sap-reader-mixer__sounds-toggle:focus-visible {
-    outline: 2px solid var(--_focus);
-    outline-offset: 2px;
-}
-
-/* A channel: name · switch · slider · percent on one line, its status and
-   (for Atmosphere) the sound choice underneath. */
+/* A channel: name · switch · slider · percent on one line, its status
+   message underneath. */
 .sap-reader-mixer__channel {
     display: grid;
-    grid-template-columns: minmax(0, var(--_name)) var(--_target) minmax(0, 1fr) var(--_percent);
-    grid-template-areas:
-        "name   switch level  percent"
-        "status status status status"
-        "pick   pick   pick   pick";
     align-items: center;
     column-gap: var(--_col-gap);
     padding-inline: var(--_row-pad);
@@ -185,21 +140,84 @@
     grid-area: status;
     padding-bottom: var(--sh-space-2);
 }
-/* A channel's sound choice is a sub-setting of it: a quieter name. */
-.sap-reader-mixer__channel > .sap-reader-mixer__choice-row > .sap-reader-mixer__name {
+/* Every channel row has two halves. On the left, its name and percentage
+   over its switch and slider; on the right, its choice's caption over a
+   ◀ value ▶ (Master's is the sleep timer, each layer's its sound). The rows
+   never grow and nothing expands, so the whole menu keeps one screen. */
+.sap-reader-mixer .sap-reader-mixer__channel {
+    grid-template-columns:
+        var(--_target) minmax(0, 1fr) var(--_split-percent)
+        minmax(0, var(--_sound-share));
+    grid-template-areas:
+        "name   name   percent caption"
+        "switch level  level   sound"
+        "status status status  status";
+    column-gap: 8px;
+    row-gap: 0;
+}
+.sap-reader-mixer
+    .sap-reader-mixer__channel
+    > *
+    > :is(.sap-reader-mixer__name, .sap-reader-mixer__percent) {
+    align-self: end;
+    padding-top: 4px;
+    line-height: 1.15;
+}
+.sap-reader-mixer
+    .sap-reader-mixer__channel
+    > *
+    > :is(.sap-reader-mixer__switch, .sap-reader-mixer__slider) {
+    margin-top: -4px;
+}
+/* The choice's caption and control take the grid's right column directly. */
+.sap-reader-mixer__channel > .sap-reader-mixer__sound {
+    display: contents;
+}
+.sap-reader-mixer__channel > .sap-reader-mixer__sound > .sap-reader-mixer__name {
+    grid-area: caption;
+    align-self: stretch;
+    display: flex;
+    align-items: flex-end;
+    min-width: 0;
+    padding: 4px 0 0 8px;
+    border-left: 1px solid var(--_border);
     color: var(--_muted);
-    font-size: 12px;
+    font-size: 11px;
+    font-weight: var(--sh-weight-medium);
+    line-height: 1.15;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
-.sap-reader-mixer__channel > .sap-reader-mixer__sound {
-    grid-template-columns: max-content minmax(0, 1fr);
-    grid-area: pick;
-    margin-inline: calc(var(--_row-pad) * -1);
-    border-top: 1px solid var(--_border);
-    border-radius: 0 0 var(--_row-radius) var(--_row-radius);
-    background: none;
+.sap-reader-mixer__channel > .sap-reader-mixer__sound > .sap-reader-mixer__stepper {
+    grid-area: sound;
+    align-self: stretch;
+    grid-template-columns: 26px minmax(0, 1fr) 26px;
+    margin-top: -4px;
+    padding-left: 2px;
+    border-left: 1px solid var(--_border);
+}
+.sap-reader-mixer__channel > .sap-reader-mixer__sound .sap-reader-mixer__step {
+    width: 26px;
+}
+.sap-reader-mixer__channel > .sap-reader-mixer__sound .sap-reader-mixer__stepper-select {
+    font-size: 13px;
+}
+/* A row with nothing to choose keeps its right half: a quiet dash. */
+.sap-reader-mixer__channel > .sap-reader-mixer__sound--empty > .sap-reader-mixer__stepper {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    place-items: center;
+    color: var(--_muted);
+    opacity: 0.6;
+}
+/* While a timer runs, its countdown and Cancel sit on Master's status line. */
+.sap-reader-mixer__channel > .sap-reader-mixer__sleep-status {
+    grid-area: status;
+    padding: 2px 0 6px;
+}
+.sap-reader-mixer__channel > .sap-reader-mixer__sleep-status .sap-reader-mixer__sleep-cancel {
+    font-size: var(--sh-text-xs);
 }
 .sap-reader-mixer__row {
     display: flex;
@@ -265,7 +283,7 @@
 /* A choice row (Atmosphere sound, Sleep timer): name · ◀ value ▶. */
 .sap-reader-mixer__choice-row {
     display: grid;
-    grid-template-columns: minmax(0, var(--_name)) minmax(0, 1fr);
+    grid-template-columns: max-content minmax(0, 1fr);
     align-items: center;
     column-gap: var(--_col-gap);
     min-height: var(--_target);
@@ -319,12 +337,7 @@
     text-overflow: ellipsis;
 }
 
-/* Sleep timer: its countdown and Cancel sit under the row while it runs. */
-.sap-reader-mixer__sleep {
-    display: flex;
-    flex-direction: column;
-    gap: var(--_row-gap);
-}
+/* Sleep timer countdown and Cancel. */
 .sap-reader-mixer__sleep-status {
     display: flex;
     align-items: center;
@@ -338,8 +351,8 @@
     display: none;
 }
 .sap-reader-mixer__sleep-cancel {
-    min-height: var(--_target);
-    padding: var(--sh-space-2) var(--sh-space-3);
+    min-height: 30px;
+    padding: 2px var(--sh-space-3);
     border: 1px solid var(--sh-field-border);
     border-radius: 999px;
     background: var(--sh-field-surface);
@@ -366,16 +379,8 @@
    the level and still announces it as its value. */
 @container (max-width: 339px) {
     .sap-reader-mixer {
-        --_name: var(--sap-reader-mixer-name-width-narrow, 5.75rem);
         --_col-gap: 6px;
         --_row-pad: 8px;
-    }
-    .sap-reader-mixer__channel {
-        grid-template-columns: minmax(0, var(--_name)) var(--_target) minmax(0, 1fr);
-        grid-template-areas:
-            "name   switch level"
-            "status status status"
-            "pick   pick   pick";
     }
     .sap-reader-mixer__channel > .sap-reader-mixer__level > .sap-reader-mixer__percent {
         display: none;
@@ -383,11 +388,20 @@
     .sap-reader-mixer__name {
         font-size: 13px;
     }
-    .sap-reader-mixer__step {
-        width: 36px;
+    /* The choice half keeps its value readable by dropping its arrows; a tap
+       still opens the device's picker. */
+    .sap-reader-mixer .sap-reader-mixer__channel {
+        grid-template-columns: var(--_target) minmax(0, 1fr) minmax(0, 1.2fr);
+        grid-template-areas:
+            "name   name   caption"
+            "switch level  sound"
+            "status status status";
     }
-    .sap-reader-mixer__stepper {
-        grid-template-columns: 36px minmax(0, 1fr) 36px;
+    .sap-reader-mixer__channel > .sap-reader-mixer__sound .sap-reader-mixer__step {
+        display: none;
+    }
+    .sap-reader-mixer__channel > .sap-reader-mixer__sound .sap-reader-mixer__stepper {
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -440,7 +454,7 @@
 }
 /* Short phones (iPhone SE height) need every row for the controls. */
 @media (max-height: 700px) {
-    .sap-reader-settings-audio .sap-reader-mixer__lead .sap-reader-settings__help {
+    .sap-reader-settings-audio > .sap-reader-settings__help {
         display: none;
     }
 }
@@ -568,6 +582,7 @@
 /* The Audio page is one flat sheet: sections divided by hairlines, never a
    card inside the sheet's own card (AGENTS.md, Mobile Viewport Architecture). */
 .sap-reader-settings-audio .sap-reader-mixer {
+    gap: 3px;
     padding: 0;
     border: 0;
     border-radius: 0;

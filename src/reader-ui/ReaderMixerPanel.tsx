@@ -35,13 +35,10 @@ export interface ReaderMixerLabels {
     formatRemainingTime: (remainingMs: number) => string
     /** Shown where the browser ignores volume and sliders act as on/off. */
     deviceVolumeHint: string
-    /** Names of the sound choice rows under Soundscapes, Sound Cues and Voice. */
+    /** Accessible names of the sound choices beside Soundscapes, Sound Cues and Voice. */
     channelSounds: Readonly<Record<ReaderChannelSoundLayer, string>>
-    /** Shown in a sound choice row before anything is chosen. */
+    /** Shown in a sound choice before anything is chosen. */
     noSound: string
-    /** The control that folds every sound choice row away, leaving the sliders. */
-    showSounds: string
-    hideSounds: string
     /** Accessible names of a choice row's ◀ and ▶ buttons; receive the row's name. */
     previous: (rowLabel: string) => string
     next: (rowLabel: string) => string
@@ -107,8 +104,6 @@ export const DEFAULT_READER_MIXER_LABELS: ReaderMixerLabels = Object.freeze({
         voice: "Narrator",
     }),
     noSound: "Choose…",
-    showSounds: "Show sounds",
-    hideSounds: "Hide sounds",
     previous: (rowLabel: string) => `Previous ${rowLabel}`,
     next: (rowLabel: string) => `Next ${rowLabel}`,
     status: Object.freeze({
@@ -135,18 +130,10 @@ export interface ReaderMixerPanelProps {
     /** Show the preset picker above the master switch. Defaults to true. */
     showPresets?: boolean
     /**
-     * Sound choices for Soundscapes, Sound Cues and Voice, each shown as a row
-     * under its channel. Atmosphere's choice comes from the mixer's catalog.
+     * Sound choices for Soundscapes, Sound Cues and Voice, each shown on the
+     * right of its channel's row. Atmosphere's comes from the mixer's catalog.
      */
     sounds?: Partial<Record<ReaderChannelSoundLayer, ReaderChannelSounds>>
-    /** Whether the sound choice rows show (controlled). Hide them to see only the sliders. */
-    soundsOpen?: boolean
-    /** Initial state when uncontrolled. Defaults to true. */
-    defaultSoundsOpen?: boolean
-    /** Told when the reader shows or hides the sound choices, so a host can remember it. */
-    onSoundsOpenChange?: (open: boolean) => void
-    /** Content at the start of the panel's top row, beside the show/hide control. */
-    lead?: ReactNode
     className?: string
     /** Theme overrides, typically `--sap-reader-mixer-*` custom properties. */
     style?: CSSProperties
@@ -378,19 +365,9 @@ export function ReaderMixerPanel({
     showAtmospherePicker = true,
     showPresets = true,
     sounds,
-    soundsOpen: soundsOpenProp,
-    defaultSoundsOpen = true,
-    onSoundsOpenChange,
-    lead,
     className,
     style,
 }: ReaderMixerPanelProps) {
-    const [soundsOpenState, setSoundsOpenState] = useState(defaultSoundsOpen)
-    const soundsOpen = soundsOpenProp ?? soundsOpenState
-    const setSoundsOpen = (open: boolean) => {
-        if (soundsOpenProp === undefined) setSoundsOpenState(open)
-        onSoundsOpenChange?.(open)
-    }
     const contextMixer = useOptionalReaderMixer()
     const mixer = mixerProp ?? contextMixer
     const state = useReaderMixerState(mixer)
@@ -432,16 +409,18 @@ export function ReaderMixerPanel({
               : ""
 
     const hasAtmospherePicker = showAtmospherePicker && (options?.length ?? 0) > 0
-    const soundLayers = READER_MIXER_LAYERS.filter((layer) =>
-        layer === "atmosphere" ? hasAtmospherePicker : Boolean(sounds?.[layer])
+    /** Every row keeps its right half; one with nothing to choose shows a quiet dash. */
+    const emptySlot = (
+        <div className="sap-reader-mixer__sound sap-reader-mixer__sound--empty" aria-hidden="true">
+            <span className="sap-reader-mixer__stepper">—</span>
+        </div>
     )
 
-    /** A host-owned sound choice row under its channel. */
+    /** A layer's sound choice, on the right of its row. */
     const renderSound = (layer: ReaderMixerLayer): ReactNode => {
-        if (!soundsOpen) return null
-        if (layer === "atmosphere") return renderPicker()
+        if (layer === "atmosphere") return renderPicker() ?? emptySlot
         const sound = sounds?.[layer]
-        if (!sound) return null
+        if (!sound) return emptySlot
         const rowLabel = labels.channelSounds[layer]
         const groupNames: (string | null)[] = []
         for (const choice of sound.choices) {
@@ -539,7 +518,6 @@ export function ReaderMixerPanel({
             aria-labelledby={showTitle ? ids.title : ids.master}
             data-master={preferences.masterEnabled ? "on" : "off"}
             data-volume-control={state.volumeControl}
-            data-sounds={soundsOpen ? "open" : "closed"}
         >
             {showTitle && (
                 <Title className="sap-reader-mixer__title" id={ids.title}>
@@ -572,27 +550,6 @@ export function ReaderMixerPanel({
                     </SEIRadioGroup>
                 </fieldset>
             )}
-            {(lead || soundLayers.length > 0) && (
-                <div className="sap-reader-mixer__toolbar">
-                    <div className="sap-reader-mixer__lead">{lead}</div>
-                    {soundLayers.length > 0 && (
-                        <button
-                            type="button"
-                            className="sap-reader-mixer__sounds-toggle"
-                            aria-expanded={soundsOpen}
-                            aria-controls={
-                                soundsOpen
-                                    ? soundLayers.map((layer) => ids.sound(layer)).join(" ")
-                                    : undefined
-                            }
-                            onClick={() => setSoundsOpen(!soundsOpen)}
-                        >
-                            {soundsOpen ? labels.hideSounds : labels.showSounds}
-                            <span aria-hidden="true">{soundsOpen ? "▴" : "▾"}</span>
-                        </button>
-                    )}
-                </div>
-            )}
             <div className="sap-reader-mixer__channel sap-reader-mixer__channel--master">
                 <div className="sap-reader-mixer__row sap-reader-mixer__row--master">
                     <span className="sap-reader-mixer__name" id={ids.master}>
@@ -614,6 +571,51 @@ export function ReaderMixerPanel({
                     <span className="sap-reader-mixer__percent" aria-hidden="true">
                         {labels.formatPercent(Math.round((preferences.masterLevel ?? 1) * 100))}
                     </span>
+                </div>
+                {/* The sleep timer sits beside Master, as each layer's sound sits beside it. */}
+                {state.sleepTimerChoices.length === 0 && emptySlot}
+                {state.sleepTimerChoices.length > 0 && (
+                    <div className="sap-reader-mixer__sound sap-reader-mixer__timer sap-reader-mixer__choice-row">
+                        <label className="sap-reader-mixer__name" htmlFor={ids.sleep}>
+                            {labels.sleepTimer}
+                        </label>
+                        <ChoiceStepper
+                            id={ids.sleep}
+                            rowLabel={labels.sleepTimer}
+                            value={
+                                (state.sleepTimer.status === "running"
+                                    ? state.sleepTimer.choiceId
+                                    : null) ??
+                                state.sleepTimerChoices.find((choice) => choice.kind === "off")
+                                    ?.id ??
+                                ""
+                            }
+                            options={state.sleepTimerChoices.map((choice) => ({
+                                value: choice.id,
+                                label: choice.label,
+                            }))}
+                            labels={labels}
+                            describedBy={ids.sleepStatus}
+                            onChange={(value) => mixer.setSleepTimer(value)}
+                        />
+                    </div>
+                )}
+                <div
+                    className="sap-reader-mixer__sleep-status"
+                    data-empty={!sleepMessage && state.sleepTimer.status !== "running"}
+                >
+                    <span id={ids.sleepStatus} aria-live="polite">
+                        {sleepMessage}
+                    </span>
+                    {state.sleepTimer.status === "running" && (
+                        <button
+                            className="sap-reader-mixer__sleep-cancel"
+                            type="button"
+                            onClick={() => mixer.cancelSleepTimer()}
+                        >
+                            {labels.cancelTimer}
+                        </button>
+                    )}
                 </div>
             </div>
             {!READER_MIXER_LAYERS.some((layer) => state.availability[layer]) && (
@@ -684,48 +686,6 @@ export function ReaderMixerPanel({
             {state.volumeControl === "on-off" && (
                 <p className="sap-reader-mixer__hint">{labels.deviceVolumeHint}</p>
             )}
-            <div className="sap-reader-mixer__sleep">
-                <div className="sap-reader-mixer__sleep-row sap-reader-mixer__choice-row">
-                    <label className="sap-reader-mixer__name" htmlFor={ids.sleep}>
-                        {labels.sleepTimer}
-                    </label>
-                    <ChoiceStepper
-                        id={ids.sleep}
-                        rowLabel={labels.sleepTimer}
-                        value={
-                            (state.sleepTimer.status === "running"
-                                ? state.sleepTimer.choiceId
-                                : null) ??
-                            state.sleepTimerChoices.find((choice) => choice.kind === "off")?.id ??
-                            ""
-                        }
-                        options={state.sleepTimerChoices.map((choice) => ({
-                            value: choice.id,
-                            label: choice.label,
-                        }))}
-                        labels={labels}
-                        describedBy={ids.sleepStatus}
-                        onChange={(value) => mixer.setSleepTimer(value)}
-                    />
-                </div>
-                <div
-                    className="sap-reader-mixer__sleep-status"
-                    data-empty={!sleepMessage && state.sleepTimer.status !== "running"}
-                >
-                    <span id={ids.sleepStatus} aria-live="polite">
-                        {sleepMessage}
-                    </span>
-                    {state.sleepTimer.status === "running" && (
-                        <button
-                            className="sap-reader-mixer__sleep-cancel"
-                            type="button"
-                            onClick={() => mixer.cancelSleepTimer()}
-                        >
-                            {labels.cancelTimer}
-                        </button>
-                    )}
-                </div>
-            </div>
         </section>
     )
 }
