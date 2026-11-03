@@ -180,6 +180,13 @@ backend selection through `audioBackend`, while the engine/session exposes
 status through `getBackendInfo()`. Neither exposes a mutable raw backend
 instance. See the backend guide before integrating one directly.
 
+Spatial position, stereo pan, orientation and lite mode are supported on that
+advanced `AudioBackend` boundary. Use `createAudioBackend("webaudio", { audioRef })`,
+own its source/play/destroy lifecycle, and check `supportsSpatial()` plus
+`getInfo().capabilities.stereoPanning`; factory runtime fallback can change
+these capabilities. The [spatial guide](../SPATIAL_AUDIO_GUIDE.md) shows the
+host integration. Standard engines do not expose a mutable backend property.
+
 ## Plugins and Automix
 
 Plugins receive a `PluginPlayerContext`, not React component internals. Keep a

@@ -120,6 +120,14 @@ queued jobs check cancellation before allocating. Preload cancellation also
 prevents a completed native decode from entering the cache. New jobs snapshot
 the policy; existing jobs keep their limits.
 
+Preloads use their own abort lifecycle, independent of active-track generations.
+Changing tracks preserves active and queued preloads, so the next load can adopt
+the same download and decode. Releasing preloads or destroying their backend
+still cancels them. Decoded-cache ownership is retained lazily by loading or
+preloading backends: one player's teardown preserves other players' buffers,
+and the last owner's teardown clears the shared LRU. A revived backend retains
+ownership again on its next load or preload.
+
 The reader checks declared sizes before downloading and counts streamed chunks,
 including missing or inaccurate Content-Length headers. PCM/float WAV headers
 provide a decoded-size estimate before calling the native decoder, accounting
@@ -155,7 +163,32 @@ Manual browser/iPhone checks (not physical listening evidence):
 4. Clear stored audio and reload the page. Verify the cache is empty and normal
    playback fetches again. Recheck the earlier Play/Pause checklist on iPhone.
 
+## 6. Runtime context recovery and independent fades
+
+The backend factory keeps one stable facade while switching to HTML5 after
+context/graph creation or non-autoplay resume failure. Existing subscriptions,
+source and settings transfer, position restores on metadata, and diagnostics
+report the active fallback. Cancellation prevents a late context failure from
+starting HTML5 after Pause, source replacement or teardown. Ordinary autoplay,
+codec, network and resource errors keep their existing handling.
+
+Non-finite volume inputs are ignored in the hook and both backends. Finite
+levels clamp to 0–1. Fades multiply a private gain by the host output gain;
+they no longer change user volume, mute or the saved unmute level. Manual
+volume/mute actions and unload reset the fade without reopening a host mute gate.
+
+Spatial controls remain a documented advanced backend API. Capability reports
+include actual stereo-panner availability, and active lite-mode replacement is
+covered with and without that node.
+
 ## Tests (Vitest, no new deps)
+- `core/audio/__tests__/AudioBackendFactory.test.ts` — static selection,
+  runtime context failures, retained settings/events, cancellation and revival.
+- `core/audio/__tests__/audioCaches.test.ts` — preload adoption across track
+  changes, cache/pool ownership, spatial initialization and live graph changes.
+- `core/audio/__tests__/outputGain.test.ts` and
+  `__tests__/useAudioPlayer.volume.test.tsx` — finite volume, independent fades,
+  host-gain composition, unmute restoration and hook runtime recovery.
 - `core/audio/__tests__/WebAudioBackend.playback.test.ts` — pending playback
   cancellation, retained loading/buffers, resume races, and active context demand.
 - `utils/__tests__/buffering.test.ts` — `shouldEnterBuffering` (waiting while

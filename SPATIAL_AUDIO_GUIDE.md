@@ -34,6 +34,9 @@ SAP (SeiHouse Audio Player) now includes comprehensive spatial audio support mod
 
 ### WebAudioBackend (Full Support)
 - All spatial audio features available
+- Dedicated stereo pan requires `getInfo().capabilities.stereoPanning` to be true.
+  Older browsers without `StereoPannerNode` still support 3D pan and lite-mode
+  changes through a direct panner-to-gain connection.
 - Default panning model: **HRTF** (high-quality 3D)
 - Lite mode uses **equalpower** (simpler, lower CPU)
 
@@ -144,6 +147,30 @@ backend.isLiteMode(): boolean
 ### Example 1: Basic Stereo Panning
 
 An advanced host should keep the backend boundary explicit:
+
+```typescript
+import { createAudioBackend } from "@seihouse/audio-player"
+
+// Call from the host's user-gesture handler. Keep the audio element mounted
+// so the factory can fall back to HTML5 if the context fails.
+const backend = createAudioBackend("webaudio", { audioRef: { current: audioElement } })
+backend.setSource("/short-spatial-sample.mp3")
+await backend.play()
+if (backend.supportsSpatial()) {
+    backend.setPos(3, 0, -2)
+    backend.setLiteMode(true)
+    if (backend.getInfo().capabilities.stereoPanning) backend.setStereo(0.3)
+}
+// On host teardown:
+backend.destroy()
+```
+
+The factory's facade keeps spatial calls bound to the active implementation.
+After runtime HTML5 fallback, `supportsSpatial()` and `stereoPanning` are false;
+spatial setters follow the HTML5 no-op contract. Recheck capabilities after
+playback starts. A normal engine or session exposes status, not these controls.
+
+For host code receiving an already-owned backend:
 
 ```typescript
 import type { AudioBackend } from "@seihouse/audio-player"

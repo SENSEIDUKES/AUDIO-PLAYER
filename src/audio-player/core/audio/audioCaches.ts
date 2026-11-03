@@ -322,6 +322,20 @@ export class HTML5AudioPool {
 }
 
 export const sharedAudioBufferCache = new LRUAudioCache()
+let audioBufferCacheOwners = 0
+
+/** Retain decoded buffers until the last backend using this shared cache releases them. */
+export function retainAudioBufferCache(): () => void {
+    audioBufferCacheOwners += 1
+    let released = false
+    return () => {
+        if (released) return
+        released = true
+        audioBufferCacheOwners -= 1
+        if (audioBufferCacheOwners === 0) sharedAudioBufferCache.clear()
+    }
+}
+
 export class AudioStorageCache extends PersistentAudioCache {}
 
 export const sharedAudioStorageCache = new PersistentAudioCache()

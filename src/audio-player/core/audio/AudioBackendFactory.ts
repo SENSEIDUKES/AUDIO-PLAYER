@@ -2,6 +2,7 @@ import type { RefObject } from "react"
 import type { AudioBackend, AudioBackendInfo, AudioBackendKind } from "./AudioBackend"
 import { HTML5AudioBackend, HTML5_CAPABILITIES } from "./HTML5AudioBackend"
 import { WebAudioBackend, WEBAUDIO_CAPABILITIES } from "./WebAudioBackend"
+import { withRuntimeFallback } from "./runtimeFallback"
 
 export interface AudioBackendDeps {
     /** Ref to the host-rendered `<audio>` element (used by the html5 backend). */
@@ -30,7 +31,8 @@ function webAudioUnsupportedReason(): string | null {
 
 /**
  * Instantiate the requested playback backend, falling back to HTML5 Audio
- * (with a console warning) when Web Audio is unavailable.
+ * (with a console warning) when Web Audio is unavailable, including runtime
+ * context creation/resume failures. Ordinary autoplay blocking stays retryable.
  */
 export function createAudioBackend(
     requested: AudioBackendKind,
@@ -45,25 +47,32 @@ export function createAudioBackend(
                 didFallback: false,
                 capabilities: WEBAUDIO_CAPABILITIES,
             }
-            return new WebAudioBackend(info)
+            return withRuntimeFallback(new WebAudioBackend(info), deps.audioRef, (failure) =>
+                createHTML5Fallback(deps, failure)
+            )
         }
-        console.warn(
-            `[AudioPlayer] Web Audio API not available (${reason}); ` +
-                "falling back to HTML5 audio backend."
-        )
-        return new HTML5AudioBackend(deps.audioRef, {
-            requested: "webaudio",
-            active: "html5",
-            didFallback: true,
-            fallbackReason: reason,
-            capabilities: HTML5_CAPABILITIES,
-        })
+        return createHTML5Fallback(deps, reason)
     }
 
     return new HTML5AudioBackend(deps.audioRef, {
         requested: "html5",
         active: "html5",
         didFallback: false,
+        capabilities: HTML5_CAPABILITIES,
+    })
+}
+
+/** Shared reporting for static capability failures and runtime context failures. */
+function createHTML5Fallback(deps: AudioBackendDeps, reason: string): AudioBackend {
+    console.warn(
+        `[AudioPlayer] Web Audio API not available (${reason}); ` +
+            "falling back to HTML5 audio backend."
+    )
+    return new HTML5AudioBackend(deps.audioRef, {
+        requested: "webaudio",
+        active: "html5",
+        didFallback: true,
+        fallbackReason: reason,
         capabilities: HTML5_CAPABILITIES,
     })
 }

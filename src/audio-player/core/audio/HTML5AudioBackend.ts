@@ -17,6 +17,7 @@ export const HTML5_CAPABILITIES = {
     decodeAhead: false,
     requiresCors: false,
     progressiveBuffered: true,
+    stereoPanning: false,
 } as const
 
 /**
@@ -143,9 +144,10 @@ export class HTML5AudioBackend implements AudioBackend {
 
     /** Store the user's level and multiply element output by the independent mixer gain. */
     setVolume(value: number): void {
-        this.volume = value
+        if (!Number.isFinite(value)) return
+        this.volume = Math.max(0, Math.min(1, value))
         const audio = this.audio
-        if (audio) audio.volume = value * this.outputGain
+        if (audio) audio.volume = this.volume * this.outputGain
     }
 
     /** Read the ungated level; retain the stored level when output is closed or unmounted. */

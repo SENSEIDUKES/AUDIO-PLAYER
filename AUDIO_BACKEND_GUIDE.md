@@ -51,7 +51,8 @@ const engine = useAudioPlayer({
 })
 ```
 
-The backend is **fixed at mount**. To switch at runtime, remount the session —
+The requested backend is **fixed at mount**. Web Audio context failures can
+automatically change the active backend to HTML5. To change the request, remount the session —
 for example with a React `key`:
 
 ```tsx
@@ -80,6 +81,7 @@ const info = engine.getBackendInfo()
 //     decodeAhead: true,
 //     requiresCors: true,
 //     progressiveBuffered: false,
+//     stereoPanning: true,     // actual StereoPannerNode support
 //   },
 // }
 ```
@@ -103,6 +105,30 @@ and returns the HTML5 backend with `didFallback: true` and a `fallbackReason`
 in `getBackendInfo()`. Playback keeps working — only the requested
 capabilities differ.
 
+The factory also handles context construction, graph initialization and
+non-autoplay resume failures at runtime. Its stable backend facade switches
+to the host's mounted `<audio>` element, transfers subscriptions, preserves
+source, volume, mute, playback rate, output gain and loop, and restores position
+after metadata. `getInfo()` reports `active: "html5"`, `didFallback: true` and a
+reason. The switch lasts for the backend's lifetime; remount to request Web
+Audio again. Advanced hosts must supply a mounted `audioRef` for this recovery.
+Creating `new WebAudioBackend(...)` directly bypasses factory recovery.
+
+`NotAllowedError` and a context that remains suspended still use the normal
+tap-to-play path. Network, codec and resource-limit failures retain their error
+contracts and do not trigger a backend switch. HTML5 autoplay failures remain
+visible to the host. HTML5 fallback loses spatial controls, precise timing,
+decode-ahead, and reliable programmatic volume on volume-locked browsers.
+
+Spatial controls are a supported **advanced host API** through the factory's
+`AudioBackend`, documented with lifecycle examples in the
+[spatial guide](./SPATIAL_AUDIO_GUIDE.md). `supportsSpatial()` reports 3D
+panning; `getInfo().capabilities.stereoPanning` reports dedicated stereo
+panning. Before graph creation the latter probes the constructor prototype;
+after creation it reflects the actual node. Without `StereoPannerNode`, both
+initial and replacement panners connect directly to the gain node. Custom
+backend capability reports must include `stereoPanning` (false if unsupported).
+
 ---
 
 ## Web Audio specifics
@@ -118,9 +144,13 @@ that plays fine under HTML5 will fail under Web Audio with a
 
 The full file is downloaded and decoded before playback starts (the player
 shows its buffering state during this window). The decoded buffer is cached
-(LRU, 3 entries) so repeat plays and `preload()`ed next tracks start
+(shared LRU, 4 entries and 250 MiB by default) so repeat plays and `preload()`ed next tracks start
 near-instantly. Decoded PCM is large — roughly 10 MB per stereo minute at
-44.1 kHz — which is why the cache is capped and cleared on unload/unmount.
+44.1 kHz — which is why the cache is capped. Backends retain the cache when
+loading or preloading and release ownership on destroy; only the last owner's
+destroy clears it. Track changes preserve in-flight preloads, and `load()`
+adopts their results. `releasePreload()` and destroy cancel that backend's
+preloads; explicit cache invalidation still prevents stale cache writes.
 
 ### Autoplay
 
@@ -134,6 +164,15 @@ raises the same `autoplayBlocked` affordance the HTML5 path uses, so the UI
 iOS Safari ignores programmatic volume on media elements, so the HTML5 path
 reports `volumeUnsupported` there. The Web Audio backend routes through a
 GainNode, which iOS honors — the volume slider and `fade()` work normally.
+
+Finite volume writes clamp to 0–1; non-finite writes are ignored by the hook
+and both backends. `engine.fade(to, durationMs)` ramps a separate 0–1 fade
+gain, multiplied by the host's `setOutputGain()` value and the user's volume.
+It preserves the slider, mute state, and unmute-restore level. Manual volume or
+mute controls reset the fade; `unload()` also resets it. Non-finite fade targets
+or durations are ignored. A zero fade gain uses element mute as well as volume
+on HTML5, so silence works on volume-locked browsers; partial fades still need
+programmatic volume support.
 
 ### Automix
 

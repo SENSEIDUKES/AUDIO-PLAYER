@@ -85,7 +85,8 @@ function sanitizeInitialCurrentTime(value: number | undefined): number | null {
  * - A monotonic `playbackToken` is bumped on every source / play-attempt
  *   boundary. Async callbacks captured before the swap check the token and
  *   no-op if it has changed, which removes the rapid-track-skip race.
- * - The backend is fixed at mount; remount (e.g. via `key`) to switch.
+ * - The requested backend is fixed at mount. Web Audio context failures can
+ *   switch the active backend to HTML5; remount to change the request.
  */
 export function useAudioPlayer(options: UseAudioPlayerOptions): AudioPlayerEngine {
     const {
@@ -158,6 +159,8 @@ export function useAudioPlayer(options: UseAudioPlayerOptions): AudioPlayerEngin
     const playPromiseRef = useRef<Promise<void> | null>(null)
     const animationFrameRef = useRef<number | null>(null)
     const fadeFrameRef = useRef<number | null>(null)
+    const outputGainRef = useRef(1)
+    const fadeGainRef = useRef(1)
     // Debounce for the buffering spinner. A `waiting`/`stalled` arms it; it
     // flips `isBuffering` true only if the stall outlasts the threshold. Cleared
     // by every buffering reset so a stale timer can never strand the spinner
@@ -711,11 +714,14 @@ export function useAudioPlayer(options: UseAudioPlayerOptions): AudioPlayerEngin
     )
 
     const setVolume = useCallback((value: number) => {
+        if (!Number.isFinite(value)) return
         if (fadeFrameRef.current !== null) {
             cancelAnimationFrame(fadeFrameRef.current)
             fadeFrameRef.current = null
         }
         const backend = backendRef.current!
+        fadeGainRef.current = 1
+        backend.setOutputGain?.(outputGainRef.current)
         const next = Math.max(0, Math.min(1, value))
         previousVolumeRef.current = next > 0 ? next : previousVolumeRef.current
         setVolumeState(next)
@@ -753,6 +759,8 @@ export function useAudioPlayer(options: UseAudioPlayerOptions): AudioPlayerEngin
         }
         const backend = backendRef.current!
         if (!backend.isAttached()) return
+        fadeGainRef.current = 1
+        backend.setOutputGain?.(outputGainRef.current)
         const nextMuted = !backend.isMuted()
         backend.setMuted(nextMuted)
         setIsMuted(nextMuted)
@@ -847,6 +855,8 @@ export function useAudioPlayer(options: UseAudioPlayerOptions): AudioPlayerEngin
             fadeFrameRef.current = null
         }
         backend.releasePreload()
+        fadeGainRef.current = 1
+        backend.setOutputGain?.(outputGainRef.current)
     }, [
         bumpToken,
         cancelSourceResolution,
@@ -857,6 +867,7 @@ export function useAudioPlayer(options: UseAudioPlayerOptions): AudioPlayerEngin
     ])
 
     const fade = useCallback((to: number, durationMs: number) => {
+        if (!Number.isFinite(to) || !Number.isFinite(durationMs)) return
         const backend = backendRef.current!
         if (!backend.isAttached()) return
         const target = Math.max(0, Math.min(1, to))
@@ -865,11 +876,11 @@ export function useAudioPlayer(options: UseAudioPlayerOptions): AudioPlayerEngin
                 cancelAnimationFrame(fadeFrameRef.current)
                 fadeFrameRef.current = null
             }
-            backend.setVolume(target)
-            setVolumeState(target)
+            fadeGainRef.current = target
+            backend.setOutputGain?.(outputGainRef.current * target)
             return
         }
-        const startVolume = backend.getVolume()
+        const startGain = fadeGainRef.current
         const startTime = performance.now()
         if (fadeFrameRef.current !== null) {
             cancelAnimationFrame(fadeFrameRef.current)
@@ -877,10 +888,10 @@ export function useAudioPlayer(options: UseAudioPlayerOptions): AudioPlayerEngin
         const step = (now: number) => {
             const elapsed = now - startTime
             const progress = Math.min(1, elapsed / durationMs)
-            const next = startVolume + (target - startVolume) * progress
+            const next = startGain + (target - startGain) * progress
             const clamped = Math.max(0, Math.min(1, next))
-            backend.setVolume(clamped)
-            setVolumeState(clamped)
+            fadeGainRef.current = clamped
+            backendRef.current!.setOutputGain?.(outputGainRef.current * clamped)
             if (progress < 1) {
                 fadeFrameRef.current = requestAnimationFrame(step)
             } else {
@@ -1249,7 +1260,8 @@ export function useAudioPlayer(options: UseAudioPlayerOptions): AudioPlayerEngin
 
     const getBackendInfo = useCallback(() => backendRef.current!.getInfo(), [])
     const setOutputGain = useCallback((gain: number) => {
-        backendRef.current!.setOutputGain?.(gain)
+        outputGainRef.current = Number.isFinite(gain) ? Math.max(0, Math.min(1, gain)) : 0
+        backendRef.current!.setOutputGain?.(outputGainRef.current * fadeGainRef.current)
     }, [])
     const getDecodedData = useCallback(() => backendRef.current!.getDecodedData(), [])
     const getPosition = useCallback(() => backendRef.current?.getCurrentTime() ?? 0, [])

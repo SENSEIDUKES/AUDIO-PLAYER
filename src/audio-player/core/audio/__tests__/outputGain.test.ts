@@ -15,6 +15,63 @@ afterEach(() => {
 })
 
 describe("independent mixer output gain", () => {
+    it("ignores non-finite HTML5 volume before and after the element mounts", () => {
+        const ref: { current: HTMLAudioElement | null } = { current: null }
+        const backend = new HTML5AudioBackend(ref)
+        backend.setVolume(0.6)
+        for (const invalid of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+            expect(() => backend.setVolume(invalid)).not.toThrow()
+            expect(backend.getVolume()).toBe(0.6)
+        }
+        ref.current = document.createElement("audio")
+        backend.setOutputGain(0.5)
+        for (const invalid of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+            expect(() => backend.setVolume(invalid)).not.toThrow()
+            expect(ref.current.volume).toBe(0.3)
+            expect(backend.getVolume()).toBe(0.6)
+        }
+        backend.setVolume(-2)
+        expect(ref.current.volume).toBe(0)
+        backend.setVolume(2)
+        expect(ref.current.volume).toBe(0.5)
+    })
+
+    it("keeps non-finite Web Audio volume out of the audio graph", async () => {
+        vi.stubGlobal("AudioContext", FakeAudioContext)
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () => new Response(new Uint8Array([1])))
+        )
+        const backend = new WebAudioBackend({
+            requested: "webaudio",
+            active: "webaudio",
+            didFallback: false,
+            capabilities: WEBAUDIO_CAPABILITIES,
+        })
+        try {
+            backend.setVolume(0.6)
+            backend.setVolume(Number.NaN)
+            backend.setSource("finite.mp3")
+            await backend.play()
+            const gain = FakeAudioContext.instances[0].buses()[0].gain
+            for (const invalid of [
+                Number.NaN,
+                Number.POSITIVE_INFINITY,
+                Number.NEGATIVE_INFINITY,
+            ]) {
+                expect(() => backend.setVolume(invalid)).not.toThrow()
+                expect(gain.value).toBe(0.6)
+                expect(backend.getVolume()).toBe(0.6)
+            }
+            backend.setVolume(-2)
+            expect(gain.value).toBe(0)
+            backend.setVolume(2)
+            expect(gain.value).toBe(1)
+        } finally {
+            backend.destroy()
+        }
+    })
+
     it("preserves a mute set before the HTML5 element mounts", () => {
         const audioRef: { current: HTMLAudioElement | null } = { current: null }
         const backend = new HTML5AudioBackend(audioRef)
