@@ -14,6 +14,8 @@ import {
 
 /** How often the playback clock samples the live position while playing. */
 const CLOCK_INTERVAL_MS = 100
+/** How far past its remembered start the live position may be and still count as that start. */
+const START_GRACE_SECONDS = 1
 
 export class CueManifestPlugin implements AudioPlayerPlugin {
     name = "cueManifest"
@@ -26,6 +28,8 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
     private target: EventTarget | null = null
     private playing = false
     private clock: ReturnType<typeof setInterval> | null = null
+    /** Where the next play window begins: track start, pause position, or last seek target. */
+    private resumeFrom: number | null = 0
 
     constructor(private options: CueRuntimeOptions = {}) {}
 
@@ -89,20 +93,20 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
     // (see CueRuntime policy), and returning to the page samples immediately.
 
     private readIsPlaying(): boolean {
-        return this.context?.getEngine?.()?.isPlaying === true
+        return this.context?.getEngine().isPlaying === true
     }
 
     private readPosition(fallback?: number): number | undefined {
         const context = this.context
         if (!context) return fallback
-        const live = context.getPlaybackPosition?.() ?? context.getAudioElement?.()?.currentTime
+        const live = context.getPlaybackPosition?.() ?? context.getAudioElement()?.currentTime
         return typeof live === "number" && Number.isFinite(live) ? live : fallback
     }
 
     /** True while a seek has been requested but the live position has not caught up. */
     private isSeekPending(): boolean {
         const context = this.context
-        return context?.getEngine?.()?.isSeeking === true || !!context?.getAudioElement?.()?.seeking
+        return context?.getEngine().isSeeking === true || !!context?.getAudioElement()?.seeking
     }
 
     private poll(fallback?: number) {
@@ -131,12 +135,29 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
         }
     }
 
+    /**
+     * Where a play window starts. `onPlay` runs from a React effect after audio has
+     * already begun, so the live sample can be slightly past the true start (0.02 s into the
+     * track); starting the window there would skip a cue at 0:00. Prefer the remembered
+     * start (track start, pause position, seek target) when the live position is just past
+     * it, and the live position otherwise (e.g. a restored position).
+     */
+    private startPosition(): number | undefined {
+        const live = this.readPosition()
+        const from = this.resumeFrom
+        this.resumeFrom = null
+        if (from === null) return live
+        if (live === undefined) return from
+        return live >= from && live - from <= START_GRACE_SECONDS ? from : live
+    }
+
     /** Hand a freshly installed runtime the player's current state. */
     private activate(runtime: CueRuntime) {
         this.runtime = runtime
         if (this.playing) {
-            runtime.setPlaying(true, this.readPosition())
+            runtime.setPlaying(true, this.startPosition())
             this.startClock()
+            this.poll() // catch up from the start position to the live one
         } else {
             runtime.setPlaying(false)
         }
@@ -183,6 +204,7 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
     /** Install the newest inline or fetched manifest; superseded fetch completions are ignored. */
     onTrackLoad(track: Track | null): PluginHookResult {
         this.cleanup()
+        this.resumeFrom = 0
         if (!track || !this.context) return
         const generation = this.generation
         if (this.readIsPlaying()) this.playing = true
@@ -216,13 +238,15 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
     onPlay(): PluginHookResult {
         this.playing = true
         if (!this.runtime) return
-        this.runtime.setPlaying(true, this.readPosition())
+        this.runtime.setPlaying(true, this.startPosition())
         this.startClock()
+        this.poll() // catch up from the start position to the live one
     }
 
     /** Catch up to the pause position, then stop timing: nothing fires while paused. */
     onPause(): PluginHookResult {
         this.poll()
+        this.resumeFrom = this.readPosition() ?? this.resumeFrom
         this.playing = false
         this.runtime?.setPlaying(false)
         this.stopClock()
@@ -234,12 +258,13 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
     }
 
     onSeek(position: number): PluginHookResult {
+        this.resumeFrom = position
         this.runtime?.handleTimeUpdate(position, true)
     }
 
     /** Fire any cues up to the end of the track, then stop timing. Never claims the advance. */
     onTrackEnded(): PluginHookResult {
-        const engine = this.context?.getEngine?.()
+        const engine = this.context?.getEngine()
         const duration = engine?.duration
         const end =
             typeof duration === "number" && Number.isFinite(duration) && duration > 0
@@ -247,6 +272,7 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
                 : this.readPosition()
         if (end !== undefined) this.runtime?.handleTrackEnd(end)
         this.playing = false
+        this.resumeFrom = null
         this.stopClock()
         return false
     }

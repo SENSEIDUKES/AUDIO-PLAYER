@@ -247,6 +247,34 @@ describe("CueManifestPlugin playback clock", () => {
         plugin.destroy()
     })
 
+    it("does not skip a cue at zero when onPlay runs after audio has already advanced", () => {
+        const h = harness()
+        const plugin = createCueManifestPlugin()
+        plugin.init(h.context)
+        plugin.onTrackLoad(track(manifestOf(cue("zero", 0), cue("a", 0.01))))
+
+        // onPlay is delivered from a React effect: the backend is already 20 ms in.
+        h.position.value = 0.02
+        plugin.onPlay()
+        expect(h.fired).toEqual(["zero", "a"])
+        plugin.destroy()
+    })
+
+    it("resumes from the pause position so cues crossed before onPlay still fire", () => {
+        const h = harness()
+        const plugin = createCueManifestPlugin()
+        plugin.init(h.context)
+        plugin.onTrackLoad(track(manifestOf(cue("a", 3.01))))
+        plugin.onPlay()
+        h.position.value = 3
+        plugin.onPause()
+
+        h.position.value = 3.03
+        plugin.onPlay()
+        expect(h.fired).toEqual(["a"])
+        plugin.destroy()
+    })
+
     it("times cues from the live position without any onTimeUpdate calls", () => {
         const h = harness()
         const plugin = createCueManifestPlugin()
