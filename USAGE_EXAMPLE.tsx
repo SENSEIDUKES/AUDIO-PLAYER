@@ -10,6 +10,7 @@ import {
     ReaderMixerNote,
     createAutomixPlugin,
     createKeyboardShortcutPlugin,
+    createAudioBackend,
     type Track,
     useAudioSession,
     useReaderMixer,
@@ -26,6 +27,25 @@ const tracks: Track[] = [
         audioFile: "https://example.com/audio.mp3",
     },
 ]
+
+// Advanced host integration: call from a user gesture; keep the audio element
+// mounted for runtime HTML5 fallback. The caller destroys the returned backend.
+export async function playSpatialAudio(audio: HTMLAudioElement, url: string) {
+    const backend = createAudioBackend("webaudio", { audioRef: { current: audio } })
+    try {
+        backend.setSource(url)
+        await backend.play()
+        if (backend.supportsSpatial()) {
+            backend.setPos(3, 0, -2)
+            backend.setLiteMode(true)
+            if (backend.getInfo().capabilities.stereoPanning) backend.setStereo(0.3)
+        }
+        return backend
+    } catch (error) {
+        backend.destroy()
+        throw error
+    }
+}
 
 // One shared queue with custom controls. Every child uses the same audio
 // element, playback state, and queue from AudioSessionProvider.

@@ -32,7 +32,23 @@ export const WEBAUDIO_CAPABILITIES = {
     decodeAhead: true,
     requiresCors: true,
     progressiveBuffered: false,
+    stereoPanning: true,
 } as const
+
+/** Context failures can switch backend; codec, network and resource errors cannot. */
+export class AudioContextUnavailableError extends Error {
+    constructor(cause: unknown) {
+        const message =
+            typeof cause === "object" &&
+            cause !== null &&
+            "message" in cause &&
+            typeof cause.message === "string"
+                ? cause.message
+                : "unknown failure"
+        super(`Web Audio context unavailable: ${message}`)
+        this.name = "NotSupportedError"
+    }
+}
 
 type WebAudioState = "idle" | "loading" | "ready" | "playing" | "paused" | "ended" | "error"
 
@@ -56,6 +72,10 @@ function namedError(name: string, message: string): Error {
     const error = new Error(message)
     error.name = name
     return error
+}
+
+function isNamedError(error: unknown, name: string): boolean {
+    return typeof error === "object" && error !== null && "name" in error && error.name === name
 }
 
 function getAudioContextCtor(): typeof AudioContext | undefined {
@@ -152,6 +172,15 @@ export class WebAudioBackend implements AudioBackend {
     }
 
     private ensureContext(): AudioContext {
+        try {
+            return this.createContext()
+        } catch (error) {
+            this.releaseContext()
+            throw new AudioContextUnavailableError(error)
+        }
+    }
+
+    private createContext(): AudioContext {
         if (this.ctx && this.ctx.state !== "closed") return this.ctx
         const Ctor = getAudioContextCtor()
         if (!Ctor) throw namedError("NotSupportedError", "Web Audio API unavailable.")
@@ -232,7 +261,7 @@ export class WebAudioBackend implements AudioBackend {
         this.lastError = code
         this.state = "error"
         // Evict so a retry() → load() genuinely re-fetches.
-        sharedAudioBufferCache.delete(url)
+        if (code !== "backend-unavailable") sharedAudioBufferCache.delete(url)
         this.emit("error")
     }
 
@@ -292,7 +321,7 @@ export class WebAudioBackend implements AudioBackend {
             return data
         } catch (error: unknown) {
             if (!current() || fetchSignal?.aborted) return null
-            if (error instanceof Error && error.name === "AbortError") return null
+            if (isNamedError(error, "AbortError")) return null
             // Includes CORS rejections, which surface as opaque network errors.
             if (reportErrors)
                 this.failLoad(
@@ -336,7 +365,11 @@ export class WebAudioBackend implements AudioBackend {
                         return buffer
                     } catch (error) {
                         if (!current()) return null
-                        if (error instanceof AudioResourceLimitError) throw error
+                        if (
+                            error instanceof AudioResourceLimitError ||
+                            error instanceof AudioContextUnavailableError
+                        )
+                            throw error
                         await sharedAudioStorageCache.delete(url)
                         if (!current()) return null
                         // Bad cached bytes get exactly one fresh network attempt.
@@ -365,7 +398,11 @@ export class WebAudioBackend implements AudioBackend {
             } catch (error) {
                 if (current() && reportErrors)
                     this.failLoad(
-                        error instanceof AudioResourceLimitError ? "src-not-supported" : "decode",
+                        error instanceof AudioContextUnavailableError
+                            ? "backend-unavailable"
+                            : error instanceof AudioResourceLimitError
+                              ? "src-not-supported"
+                              : "decode",
                         url
                     )
                 return null
@@ -464,11 +501,12 @@ export class WebAudioBackend implements AudioBackend {
         assertCurrentPlayback()
 
         let resumed = false
+        let resumeError: unknown
         try {
             await this.contextLease!.setActive(true, true)
             resumed = true
-        } catch {
-            resumed = false
+        } catch (error) {
+            resumeError = error
         }
         // A stale request must not release a newer play request's demand or
         // report a cancelled resume as an autoplay failure.
@@ -477,6 +515,14 @@ export class WebAudioBackend implements AudioBackend {
         // treat that as autoplay-blocked so the hook's affordance shows.
         if (!resumed || ctx.state !== "running") {
             void this.contextLease?.setActive(false).catch(() => {})
+            if (
+                (!resumed && !isNamedError(resumeError, "NotAllowedError")) ||
+                ctx.state === "closed"
+            ) {
+                throw new AudioContextUnavailableError(
+                    resumeError ?? new Error("AudioContext is closed.")
+                )
+            }
             throw namedError("NotAllowedError", "AudioContext requires a user gesture to start.")
         }
         if (!this.buffer) {
@@ -622,6 +668,7 @@ export class WebAudioBackend implements AudioBackend {
 
     /** Clamp and store the user's level while retaining mixer output gain and mute. */
     setVolume(value: number): void {
+        if (!Number.isFinite(value)) return
         this.volume = Math.max(0, Math.min(1, value))
         if (this.gain) {
             this.gain.gain.value = this.muted ? 0 : this.volume * this.outputGain
@@ -732,7 +779,15 @@ export class WebAudioBackend implements AudioBackend {
     }
 
     getInfo(): AudioBackendInfo {
-        return this.info
+        return {
+            ...this.info,
+            capabilities: {
+                ...this.info.capabilities,
+                stereoPanning: this.ctx
+                    ? this.stereoPanner !== null
+                    : typeof getAudioContextCtor()?.prototype?.createStereoPanner === "function",
+            },
+        }
     }
 
     destroy(): void {
@@ -749,36 +804,26 @@ export class WebAudioBackend implements AudioBackend {
         this.loadPromise = null
         this.state = "idle"
 
-        // Disconnect spatial audio nodes
-        if (this.panner) {
+        this.releaseContext()
+        // Revivable by design: the next load()/play() lazily recreates the
+        // context (required for React StrictMode unmount/remount cycles).
+    }
+
+    /** Release partial graphs too when context or node construction fails. */
+    private releaseContext(): void {
+        for (const node of [this.panner, this.stereoPanner, this.gain]) {
             try {
-                this.panner.disconnect()
+                node?.disconnect()
             } catch {
                 // Already disconnected.
             }
-            this.panner = null
         }
-        if (this.stereoPanner) {
-            try {
-                this.stereoPanner.disconnect()
-            } catch {
-                // Already disconnected.
-            }
-            this.stereoPanner = null
-        }
-        if (this.gain) {
-            try {
-                this.gain.disconnect()
-            } catch {
-                // Already disconnected.
-            }
-            this.gain = null
-        }
+        this.panner = null
+        this.stereoPanner = null
+        this.gain = null
         this.contextLease?.release()
         this.contextLease = null
         this.ctx = null
-        // Revivable by design: the next load()/play() lazily recreates the
-        // context (required for React StrictMode unmount/remount cycles).
     }
 
     // ===================== SPATIAL AUDIO METHODS =====================

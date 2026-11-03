@@ -163,7 +163,32 @@ Manual browser/iPhone checks (not physical listening evidence):
 4. Clear stored audio and reload the page. Verify the cache is empty and normal
    playback fetches again. Recheck the earlier Play/Pause checklist on iPhone.
 
+## 6. Runtime context recovery and independent fades
+
+The backend factory keeps one stable facade while switching to HTML5 after
+context/graph creation or non-autoplay resume failure. Existing subscriptions,
+source and settings transfer, position restores on metadata, and diagnostics
+report the active fallback. Cancellation prevents a late context failure from
+starting HTML5 after Pause, source replacement or teardown. Ordinary autoplay,
+codec, network and resource errors keep their existing handling.
+
+Non-finite volume inputs are ignored in the hook and both backends. Finite
+levels clamp to 0–1. Fades multiply a private gain by the host output gain;
+they no longer change user volume, mute or the saved unmute level. Manual
+volume/mute actions and unload reset the fade without reopening a host mute gate.
+
+Spatial controls remain a documented advanced backend API. Capability reports
+include actual stereo-panner availability, and active lite-mode replacement is
+covered with and without that node.
+
 ## Tests (Vitest, no new deps)
+- `core/audio/__tests__/AudioBackendFactory.test.ts` — static selection,
+  runtime context failures, retained settings/events, cancellation and revival.
+- `core/audio/__tests__/audioCaches.test.ts` — preload adoption across track
+  changes, cache/pool ownership, spatial initialization and live graph changes.
+- `core/audio/__tests__/outputGain.test.ts` and
+  `__tests__/useAudioPlayer.volume.test.tsx` — finite volume, independent fades,
+  host-gain composition, unmute restoration and hook runtime recovery.
 - `core/audio/__tests__/WebAudioBackend.playback.test.ts` — pending playback
   cancellation, retained loading/buffers, resume races, and active context demand.
 - `utils/__tests__/buffering.test.ts` — `shouldEnterBuffering` (waiting while

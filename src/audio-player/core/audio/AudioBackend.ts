@@ -39,11 +39,11 @@ export type AudioBackendEvent =
     | "loadstart"
 
 /**
- * Normalized load/playback failure codes. Mirrors the `MediaError` code space
- * so both backends can drive the same user-facing error messages.
+ * Normalized load/playback failures, including Web Audio context availability.
+ * Media errors share the same codes on both backends.
  */
 export type AudioBackendErrorCode =
-    "aborted" | "network" | "decode" | "src-not-supported" | "unknown"
+    "aborted" | "network" | "decode" | "src-not-supported" | "backend-unavailable" | "unknown"
 
 /** What a backend can and cannot do, for consumers picking a backend. */
 export interface AudioBackendCapabilities {
@@ -59,6 +59,8 @@ export interface AudioBackendCapabilities {
     requiresCors: boolean
     /** Multi-segment buffered ranges reported while downloading. */
     progressiveBuffered: boolean
+    /** Dedicated stereo panning is available; check again after the Web Audio graph is created. */
+    stereoPanning: boolean
 }
 
 /** Result of `engine.getBackendInfo()` — which backend ran and why. */
@@ -124,7 +126,7 @@ export interface AudioBackend {
     /** Equivalent of `readyState >= 1` (metadata known). */
     hasMetadata(): boolean
 
-    /** Raw volume write — no support detection; the hook owns that probe. */
+    /** Clamp finite volume to 0–1; ignore non-finite input. The hook owns support detection. */
     setVolume(value: number): void
     /** Optional output gain, separate from the user's volume and mute controls. */
     setOutputGain?(gain: number): void

@@ -882,6 +882,7 @@ describe("WebAudioBackend lite mode switching", () => {
         expect(internals.panner.panningModel).toBe("equalpower")
         expect(oldPanner.disconnect).toHaveBeenCalledWith()
         expect(internals.panner.connect).toHaveBeenCalledWith(stereoPanner)
+        expect(backend.getInfo().capabilities.stereoPanning).toBe(true)
         backend.destroy()
     })
 
@@ -889,6 +890,7 @@ describe("WebAudioBackend lite mode switching", () => {
         const { backend, internals } = createBackendWithGraph({ stereoPanner: false })
         const oldPanner = internals.panner
         expect(internals.stereoPanner).toBeNull()
+        expect(backend.getInfo().capabilities.stereoPanning).toBe(false)
 
         expect(() => backend.setLiteMode(true)).not.toThrow()
         expect(internals.panner.panningModel).toBe("equalpower")
@@ -901,6 +903,121 @@ describe("WebAudioBackend lite mode switching", () => {
         expect(internals.panner.connect).toHaveBeenCalledWith(internals.gain)
         backend.destroy()
     })
+
+    it("applies stored spatial settings to the initial graph and updates live settings", () => {
+        installWebAudioContext(async () => fakeBuffer("unused"))
+        const backend = createWebAudioBackend()
+        expect(backend.getAudioContext()).toBeNull()
+        expect(backend.supportsSpatial()).toBe(true)
+        backend.setStereo(0.4)
+        backend.setPos(1, 2, 3)
+        backend.setOrientation(-1, 0.5, 0)
+        backend.setDistanceModel("linear")
+        backend.setRefDistance(2)
+        backend.setMaxDistance(50)
+        backend.setRolloffFactor(0.5)
+        backend.setConeInnerAngle(60)
+        backend.setConeOuterAngle(120)
+        backend.setConeOuterGain(0.3)
+        backend.setLiteMode(true)
+        ;(backend as unknown as { ensureContext(): AudioContext }).ensureContext()
+        const internals = backend as unknown as Internals
+        expect(internals.panner).toMatchObject({
+            panningModel: "equalpower",
+            distanceModel: "linear",
+            refDistance: 2,
+            maxDistance: 50,
+            rolloffFactor: 0.5,
+            coneInnerAngle: 60,
+            coneOuterAngle: 120,
+            coneOuterGain: 0.3,
+            positionX: { value: 1 },
+            positionY: { value: 2 },
+            positionZ: { value: 3 },
+            orientationX: { value: -1 },
+            orientationY: { value: 0.5 },
+            orientationZ: { value: 0 },
+        })
+        expect(internals.stereoPanner).toMatchObject({ pan: { value: 0.4 } })
+        backend.setStereo(5)
+        backend.setPos(4, 5, 6)
+        backend.setOrientation(0, 1, 0)
+        backend.setDistanceModel("exponential")
+        backend.setRefDistance(-1)
+        backend.setMaxDistance(-1)
+        backend.setRolloffFactor(-1)
+        backend.setConeInnerAngle(400)
+        backend.setConeOuterAngle(-1)
+        backend.setConeOuterGain(2)
+        expect(backend.getStereo()).toBe(1)
+        expect(backend.getPos()).toEqual([4, 5, 6])
+        expect(backend.getOrientation()).toEqual([0, 1, 0])
+        expect(backend.getDistanceModel()).toBe("exponential")
+        expect(backend.getRefDistance()).toBe(0)
+        expect(backend.getMaxDistance()).toBe(0)
+        expect(backend.getRolloffFactor()).toBe(0)
+        expect(backend.getConeInnerAngle()).toBe(360)
+        expect(backend.getConeOuterAngle()).toBe(0)
+        expect(backend.getConeOuterGain()).toBe(1)
+        expect(internals.panner).toMatchObject({
+            distanceModel: "exponential",
+            refDistance: 0,
+            maxDistance: 0,
+            rolloffFactor: 0,
+            coneInnerAngle: 360,
+            coneOuterAngle: 0,
+            coneOuterGain: 1,
+            positionX: { value: 4 },
+            positionY: { value: 5 },
+            positionZ: { value: 6 },
+            orientationX: { value: 0 },
+            orientationY: { value: 1 },
+            orientationZ: { value: 0 },
+        })
+        expect(backend.getAudioContext()).not.toBeNull()
+        backend.destroy()
+        expect(backend.getAudioContext()).toBeNull()
+    })
+
+    it.each([true, false])(
+        "keeps a playing source connected when lite mode changes (stereo=%s)",
+        async (stereo) => {
+            const decoded = { duration: 30, length: 1, numberOfChannels: 1 } as AudioBuffer
+            const context = installWebAudioContext(async () => decoded)
+            if (!stereo) (context as Partial<typeof context>).createStereoPanner = undefined
+            const source = Object.assign(new FakeWebAudioNode(), {
+                start: vi.fn(),
+                stop: vi.fn(),
+                playbackRate: { value: 1 },
+                onended: null,
+            })
+            context.createBufferSource.mockReturnValue(source)
+            const backend = createWebAudioBackend()
+            sharedAudioBufferCache.set("spatial.mp3", decoded)
+            backend.setSource("spatial.mp3")
+            await backend.play()
+            const internals = backend as unknown as Internals
+            const oldPanner = internals.panner
+            backend.setPos(2, 0, -3)
+            backend.setLiteMode(true)
+            expect(source.disconnect).toHaveBeenCalledWith(oldPanner)
+            expect(source.connect).toHaveBeenLastCalledWith(internals.panner)
+            expect(internals.panner.connect).toHaveBeenCalledWith(
+                stereo ? internals.stereoPanner : internals.gain
+            )
+            expect(internals.panner.positionX.value).toBe(2)
+            expect(internals.panner.positionZ.value).toBe(-3)
+            expect(backend.isLiteMode()).toBe(true)
+            expect(backend.isPaused()).toBe(false)
+            const currentPanner = internals.panner
+            backend.setLiteMode(true)
+            expect(internals.panner).toBe(currentPanner)
+            backend.setLiteMode(false)
+            expect(internals.panner.panningModel).toBe("HRTF")
+            expect(source.start).toHaveBeenCalledOnce()
+            backend.destroy()
+        }
+    )
 })
 
 describe("Web Audio cache recovery and resource admission", () => {

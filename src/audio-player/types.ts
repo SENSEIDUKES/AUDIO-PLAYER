@@ -460,7 +460,9 @@ export interface AudioPlayerEngine {
     preload: (track: Track) => void
     // Explicitly clear the active source, stop playback, and release refs.
     unload: () => void
-    // Smoothly ramp volume to a target level over a duration (ms).
+    /** Ramp an independent 0–1 fade gain over durationMs, preserving user volume/mute and host gain.
+     * Manual volume/mute controls reset the fade. Non-finite arguments are ignored.
+     */
     fade: (to: number, durationMs: number) => void
     /** Which playback backend is running, whether it fell back, and what it can do. */
     getBackendInfo: () => AudioBackendInfo
