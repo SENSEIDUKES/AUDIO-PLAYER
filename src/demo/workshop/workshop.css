@@ -1749,6 +1749,15 @@ body.lab-frame-body {
     .wk-shell[data-tab="about"] .wk-shell-hud {
         display: none;
     }
+    /* The HUD sits at the top of the scroll area, so the note's quick
+       master volume opens downward over the section instead of upward past
+       the top bar, where it would be clipped out of reach. */
+    .wk-shell .wk-shell-hud .sap-reader-note-face__volume {
+        top: 0;
+        bottom: auto;
+        padding: 48px 1px 12px;
+        transform-origin: top center;
+    }
     .wk-shell-hud__now {
         display: grid;
         gap: 2px;
