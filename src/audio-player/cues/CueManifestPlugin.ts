@@ -5,8 +5,15 @@ import type {
 } from "../core/plugins/PluginInterface"
 import type { ReaderMixer } from "../narrative/ReaderMixer"
 import type { Track } from "../types"
-import { CueRuntime, notifyCue, type CueRuntimeOptions } from "./cueRuntime"
-import { validateCueManifest } from "./cueManifestSchema"
+import { CueRuntime, notifyCue, resolveCueEventTarget, type CueRuntimeOptions } from "./cueRuntime"
+import {
+    formatCueManifestIssue,
+    parseCueManifest,
+    type CueManifestParseResult,
+} from "./cueManifestSchema"
+
+/** How often the playback clock samples the live position while playing. */
+const CLOCK_INTERVAL_MS = 100
 
 export class CueManifestPlugin implements AudioPlayerPlugin {
     name = "cueManifest"
@@ -17,6 +24,8 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
 
     private generation = 0
     private target: EventTarget | null = null
+    private playing = false
+    private clock: ReturnType<typeof setInterval> | null = null
 
     constructor(private options: CueRuntimeOptions = {}) {}
 
@@ -24,9 +33,10 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
     init(context: PluginPlayerContext) {
         this.destroy()
         this.context = context
-        const target = this.context.getRootElement() || window
+        const target = resolveCueEventTarget(context)
         this.target = target
         target.addEventListener("sap-dispatch-cue", this.handleDispatchCue as EventListener)
+        this.playing = this.readIsPlaying()
     }
 
     /** Remove the original listener and release the runtime regardless of session cleanup order. */
@@ -36,6 +46,8 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
             this.handleDispatchCue as EventListener
         )
         this.target = null
+        this.stopClock()
+        this.playing = false
         try {
             this.cleanup()
         } finally {
@@ -53,6 +65,7 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
     /** Invalidate asynchronous work before best-effort cleanup so replacement can always continue. */
     private cleanup() {
         ++this.generation
+        this.stopClock()
         const abort = this.abortController
         const runtime = this.runtime
         this.abortController = null
@@ -69,21 +82,113 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
         }
     }
 
+    // ===================== PLAYBACK CLOCK =====================
+    // Cues are timed from the live backend position, sampled on an interval, not from the
+    // rAF-driven `onTimeUpdate` state: animation frames stop in hidden tabs, which would
+    // delay or drop cues while audio keeps playing. A sample after a long gap catches up
+    // (see CueRuntime policy), and returning to the page samples immediately.
+
+    private readIsPlaying(): boolean {
+        return this.context?.getEngine?.()?.isPlaying === true
+    }
+
+    private readPosition(fallback?: number): number | undefined {
+        const context = this.context
+        if (!context) return fallback
+        const live = context.getPlaybackPosition?.() ?? context.getAudioElement?.()?.currentTime
+        return typeof live === "number" && Number.isFinite(live) ? live : fallback
+    }
+
+    /** True while a seek has been requested but the live position has not caught up. */
+    private isSeekPending(): boolean {
+        const context = this.context
+        return context?.getEngine?.()?.isSeeking === true || !!context?.getAudioElement?.()?.seeking
+    }
+
+    private poll(fallback?: number) {
+        if (!this.runtime || !this.playing || this.isSeekPending()) return
+        const position = this.readPosition(fallback)
+        if (position !== undefined) this.runtime.handleTimeUpdate(position)
+    }
+
+    private handleVisibility = () => {
+        if (typeof document === "undefined" || document.visibilityState === "visible") this.poll()
+    }
+
+    private startClock() {
+        if (this.clock !== null) return
+        this.clock = setInterval(() => this.poll(), CLOCK_INTERVAL_MS)
+        if (typeof document !== "undefined") {
+            document.addEventListener("visibilitychange", this.handleVisibility)
+        }
+    }
+
+    private stopClock() {
+        if (this.clock !== null) clearInterval(this.clock)
+        this.clock = null
+        if (typeof document !== "undefined") {
+            document.removeEventListener("visibilitychange", this.handleVisibility)
+        }
+    }
+
+    /** Hand a freshly installed runtime the player's current state. */
+    private activate(runtime: CueRuntime) {
+        this.runtime = runtime
+        if (this.playing) {
+            runtime.setPlaying(true, this.readPosition())
+            this.startClock()
+        } else {
+            runtime.setPlaying(false)
+        }
+    }
+
+    /** Report validation to the host and return the manifest when it is usable. */
+    private admit(data: unknown): { result: CueManifestParseResult; ok: boolean } {
+        const result = parseCueManifest(data)
+        const rawId = (data as { id?: unknown } | null)?.id
+        const id = result.manifest?.id ?? (typeof rawId === "string" ? rawId : undefined)
+        if (result.status === "invalid") {
+            const errors = result.issues.filter((issue) => issue.severity === "error")
+            notifyCue(this.options.onStatus, {
+                manifestId: id,
+                status: "failed",
+                message: `Invalid cue manifest: ${errors.length} error(s)${errors[0] ? `; first: ${formatCueManifestIssue(errors[0])}` : ""}`,
+                issues: result.issues,
+            })
+            return { result, ok: false }
+        }
+        if (result.status === "accepted-with-omissions") {
+            notifyCue(this.options.onStatus, {
+                manifestId: id,
+                status: "accepted-with-omissions",
+                message: `${result.omittedCueCount} cue(s) and ${result.omittedActionCount} action(s) omitted`,
+                issues: result.issues,
+            })
+        }
+        return { result, ok: true }
+    }
+
+    private install(data: unknown) {
+        if (!this.context) return
+        const { result, ok } = this.admit(data)
+        if (!ok || !result.manifest) return
+        this.activate(
+            new CueRuntime(this.context, result.manifest, {
+                ...this.options,
+                validationIssues: result.issues,
+            })
+        )
+    }
+
     /** Install the newest inline or fetched manifest; superseded fetch completions are ignored. */
     onTrackLoad(track: Track | null): PluginHookResult {
         this.cleanup()
         if (!track || !this.context) return
         const generation = this.generation
+        if (this.readIsPlaying()) this.playing = true
 
         if (track.cueManifest) {
-            const manifest = validateCueManifest(track.cueManifest)
-            if (manifest) {
-                this.runtime = new CueRuntime(this.context, manifest, this.options)
-            } else
-                notifyCue(this.options.onStatus, {
-                    status: "failed",
-                    message: "Invalid cue manifest",
-                })
+            this.install(track.cueManifest)
         } else if (track.cueManifestUrl) {
             this.abortController = new AbortController()
             fetch(track.cueManifestUrl, { signal: this.abortController.signal })
@@ -96,15 +201,8 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
                     return res.json()
                 })
                 .then((data) => {
-                    if (generation !== this.generation) return
-                    const manifest = validateCueManifest(data)
-                    if (manifest && this.context && generation === this.generation) {
-                        this.runtime = new CueRuntime(this.context, manifest, this.options)
-                    } else if (!manifest)
-                        notifyCue(this.options.onStatus, {
-                            status: "failed",
-                            message: "Invalid cue manifest",
-                        })
+                    if (generation !== this.generation || !this.context) return
+                    this.install(data)
                 })
                 .catch((e) => {
                     if (generation === this.generation && e.name !== "AbortError") {
@@ -114,16 +212,43 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
         }
     }
 
+    /** Start (or resume) the play window at the live position; cues at that moment fire now. */
+    onPlay(): PluginHookResult {
+        this.playing = true
+        if (!this.runtime) return
+        this.runtime.setPlaying(true, this.readPosition())
+        this.startClock()
+    }
+
+    /** Catch up to the pause position, then stop timing: nothing fires while paused. */
+    onPause(): PluginHookResult {
+        this.poll()
+        this.playing = false
+        this.runtime?.setPlaying(false)
+        this.stopClock()
+    }
+
+    /** Nudge the clock; the live position, not the throttled argument, is authoritative. */
     onTimeUpdate(position: number): PluginHookResult {
-        if (this.runtime && this.context) {
-            this.runtime.handleTimeUpdate(position, false)
-        }
+        this.poll(position)
     }
 
     onSeek(position: number): PluginHookResult {
-        if (this.runtime) {
-            this.runtime.handleTimeUpdate(position, true)
-        }
+        this.runtime?.handleTimeUpdate(position, true)
+    }
+
+    /** Fire any cues up to the end of the track, then stop timing. Never claims the advance. */
+    onTrackEnded(): PluginHookResult {
+        const engine = this.context?.getEngine?.()
+        const duration = engine?.duration
+        const end =
+            typeof duration === "number" && Number.isFinite(duration) && duration > 0
+                ? duration
+                : this.readPosition()
+        if (end !== undefined) this.runtime?.handleTrackEnd(end)
+        this.playing = false
+        this.stopClock()
+        return false
     }
 
     onStop(): PluginHookResult {

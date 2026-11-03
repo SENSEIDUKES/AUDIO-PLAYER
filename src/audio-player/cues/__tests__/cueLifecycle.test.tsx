@@ -200,6 +200,7 @@ describe("cue readiness and ownership", () => {
         const status = vi.fn()
         const plugin = createCueManifestPlugin({ onStatus: status })
         plugin.init(context({ ...old, createScope }))
+        plugin.onPlay() // time cues only fire while the player is playing
         plugin.onTrackLoad(track())
         await flushMicrotasks()
         plugin.onTimeUpdate(1)

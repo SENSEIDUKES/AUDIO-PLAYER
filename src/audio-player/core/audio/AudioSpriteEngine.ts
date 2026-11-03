@@ -86,6 +86,8 @@ type AudioSpriteInstance = AudioSpriteInstanceInfo & {
     gain: GainNode
     /** Pending stop scheduled by `fadeOut`, cleared if the instance is retargeted. */
     fadeStopTimer?: ReturnType<typeof setTimeout>
+    /** Context time when the latest fade ramp finishes; the gain is `volume` afterwards. */
+    rampEndsAt?: number
     cancelStart?: () => void
     onEnded?: () => void
 }
@@ -427,10 +429,16 @@ export class AudioSpriteEngine {
         const now = this.ctx.currentTime
         const duration = Math.max(0, durationMs) / 1000
         const target = clamp01(toVolume)
+        // `gain.value` only advances per render quantum, so right after play() (or a
+        // previous fade) it can still hold a stale level. A settled gain is exactly
+        // `instance.volume`; only an in-flight ramp needs the live value.
+        const ramping = instance.rampEndsAt !== undefined && now < instance.rampEndsAt
+        const from = ramping ? gain.value : instance.volume
         gain.cancelScheduledValues(now)
-        gain.setValueAtTime(gain.value, now)
+        gain.setValueAtTime(from, now)
         gain.linearRampToValueAtTime(target, now + duration)
         instance.volume = target
+        instance.rampEndsAt = now + duration
     }
 
     /**

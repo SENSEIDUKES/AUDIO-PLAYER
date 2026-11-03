@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import type { UseNarrativeAudioOptions } from "../narrative/useNarrativeAudio"
+import { useAudioSessionCueTarget, useOptionalAudioSession } from "../session/AudioSessionContext"
 import type { CueAction } from "./cueTypes"
 
 export interface NarrativeCueControllerState {
@@ -10,19 +11,41 @@ export interface NarrativeCueControllerState {
     duckAmount?: number
     intensity?: number
     chapterId?: string
+    /** Crossfade length requested by the latest `ambience.crossfade`; unset means the default. */
+    crossfadeMs?: number
+    /** Narration level driven by `volume.fadeNarration`; unset until a cue sets it. */
+    narrationVolume?: number
 }
 
 export interface UseNarrativeCueControllerOptions {
-    /** Target element to listen for narrative events. Defaults to window. */
-    eventTarget?: HTMLElement | Window
+    /**
+     * Where cue events travel. Defaults to the surrounding `AudioSessionProvider`'s private
+     * cue channel, or `window` outside a provider.
+     */
+    eventTarget?: EventTarget
 }
+
+const FADE_STEP_MS = 50
+
+const clamp01 = (value: number) => Math.max(0, Math.min(1, value))
 
 /**
  * A host-facing React hook that acts as the bridge between generic Cue Manifest
  * events and the SAP narrative audio engine.
+ *
+ * Applies (and claims, so the runtime reports them as executed): `ambience.crossfade`
+ * (profile + duration), `duck.set`, `volume.fadeNarration` (a timed ramp of
+ * `narrationVolume`), and `layer.set` (`intensity`, `mood`/`scene`, plus every layer in
+ * `layers`). `spatial.pan` is not supported here and is left unclaimed. Spread
+ * `narrativeOptions` into `useNarrativeAudio` / `NarrativeFace` for the audio to follow.
+ * See `CUE_ACTION_SUPPORT`.
  */
 export function useNarrativeCueController(options: UseNarrativeCueControllerOptions = {}) {
     const { eventTarget } = options
+    const sessionTarget = useAudioSessionCueTarget()
+    const session = useOptionalAudioSession()
+    const sessionVolumeRef = useRef(session?.volume)
+    sessionVolumeRef.current = session?.volume
 
     const [state, setState] = useState<NarrativeCueControllerState>({
         sceneMood: undefined,
@@ -33,46 +56,94 @@ export function useNarrativeCueController(options: UseNarrativeCueControllerOpti
         intensity: 1,
         chapterId: undefined,
     })
+    const [layers, setLayers] = useState<Record<string, string | number>>({})
+    const fadeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+    const narrationVolumeRef = useRef<number | undefined>(undefined)
+
+    const resolveTarget = useCallback(
+        (): EventTarget | null =>
+            eventTarget ?? sessionTarget ?? (typeof window !== "undefined" ? window : null),
+        [eventTarget, sessionTarget]
+    )
 
     useEffect(() => {
-        const target = eventTarget || (typeof window !== "undefined" ? window : null)
-        if (!target) return
-
-        const handler = (e: CustomEvent<CueAction>) => {
-            const action = e.detail
-            if (!action || !action.command) return
-
-            setState((s) => {
-                const next = { ...s }
-                switch (action.command) {
-                    case "ambience.crossfade":
-                        next.ambientProfile = action.profile
-                        break
-                    case "duck.set":
-                        next.duckAmount = action.amount
-                        break
-                    // In V1, 'layer.set' could be used for generic properties, or 'volume.fadeNarration' for intensity
-                }
-                return next
-            })
+        const stopFade = () => {
+            if (fadeTimerRef.current !== null) clearInterval(fadeTimerRef.current)
+            fadeTimerRef.current = null
+        }
+        const setNarrationVolume = (value: number) => {
+            narrationVolumeRef.current = value
+            setState((s) => ({ ...s, narrationVolume: value }))
+        }
+        const fadeNarration = (target: number, durationMs: number) => {
+            stopFade()
+            const to = clamp01(target)
+            const from = narrationVolumeRef.current ?? sessionVolumeRef.current ?? to
+            if (!(durationMs > 0) || from === to) {
+                setNarrationVolume(to)
+                return
+            }
+            const startedAt = Date.now()
+            fadeTimerRef.current = setInterval(() => {
+                const progress = Math.min(1, (Date.now() - startedAt) / durationMs)
+                setNarrationVolume(from + (to - from) * progress)
+                if (progress >= 1) stopFade()
+            }, FADE_STEP_MS)
         }
 
-        target.addEventListener("sap-narrative-cue", handler as EventListener)
-        return () => target.removeEventListener("sap-narrative-cue", handler as EventListener)
-    }, [eventTarget])
+        const target = resolveTarget()
+        if (!target) return stopFade
+
+        const handler = (e: Event) => {
+            const action = (e as CustomEvent<CueAction>).detail
+            if (!action || !action.command) return
+
+            switch (action.command) {
+                case "ambience.crossfade":
+                    setState((s) => ({
+                        ...s,
+                        ambientProfile: action.profile,
+                        crossfadeMs: action.durationMs,
+                    }))
+                    break
+                case "duck.set":
+                    setState((s) => ({ ...s, duckAmount: clamp01(action.amount) }))
+                    break
+                case "volume.fadeNarration":
+                    fadeNarration(action.volume, action.durationMs)
+                    break
+                case "layer.set":
+                    setLayers((l) => ({ ...l, [action.layer]: action.state }))
+                    if (action.layer === "intensity" && typeof action.state === "number") {
+                        const intensity = clamp01(action.state)
+                        setState((s) => ({ ...s, intensity }))
+                    } else if (["mood", "scene", "sceneMood"].includes(action.layer)) {
+                        setState((s) => ({ ...s, sceneMood: String(action.state) }))
+                    }
+                    break
+                default:
+                    return // not handled here (e.g. spatial.pan): leave it unclaimed
+            }
+            e.preventDefault() // claim: the runtime reports this action as executed
+        }
+
+        target.addEventListener("sap-narrative-cue", handler)
+        return () => {
+            target.removeEventListener("sap-narrative-cue", handler)
+            stopFade()
+        }
+    }, [resolveTarget])
 
     const dispatchCueEvent = useCallback(
         (trigger: { kind?: string; value?: string | number; id?: string }) => {
-            const target = eventTarget || (typeof window !== "undefined" ? window : null)
-            if (!target) return
-            target.dispatchEvent(
+            resolveTarget()?.dispatchEvent(
                 new CustomEvent("sap-dispatch-cue", {
                     detail: trigger,
                     bubbles: true,
                 })
             )
         },
-        [eventTarget]
+        [resolveTarget]
     )
 
     const enterScene = useCallback(
@@ -106,6 +177,8 @@ export function useNarrativeCueController(options: UseNarrativeCueControllerOpti
     return {
         /** Options to spread into `useNarrativeAudio`. */
         narrativeOptions: state as UseNarrativeAudioOptions,
+        /** Latest value of every layer set by `layer.set`, for host UI to render. */
+        layers,
         dispatchCueEvent,
         enterScene,
         enterParagraph,
