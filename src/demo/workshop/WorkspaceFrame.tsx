@@ -1,10 +1,11 @@
-import { Component, Suspense, useEffect, useState } from "react"
+import { Component, Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import type { ErrorInfo, ReactNode } from "react"
 import { ArrowLeft, Check, Link2 } from "lucide-react"
 import { getCategory } from "./catalog"
 import type { WorkshopEntry } from "./catalog"
 import { handleLinkClick, homeHref } from "./routing"
-import { StatusBadge } from "./ui"
+import { ShellHostContext, StatusBadge } from "./ui"
+import type { ShellHost } from "./ui"
 
 /* The chrome every workspace shares: a way back, where you are, how finished
    the piece is, and an honest list of what works and what doesn't yet. The
@@ -72,15 +73,53 @@ class WorkspaceErrorBoundary extends Component<
 }
 
 export function WorkspaceFrame({ entry, children }: { entry: WorkshopEntry; children: ReactNode }) {
-    const category = getCategory(entry.category)
     const backHref = homeHref(entry.category)
 
     useEffect(() => {
         document.title = `${entry.title} · Audio Player Workshop`
     }, [entry.title])
 
+    // A workspace that renders a MobileShell attaches here; on phones the page
+    // then locks to the viewport and this header becomes the shell's About tab.
+    const [shells, setShells] = useState(0)
+    const [shellTab, setShellTab] = useState<string | null>(null)
+    const attach = useCallback(() => {
+        setShells((count) => count + 1)
+        return () => setShells((count) => count - 1)
+    }, [])
+    const host = useMemo<ShellHost>(
+        () => ({ tab: shellTab, select: setShellTab, attach }),
+        [shellTab, attach]
+    )
+
     return (
-        <div className="wk-page">
+        <ShellHostContext.Provider value={host}>
+            <WorkspacePage entry={entry} backHref={backHref} shell={shells > 0} shellTab={shellTab}>
+                {children}
+            </WorkspacePage>
+        </ShellHostContext.Provider>
+    )
+}
+
+function WorkspacePage({
+    entry,
+    backHref,
+    shell,
+    shellTab,
+    children,
+}: {
+    entry: WorkshopEntry
+    backHref: string
+    shell: boolean
+    shellTab: string | null
+    children: ReactNode
+}) {
+    const category = getCategory(entry.category)
+    return (
+        <div
+            className={`wk-page${shell ? " wk-page--shell" : ""}`}
+            data-shell-tab={shell ? (shellTab ?? "") : undefined}
+        >
             <header className="wk-bar">
                 <a
                     className="wk-bar__back"

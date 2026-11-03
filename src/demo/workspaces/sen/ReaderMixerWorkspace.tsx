@@ -28,17 +28,19 @@ import {
     Button,
     ButtonRow,
     EventLog,
+    MobileShell,
     Note,
     Panel,
     RangeField,
     Readout,
     Segmented,
+    ShellPanel,
     SplitLayout,
     WidthFrame,
     parseStageWidth,
     useEventLog,
 } from "../../workshop/ui"
-import type { LogLine } from "../../workshop/ui"
+import type { LogLine, ShellTab } from "../../workshop/ui"
 
 /* SEN reader audio: the four-layer ReaderMixer driven the way the NovelExpanded
    reader will drive it. The chapter buttons and cue pads stand in for the host
@@ -210,6 +212,15 @@ const LAYER_NAMES: Record<ReaderMixerLayer, string> = {
 
 const MIXER_VIEW_ID = "sen-reader-mixer-view"
 
+/** Phone sections, switched in place by the shell's pill dock. */
+const SHELL_TABS: readonly ShellTab[] = [
+    { id: "reader", label: "Reader" },
+    { id: "scores", label: "Scores" },
+    { id: "mixer", label: "Mixer" },
+    { id: "state", label: "State" },
+    { id: "setup", label: "Setup" },
+]
+
 /** Show chapter controls, narration and approved settings under one shared mixer. */
 function ReaderSimulation({
     set,
@@ -279,10 +290,20 @@ function ReaderSimulation({
         append(`${reason} → playSoundscape(“${score.track.title}”)`)
     }
     const audibleKey = state.layers.soundscapes.current
+    const nowPlaying = (layer: "soundscapes" | "atmosphere") => {
+        const layerState = state.layers[layer]
+        const current = layer === "soundscapes" ? titleFor(layerState.current) : layerState.current
+        return current ? `${current} · ${layerState.status}` : layerState.status
+    }
 
     return (
         <>
-            <article className="wk-stage-card wk-reader wk-reader--sen" aria-label="Reader preview">
+            {/* On phones this card is the shell's HUD: it stays pinned above every
+                section so narration and the note face are always in reach. */}
+            <article
+                className="wk-stage-card wk-reader wk-reader--sen wk-shell-hud"
+                aria-label="Reader preview"
+            >
                 <p className="wk-stage-card__title">Chapter · the narrator face + Reader mixer</p>
                 <p className="wk-reader__text">
                     The music note is the narrator face SEN&apos;s reader ships. A tap mutes the
@@ -290,6 +311,16 @@ function ReaderSimulation({
                     the narration speaks, the music and atmosphere step back under it. Voice keeps
                     its own volume in the mixer&apos;s fourth slot, and cues stay at full level.
                 </p>
+                <dl className="wk-shell-hud__now" aria-label="Now playing">
+                    <div>
+                        <dt>Music</dt>
+                        <dd>{nowPlaying("soundscapes")}</dd>
+                    </div>
+                    <div>
+                        <dt>Air</dt>
+                        <dd>{nowPlaying("atmosphere")}</dd>
+                    </div>
+                </dl>
                 <div className="wk-reader__actions">
                     <Button
                         onClick={() => {
@@ -302,163 +333,176 @@ function ReaderSimulation({
                     <ReaderNoteFace />
                 </div>
             </article>
-            <Panel
-                title="Reader · what the app does"
-                hint="These buttons stand in for NovelExpanded: it picks the score, places cues in the text, and calls the mixer."
-            >
-                <ButtonRow>
-                    <Button
-                        onClick={() => {
-                            scene.current += 1
-                            playScore(chapterScore, "chapter opens")
-                            mixer.startAtmosphere()
-                            append("chapter opens → startAtmosphere()")
-                        }}
-                    >
-                        Open chapter
-                    </Button>
-                    <Button
-                        onClick={() => {
-                            scene.current += 1
-                            playScore(chapterScore, "new scene, same score")
-                        }}
-                    >
-                        Next scene
-                    </Button>
-                    <Button
-                        onClick={() => {
-                            mixer.notifyChapterEnd()
-                            append("chapter ends → notifyChapterEnd()")
-                        }}
-                    >
-                        End chapter
-                    </Button>
-                    <Button
-                        onClick={() => {
-                            const battles = set.scores.filter(
-                                (score) => score.category === set.battleCategory
-                            )
-                            if (battles.length === 0) return
-                            const score = battles[battleTurn.current % battles.length]
-                            battleTurn.current += 1
-                            scene.current += 1
-                            playScore(score, "battle starts")
-                        }}
-                    >
-                        Battle starts
-                    </Button>
-                    <Button
-                        variant="danger"
-                        onClick={() => {
-                            mixer.stopAll()
-                            append("reader closes → stopAll()")
-                        }}
-                    >
-                        Close chapter
-                    </Button>
-                </ButtonRow>
-                <div className="wk-pads">
-                    {set.cues.map((cue) => (
-                        <button
-                            key={cue.id}
-                            type="button"
-                            className="wk-pad"
+            <ShellPanel tab="reader">
+                <Panel
+                    title="Reader · what the app does"
+                    hint="These buttons stand in for NovelExpanded: it picks the score, places cues in the text, and calls the mixer."
+                >
+                    <ButtonRow>
+                        <Button
                             onClick={() => {
-                                const played = mixer.playCue(cue.url, {
-                                    volume: cue.volume,
-                                    loudness: cue.loudness,
-                                })
-                                append(
-                                    `cue reached → playCue(“${cue.label}”)${played ? "" : " skipped"}`,
-                                    played ? "ok" : "warn"
-                                )
+                                scene.current += 1
+                                playScore(chapterScore, "chapter opens")
+                                mixer.startAtmosphere()
+                                append("chapter opens → startAtmosphere()")
                             }}
                         >
-                            <span className="wk-pad__title">{cue.label}</span>
-                            <span className="wk-pad__sub">Sound cue</span>
-                        </button>
-                    ))}
-                </div>
-                <Readout
-                    label="Mixer state"
-                    rows={[
-                        ["Soundscapes", row("soundscapes")],
-                        ["Atmosphere", row("atmosphere")],
-                        ["Sound Cues", `${row("cues")} · ${state.activeCues} playing`],
-                        ["Voice", row("voice")],
-                        ["Saved atmosphere", state.preferences.atmosphereId ?? "Off"],
-                        ["Routing", state.routing],
-                        ["Sliders", state.volumeControl === "level" ? "set loudness" : "on/off"],
-                        ["Needs a tap", state.needsGesture ? "yes" : "no"],
-                        ["Ducked under narration", `${Math.round(state.duck * 100)}%`],
-                        ["Full plays completed", String(state.soundscapePlays)],
-                        ["Idle pause", state.idle ? "yes" : "no"],
-                        [
-                            "Sleep timer",
-                            `${state.sleepTimer.status}${state.sleepTimer.remainingMs !== null ? ` · ${Math.ceil(state.sleepTimer.remainingMs / 1000)} s` : ""}`,
-                        ],
-                        ["Leveling", state.leveling ? "on" : "off"],
-                    ]}
-                />
-            </Panel>
-            <Panel
-                title={`Soundscapes · ${set.scores.length} scores`}
-                hint="The chapter score. Play switches the music now (a crossfade); the chosen score is also what Open chapter plays. Battle starts cycles through the Fighting scores."
-            >
-                {set.categories.length > 1 && (
-                    <Segmented
-                        label="Category"
-                        value={category}
-                        options={set.categories.map((name) => ({ value: name, label: name }))}
-                        onChange={setCategory}
-                    />
-                )}
-                <ul className="wk-inline-list">
-                    {set.scores
-                        .filter((score) => score.category === category)
-                        .map((score) => {
-                            const audible = audibleKey === `id:${score.track.id}`
-                            const chosen = chapterScore.track.id === score.track.id
-                            return (
-                                <li
-                                    key={score.track.id}
-                                    className={`wk-inline-list__row${audible ? " wk-inline-list__row--active" : ""}`}
-                                >
-                                    <span className="wk-inline-list__main">
-                                        <span className="wk-inline-list__title">
-                                            {score.track.title}
-                                        </span>
-                                        <span className="wk-inline-list__sub">
-                                            {audible ? "Playing now · " : ""}
-                                            {chosen ? "Chapter score · " : ""}
-                                            {score.detail}
-                                        </span>
-                                    </span>
-                                    <span className="wk-inline-list__actions">
-                                        <Button
-                                            onClick={() => {
-                                                setChapterScore(score)
-                                                playScore(score, "score chosen")
-                                            }}
-                                        >
-                                            Play
-                                        </Button>
-                                    </span>
-                                </li>
-                            )
-                        })}
-                </ul>
-            </Panel>
-            <Panel
-                title="Settings › Audio · the mixer view"
-                hint="ReaderSettingsAudio: the Audio tab of SEN's Reader Settings, exactly as the reader shows it."
-            >
-                <WidthFrame width={width}>
-                    <div className="wk-sen-settings" id={MIXER_VIEW_ID}>
-                        <ReaderSettingsAudio />
+                            Open chapter
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                scene.current += 1
+                                playScore(chapterScore, "new scene, same score")
+                            }}
+                        >
+                            Next scene
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                mixer.notifyChapterEnd()
+                                append("chapter ends → notifyChapterEnd()")
+                            }}
+                        >
+                            End chapter
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                const battles = set.scores.filter(
+                                    (score) => score.category === set.battleCategory
+                                )
+                                if (battles.length === 0) return
+                                const score = battles[battleTurn.current % battles.length]
+                                battleTurn.current += 1
+                                scene.current += 1
+                                playScore(score, "battle starts")
+                            }}
+                        >
+                            Battle starts
+                        </Button>
+                        <Button
+                            variant="danger"
+                            onClick={() => {
+                                mixer.stopAll()
+                                append("reader closes → stopAll()")
+                            }}
+                        >
+                            Close chapter
+                        </Button>
+                    </ButtonRow>
+                    <div className="wk-pads">
+                        {set.cues.map((cue) => (
+                            <button
+                                key={cue.id}
+                                type="button"
+                                className="wk-pad"
+                                onClick={() => {
+                                    const played = mixer.playCue(cue.url, {
+                                        volume: cue.volume,
+                                        loudness: cue.loudness,
+                                    })
+                                    append(
+                                        `cue reached → playCue(“${cue.label}”)${played ? "" : " skipped"}`,
+                                        played ? "ok" : "warn"
+                                    )
+                                }}
+                            >
+                                <span className="wk-pad__title">{cue.label}</span>
+                                <span className="wk-pad__sub">Sound cue</span>
+                            </button>
+                        ))}
                     </div>
-                </WidthFrame>
-            </Panel>
+                </Panel>
+            </ShellPanel>
+            <ShellPanel tab="state">
+                <Panel title="Mixer state">
+                    <Readout
+                        label="Mixer state"
+                        rows={[
+                            ["Soundscapes", row("soundscapes")],
+                            ["Atmosphere", row("atmosphere")],
+                            ["Sound Cues", `${row("cues")} · ${state.activeCues} playing`],
+                            ["Voice", row("voice")],
+                            ["Saved atmosphere", state.preferences.atmosphereId ?? "Off"],
+                            ["Routing", state.routing],
+                            [
+                                "Sliders",
+                                state.volumeControl === "level" ? "set loudness" : "on/off",
+                            ],
+                            ["Needs a tap", state.needsGesture ? "yes" : "no"],
+                            ["Ducked under narration", `${Math.round(state.duck * 100)}%`],
+                            ["Full plays completed", String(state.soundscapePlays)],
+                            ["Idle pause", state.idle ? "yes" : "no"],
+                            [
+                                "Sleep timer",
+                                `${state.sleepTimer.status}${state.sleepTimer.remainingMs !== null ? ` · ${Math.ceil(state.sleepTimer.remainingMs / 1000)} s` : ""}`,
+                            ],
+                            ["Leveling", state.leveling ? "on" : "off"],
+                        ]}
+                    />
+                </Panel>
+            </ShellPanel>
+            <ShellPanel tab="scores">
+                <Panel
+                    title={`Soundscapes · ${set.scores.length} scores`}
+                    hint="The chapter score. Play switches the music now (a crossfade); the chosen score is also what Open chapter plays. Battle starts cycles through the Fighting scores."
+                >
+                    {set.categories.length > 1 && (
+                        <Segmented
+                            label="Category"
+                            value={category}
+                            options={set.categories.map((name) => ({ value: name, label: name }))}
+                            onChange={setCategory}
+                        />
+                    )}
+                    <ul className="wk-inline-list">
+                        {set.scores
+                            .filter((score) => score.category === category)
+                            .map((score) => {
+                                const audible = audibleKey === `id:${score.track.id}`
+                                const chosen = chapterScore.track.id === score.track.id
+                                return (
+                                    <li
+                                        key={score.track.id}
+                                        className={`wk-inline-list__row${audible ? " wk-inline-list__row--active" : ""}`}
+                                    >
+                                        <span className="wk-inline-list__main">
+                                            <span className="wk-inline-list__title">
+                                                {score.track.title}
+                                            </span>
+                                            <span className="wk-inline-list__sub">
+                                                {audible ? "Playing now · " : ""}
+                                                {chosen ? "Chapter score · " : ""}
+                                                {score.detail}
+                                            </span>
+                                        </span>
+                                        <span className="wk-inline-list__actions">
+                                            <Button
+                                                onClick={() => {
+                                                    setChapterScore(score)
+                                                    playScore(score, "score chosen")
+                                                }}
+                                            >
+                                                Play
+                                            </Button>
+                                        </span>
+                                    </li>
+                                )
+                            })}
+                    </ul>
+                </Panel>
+            </ShellPanel>
+            <ShellPanel tab="mixer">
+                <Panel
+                    title="Settings › Audio · the mixer view"
+                    hint="ReaderSettingsAudio: the Audio tab of SEN's Reader Settings, exactly as the reader shows it."
+                >
+                    <WidthFrame width={width}>
+                        <div className="wk-sen-settings" id={MIXER_VIEW_ID}>
+                            <ReaderSettingsAudio />
+                        </div>
+                    </WidthFrame>
+                </Panel>
+            </ShellPanel>
         </>
     )
 }
@@ -615,123 +659,135 @@ export function ReaderMixerWorkspace() {
             key={`${routing}:${host}:${quickPolicies}:${maxPlays}`}
             options={options}
         >
-            <SplitLayout
-                stage={
-                    <>
-                        <AudioSessionProvider initialQueue={narrationTracks} audioBackend="html5">
-                            <ReaderMixerVoice />
-                            <ReaderSimulation
-                                set={set}
-                                width={parseStageWidth(stageWidth)}
-                                duckAmount={duckAmount}
-                                append={append}
-                                shortPlays={quickPolicies}
-                            />
-                        </AudioSessionProvider>
-                        <Panel
-                            title="Events"
-                            actions={
-                                <Button variant="ghost" onClick={clear}>
-                                    Clear
-                                </Button>
-                            }
-                        >
-                            <EventLog
-                                lines={lines}
-                                empty="Open a chapter, pick an atmosphere, fire a cue."
-                            />
-                        </Panel>
-                    </>
-                }
-                controls={
-                    <>
-                        <Panel title="Mixer setup">
-                            <Segmented
-                                label="Routing"
-                                value={routing}
-                                options={[
-                                    { value: "element", label: "Element" },
-                                    { value: "auto", label: "Auto" },
-                                    { value: "web-audio", label: "Web Audio" },
-                                ]}
-                                onChange={setRouting}
-                            />
-                            <Segmented
-                                label="Audio files"
-                                value={host}
-                                options={[
-                                    { value: "seihouse", label: "SEIHouse" },
-                                    { value: "cors-sample", label: "CORS sample" },
-                                ]}
-                                onChange={setHost}
-                            />
-                            <Segmented
-                                label="Settings width"
-                                value={stageWidth}
-                                options={[
-                                    { value: "auto", label: "Auto" },
-                                    { value: "320", label: "320" },
-                                    { value: "390", label: "390" },
-                                    { value: "480", label: "480" },
-                                    { value: "640", label: "Desktop" },
-                                ]}
-                                onChange={setStageWidth}
-                            />
-                            <ButtonRow>
-                                <ResetMixerSettings append={append} />
-                            </ButtonRow>
-                            <RangeField
-                                label="Duck under narration"
-                                value={duckAmount}
-                                min={0}
-                                max={1}
-                                step={0.05}
-                                format={(value) => `${Math.round(value * 100)}%`}
-                                onChange={setDuckAmount}
-                            />
-                            <label className="wk-field">
-                                <input
-                                    type="checkbox"
-                                    checked={quickPolicies}
-                                    onChange={(event) => setQuickPolicies(event.target.checked)}
-                                />{" "}
-                                Short policy tests (6 s score tails, 15 s idle, 2 s fades)
-                            </label>
-                            <Segmented
-                                label="Plays before music rests"
-                                value={maxPlays}
-                                options={[
-                                    { value: "1", label: "1" },
-                                    { value: "2", label: "2" },
-                                    { value: "3", label: "3" },
-                                    { value: "never", label: "Never" },
-                                ]}
-                                onChange={setMaxPlays}
-                            />
-                        </Panel>
-                        <MixerDeveloperControls append={append} duckAmount={duckAmount} />
-                        <Note>
-                            Auto (the default) uses Web Audio with leveling on, including a summed
-                            safety limiter. With leveling off it uses plain elements where their
-                            volume works, and Web Audio on iPhone. Element forces plain media
-                            elements: on iPhone the sliders then work as on/off and the view says
-                            so. Web Audio routes the score, atmosphere and cues through their own
-                            GainNodes. Voice uses the recorded help lines on HTML5: desktop volume
-                            works; iPhone uses the on/off fallback. TTS files with CORS can use the
-                            narration session&apos;s Web Audio backend for real iPhone volume.
-                        </Note>
-                        <Note>
-                            celestialaudio.seihouse.org and audio.seihouse.org send CORS headers
-                            (enabled 2026-10-02), so SEIHouse files play on every route.
-                        </Note>
-                        <Note>
-                            Hide this tab to see both loops and a playing voice pause. They resume
-                            on return unless idle or sleep has stopped them. Your levels, switches
-                            and atmosphere are saved in this browser only; timers are not.
-                        </Note>
-                    </>
-                }
-            />
+            <MobileShell tabs={SHELL_TABS}>
+                <SplitLayout
+                    stage={
+                        <>
+                            <AudioSessionProvider
+                                initialQueue={narrationTracks}
+                                audioBackend="html5"
+                            >
+                                <ReaderMixerVoice />
+                                <ReaderSimulation
+                                    set={set}
+                                    width={parseStageWidth(stageWidth)}
+                                    duckAmount={duckAmount}
+                                    append={append}
+                                    shortPlays={quickPolicies}
+                                />
+                            </AudioSessionProvider>
+                            <ShellPanel tab="state">
+                                <Panel
+                                    title="Events"
+                                    actions={
+                                        <Button variant="ghost" onClick={clear}>
+                                            Clear
+                                        </Button>
+                                    }
+                                >
+                                    <EventLog
+                                        lines={lines}
+                                        empty="Open a chapter, pick an atmosphere, fire a cue."
+                                    />
+                                </Panel>
+                            </ShellPanel>
+                        </>
+                    }
+                    controls={
+                        <ShellPanel tab="setup">
+                            <Panel title="Mixer setup">
+                                <Segmented
+                                    label="Routing"
+                                    value={routing}
+                                    options={[
+                                        { value: "element", label: "Element" },
+                                        { value: "auto", label: "Auto" },
+                                        { value: "web-audio", label: "Web Audio" },
+                                    ]}
+                                    onChange={setRouting}
+                                />
+                                <Segmented
+                                    label="Audio files"
+                                    value={host}
+                                    options={[
+                                        { value: "seihouse", label: "SEIHouse" },
+                                        { value: "cors-sample", label: "CORS sample" },
+                                    ]}
+                                    onChange={setHost}
+                                />
+                                {/* A phone already shows the mixer view at its own width. */}
+                                <div className="wk-shell-wide-only">
+                                    <Segmented
+                                        label="Settings width"
+                                        value={stageWidth}
+                                        options={[
+                                            { value: "auto", label: "Auto" },
+                                            { value: "320", label: "320" },
+                                            { value: "390", label: "390" },
+                                            { value: "480", label: "480" },
+                                            { value: "640", label: "Desktop" },
+                                        ]}
+                                        onChange={setStageWidth}
+                                    />
+                                </div>
+                                <ButtonRow>
+                                    <ResetMixerSettings append={append} />
+                                </ButtonRow>
+                                <RangeField
+                                    label="Duck under narration"
+                                    value={duckAmount}
+                                    min={0}
+                                    max={1}
+                                    step={0.05}
+                                    format={(value) => `${Math.round(value * 100)}%`}
+                                    onChange={setDuckAmount}
+                                />
+                                <label className="wk-field wk-field--checkbox">
+                                    <input
+                                        type="checkbox"
+                                        checked={quickPolicies}
+                                        onChange={(event) => setQuickPolicies(event.target.checked)}
+                                    />{" "}
+                                    Short policy tests (6 s score tails, 15 s idle, 2 s fades)
+                                </label>
+                                <Segmented
+                                    label="Plays before music rests"
+                                    value={maxPlays}
+                                    options={[
+                                        { value: "1", label: "1" },
+                                        { value: "2", label: "2" },
+                                        { value: "3", label: "3" },
+                                        { value: "never", label: "Never" },
+                                    ]}
+                                    onChange={setMaxPlays}
+                                />
+                            </Panel>
+                            <MixerDeveloperControls append={append} duckAmount={duckAmount} />
+                            <Note>
+                                Auto (the default) uses Web Audio with leveling on, including a
+                                summed safety limiter. With leveling off it uses plain elements
+                                where their volume works, and Web Audio on iPhone. Element forces
+                                plain media elements: on iPhone the sliders then work as on/off and
+                                the view says so. Web Audio routes the score, atmosphere and cues
+                                through their own GainNodes. Voice uses the recorded help lines on
+                                HTML5: desktop volume works; iPhone uses the on/off fallback. TTS
+                                files with CORS can use the narration session&apos;s Web Audio
+                                backend for real iPhone volume.
+                            </Note>
+                            <Note>
+                                celestialaudio.seihouse.org and audio.seihouse.org send CORS headers
+                                (enabled 2026-10-02), so SEIHouse files play on every route.
+                            </Note>
+                            <Note>
+                                Hide this tab to see both loops and a playing voice pause. They
+                                resume on return unless idle or sleep has stopped them. Your levels,
+                                switches and atmosphere are saved in this browser only; timers are
+                                not.
+                            </Note>
+                        </ShellPanel>
+                    }
+                />
+            </MobileShell>
         </ReaderMixerProvider>
     )
 }

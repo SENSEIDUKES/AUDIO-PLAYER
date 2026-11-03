@@ -18,15 +18,18 @@ import {
     Button,
     ButtonRow,
     EventLog,
+    MobileShell,
     Note,
     Panel,
     Readout,
     Segmented,
+    ShellPanel,
     SplitLayout,
     WidthFrame,
     parseStageWidth,
     useEventLog,
 } from "../../workshop/ui"
+import type { ShellTab } from "../../workshop/ui"
 import "./reader-face.css"
 
 /* The narrator face SEN's reader ships, and the Reader Settings it opens:
@@ -74,6 +77,13 @@ const SCORE =
 const LISTEN_DUCK = 0.25
 
 type Section = "text" | "audio" | "narration"
+
+/** Phone sections, switched in place by the shell's pill dock. */
+const SHELL_TABS: readonly ShellTab[] = [
+    { id: "face", label: "Reader" },
+    { id: "controls", label: "Controls" },
+    { id: "state", label: "State" },
+]
 
 /** Duck the music and keep the mixer awake while narration speaks, as SEN's reader does. */
 function NarrationDuck() {
@@ -247,73 +257,79 @@ function HostControls({ append }: { append: ReturnType<typeof useEventLog>["appe
     const level = (value: number) => `${Math.round(value * 100)}%`
     return (
         <>
-            <Panel
-                title="Reader · what the app does"
-                hint="These buttons stand in for SEN's reader: it starts the chapter's score and atmosphere, and reads aloud."
-            >
-                <ButtonRow>
-                    <Button
-                        onClick={() => {
-                            mixer.playSoundscape(
-                                {
-                                    id: SCORE.id,
-                                    title: SCORE.title,
-                                    artist: "SEN Soundscapes · Volume 1",
-                                    audioFile: SCORE.url,
-                                    loudness: SCORE.loudness,
-                                },
-                                { scene: "workshop-face" }
-                            )
-                            mixer.startAtmosphere()
-                            append(`chapter opens → “${SCORE.title}” + atmosphere`)
-                        }}
-                    >
-                        Open chapter
-                    </Button>
-                    <Button
-                        onClick={() => {
-                            session.toggle()
-                            append(session.isPlaying ? "read-aloud paused" : "read-aloud speaks")
-                        }}
-                    >
-                        {session.isPlaying ? "Pause narration" : "Play narration"}
-                    </Button>
-                    <Button
-                        variant="danger"
-                        onClick={() => {
-                            mixer.stopAll()
-                            append("reader closes → stopAll()")
-                        }}
-                    >
-                        Close chapter
-                    </Button>
-                </ButtonRow>
-            </Panel>
-            <Panel title="Mixer state">
-                <Readout
-                    label="Mixer"
-                    rows={[
-                        [
-                            "Master",
-                            `${state.preferences.masterEnabled ? "on" : "off"}${state.preferences.masterMuted ? " · muted by the note" : ""} · ${level(state.preferences.masterLevel ?? 1)}`,
-                        ],
-                        [
-                            "Soundscapes",
-                            `${state.layers.soundscapes.status} · ${level(state.layers.soundscapes.effectiveLevel)}`,
-                        ],
-                        [
-                            "Atmosphere",
-                            `${state.layers.atmosphere.status} · ${level(state.layers.atmosphere.effectiveLevel)}`,
-                        ],
-                        [
-                            "Voice",
-                            `${state.layers.voice.status} · ${level(state.layers.voice.effectiveLevel)}`,
-                        ],
-                        ["Preset", state.activePresetId ?? "custom"],
-                        ["Needs a tap", state.needsGesture ? "yes" : "no"],
-                    ]}
-                />
-            </Panel>
+            <ShellPanel tab="controls">
+                <Panel
+                    title="Reader · what the app does"
+                    hint="These buttons stand in for SEN's reader: it starts the chapter's score and atmosphere, and reads aloud."
+                >
+                    <ButtonRow>
+                        <Button
+                            onClick={() => {
+                                mixer.playSoundscape(
+                                    {
+                                        id: SCORE.id,
+                                        title: SCORE.title,
+                                        artist: "SEN Soundscapes · Volume 1",
+                                        audioFile: SCORE.url,
+                                        loudness: SCORE.loudness,
+                                    },
+                                    { scene: "workshop-face" }
+                                )
+                                mixer.startAtmosphere()
+                                append(`chapter opens → “${SCORE.title}” + atmosphere`)
+                            }}
+                        >
+                            Open chapter
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                session.toggle()
+                                append(
+                                    session.isPlaying ? "read-aloud paused" : "read-aloud speaks"
+                                )
+                            }}
+                        >
+                            {session.isPlaying ? "Pause narration" : "Play narration"}
+                        </Button>
+                        <Button
+                            variant="danger"
+                            onClick={() => {
+                                mixer.stopAll()
+                                append("reader closes → stopAll()")
+                            }}
+                        >
+                            Close chapter
+                        </Button>
+                    </ButtonRow>
+                </Panel>
+            </ShellPanel>
+            <ShellPanel tab="state">
+                <Panel title="Mixer state">
+                    <Readout
+                        label="Mixer"
+                        rows={[
+                            [
+                                "Master",
+                                `${state.preferences.masterEnabled ? "on" : "off"}${state.preferences.masterMuted ? " · muted by the note" : ""} · ${level(state.preferences.masterLevel ?? 1)}`,
+                            ],
+                            [
+                                "Soundscapes",
+                                `${state.layers.soundscapes.status} · ${level(state.layers.soundscapes.effectiveLevel)}`,
+                            ],
+                            [
+                                "Atmosphere",
+                                `${state.layers.atmosphere.status} · ${level(state.layers.atmosphere.effectiveLevel)}`,
+                            ],
+                            [
+                                "Voice",
+                                `${state.layers.voice.status} · ${level(state.layers.voice.effectiveLevel)}`,
+                            ],
+                            ["Preset", state.activePresetId ?? "custom"],
+                            ["Needs a tap", state.needsGesture ? "yes" : "no"],
+                        ]}
+                    />
+                </Panel>
+            </ShellPanel>
         </>
     )
 }
@@ -330,52 +346,64 @@ export function ReaderFaceWorkspace() {
             <AudioSessionProvider initialQueue={narrationTracks} audioBackend="html5">
                 <ReaderMixerVoice />
                 <NarrationDuck />
-                <SplitLayout
-                    stage={
-                        <>
-                            <WidthFrame width={parseStageWidth(stageWidth)}>
-                                <div className="wk-rf-frame">
-                                    <ReaderStage append={append} />
+                <MobileShell tabs={SHELL_TABS}>
+                    <SplitLayout
+                        stage={
+                            <>
+                                <ShellPanel tab="face" fill>
+                                    <WidthFrame width={parseStageWidth(stageWidth)}>
+                                        <div className="wk-rf-frame">
+                                            <ReaderStage append={append} />
+                                        </div>
+                                    </WidthFrame>
+                                </ShellPanel>
+                                <ShellPanel tab="state">
+                                    <Panel
+                                        title="Events"
+                                        actions={
+                                            <Button variant="ghost" onClick={clear}>
+                                                Clear
+                                            </Button>
+                                        }
+                                    >
+                                        <EventLog
+                                            lines={lines}
+                                            empty="Open the chapter, then tap or hold the note."
+                                        />
+                                    </Panel>
+                                </ShellPanel>
+                            </>
+                        }
+                        controls={
+                            <>
+                                {/* A phone already shows the reader at its own width. */}
+                                <div className="wk-shell-wide-only">
+                                    <Panel title="Stage">
+                                        <Segmented
+                                            label="Reader width"
+                                            value={stageWidth}
+                                            options={[
+                                                { value: "auto", label: "Auto" },
+                                                { value: "390", label: "Phone" },
+                                                { value: "768", label: "Tablet" },
+                                            ]}
+                                            onChange={setStageWidth}
+                                        />
+                                    </Panel>
                                 </div>
-                            </WidthFrame>
-                            <Panel
-                                title="Events"
-                                actions={
-                                    <Button variant="ghost" onClick={clear}>
-                                        Clear
-                                    </Button>
-                                }
-                            >
-                                <EventLog
-                                    lines={lines}
-                                    empty="Open the chapter, then tap or hold the note."
-                                />
-                            </Panel>
-                        </>
-                    }
-                    controls={
-                        <>
-                            <Panel title="Stage">
-                                <Segmented
-                                    label="Reader width"
-                                    value={stageWidth}
-                                    options={[
-                                        { value: "auto", label: "Auto" },
-                                        { value: "390", label: "Phone" },
-                                        { value: "768", label: "Tablet" },
-                                    ]}
-                                    onChange={setStageWidth}
-                                />
-                            </Panel>
-                            <HostControls append={append} />
-                            <Note>
-                                This is the face SEN&apos;s reader ships: ReaderNoteFace from the
-                                main entry and ReaderSettingsAudio from the reader-ui entry. The
-                                older NarrativeFace bar is archived; no reader uses it.
-                            </Note>
-                        </>
-                    }
-                />
+                                <HostControls append={append} />
+                                <ShellPanel tab="controls">
+                                    <Note>
+                                        This is the face SEN&apos;s reader ships: ReaderNoteFace
+                                        from the main entry and ReaderSettingsAudio from the
+                                        reader-ui entry. The older NarrativeFace bar is archived; no
+                                        reader uses it.
+                                    </Note>
+                                </ShellPanel>
+                            </>
+                        }
+                    />
+                </MobileShell>
             </AudioSessionProvider>
         </ReaderMixerProvider>
     )

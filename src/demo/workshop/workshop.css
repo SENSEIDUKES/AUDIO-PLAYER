@@ -1597,3 +1597,291 @@ body.lab-frame-body {
     max-width: 36ch;
     opacity: 0.7;
 }
+
+/* ------------------------- Mobile app shell -------------------------
+   AGENTS.md › Mobile Viewport Architecture Rule. A workspace that renders a
+   MobileShell (ui.tsx) becomes a viewport-locked app screen on phones: a fixed
+   top bar, a pinned translucent HUD, one section at a time, and a floating pill
+   dock. The page itself never scrolls; only the active section's content area
+   does, inside the bounds the bar and dock reserve. Wider screens keep the
+   normal workspace layout and never see the dock. */
+.wk-shell__dock,
+.wk-shell-hud__now {
+    display: none;
+}
+.wk-shell-panel {
+    display: contents;
+}
+
+@media (max-width: 760px), (max-height: 500px) {
+    .wk-page--shell {
+        --wk-shell-gutter: 16px;
+        --wk-shell-dock: 52px;
+        --wk-shell-dock-gap: 10px;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        height: 100dvh;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    /* Top bar: a fixed, safe-area-aware strip, never a sticky overlay. */
+    .wk-page--shell .wk-bar {
+        position: relative;
+        flex: none;
+        min-height: 52px;
+        padding: max(6px, env(safe-area-inset-top)) var(--wk-shell-gutter) 6px;
+    }
+    .wk-page--shell .wk-bar__back span {
+        display: none;
+    }
+    .wk-page--shell .wk-bar__back {
+        padding: 6px 10px;
+    }
+
+    /* The one scrolling area: between the bar and the dock's reserved space. */
+    .wk-page--shell .wk-workspace {
+        flex: 1;
+        min-height: 0;
+        width: 100%;
+        max-width: none;
+        margin: 0;
+        padding: 0 0
+            calc(
+                var(--wk-shell-dock) + var(--wk-shell-dock-gap) * 2 + 16px +
+                    env(safe-area-inset-bottom)
+            );
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-width: none;
+    }
+
+    /* The Workshop header is the About tab. */
+    .wk-page--shell .wk-ws-head {
+        display: none;
+    }
+    .wk-page--shell[data-shell-tab="about"] .wk-ws-head {
+        display: grid;
+        margin: 0;
+        padding: 18px var(--wk-shell-gutter) 0;
+    }
+    .wk-page--shell .wk-facts {
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: none;
+    }
+
+    /* Sections replace the stacked columns. */
+    .wk-shell .wk-split,
+    .wk-shell .wk-stage,
+    .wk-shell .wk-controls {
+        display: contents;
+    }
+    .wk-shell {
+        display: flex;
+        flex-direction: column;
+        min-height: 100%;
+    }
+    .wk-shell-panel {
+        display: none;
+    }
+    .wk-shell-panel--on {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0;
+    }
+    .wk-shell-panel--on > * + * {
+        border-top: 1px solid var(--lab-border);
+    }
+
+    /* Flat sections, not cards: no outer boxes stacked down the page. */
+    .wk-shell .wk-panel,
+    .wk-shell .wk-shell-panel > .wk-note {
+        padding: 16px var(--wk-shell-gutter);
+        border: 0;
+        border-radius: 0;
+        background: none;
+    }
+    .wk-shell .wk-shell-panel > .wk-note {
+        padding-top: 12px;
+        padding-bottom: 12px;
+        font-size: 12px;
+        color: var(--lab-text-faint);
+    }
+    .wk-shell .wk-panel__hint {
+        font-size: 12px;
+    }
+
+    /* HUD: the reader card pinned above every section, translucent over it. */
+    .wk-shell .wk-shell-hud {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        flex: none;
+        padding: 10px var(--wk-shell-gutter);
+        border: 0;
+        border-bottom: 1px solid var(--lab-border);
+        border-radius: 0;
+        background: rgba(5, 5, 5, 0.72);
+        -webkit-backdrop-filter: blur(18px) saturate(140%);
+        backdrop-filter: blur(18px) saturate(140%);
+    }
+    .wk-shell .wk-shell-hud .wk-stage-card__title {
+        display: none;
+    }
+    .wk-shell .wk-shell-hud .wk-reader__actions {
+        margin-top: 8px;
+    }
+    .wk-shell .wk-shell-hud .wk-reader__text {
+        display: none;
+    }
+    .wk-shell[data-tab="reader"] .wk-shell-hud .wk-reader__text {
+        display: block;
+        margin: 0 0 8px;
+        font-size: 13.5px;
+        line-height: 1.55;
+    }
+    .wk-shell[data-tab="reader"] .wk-shell-hud {
+        position: relative;
+    }
+    .wk-shell[data-tab="about"] .wk-shell-hud {
+        display: none;
+    }
+    .wk-shell-hud__now {
+        display: grid;
+        gap: 2px;
+        margin: 0;
+        font-size: 12px;
+    }
+    .wk-shell-hud__now > div {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        min-width: 0;
+    }
+    .wk-shell-hud__now dt {
+        flex: none;
+        color: var(--lab-text-faint);
+    }
+    .wk-shell-hud__now dd {
+        margin: 0;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        text-align: right;
+        color: var(--lab-text);
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* Rows, not boxes, inside a section. */
+    .wk-shell .wk-inline-list {
+        gap: 0;
+    }
+    .wk-shell .wk-inline-list__row {
+        margin: 0 calc(var(--wk-shell-gutter) * -1);
+        padding: 9px var(--wk-shell-gutter);
+        border: 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 0;
+        background: none;
+    }
+    .wk-shell .wk-inline-list__row--active {
+        background: color-mix(in srgb, var(--wk-sen) 12%, transparent);
+        box-shadow: inset 3px 0 0 var(--wk-sen);
+    }
+    .wk-shell .wk-pads {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+    }
+    .wk-shell .wk-pad {
+        min-height: 54px;
+        padding: 8px 10px;
+    }
+    .wk-shell .wk-log {
+        max-height: none;
+    }
+
+    /* The mixer view fills the screen edge to edge, as the reader's sheet does. */
+    .wk-shell .wk-width-frame--fixed {
+        width: auto !important;
+        margin: 0;
+        outline: 0;
+    }
+    .wk-shell .wk-width-frame__label,
+    .wk-shell .wk-shell-wide-only {
+        display: none;
+    }
+    .wk-shell [data-shell-panel="mixer"] .wk-panel__body {
+        margin: 12px calc(var(--wk-shell-gutter) * -1) -16px;
+    }
+    .wk-shell .wk-sen-settings {
+        border-width: 1px 0 0;
+        border-radius: 0;
+    }
+
+    /* Floating dock: segmented pills inside the reserved bottom bounds. */
+    .wk-shell__dock {
+        position: fixed;
+        z-index: 30;
+        left: var(--wk-shell-dock-gap);
+        right: var(--wk-shell-dock-gap);
+        bottom: calc(var(--wk-shell-dock-gap) + env(safe-area-inset-bottom));
+        display: flex;
+        gap: 2px;
+        height: var(--wk-shell-dock);
+        padding: 5px;
+        border: 1px solid var(--lab-border-strong);
+        border-radius: 999px;
+        background: rgba(12, 12, 16, 0.72);
+        -webkit-backdrop-filter: blur(20px) saturate(150%);
+        backdrop-filter: blur(20px) saturate(150%);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    }
+    .wk-shell__tab {
+        flex: 1 1 0;
+        min-width: 0;
+        padding: 0 4px;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--lab-text-dim);
+        font: inherit;
+        font-size: 12.5px;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        cursor: pointer;
+    }
+    .wk-shell__tab--on {
+        background: color-mix(in srgb, var(--wk-sen) 22%, rgba(255, 255, 255, 0.06));
+        color: var(--lab-text);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wk-sen) 55%, transparent);
+    }
+}
+
+/* A `fill` section is the stage itself: it takes every pixel between the top
+   bar and the dock's reserved bounds, edge to edge. */
+@media (max-width: 760px), (max-height: 500px) {
+    .wk-shell:has(> .wk-split .wk-shell-panel--fill.wk-shell-panel--on) {
+        height: 100%;
+    }
+    .wk-shell-panel--fill.wk-shell-panel--on {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        min-height: 0;
+    }
+    .wk-shell-panel--fill.wk-shell-panel--on > .wk-width-frame {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        width: auto !important;
+        min-height: 0;
+        margin: 0;
+        outline: 0;
+    }
+}

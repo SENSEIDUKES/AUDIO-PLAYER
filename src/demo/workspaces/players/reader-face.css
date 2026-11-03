@@ -180,3 +180,37 @@
 .wk-rf-frame {
     container-type: inline-size;
 }
+
+/* Phones: the reader is the shell's full-bleed stage (AGENTS.md › Mobile
+   Viewport Architecture Rule). It fills the screen between the top bar and
+   the dock, the chapter scrolls inside it like the real reader, and the
+   settings sheet rises over it. */
+@media (max-width: 760px), (max-height: 500px) {
+    .wk-shell .wk-rf-frame {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        min-height: 0;
+    }
+    .wk-shell .wk-rf {
+        flex: 1;
+        min-height: 0;
+        border: 0;
+        border-radius: 0;
+    }
+    .wk-shell .wk-rf__reader {
+        min-height: 0;
+    }
+    .wk-shell .wk-rf__page {
+        min-height: 0;
+        max-width: none;
+        padding: 24px 20px 104px;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        font-size: 17px;
+        line-height: 1.9;
+    }
+    .wk-shell .wk-rf-sheet__panel {
+        max-height: none;
+    }
+}
