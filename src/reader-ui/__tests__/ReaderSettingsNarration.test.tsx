@@ -104,6 +104,11 @@ it("always shows eight slots, unused ones as a dash, so the page keeps its shape
     expect(screen.queryByRole("combobox", { name: "Voice for The physician" })).toBeNull()
 })
 
+it("renders nothing without a mixer, like the Audio page", () => {
+    const { container } = render(<ReaderSettingsNarration tiers={TIERS} slots={SLOTS} />)
+    expect(container).toBeEmptyDOMElement()
+})
+
 it("follows the Voice layer when it changes elsewhere", () => {
     render(<ReaderSettingsNarration mixer={mixer} />)
     act(() => mixer.setLayerLevel("voice", 0.3))

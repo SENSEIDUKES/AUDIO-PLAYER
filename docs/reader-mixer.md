@@ -923,7 +923,10 @@ soundtrack, so `ReaderSettingsAudio` leaves Voice out unless `showVoice` is set
   codex character) gets a slot whose `◀ voice ▶` picks from the chosen tier's
   `voices` (`{ id, label, group? }`; groups name a voice's source, such as a
   provider). Unused slots keep their place with a dash, so the page never
-  changes shape.
+  changes shape. A chapter rarely has more speakers than slots; any beyond
+  `slotCount` are not shown, and the host voices them itself (SEN gives them
+  a random voice from the tier). Reading speed is not here: it lives in the
+  reader chamber.
 - **Host-owned.** The host supplies `tiers`, `tier`, `voices` and `slots`,
   and decides what `onTierChange` and `onAssign(slotId, voiceId)` do. The page
   never prices, generates or stores anything.

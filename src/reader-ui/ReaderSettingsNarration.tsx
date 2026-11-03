@@ -126,10 +126,13 @@ export function ReaderSettingsNarration({
             ),
         [voices]
     )
+    // After every hook: like the Audio page, there is nothing to show without a mixer.
+    if (!mixer || !state) return null
+
     const voiceOptions = voiceGroups.flatMap((group) => group.options)
     const current = tiers.find((entry) => entry.id === tier)
-    const preference = state?.preferences.layers.voice
-    const percent = Math.round((preference?.level ?? 1) * 100)
+    const preference = state.preferences.layers.voice
+    const percent = Math.round(preference.level * 100)
     const visible = slots.slice(0, slotCount)
     const empties = Math.max(0, slotCount - visible.length)
 
@@ -151,29 +154,25 @@ export function ReaderSettingsNarration({
                 {/* Voice | Tier: the same split row as each Audio channel. */}
                 <div
                     className="sap-reader-mixer__channel sap-reader-narration__voice"
-                    data-enabled={preference?.enabled === false ? "false" : "true"}
+                    data-enabled={preference.enabled ? "true" : "false"}
                 >
                     <div className="sap-reader-mixer__row">
                         <span className="sap-reader-mixer__name" id={ids.voice}>
                             {labels.voice}
                         </span>
-                        {mixer && preference && (
-                            <MixerSwitch
-                                checked={preference.enabled}
-                                labelledBy={ids.voice}
-                                onChange={(enabled) => mixer.setLayerEnabled("voice", enabled)}
-                            />
-                        )}
+                        <MixerSwitch
+                            checked={preference.enabled}
+                            labelledBy={ids.voice}
+                            onChange={(enabled) => mixer.setLayerEnabled("voice", enabled)}
+                        />
                     </div>
                     <div className="sap-reader-mixer__level">
-                        {mixer && preference && (
-                            <MixerSlider
-                                percent={percent}
-                                label={labels.volume(labels.voice)}
-                                formatPercent={labels.formatPercent}
-                                onChange={(value) => mixer.setLayerLevel("voice", value / 100)}
-                            />
-                        )}
+                        <MixerSlider
+                            percent={percent}
+                            label={labels.volume(labels.voice)}
+                            formatPercent={labels.formatPercent}
+                            onChange={(value) => mixer.setLayerLevel("voice", value / 100)}
+                        />
                         <span className="sap-reader-mixer__percent" aria-hidden="true">
                             {labels.formatPercent(percent)}
                         </span>
