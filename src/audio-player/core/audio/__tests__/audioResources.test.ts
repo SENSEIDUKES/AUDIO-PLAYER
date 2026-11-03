@@ -33,6 +33,16 @@ function disk() {
 }
 
 describe("persistent audio retention", () => {
+    it("ignores undefined retention options while applying defined options", async () => {
+        const { entries } = disk()
+        const store = new PersistentAudioCache()
+        await store.configureRetention({ maxEntries: 1, maxBytes: undefined, maxAgeMs: undefined })
+        await store.putArrayBuffer("a", new ArrayBuffer(1))
+        await store.putArrayBuffer("b", new ArrayBuffer(1))
+        expect([...entries.keys()]).toEqual(["b"])
+        expect(await store.getArrayBuffer("b")).not.toBeNull()
+    })
+
     it("expires old and legacy entries and enforces entry and byte retention", async () => {
         const { entries } = disk()
         const now = vi.spyOn(Date, "now").mockReturnValue(1000)
@@ -94,6 +104,24 @@ describe("persistent audio retention", () => {
 })
 
 describe("audio download admission", () => {
+    it("ignores undefined resource options and applies updates atomically", () => {
+        const original = getAudioResourcePolicy()
+        try {
+            configureAudioResources({
+                maxConcurrentLoads: 1,
+                maxEncodedBytes: undefined,
+                maxDecodedBytes: undefined,
+            })
+            expect(getAudioResourcePolicy()).toEqual({ ...original, maxConcurrentLoads: 1 })
+            expect(() =>
+                configureAudioResources({ maxConcurrentLoads: 2, maxEncodedBytes: 0 })
+            ).toThrow(RangeError)
+            expect(getAudioResourcePolicy()).toEqual({ ...original, maxConcurrentLoads: 1 })
+        } finally {
+            configureAudioResources(original)
+        }
+    })
+
     it("rejects declared oversize before reading the body", async () => {
         const cancel = vi.fn()
         const response = new Response(new ReadableStream({ cancel }), {

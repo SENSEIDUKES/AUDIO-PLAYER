@@ -16,11 +16,15 @@ let policy = { ...defaults }
 
 /** Applies to new jobs. Existing jobs keep their policy snapshot. */
 export function configureAudioResources(next: Partial<AudioResourcePolicy>): void {
-    for (const value of Object.values(next)) {
+    const updated = { ...policy }
+    for (const key of Object.keys(updated) as (keyof AudioResourcePolicy)[]) {
+        const value = next[key]
+        if (value === undefined) continue
         if (!Number.isSafeInteger(value) || value < 1)
             throw new RangeError("Audio limits must be positive integers.")
+        updated[key] = value
     }
-    policy = { ...policy, ...next }
+    policy = updated
     drain()
 }
 

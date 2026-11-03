@@ -134,11 +134,15 @@ export class PersistentAudioCache {
     }
 
     async configureRetention(next: Partial<AudioCacheRetention>): Promise<void> {
-        for (const value of Object.values(next)) {
+        const updated = { ...this.retention }
+        for (const key of Object.keys(updated) as (keyof AudioCacheRetention)[]) {
+            const value = next[key]
+            if (value === undefined) continue
             if (!Number.isSafeInteger(value) || value < 0)
                 throw new RangeError("Cache retention limits must be nonnegative integers.")
+            updated[key] = value
         }
-        this.retention = { ...this.retention, ...next }
+        this.retention = updated
         await this.prune()
     }
 
