@@ -140,24 +140,92 @@ describe("ReaderMixerPanel", () => {
 
     it("picks an atmosphere from grouped host options, with Off", () => {
         renderPanel()
-        const summary = screen.getByRole("button", { name: "Atmosphere: Off" })
-        expect(summary).toHaveTextContent("Off")
-        expect(summary).not.toHaveTextContent("Atmosphere")
-        expect(summary).toHaveAttribute("aria-expanded", "false")
-        expect(screen.queryByRole("radio", { name: "Rain" })).toBeNull()
-        fireEvent.click(summary)
-        const picker = screen.getByRole("group", { name: "Atmosphere sound" })
-        expect(within(picker).getByRole("radio", { name: "Off" })).toBeChecked()
+        const picker = screen.getByRole("combobox", { name: "Atmosphere sound" })
+        // Off first, then the host's options grouped for the device picker.
+        expect(picker).toHaveValue("null")
+        expect(within(picker).getAllByRole("option")[0]).toHaveTextContent("Off")
         expect(within(picker).getByRole("group", { name: "Weather" })).toBeInTheDocument()
         expect(within(picker).getByRole("group", { name: "Places" })).toBeInTheDocument()
+        expect(
+            within(within(picker).getByRole("group", { name: "Weather" }))
+                .getAllByRole("option")
+                .map((option) => option.textContent)
+        ).toEqual(["Rain", "Wind"])
 
-        fireEvent.click(within(picker).getByRole("radio", { name: "Rain" }))
+        fireEvent.change(picker, { target: { value: JSON.stringify("rain") } })
         expect(mixer!.getPreferences().atmosphereId).toBe("rain")
-        expect(within(picker).getByRole("radio", { name: "Rain" })).toBeChecked()
+        expect(picker).toHaveValue(JSON.stringify("rain"))
         expect(FakeAudio.withSrc("https://a.test/rain.mp3")).toHaveLength(1)
 
-        fireEvent.click(within(picker).getByRole("radio", { name: "Off" }))
+        fireEvent.change(picker, { target: { value: "null" } })
         expect(mixer!.getPreferences().atmosphereId).toBeNull()
+    })
+
+    it("steps through atmosphere choices in place with ◀ and ▶", () => {
+        renderPanel()
+        const previous = screen.getByRole("button", { name: "Previous Atmosphere sound" })
+        const next = screen.getByRole("button", { name: "Next Atmosphere sound" })
+        // Off is first, so there is nothing before it.
+        expect(previous).toBeDisabled()
+        fireEvent.click(next)
+        expect(mixer!.getPreferences().atmosphereId).toBe("rain")
+        fireEvent.click(next)
+        fireEvent.click(next)
+        expect(mixer!.getPreferences().atmosphereId).toBe("city")
+        expect(next).toBeDisabled()
+        fireEvent.click(previous)
+        expect(mixer!.getPreferences().atmosphereId).toBe("wind")
+    })
+
+    it("gives every channel a sound choice row from the host", () => {
+        const picks: string[] = []
+        renderPanel({
+            sounds: {
+                soundscapes: {
+                    choices: [
+                        { id: "a1", label: "Fanfare", group: "Adventure" },
+                        { id: "f1", label: "Clash", group: "Fighting" },
+                    ],
+                    value: "a1",
+                    onChange: (id) => picks.push(`score:${id}`),
+                },
+                cues: {
+                    choices: [
+                        { id: "bell", label: "Temple bell" },
+                        { id: "growl", label: "Beast growl" },
+                    ],
+                    value: null,
+                    onChange: (id) => picks.push(`cue:${id}`),
+                },
+                voice: {
+                    choices: [{ id: "n1", label: "Story Seed" }],
+                    value: "n1",
+                    onChange: (id) => picks.push(`voice:${id}`),
+                },
+            },
+        })
+        const score = screen.getByRole("combobox", { name: "Score" })
+        expect(score).toHaveValue("a1")
+        expect(within(score).getByRole("group", { name: "Fighting" })).toBeInTheDocument()
+        fireEvent.click(screen.getByRole("button", { name: "Next Score" }))
+        expect(picks).toEqual(["score:f1"])
+
+        // Nothing chosen yet: the placeholder shows and ▶ starts at the first choice.
+        const cue = screen.getByRole("combobox", { name: "Cue sound" })
+        expect(cue).toHaveValue("")
+        expect((cue as HTMLSelectElement).selectedOptions[0]).toHaveTextContent("Choose…")
+        fireEvent.change(cue, { target: { value: "growl" } })
+        expect(picks).toEqual(["score:f1", "cue:growl"])
+
+        // A channel's sound row comes and goes with the channel itself.
+        expect(screen.queryByRole("combobox", { name: "Narrator" })).toBeNull()
+        act(() => mixer!.setLayerAvailability({ voice: true }))
+        expect(screen.getByRole("combobox", { name: "Narrator" })).toHaveValue("n1")
+        expect(screen.getByRole("combobox", { name: "Atmosphere sound" })).toBeInTheDocument()
+
+        // Each sound choice sits in its own channel's row, beside its controls.
+        const cues = screen.getByRole("switch", { name: "Sound Cues" }).closest("li")!
+        expect(within(cues).getByRole("combobox", { name: "Cue sound" })).toBe(cue)
     })
 
     it("tolerates a non-string group from untyped host data", () => {
@@ -172,8 +240,7 @@ describe("ReaderMixerPanel", () => {
             ],
         })
         render(<ReaderMixerPanel mixer={mixer} />)
-        fireEvent.click(screen.getByRole("button", { name: /Atmosphere:/ }))
-        expect(screen.getByRole("radio", { name: "Odd" })).toBeInTheDocument()
+        expect(screen.getByRole("option", { name: "Odd" })).toBeInTheDocument()
     })
 
     it("offers presets and marks the one in effect", () => {
@@ -218,9 +285,11 @@ describe("ReaderMixerPanel", () => {
             "aria-valuetext",
             "75 %"
         )
-        fireEvent.click(screen.getByRole("button", { name: "Atmosphere: Apagado" }))
-        expect(screen.getByRole("radio", { name: "Apagado" })).toBeChecked()
-        expect(screen.getByRole("group", { name: "Ambiente" })).toBeInTheDocument()
+        const picker = screen.getByRole("combobox", { name: "Ambiente" })
+        expect(within(picker).getByRole("option", { name: "Apagado" })).toHaveProperty(
+            "selected",
+            true
+        )
         expect(screen.getByRole("group", { name: "Mezclas" })).toBeInTheDocument()
     })
 
@@ -326,6 +395,14 @@ describe("ReaderMixerPanel", () => {
         fireEvent.change(select, { target: { value: "chapter-end" } })
         expect(mixer!.getState().sleepTimer.status).toBe("running")
         expect(select).toHaveValue("chapter-end")
+    })
+
+    it("describes the sleep timer with its countdown", () => {
+        renderPanel()
+        const select = screen.getByRole("combobox", { name: "Sleep timer" })
+        expect(select).toHaveAccessibleDescription("")
+        fireEvent.change(select, { target: { value: "30-minutes" } })
+        expect(select).toHaveAccessibleDescription("Stops in 30 min")
     })
 
     it("arms translated timers, reports remaining wall-clock time, and cancels", () => {

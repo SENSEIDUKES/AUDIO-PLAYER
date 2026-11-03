@@ -2,7 +2,7 @@ import type { CSSProperties, ReactNode } from "react"
 import { useOptionalReaderMixer } from "@seihouse/audio-player"
 import type { ReaderAtmosphereOption, ReaderMixer } from "@seihouse/audio-player"
 import { ReaderMixerPanel } from "./ReaderMixerPanel.js"
-import type { ReaderMixerLabelOverrides } from "./ReaderMixerPanel.js"
+import type { ReaderMixerLabelOverrides, ReaderMixerPanelProps } from "./ReaderMixerPanel.js"
 import { ReaderAudioPresets } from "./ReaderAudioPresets.js"
 import "./reader-ui.css"
 
@@ -22,6 +22,8 @@ export interface ReaderSettingsAudioProps {
     showAtmospherePicker?: boolean
     /** Show the preset pills under the levels. Defaults to true. */
     showPresets?: boolean
+    /** Sound choices for Soundscapes, Sound Cues and Voice; see `ReaderMixerPanel`. */
+    sounds?: ReaderMixerPanelProps["sounds"]
     /** Host-owned pieces below the presets, such as SEN's scene and soundtrack chooser. */
     children?: ReactNode
     className?: string
@@ -43,6 +45,7 @@ export function ReaderSettingsAudio({
     labels,
     showAtmospherePicker = true,
     showPresets = true,
+    sounds,
     children,
     className,
     style,
@@ -66,6 +69,7 @@ export function ReaderSettingsAudio({
                 showTitle={false}
                 showPresets={false}
                 showAtmospherePicker={showAtmospherePicker}
+                sounds={sounds}
             />
             {showPresets && <ReaderAudioPresets mixer={mixer} legend={labels?.presets} />}
             {children}

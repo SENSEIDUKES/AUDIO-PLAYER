@@ -1746,6 +1746,29 @@ body.lab-frame-body {
     .wk-shell[data-tab="reader"] .wk-shell-hud {
         position: relative;
     }
+    /* Off the Reader tab the HUD is one line (narration, what is playing,
+       the note) so a section such as the mixer fits beneath it unscrolled. */
+    .wk-shell:not([data-tab="reader"]) .wk-shell-hud {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-areas: "play now note";
+        align-items: center;
+        column-gap: 12px;
+        padding-block: 6px;
+    }
+    .wk-shell:not([data-tab="reader"]) .wk-shell-hud .wk-reader__actions {
+        display: contents;
+    }
+    .wk-shell:not([data-tab="reader"]) .wk-shell-hud .wk-reader__actions > .wk-btn {
+        grid-area: play;
+    }
+    .wk-shell:not([data-tab="reader"]) .wk-shell-hud .wk-reader__actions > :last-child {
+        grid-area: note;
+    }
+    .wk-shell:not([data-tab="reader"]) .wk-shell-hud .wk-shell-hud__now {
+        grid-area: now;
+        font-size: 11px;
+    }
     .wk-shell[data-tab="about"] .wk-shell-hud {
         display: none;
     }
@@ -1823,8 +1846,13 @@ body.lab-frame-body {
     .wk-shell .wk-shell-wide-only {
         display: none;
     }
+    /* The Mixer tab already names the section; give the mixer the room. */
+    .wk-shell [data-shell-panel="mixer"] .wk-panel__head,
+    .wk-shell [data-shell-panel="mixer"] .wk-panel__hint {
+        display: none;
+    }
     .wk-shell [data-shell-panel="mixer"] .wk-panel__body {
-        margin: 12px calc(var(--wk-shell-gutter) * -1) -16px;
+        margin: -16px calc(var(--wk-shell-gutter) * -1) -16px;
     }
     .wk-shell .wk-sen-settings {
         border-width: 1px 0 0;

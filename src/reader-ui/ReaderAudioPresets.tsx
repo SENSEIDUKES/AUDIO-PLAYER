@@ -13,7 +13,8 @@ export interface ReaderAudioPresetsProps {
 
 /**
  * The reader's preset choices as SEN places them: below Master and the layer
- * levels, so presets stay secondary to them, as two columns of 44px pills.
+ * levels, so presets stay secondary to them: one options-table row, its name
+ * on the left and a segmented row of 44px pills on the right.
  */
 export function ReaderAudioPresets({
     mixer: mixerProp,
@@ -23,13 +24,24 @@ export function ReaderAudioPresets({
     const context = useOptionalReaderMixer()
     const mixer = mixerProp ?? context
     const state = useReaderMixerState(mixer)
-    const name = `sap-reader-preset-${useId()}`
+    const id = useId()
+    const name = `sap-reader-preset-${id}`
+    const legendId = `${name}-legend`
     if (!mixer || !state?.presets.length) return null
     return (
         <div className={["sap-reader-settings__group", className].filter(Boolean).join(" ")}>
-            <fieldset className="sap-reader-settings__field" data-control="reader-audio-preset">
-                <legend className="sap-reader-settings__label">{legend}</legend>
-                <div className="sap-reader-settings__options sap-reader-settings__options--two">
+            {/* One options-table row: the name on the left, the pills on the right. A
+                labelled group rather than a fieldset, whose legend can't sit in a row. */}
+            <div
+                role="group"
+                aria-labelledby={legendId}
+                className="sap-reader-settings__field sap-reader-settings__row"
+                data-control="reader-audio-preset"
+            >
+                <span className="sap-reader-settings__label" id={legendId}>
+                    {legend}
+                </span>
+                <div className="sap-reader-settings__options sap-reader-settings__options--segmented">
                     {state.presets.map((preset) => (
                         <label key={preset.id} className="sap-reader-settings__option">
                             <input
@@ -44,7 +56,7 @@ export function ReaderAudioPresets({
                         </label>
                     ))}
                 </div>
-            </fieldset>
+            </div>
         </div>
     )
 }
