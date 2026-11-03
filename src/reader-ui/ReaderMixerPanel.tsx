@@ -35,6 +35,13 @@ export interface ReaderMixerLabels {
     formatRemainingTime: (remainingMs: number) => string
     /** Shown where the browser ignores volume and sliders act as on/off. */
     deviceVolumeHint: string
+    /** Names of the sound choice rows under Soundscapes, Sound Cues and Voice. */
+    channelSounds: Readonly<Record<ReaderChannelSoundLayer, string>>
+    /** Shown in a sound choice row before anything is chosen. */
+    noSound: string
+    /** The control that folds every sound choice row away, leaving the sliders. */
+    showSounds: string
+    hideSounds: string
     /** Accessible names of a choice row's ◀ and ▶ buttons; receive the row's name. */
     previous: (rowLabel: string) => string
     next: (rowLabel: string) => string
@@ -42,10 +49,36 @@ export interface ReaderMixerLabels {
     status: Readonly<Partial<Record<ReaderMixerLayerStatus, string>>>
 }
 
-/** Override any label; `layers` and `status` merge key by key. */
-export type ReaderMixerLabelOverrides = Partial<Omit<ReaderMixerLabels, "layers" | "status">> & {
+/** Override any label; `layers`, `channelSounds` and `status` merge key by key. */
+export type ReaderMixerLabelOverrides = Partial<
+    Omit<ReaderMixerLabels, "layers" | "status" | "channelSounds">
+> & {
     layers?: Partial<Record<ReaderMixerLayer, string>>
+    channelSounds?: Partial<Record<ReaderChannelSoundLayer, string>>
     status?: Partial<Record<ReaderMixerLayerStatus, string>>
+}
+
+/** The channels whose sound the host chooses (Atmosphere's comes from the mixer's catalog). */
+export type ReaderChannelSoundLayer = Exclude<ReaderMixerLayer, "atmosphere">
+
+/** One sound a channel can play, offered by the host. */
+export interface ReaderChannelSoundChoice {
+    id: string
+    label: string
+    /** Groups the choice in the device's picker, such as a score's category. */
+    group?: string
+}
+
+/**
+ * A host-owned sound choice for one channel: the panel shows it as a
+ * `name ◀ value ▶` row under that channel and reports picks to `onChange`.
+ * What a pick means is the host's (a scene score, a cue set, a narrator).
+ */
+export interface ReaderChannelSounds {
+    choices: readonly ReaderChannelSoundChoice[]
+    /** The current choice's id, or null before one is made. */
+    value: string | null
+    onChange: (id: string) => void
 }
 
 export const DEFAULT_READER_MIXER_LABELS: ReaderMixerLabels = Object.freeze({
@@ -68,6 +101,14 @@ export const DEFAULT_READER_MIXER_LABELS: ReaderMixerLabels = Object.freeze({
     sleepStopped: "Stopped by sleep timer",
     formatRemainingTime: (remainingMs: number) => `Stops in ${Math.ceil(remainingMs / 60000)} min`,
     deviceVolumeHint: "Volume is set by your device on this browser",
+    channelSounds: Object.freeze({
+        soundscapes: "Score",
+        cues: "Cue sound",
+        voice: "Narrator",
+    }),
+    noSound: "Choose…",
+    showSounds: "Show sounds",
+    hideSounds: "Hide sounds",
     previous: (rowLabel: string) => `Previous ${rowLabel}`,
     next: (rowLabel: string) => `Next ${rowLabel}`,
     status: Object.freeze({
@@ -93,6 +134,19 @@ export interface ReaderMixerPanelProps {
     showAtmospherePicker?: boolean
     /** Show the preset picker above the master switch. Defaults to true. */
     showPresets?: boolean
+    /**
+     * Sound choices for Soundscapes, Sound Cues and Voice, each shown as a row
+     * under its channel. Atmosphere's choice comes from the mixer's catalog.
+     */
+    sounds?: Partial<Record<ReaderChannelSoundLayer, ReaderChannelSounds>>
+    /** Whether the sound choice rows show (controlled). Hide them to see only the sliders. */
+    soundsOpen?: boolean
+    /** Initial state when uncontrolled. Defaults to true. */
+    defaultSoundsOpen?: boolean
+    /** Told when the reader shows or hides the sound choices, so a host can remember it. */
+    onSoundsOpenChange?: (open: boolean) => void
+    /** Content at the start of the panel's top row, beside the show/hide control. */
+    lead?: ReactNode
     className?: string
     /** Theme overrides, typically `--sap-reader-mixer-*` custom properties. */
     style?: CSSProperties
@@ -105,6 +159,10 @@ function mergeLabels(overrides: ReaderMixerLabelOverrides | undefined): ReaderMi
         ...DEFAULT_READER_MIXER_LABELS,
         ...overrides,
         layers: { ...DEFAULT_READER_MIXER_LABELS.layers, ...overrides.layers },
+        channelSounds: {
+            ...DEFAULT_READER_MIXER_LABELS.channelSounds,
+            ...overrides.channelSounds,
+        },
         status: { ...DEFAULT_READER_MIXER_LABELS.status, ...overrides.status },
     }
 }
@@ -197,6 +255,7 @@ function ChoiceStepper({
     groups,
     labels,
     describedBy,
+    placeholder = "",
     onChange,
 }: {
     id: string
@@ -208,6 +267,8 @@ function ChoiceStepper({
     groups?: readonly { name: string | null; options: readonly StepperOption[] }[]
     labels: ReaderMixerLabels
     describedBy?: string
+    /** Text shown while the value matches none of the options. */
+    placeholder?: string
     onChange: (value: string) => void
 }) {
     const index = options.findIndex((option) => option.value === value)
@@ -234,7 +295,11 @@ function ChoiceStepper({
                 value={value}
                 onChange={(event) => onChange(event.target.value)}
             >
-                {index < 0 && <option value={value} disabled hidden />}
+                {index < 0 && (
+                    <option value={value} disabled hidden>
+                        {placeholder}
+                    </option>
+                )}
                 {(groups ?? [{ name: null, options }]).map((group) =>
                     group.name === null ? (
                         group.options.map((option) => (
@@ -312,9 +377,20 @@ export function ReaderMixerPanel({
     titleAs: Title = "h3",
     showAtmospherePicker = true,
     showPresets = true,
+    sounds,
+    soundsOpen: soundsOpenProp,
+    defaultSoundsOpen = true,
+    onSoundsOpenChange,
+    lead,
     className,
     style,
 }: ReaderMixerPanelProps) {
+    const [soundsOpenState, setSoundsOpenState] = useState(defaultSoundsOpen)
+    const soundsOpen = soundsOpenProp ?? soundsOpenState
+    const setSoundsOpen = (open: boolean) => {
+        if (soundsOpenProp === undefined) setSoundsOpenState(open)
+        onSoundsOpenChange?.(open)
+    }
     const contextMixer = useOptionalReaderMixer()
     const mixer = mixerProp ?? contextMixer
     const state = useReaderMixerState(mixer)
@@ -343,6 +419,7 @@ export function ReaderMixerPanel({
         master: `${baseId}-master`,
         layer: (layer: ReaderMixerLayer) => `${baseId}-${layer}`,
         picker: `${baseId}-atmosphere-sound`,
+        sound: (layer: ReaderMixerLayer) => `${baseId}-${layer}-sound-row`,
         presets: `${baseId}-presets`,
         sleep: `${baseId}-sleep`,
         sleepStatus: `${baseId}-sleep-status`,
@@ -354,8 +431,64 @@ export function ReaderMixerPanel({
               ? labels.formatRemainingTime(state.sleepTimer.remainingMs)
               : ""
 
+    const hasAtmospherePicker = showAtmospherePicker && (options?.length ?? 0) > 0
+    const soundLayers = READER_MIXER_LAYERS.filter((layer) =>
+        layer === "atmosphere" ? hasAtmospherePicker : Boolean(sounds?.[layer])
+    )
+
+    /** A host-owned sound choice row under its channel. */
+    const renderSound = (layer: ReaderMixerLayer): ReactNode => {
+        if (!soundsOpen) return null
+        if (layer === "atmosphere") return renderPicker()
+        const sound = sounds?.[layer]
+        if (!sound) return null
+        const rowLabel = labels.channelSounds[layer]
+        const groupNames: (string | null)[] = []
+        for (const choice of sound.choices) {
+            const name = typeof choice.group === "string" ? choice.group.trim() || null : null
+            if (!groupNames.includes(name)) groupNames.push(name)
+        }
+        const toOption = (choice: ReaderChannelSoundChoice): StepperOption => ({
+            value: choice.id,
+            label: choice.label,
+        })
+        const soundGroups = [...groupNames]
+            .sort((a, b) => (a === null ? -1 : b === null ? 1 : 0))
+            .map((name) => ({
+                name,
+                options: sound.choices
+                    .filter(
+                        (choice) =>
+                            (typeof choice.group === "string"
+                                ? choice.group.trim() || null
+                                : null) === name
+                    )
+                    .map(toOption),
+            }))
+        return (
+            <div
+                className="sap-reader-mixer__sound sap-reader-mixer__choice-row"
+                id={ids.sound(layer)}
+            >
+                <label className="sap-reader-mixer__name" htmlFor={`${ids.sound(layer)}-select`}>
+                    {rowLabel}
+                </label>
+                <ChoiceStepper
+                    id={`${ids.sound(layer)}-select`}
+                    rowLabel={rowLabel}
+                    value={sound.value ?? ""}
+                    placeholder={labels.noSound}
+                    options={soundGroups.flatMap((group) => group.options)}
+                    groups={soundGroups}
+                    labels={labels}
+                    onChange={sound.onChange}
+                />
+            </div>
+        )
+    }
+
     const renderPicker = (): ReactNode => {
-        if (!showAtmospherePicker) return null
+        if (!hasAtmospherePicker) return null
         // Off first, then the host's choices in catalog order (ungrouped first).
         const off: StepperOption = { value: "null", label: labels.atmosphereOff }
         const toOption = (option: ReaderAtmosphereOption): StepperOption => ({
@@ -375,7 +508,10 @@ export function ReaderMixerPanel({
                 .map((group) => ({ name: group.name, options: group.options.map(toOption) })),
         ]
         return (
-            <div className="sap-reader-mixer__atmosphere sap-reader-mixer__choice-row">
+            <div
+                className="sap-reader-mixer__atmosphere sap-reader-mixer__sound sap-reader-mixer__choice-row"
+                id={ids.sound("atmosphere")}
+            >
                 <label className="sap-reader-mixer__name" htmlFor={ids.picker}>
                     {labels.atmospherePicker}
                 </label>
@@ -403,6 +539,7 @@ export function ReaderMixerPanel({
             aria-labelledby={showTitle ? ids.title : ids.master}
             data-master={preferences.masterEnabled ? "on" : "off"}
             data-volume-control={state.volumeControl}
+            data-sounds={soundsOpen ? "open" : "closed"}
         >
             {showTitle && (
                 <Title className="sap-reader-mixer__title" id={ids.title}>
@@ -434,6 +571,27 @@ export function ReaderMixerPanel({
                         ))}
                     </SEIRadioGroup>
                 </fieldset>
+            )}
+            {(lead || soundLayers.length > 0) && (
+                <div className="sap-reader-mixer__toolbar">
+                    <div className="sap-reader-mixer__lead">{lead}</div>
+                    {soundLayers.length > 0 && (
+                        <button
+                            type="button"
+                            className="sap-reader-mixer__sounds-toggle"
+                            aria-expanded={soundsOpen}
+                            aria-controls={
+                                soundsOpen
+                                    ? soundLayers.map((layer) => ids.sound(layer)).join(" ")
+                                    : undefined
+                            }
+                            onClick={() => setSoundsOpen(!soundsOpen)}
+                        >
+                            {soundsOpen ? labels.hideSounds : labels.showSounds}
+                            <span aria-hidden="true">{soundsOpen ? "▴" : "▾"}</span>
+                        </button>
+                    )}
+                </div>
             )}
             <div className="sap-reader-mixer__channel sap-reader-mixer__channel--master">
                 <div className="sap-reader-mixer__row sap-reader-mixer__row--master">
@@ -518,7 +676,7 @@ export function ReaderMixerPanel({
                             <p className="sap-reader-mixer__status" aria-live="polite">
                                 {message}
                             </p>
-                            {layer === "atmosphere" && renderPicker()}
+                            {renderSound(layer)}
                         </li>
                     )
                 })}

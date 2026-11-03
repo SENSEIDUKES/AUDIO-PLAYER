@@ -14,6 +14,7 @@ import {
     useReaderMixerState,
 } from "../../../audio-player"
 import { ReaderSettingsAudio } from "../../../reader-ui"
+import type { ReaderSettingsAudioProps } from "../../../reader-ui"
 import type {
     ReaderAtmosphereOption,
     ReaderMixerLayer,
@@ -249,6 +250,7 @@ function ReaderSimulation({
     }, [mixer, session.isPlaying, duckAmount])
     const [category, setCategory] = useState(set.categories[0])
     const [chapterScore, setChapterScore] = useState(set.scores[0])
+    const [cueSound, setCueSound] = useState<string | null>(null)
     const battleTurn = useRef(0)
     const scene = useRef(0)
     const titleFor = (key: string | null) =>
@@ -290,6 +292,58 @@ function ReaderSimulation({
         append(`${reason} → playSoundscape(“${score.track.title}”)`)
     }
     const audibleKey = state.layers.soundscapes.current
+    const playCue = (cue: SceneSet["cues"][number], reason: string) => {
+        const played = mixer.playCue(cue.url, { volume: cue.volume, loudness: cue.loudness })
+        append(
+            `${reason} → playCue(“${cue.label}”)${played ? "" : " skipped"}`,
+            played ? "ok" : "warn"
+        )
+    }
+
+    /* Every channel's sound choice, as NovelExpanded would supply them: the
+       chapter score, an audition of each cue, and the narration recording. */
+    const sounds: ReaderSettingsAudioProps["sounds"] = {
+        soundscapes: {
+            choices: set.scores.map((score) => ({
+                id: score.track.id ?? score.track.title,
+                label: score.track.title.replace(`${score.category} `, ""),
+                group: score.category,
+            })),
+            value: chapterScore.track.id ?? chapterScore.track.title,
+            onChange: (id) => {
+                const score = set.scores.find(
+                    (entry) => (entry.track.id ?? entry.track.title) === id
+                )
+                if (!score) return
+                setChapterScore(score)
+                playScore(score, "score chosen in Settings")
+            },
+        },
+        cues: {
+            choices: set.cues.map((cue) => ({ id: cue.id, label: cue.label })),
+            value: cueSound,
+            onChange: (id) => {
+                const cue = set.cues.find((entry) => entry.id === id)
+                if (!cue) return
+                setCueSound(id)
+                playCue(cue, "cue sound chosen in Settings")
+            },
+        },
+        voice: {
+            // Recordings are chosen by their place in the narration queue.
+            choices: session.queue.map((track, index) => ({
+                id: String(index),
+                label: track.title,
+            })),
+            value: session.currentIndex >= 0 ? String(session.currentIndex) : null,
+            onChange: (id) => {
+                const index = Number(id)
+                if (!session.queue[index]) return
+                session.playTrack(index)
+                append(`narrator chosen in Settings → “${session.queue[index].title}”`)
+            },
+        },
+    }
     const nowPlaying = (layer: "soundscapes" | "atmosphere") => {
         const layerState = state.layers[layer]
         const current = layer === "soundscapes" ? titleFor(layerState.current) : layerState.current
@@ -395,16 +449,7 @@ function ReaderSimulation({
                                 key={cue.id}
                                 type="button"
                                 className="wk-pad"
-                                onClick={() => {
-                                    const played = mixer.playCue(cue.url, {
-                                        volume: cue.volume,
-                                        loudness: cue.loudness,
-                                    })
-                                    append(
-                                        `cue reached → playCue(“${cue.label}”)${played ? "" : " skipped"}`,
-                                        played ? "ok" : "warn"
-                                    )
-                                }}
+                                onClick={() => playCue(cue, "cue reached")}
                             >
                                 <span className="wk-pad__title">{cue.label}</span>
                                 <span className="wk-pad__sub">Sound cue</span>
@@ -498,7 +543,7 @@ function ReaderSimulation({
                 >
                     <WidthFrame width={width}>
                         <div className="wk-sen-settings" id={MIXER_VIEW_ID}>
-                            <ReaderSettingsAudio />
+                            <ReaderSettingsAudio sounds={sounds} />
                         </div>
                     </WidthFrame>
                 </Panel>

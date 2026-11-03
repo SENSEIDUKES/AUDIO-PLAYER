@@ -109,6 +109,46 @@
     box-shadow: none;
 }
 
+/* Top row: the host's lead (the help line) and the control that folds every
+   sound choice away, leaving only the sliders. */
+.sap-reader-mixer__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--_col-gap);
+    min-height: var(--_target);
+}
+.sap-reader-mixer__lead {
+    min-width: 0;
+}
+.sap-reader-mixer__lead > * {
+    margin: 0;
+}
+.sap-reader-mixer__sounds-toggle {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    min-height: var(--_target);
+    margin-inline-start: auto;
+    padding: 0 var(--sh-space-3);
+    border: 1px solid var(--_border);
+    border-radius: 999px;
+    background: none;
+    color: var(--sh-interactive-primary);
+    font: inherit;
+    font-size: var(--sh-text-xs);
+    font-weight: var(--sh-weight-semibold);
+    cursor: pointer;
+}
+.sap-reader-mixer__sounds-toggle[aria-expanded="true"] {
+    color: var(--_muted);
+}
+.sap-reader-mixer__sounds-toggle:focus-visible {
+    outline: 2px solid var(--_focus);
+    outline-offset: 2px;
+}
+
 /* A channel: name · switch · slider · percent on one line, its status and
    (for Atmosphere) the sound choice underneath. */
 .sap-reader-mixer__channel {
@@ -145,7 +185,7 @@
     grid-area: status;
     padding-bottom: var(--sh-space-2);
 }
-/* Atmosphere sound is a sub-setting of its channel: a quieter name. */
+/* A channel's sound choice is a sub-setting of it: a quieter name. */
 .sap-reader-mixer__channel > .sap-reader-mixer__choice-row > .sap-reader-mixer__name {
     color: var(--_muted);
     font-size: 12px;
@@ -153,7 +193,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
-.sap-reader-mixer__channel > .sap-reader-mixer__atmosphere {
+.sap-reader-mixer__channel > .sap-reader-mixer__sound {
     grid-template-columns: max-content minmax(0, 1fr);
     grid-area: pick;
     margin-inline: calc(var(--_row-pad) * -1);
@@ -394,13 +434,13 @@
 }
 .sap-reader-settings__help {
     margin: 0 0 6px;
+    line-height: 1.4;
     color: var(--_rs-muted);
     font-size: 12px;
-    line-height: 1.6;
 }
 /* Short phones (iPhone SE height) need every row for the controls. */
 @media (max-height: 700px) {
-    .sap-reader-settings-audio > .sap-reader-settings__help {
+    .sap-reader-settings-audio .sap-reader-mixer__lead .sap-reader-settings__help {
         display: none;
     }
 }

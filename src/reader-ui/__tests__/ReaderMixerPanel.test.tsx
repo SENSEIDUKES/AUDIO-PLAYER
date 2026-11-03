@@ -177,6 +177,92 @@ describe("ReaderMixerPanel", () => {
         expect(mixer!.getPreferences().atmosphereId).toBe("wind")
     })
 
+    it("gives every channel a sound choice row from the host", () => {
+        const picks: string[] = []
+        renderPanel({
+            sounds: {
+                soundscapes: {
+                    choices: [
+                        { id: "a1", label: "Fanfare", group: "Adventure" },
+                        { id: "f1", label: "Clash", group: "Fighting" },
+                    ],
+                    value: "a1",
+                    onChange: (id) => picks.push(`score:${id}`),
+                },
+                cues: {
+                    choices: [
+                        { id: "bell", label: "Temple bell" },
+                        { id: "growl", label: "Beast growl" },
+                    ],
+                    value: null,
+                    onChange: (id) => picks.push(`cue:${id}`),
+                },
+                voice: {
+                    choices: [{ id: "n1", label: "Story Seed" }],
+                    value: "n1",
+                    onChange: (id) => picks.push(`voice:${id}`),
+                },
+            },
+        })
+        const score = screen.getByRole("combobox", { name: "Score" })
+        expect(score).toHaveValue("a1")
+        expect(within(score).getByRole("group", { name: "Fighting" })).toBeInTheDocument()
+        fireEvent.click(screen.getByRole("button", { name: "Next Score" }))
+        expect(picks).toEqual(["score:f1"])
+
+        // Nothing chosen yet: the placeholder shows and ▶ starts at the first choice.
+        const cue = screen.getByRole("combobox", { name: "Cue sound" })
+        expect(cue).toHaveValue("")
+        expect((cue as HTMLSelectElement).selectedOptions[0]).toHaveTextContent("Choose…")
+        fireEvent.change(cue, { target: { value: "growl" } })
+        expect(picks).toEqual(["score:f1", "cue:growl"])
+
+        // A channel's sound row comes and goes with the channel itself.
+        expect(screen.queryByRole("combobox", { name: "Narrator" })).toBeNull()
+        act(() => mixer!.setLayerAvailability({ voice: true }))
+        expect(screen.getByRole("combobox", { name: "Narrator" })).toHaveValue("n1")
+        expect(screen.getByRole("combobox", { name: "Atmosphere sound" })).toBeInTheDocument()
+
+        // Each row sits under its own channel.
+        const cues = screen.getByRole("switch", { name: "Sound Cues" }).closest("li")!
+        expect(within(cues).getByRole("combobox", { name: "Cue sound" })).toBe(cue)
+    })
+
+    it("folds every sound choice away to leave only the sliders", () => {
+        const changes: boolean[] = []
+        renderPanel({
+            sounds: {
+                cues: {
+                    choices: [{ id: "bell", label: "Temple bell" }],
+                    value: "bell",
+                    onChange: () => {},
+                },
+            },
+            onSoundsOpenChange: (open) => changes.push(open),
+        })
+        const toggle = screen.getByRole("button", { name: "Hide sounds" })
+        expect(toggle).toHaveAttribute("aria-expanded", "true")
+        fireEvent.click(toggle)
+        expect(screen.queryAllByRole("combobox", { name: /sound/i })).toHaveLength(0)
+        expect(screen.getAllByRole("slider")).toHaveLength(4)
+        expect(screen.getByRole("combobox", { name: "Sleep timer" })).toBeInTheDocument()
+        expect(screen.getByRole("button", { name: "Show sounds" })).toHaveAttribute(
+            "aria-expanded",
+            "false"
+        )
+        fireEvent.click(screen.getByRole("button", { name: "Show sounds" }))
+        expect(screen.getByRole("combobox", { name: "Cue sound" })).toBeInTheDocument()
+        expect(changes).toEqual([false, true])
+    })
+
+    it("lets the host control whether the sound choices show", () => {
+        renderPanel({ soundsOpen: false })
+        expect(screen.queryByRole("combobox", { name: "Atmosphere sound" })).toBeNull()
+        // Controlled: a click reports the wish but the host decides.
+        fireEvent.click(screen.getByRole("button", { name: "Show sounds" }))
+        expect(screen.queryByRole("combobox", { name: "Atmosphere sound" })).toBeNull()
+    })
+
     it("tolerates a non-string group from untyped host data", () => {
         mixer = createReaderMixer({
             atmospheres: [

@@ -4,6 +4,9 @@ export type {
     ReaderMixerPanelProps,
     ReaderMixerLabels,
     ReaderMixerLabelOverrides,
+    ReaderChannelSoundLayer,
+    ReaderChannelSoundChoice,
+    ReaderChannelSounds,
 } from "./ReaderMixerPanel.js"
 /** The reader Settings › Audio page as SEN's reader ships it. */
 export { ReaderSettingsAudio } from "./ReaderSettingsAudio.js"
