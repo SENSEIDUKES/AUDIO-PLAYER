@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react"
 import type { CSSProperties, ReactNode } from "react"
-import { SEIField, SEIRadio, SEIRadioGroup, SEISelect, SEISlider, SEISwitch } from "@seihouse/ui"
+import { SEIRadio, SEIRadioGroup, SEISelect, SEISlider, SEISwitch } from "@seihouse/ui"
 import {
     READER_MIXER_LAYERS,
     useOptionalReaderMixer,
@@ -116,6 +116,7 @@ function MixerSwitch({
 }) {
     return (
         <SEISwitch
+            size="compact"
             isSelected={checked}
             aria-labelledby={labelledBy}
             className="sap-reader-mixer__switch"
@@ -201,9 +202,12 @@ function AtmosphereChip({ value, label }: { value: string; label: string }) {
 }
 
 /**
- * Inline controls for a {@link ReaderMixer}: a master switch, then one row
- * per layer (Soundscapes, Atmosphere, Sound Cues and connected Voice) with a switch, a volume
- * slider and its percentage, and an atmosphere picker under Atmosphere.
+ * Inline controls for a {@link ReaderMixer}, laid out mobile first: Master and
+ * each layer (Soundscapes, Atmosphere, Sound Cues and connected Voice) is one
+ * compact channel line (switch, name, volume slider, percentage), with the
+ * atmosphere choice as a key/value line under Atmosphere and the sleep timer
+ * as a key/value line at the end. Very narrow containers drop each slider to
+ * its own line.
  *
  * It renders in normal flow (never fixed or floating) so a host can place it
  * in a settings menu. Theme it with `--sap-reader-mixer-*` custom properties.
@@ -251,13 +255,25 @@ export function ReaderMixerPanel({
         presets: `${baseId}-presets`,
         group: (index: number) => `${baseId}-group-${index}`,
         pickerList: `${baseId}-atmosphere-list`,
+        sleep: `${baseId}-sleep`,
+        sleepStatus: `${baseId}-sleep-status`,
     }
+    const sleepMessage =
+        state.sleepTimer.status === "fired"
+            ? labels.sleepStopped
+            : state.sleepTimer.remainingMs !== null
+              ? labels.formatRemainingTime(state.sleepTimer.remainingMs)
+              : ""
 
     const renderPicker = (): ReactNode => {
         if (!showAtmospherePicker) return null
         const selected = preferences.atmosphereId
         return (
             <div className="sap-reader-mixer__atmosphere">
+                {/* A key/value row: the key is visual only, the button names itself. */}
+                <span className="sap-reader-mixer__atmosphere-key" aria-hidden="true">
+                    {labels.atmospherePicker}
+                </span>
                 <button
                     type="button"
                     className="sap-reader-mixer__atmosphere-summary"
@@ -266,8 +282,10 @@ export function ReaderMixerPanel({
                     aria-label={`${labels.layers.atmosphere}: ${options?.find((option) => option.id === selected)?.label ?? labels.atmosphereOff}`}
                     onClick={() => setPickerOpen((open) => !open)}
                 >
-                    {options?.find((option) => option.id === selected)?.label ??
-                        labels.atmosphereOff}
+                    <span className="sap-reader-mixer__atmosphere-value">
+                        {options?.find((option) => option.id === selected)?.label ??
+                            labels.atmosphereOff}
+                    </span>
                     <span aria-hidden="true">{pickerOpen ? "⌄" : "›"}</span>
                 </button>
                 {pickerOpen && (
@@ -374,26 +392,28 @@ export function ReaderMixerPanel({
                     </SEIRadioGroup>
                 </fieldset>
             )}
-            <div className="sap-reader-mixer__row sap-reader-mixer__row--master">
-                <span className="sap-reader-mixer__name" id={ids.master}>
-                    {labels.master}
-                </span>
-                <MixerSwitch
-                    checked={preferences.masterEnabled && state.sleepTimer.status !== "fired"}
-                    labelledBy={ids.master}
-                    onChange={(enabled) => mixer.setMasterEnabled(enabled)}
-                />
-            </div>
-            <div className="sap-reader-mixer__level">
-                <MixerSlider
-                    percent={Math.round((preferences.masterLevel ?? 1) * 100)}
-                    label={labels.volume(labels.master)}
-                    formatPercent={labels.formatPercent}
-                    onChange={(value) => mixer.setMasterLevel(value / 100)}
-                />
-                <span className="sap-reader-mixer__percent" aria-hidden="true">
-                    {labels.formatPercent(Math.round((preferences.masterLevel ?? 1) * 100))}
-                </span>
+            <div className="sap-reader-mixer__channel sap-reader-mixer__channel--master">
+                <div className="sap-reader-mixer__row sap-reader-mixer__row--master">
+                    <span className="sap-reader-mixer__name" id={ids.master}>
+                        {labels.master}
+                    </span>
+                    <MixerSwitch
+                        checked={preferences.masterEnabled && state.sleepTimer.status !== "fired"}
+                        labelledBy={ids.master}
+                        onChange={(enabled) => mixer.setMasterEnabled(enabled)}
+                    />
+                </div>
+                <div className="sap-reader-mixer__level">
+                    <MixerSlider
+                        percent={Math.round((preferences.masterLevel ?? 1) * 100)}
+                        label={labels.volume(labels.master)}
+                        formatPercent={labels.formatPercent}
+                        onChange={(value) => mixer.setMasterLevel(value / 100)}
+                    />
+                    <span className="sap-reader-mixer__percent" aria-hidden="true">
+                        {labels.formatPercent(Math.round((preferences.masterLevel ?? 1) * 100))}
+                    </span>
+                </div>
             </div>
             {!READER_MIXER_LAYERS.some((layer) => state.availability[layer]) && (
                 <p className="sap-reader-mixer__empty">{labels.noAudio}</p>
@@ -416,7 +436,7 @@ export function ReaderMixerPanel({
                     return (
                         <li
                             key={layer}
-                            className="sap-reader-mixer__layer"
+                            className="sap-reader-mixer__layer sap-reader-mixer__channel"
                             data-layer={layer}
                             data-enabled={preference.enabled ? "true" : "false"}
                             data-status={layerState.status}
@@ -464,22 +484,15 @@ export function ReaderMixerPanel({
                 <p className="sap-reader-mixer__hint">{labels.deviceVolumeHint}</p>
             )}
             <div className="sap-reader-mixer__sleep">
-                <SEIField
-                    label={labels.sleepTimer}
-                    htmlFor={`${baseId}-sleep`}
-                    helperText={
-                        <span aria-live="polite">
-                            {state.sleepTimer.status === "fired"
-                                ? labels.sleepStopped
-                                : state.sleepTimer.remainingMs !== null
-                                  ? labels.formatRemainingTime(state.sleepTimer.remainingMs)
-                                  : ""}
-                        </span>
-                    }
-                >
+                <div className="sap-reader-mixer__sleep-row">
+                    <label className="sap-reader-mixer__name" htmlFor={ids.sleep}>
+                        {labels.sleepTimer}
+                    </label>
                     <SEISelect
                         className="sap-reader-mixer__sleep-select"
-                        id={`${baseId}-sleep`}
+                        wrapperClassName="sap-reader-mixer__sleep-field"
+                        id={ids.sleep}
+                        aria-describedby={ids.sleepStatus}
                         value={
                             (state.sleepTimer.status === "running"
                                 ? state.sleepTimer.choiceId
@@ -500,16 +513,24 @@ export function ReaderMixerPanel({
                             </option>
                         ))}
                     </SEISelect>
-                </SEIField>
-                {state.sleepTimer.status === "running" && (
-                    <button
-                        className="sap-reader-mixer__sleep-cancel"
-                        type="button"
-                        onClick={() => mixer.cancelSleepTimer()}
-                    >
-                        {labels.cancelTimer}
-                    </button>
-                )}
+                </div>
+                <div
+                    className="sap-reader-mixer__sleep-status"
+                    data-empty={!sleepMessage && state.sleepTimer.status !== "running"}
+                >
+                    <span id={ids.sleepStatus} aria-live="polite">
+                        {sleepMessage}
+                    </span>
+                    {state.sleepTimer.status === "running" && (
+                        <button
+                            className="sap-reader-mixer__sleep-cancel"
+                            type="button"
+                            onClick={() => mixer.cancelSleepTimer()}
+                        >
+                            {labels.cancelTimer}
+                        </button>
+                    )}
+                </div>
             </div>
         </section>
     )

@@ -328,6 +328,14 @@ describe("ReaderMixerPanel", () => {
         expect(select).toHaveValue("chapter-end")
     })
 
+    it("describes the sleep timer with its countdown", () => {
+        renderPanel()
+        const select = screen.getByRole("combobox", { name: "Sleep timer" })
+        expect(select).toHaveAccessibleDescription("")
+        fireEvent.change(select, { target: { value: "30-minutes" } })
+        expect(select).toHaveAccessibleDescription("Stops in 30 min")
+    })
+
     it("arms translated timers, reports remaining wall-clock time, and cancels", () => {
         vi.useFakeTimers()
         renderPanel({ labels: { sleepTimer: "Stop audio", cancelTimer: "Keep playing" } })

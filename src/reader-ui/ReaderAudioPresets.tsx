@@ -13,7 +13,8 @@ export interface ReaderAudioPresetsProps {
 
 /**
  * The reader's preset choices as SEN places them: below Master and the layer
- * levels, so presets stay secondary to them, as two columns of 44px pills.
+ * levels, so presets stay secondary to them, as one segmented row of 44px
+ * pills (two columns on very narrow screens).
  */
 export function ReaderAudioPresets({
     mixer: mixerProp,
@@ -29,7 +30,7 @@ export function ReaderAudioPresets({
         <div className={["sap-reader-settings__group", className].filter(Boolean).join(" ")}>
             <fieldset className="sap-reader-settings__field" data-control="reader-audio-preset">
                 <legend className="sap-reader-settings__label">{legend}</legend>
-                <div className="sap-reader-settings__options sap-reader-settings__options--two">
+                <div className="sap-reader-settings__options sap-reader-settings__options--segmented">
                     {state.presets.map((preset) => (
                         <label key={preset.id} className="sap-reader-settings__option">
                             <input

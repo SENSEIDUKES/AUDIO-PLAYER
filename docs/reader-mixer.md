@@ -634,7 +634,7 @@ Selecting an atmosphere outside that lifetime starts a bounded audition instead.
 A preset's `preferences` may be partial:
 fields it leaves out keep the reader's current choice. `state.activePresetId`
 names the preset the current mix matches, or `null` for a custom mix, and
-`ReaderMixerPanel` shows the presets as a chip row above the master switch
+`ReaderMixerPanel` shows the presets as a segmented pill row above the master switch
 (`showPresets={false}` hides it; `labels.presets` names it). Pass `presets` to
 offer your own list and labels, for example translated ones.
 
@@ -809,11 +809,19 @@ chapter with `stopAll()` cancels any automatic Voice resume.
 
 ## Mixer view
 
-`ReaderMixerPanel` renders a soundtrack master switch, then one row per layer in use
-(Soundscapes, Atmosphere, Sound Cues, connected Voice), each with an on/off switch, a 0–100
-slider and its percentage. An atmosphere picker sits under the Atmosphere row,
-collapsed by default to a current-choice button. Expanding it reveals native
-radios with Off first and the host's options grouped by `group`.
+`ReaderMixerPanel` is laid out mobile first, so a phone sees the whole mixer
+without scrolling. Master and each layer in use (Soundscapes, Atmosphere, Sound
+Cues, connected Voice) is one compact **channel line**: on/off switch, name,
+0–100 slider and percentage. Fixed name and percentage columns keep every slider
+aligned, and a row's status message sits on a line of its own underneath. In a
+container narrower than 320px each slider drops to its own line under its name.
+
+The atmosphere choice is a key/value line under the Atmosphere channel
+("Atmosphere sound … Gentle rain ›"), collapsed by default. Expanding it reveals
+native radios drawn as wrapping pills, Off first and the host's options grouped
+by `group`. The sleep timer is a key/value line too (name, then the select),
+with its countdown and Cancel underneath; the select is described by that
+countdown.
 
 - **Inline only.** Normal document flow, no fixed positioning, so it fits in
   the Audio section of a settings menu.
@@ -831,9 +839,13 @@ radios with Off first and the host's options grouped by `group`.
     | `--sap-reader-mixer-focus` | `--sh-focus-ring` |
     | `--sap-reader-mixer-radius` / `--sap-reader-mixer-gap` / `--sap-reader-mixer-padding` | `--sh-radius-panel` / `--sh-space-4` / `--sh-space-4` |
     | `--sap-reader-mixer-target-size` | `44px`, with a 44px minimum |
+    | `--sap-reader-mixer-column-gap` | `10px` |
+    | `--sap-reader-mixer-name-width` / `--sap-reader-mixer-percent-width` | `6.75rem` / `3.25rem` |
     | `--sap-reader-mixer-font` | inherited |
 
-- **Mobile first.** Designed for 390px, with every switch, slider and chip at least 44px tall.
+- **Mobile first.** Designed for 390px (Master, four layers, the atmosphere and
+  timer lines and the presets fit in under 500px), with every switch, slider
+  and chip at least 44px tall.
 - **Accessible.** Switches are native inputs with `role="switch"` named by their row;
   sliders are native range inputs named "Soundscapes volume" and so on, with the
   percentage as their value text; the picker is a native radio group in a
@@ -850,9 +862,12 @@ radios with Off first and the host's options grouped by `group`.
 
 `ReaderSettingsAudio` (reader-ui entry, 5.1.0) is the Audio tab of SEN's Reader
 Settings in one piece: a help line, then `ReaderMixerPanel` without its title or
-radio presets, then `ReaderAudioPresets` (the presets as two columns of 44px
-pills, placed under the levels so they stay secondary to them), then any
-`children` the host adds, such as SEN's scene and soundtrack chooser.
+radio presets, then `ReaderAudioPresets` (the presets as one segmented row of
+44px pills, two columns under 300px, placed under the levels so they stay
+secondary to them), then any `children` the host adds, such as SEN's scene and
+soundtrack chooser. The page is one flat sheet: inside it the panel and the
+presets drop their own card backgrounds and borders and are divided by
+hairlines instead, so there is never a card inside the sheet's card.
 
 ```tsx
 <ReaderSettingsAudio showAtmospherePicker={!hostPicksAtmosphere}>
