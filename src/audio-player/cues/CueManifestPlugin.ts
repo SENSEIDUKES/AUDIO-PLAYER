@@ -27,6 +27,12 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
     private generation = 0
     private target: EventTarget | null = null
     private playing = false
+    /**
+     * A new track loaded while the previous one was playing. The engine's playing flag is
+     * stale until its state re-renders, so cues stay inactive until playback of the new
+     * source is actually confirmed (an onPlay hook, or the media element reporting it).
+     */
+    private awaitingStart = false
     private clock: ReturnType<typeof setInterval> | null = null
     /** Where the next play window begins: track start, pause position, or last seek target. */
     private resumeFrom: number | null = 0
@@ -69,6 +75,7 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
     /** Invalidate asynchronous work before best-effort cleanup so replacement can always continue. */
     private cleanup() {
         ++this.generation
+        this.awaitingStart = false
         this.stopClock()
         const abort = this.abortController
         const runtime = this.runtime
@@ -109,7 +116,17 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
         return context?.getEngine().isSeeking === true || !!context?.getAudioElement()?.seeking
     }
 
+    /** The media element is really playing the (new) source. False without an element. */
+    private mediaStarted(): boolean {
+        const element = this.context?.getAudioElement()
+        return !!element && !element.paused && element.readyState >= 2 && !element.seeking
+    }
+
     private poll(fallback?: number) {
+        if (this.awaitingStart && this.mediaStarted()) {
+            this.onPlay()
+            return
+        }
         if (!this.runtime || !this.playing || this.isSeekPending()) return
         const position = this.readPosition(fallback)
         if (position !== undefined) this.runtime.handleTimeUpdate(position)
@@ -207,7 +224,10 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
         this.resumeFrom = 0
         if (!track || !this.context) return
         const generation = this.generation
-        if (this.readIsPlaying()) this.playing = true
+        // Never carry the previous track's playing state over: wait for the new source.
+        this.playing = false
+        this.awaitingStart = this.readIsPlaying()
+        if (this.awaitingStart) this.startClock()
 
         if (track.cueManifest) {
             this.install(track.cueManifest)
@@ -236,6 +256,7 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
 
     /** Start (or resume) the play window at the live position; cues at that moment fire now. */
     onPlay(): PluginHookResult {
+        this.awaitingStart = false
         this.playing = true
         if (!this.runtime) return
         this.runtime.setPlaying(true, this.startPosition())
@@ -245,6 +266,7 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
 
     /** Catch up to the pause position, then stop timing: nothing fires while paused. */
     onPause(): PluginHookResult {
+        this.awaitingStart = false
         this.poll()
         this.resumeFrom = this.readPosition() ?? this.resumeFrom
         this.playing = false

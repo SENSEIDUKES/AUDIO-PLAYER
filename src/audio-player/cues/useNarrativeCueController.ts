@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
+import type { ReaderMixer } from "../narrative/ReaderMixer"
 import type { UseNarrativeAudioOptions } from "../narrative/useNarrativeAudio"
 import { useAudioSessionCueTarget, useOptionalAudioSession } from "../session/AudioSessionContext"
 import type { CueAction } from "./cueTypes"
@@ -23,6 +24,12 @@ export interface UseNarrativeCueControllerOptions {
      * cue channel, or `window` outside a provider.
      */
     eventTarget?: EventTarget
+    /**
+     * The same reader mixer you pass to `useNarrativeAudio`. With it, narration lives on the
+     * mixer's Voice level, so `volume.fadeNarration` starts from that level instead of the
+     * session volume (which would jump the first step).
+     */
+    mixer?: ReaderMixer | null
 }
 
 const FADE_STEP_MS = 50
@@ -41,7 +48,9 @@ const clamp01 = (value: number) => Math.max(0, Math.min(1, value))
  * See `CUE_ACTION_SUPPORT`.
  */
 export function useNarrativeCueController(options: UseNarrativeCueControllerOptions = {}) {
-    const { eventTarget } = options
+    const { eventTarget, mixer } = options
+    const mixerRef = useRef(mixer)
+    mixerRef.current = mixer
     const sessionTarget = useAudioSessionCueTarget()
     const session = useOptionalAudioSession()
     const sessionVolumeRef = useRef(session?.volume)
@@ -76,9 +85,16 @@ export function useNarrativeCueController(options: UseNarrativeCueControllerOpti
             setState((s) => ({ ...s, narrationVolume: value }))
         }
         const fadeNarration = (target: number, durationMs: number) => {
+            const ramping = fadeTimerRef.current !== null
             stopFade()
             const to = clamp01(target)
-            const from = narrationVolumeRef.current ?? sessionVolumeRef.current ?? to
+            // Mid-ramp, continue from our own last value; otherwise start from the level the
+            // listener currently hears (mixer Voice, else session volume).
+            const live =
+                mixerRef.current?.getState().preferences.layers.voice.level ??
+                sessionVolumeRef.current
+            const from =
+                (ramping ? narrationVolumeRef.current : live) ?? narrationVolumeRef.current ?? to
             if (!(durationMs > 0) || from === to) {
                 setNarrationVolume(to)
                 return

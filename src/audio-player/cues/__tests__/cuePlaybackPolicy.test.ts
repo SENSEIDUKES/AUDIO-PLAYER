@@ -361,9 +361,50 @@ describe("CueManifestPlugin playback clock", () => {
 
         h.position.value = 0
         plugin.onTrackLoad(track(manifestOf(cue("b", 1)), "two"))
+        plugin.onPlay() // the new source started playing
         h.position.value = 6
         vi.advanceTimersByTime(100)
         expect(h.fired).toEqual(["b"]) // "a" belonged to the previous track
+        plugin.destroy()
+    })
+
+    it("does not activate a new track's cues from the previous track's stale playing flag", () => {
+        const h = harness()
+        const plugin = createCueManifestPlugin()
+        plugin.init(h.context)
+        plugin.onTrackLoad(track(manifestOf(cue("a", 5)), "one"))
+        h.engine.isPlaying = true
+        plugin.onPlay()
+
+        // Track change: the engine flag has not re-rendered yet and the new source is loading.
+        plugin.onTrackLoad(track(manifestOf(cue("zero", 0)), "two"))
+        h.position.value = 0.02
+        vi.advanceTimersByTime(1000)
+        expect(h.fired).toEqual([])
+
+        plugin.onPlay() // playback of the new source confirmed
+        expect(h.fired).toEqual(["zero"])
+        plugin.destroy()
+    })
+
+    it("confirms a new source from the media element when no play hook arrives", () => {
+        const element = { paused: true, readyState: 0, seeking: false }
+        const h = harness({ getAudioElement: () => element as unknown as HTMLAudioElement })
+        const plugin = createCueManifestPlugin()
+        plugin.init(h.context)
+        plugin.onTrackLoad(track(manifestOf(cue("a", 5)), "one"))
+        h.engine.isPlaying = true
+        plugin.onPlay()
+
+        plugin.onTrackLoad(track(manifestOf(cue("zero", 0)), "two"))
+        vi.advanceTimersByTime(500)
+        expect(h.fired).toEqual([]) // still loading
+
+        element.paused = false
+        element.readyState = 4
+        h.position.value = 0.03
+        vi.advanceTimersByTime(100)
+        expect(h.fired).toEqual(["zero"])
         plugin.destroy()
     })
 

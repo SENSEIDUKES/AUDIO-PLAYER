@@ -10,6 +10,7 @@ import { useNarrativeCueController } from "../useNarrativeCueController"
 import type { CueAction, CueManifest } from "../cueTypes"
 import type { PluginPlayerContext, PluginSoundScope } from "../../core/plugins/PluginInterface"
 import type { Track } from "../../types"
+import type { ReaderMixer } from "../../narrative/ReaderMixer"
 import { flushMicrotasks } from "../../narrative/__tests__/fakeMedia"
 
 const sceneManifest: CueManifest = {
@@ -118,11 +119,14 @@ describe("narrative cue actions", () => {
         vi.restoreAllMocks()
     })
 
-    function mountController() {
+    function mountController(options: Parameters<typeof useNarrativeCueController>[0] = {}) {
         const wrapper = ({ children }: { children: ReactNode }) =>
             createElement(AudioSessionProvider, null, children)
         return renderHook(
-            () => ({ controller: useNarrativeCueController(), target: useAudioSessionCueTarget() }),
+            () => ({
+                controller: useNarrativeCueController(options),
+                target: useAudioSessionCueTarget(),
+            }),
             { wrapper }
         )
     }
@@ -187,6 +191,29 @@ describe("narrative cue actions", () => {
             vi.advanceTimersByTime(600)
         })
         expect(result.current.controller.narrativeOptions.narrationVolume).toBeCloseTo(0.2)
+    })
+
+    it("starts a narration fade from the mixer's Voice level, not the session volume", () => {
+        const mixer = {
+            getState: () => ({ preferences: { layers: { voice: { level: 0.2 } } } }),
+        } as unknown as ReaderMixer
+        const { result } = mountController({ mixer })
+
+        send(result.current.target!, {
+            command: "volume.fadeNarration",
+            volume: 0,
+            durationMs: 1000,
+        })
+        act(() => {
+            vi.advanceTimersByTime(50)
+        })
+        const first = result.current.controller.narrativeOptions.narrationVolume!
+        expect(first).toBeLessThanOrEqual(0.2) // session volume (1) would have jumped to ~0.95
+        expect(first).toBeGreaterThan(0.1)
+        act(() => {
+            vi.advanceTimersByTime(1100)
+        })
+        expect(result.current.controller.narrativeOptions.narrationVolume).toBeCloseTo(0)
     })
 
     it("leaves spatial.pan unclaimed so the runtime reports it as unhandled", () => {
