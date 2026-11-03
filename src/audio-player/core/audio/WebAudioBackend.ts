@@ -7,7 +7,21 @@ import type {
     AudioBackendKind,
 } from "./AudioBackend"
 import { DEFAULT_PLAYBACK_RATE, sanitizePlaybackRate } from "./AudioBackend"
-import { sharedAudioBufferCache, sharedAudioStorageCache } from "./audioCaches"
+import {
+    getAudioCacheRevision,
+    sharedAudioBufferCache,
+    sharedAudioStorageCache,
+} from "./audioCaches"
+import {
+    AudioResourceLimitError,
+    decodedBytes,
+    estimateWavDecodedBytes,
+    getAudioResourcePolicy,
+    readBoundedAudio,
+    trackActiveAudioBuffer,
+    withAudioLoad,
+    type AudioLoadJob,
+} from "./audioResources"
 import { retainAudioContext, type AudioContextLease } from "./sharedAudioContext"
 
 export const WEBAUDIO_CAPABILITIES = {
@@ -75,6 +89,8 @@ function getAudioContextCtor(): typeof AudioContext | undefined {
  *
  * A monotonic `generation` invalidates every in-flight fetch/decode/play when
  * the source changes — the backend-level mirror of the hook's playbackToken.
+ * A separate playback token lets pause cancel pending play without cancelling
+ * the download or discarding its decoded buffer.
  */
 export class WebAudioBackend implements AudioBackend {
     readonly kind: AudioBackendKind = "webaudio"
@@ -98,6 +114,7 @@ export class WebAudioBackend implements AudioBackend {
     private loopFlag = false
     private lastError: AudioBackendErrorCode | null = null
     private generation = 0
+    private playbackToken = 0
     /** Invalidates `source.onended` from nodes we stopped on purpose. */
     private sourceToken = 0
     private loadPromise: Promise<void> | null = null
@@ -208,6 +225,7 @@ export class WebAudioBackend implements AudioBackend {
 
     private failLoad(code: AudioBackendErrorCode, url: string): void {
         this.buffer = null
+        trackActiveAudioBuffer(this, null)
         this.lastError = code
         this.state = "error"
         // Evict so a retry() → load() genuinely re-fetches.
@@ -215,30 +233,35 @@ export class WebAudioBackend implements AudioBackend {
         this.emit("error")
     }
 
-    private async decodeArrayBuffer(
-        data: ArrayBuffer,
-        url: string,
-        gen: number,
-        reportErrors = true
-    ): Promise<AudioBuffer | null> {
+    /** Preflight known sizes and validate decoded PCM before adopting or caching it. */
+    private async decodeArrayBuffer(data: ArrayBuffer, job: AudioLoadJob): Promise<AudioBuffer> {
+        if (data.byteLength > job.policy.maxEncodedBytes) throw new AudioResourceLimitError()
+        const ctx = this.ensureContext()
+        const estimate = estimateWavDecodedBytes(data, ctx.sampleRate)
+        if (estimate !== null && estimate > job.policy.maxDecodedBytes)
+            throw new AudioResourceLimitError()
+        job.encodedBytes = data.byteLength * 2
+        job.decoding = true
         try {
-            // decodeAudioData works on a suspended context; no gesture needed.
-            const buffer = await this.ensureContext().decodeAudioData(data.slice(0))
-            if (gen !== this.generation) return null
-            this.cachePut(url, buffer)
+            // The decoder consumes its input; retain the original for a successful disk write.
+            const buffer = await ctx.decodeAudioData(data.slice(0))
+            if (decodedBytes(buffer) > job.policy.maxDecodedBytes)
+                throw new AudioResourceLimitError()
             return buffer
-        } catch {
-            if (gen !== this.generation) return null
-            if (reportErrors) this.failLoad("decode", url)
-            return null
+        } finally {
+            job.decoding = false
+            job.encodedBytes = data.byteLength
         }
     }
 
+    /** Fetch a bounded body and suppress failures belonging to cancelled source generations. */
     private async fetchNetworkArrayBuffer(
         url: string,
         gen: number,
+        job: AudioLoadJob,
         reportErrors = true,
-        signal?: AbortSignal
+        signal?: AbortSignal,
+        reload = false
     ): Promise<ArrayBuffer | null> {
         const abort = signal ? null : new AbortController()
         const fetchSignal = signal ?? abort?.signal
@@ -247,55 +270,116 @@ export class WebAudioBackend implements AudioBackend {
             const response = await fetch(url, {
                 mode: "cors",
                 signal: fetchSignal,
+                ...(reload ? { cache: "reload" as const } : {}),
             })
             if (gen !== this.generation || fetchSignal?.aborted) return null
             if (!response.ok) {
                 if (reportErrors) this.failLoad("src-not-supported", url)
                 return null
             }
-            const data = await response.arrayBuffer()
+            const data = await readBoundedAudio(
+                response,
+                job.policy.maxEncodedBytes,
+                fetchSignal,
+                (bytes) => {
+                    job.encodedBytes = bytes
+                }
+            )
             if (gen !== this.generation || fetchSignal?.aborted) return null
             return data
         } catch (error: unknown) {
             if (gen !== this.generation) return null
             if (error instanceof Error && error.name === "AbortError") return null
             // Includes CORS rejections, which surface as opaque network errors.
-            if (reportErrors) this.failLoad("network", url)
+            if (reportErrors)
+                this.failLoad(
+                    error instanceof AudioResourceLimitError ? "src-not-supported" : "network",
+                    url
+                )
             return null
         } finally {
             if (abort && this.fetchAbort === abort) this.fetchAbort = null
         }
     }
 
+    /** Load memory/disk/network in order, recovering corrupt disk bytes once within a load slot. */
     private async loadBufferWaterfall(
         url: string,
         gen: number,
         reportErrors = true,
         signal?: AbortSignal
     ): Promise<AudioBuffer | null> {
+        const revision = getAudioCacheRevision()
         const memoryHit = this.cacheTouch(url)
-        if (memoryHit) return memoryHit
-
-        const diskHit = await sharedAudioStorageCache.getArrayBuffer(url)
-        if (gen !== this.generation || signal?.aborted) return null
-        if (diskHit) return this.decodeArrayBuffer(diskHit, url, gen, reportErrors)
-
-        const networkData = await this.fetchNetworkArrayBuffer(url, gen, reportErrors, signal)
-        if (!networkData || gen !== this.generation || signal?.aborted) return null
-        const buffer = await this.decodeArrayBuffer(networkData, url, gen, reportErrors)
-        if (buffer) void sharedAudioStorageCache.putArrayBuffer(url, networkData)
-        return buffer
+        if (memoryHit && decodedBytes(memoryHit) <= getAudioResourcePolicy().maxDecodedBytes)
+            return memoryHit
+        const current = () => gen === this.generation && !signal?.aborted
+        return withAudioLoad(async (job) => {
+            if (!current()) return null
+            try {
+                let retryingDisk = false
+                // Reserve for a disk read too; the bounded reader limits actual bytes.
+                job.encodedBytes = job.policy.maxEncodedBytes * 2
+                const diskHit = await sharedAudioStorageCache.getArrayBuffer(
+                    url,
+                    job.policy.maxEncodedBytes
+                )
+                job.encodedBytes = diskHit?.byteLength ?? 0
+                if (!current()) return null
+                if (diskHit) {
+                    try {
+                        const buffer = await this.decodeArrayBuffer(diskHit, job)
+                        if (!current()) return null
+                        if (revision === getAudioCacheRevision()) this.cachePut(url, buffer)
+                        return buffer
+                    } catch (error) {
+                        if (!current()) return null
+                        if (error instanceof AudioResourceLimitError) throw error
+                        await sharedAudioStorageCache.delete(url)
+                        if (!current()) return null
+                        // Bad cached bytes get exactly one fresh network attempt.
+                        retryingDisk = true
+                    }
+                }
+                job.encodedBytes = 0
+                const networkData = await this.fetchNetworkArrayBuffer(
+                    url,
+                    gen,
+                    job,
+                    reportErrors,
+                    signal,
+                    retryingDisk
+                )
+                if (!networkData || !current()) return null
+                const buffer = await this.decodeArrayBuffer(networkData, job)
+                if (!current()) return null
+                if (revision === getAudioCacheRevision()) {
+                    this.cachePut(url, buffer)
+                    // Hold the concurrency slot until Cache API has consumed the encoded bytes.
+                    job.encodedBytes = networkData.byteLength * 2
+                    await sharedAudioStorageCache.putArrayBuffer(url, networkData)
+                }
+                return current() ? buffer : null
+            } catch (error) {
+                if (current() && reportErrors)
+                    this.failLoad(
+                        error instanceof AudioResourceLimitError ? "src-not-supported" : "decode",
+                        url
+                    )
+                return null
+            }
+        })
     }
 
     private async fetchAndDecode(url: string, gen: number): Promise<void> {
         const buffer = await this.loadBufferWaterfall(url, gen)
-        if (buffer && gen === this.generation) this.completeLoad(url, buffer)
+        if (buffer && gen === this.generation) this.completeLoad(buffer)
     }
 
     /** Adopt a decoded buffer as the active source and announce readiness. */
-    private completeLoad(url: string, buffer: AudioBuffer): void {
+    private completeLoad(buffer: AudioBuffer): void {
         this.buffer = buffer
-        this.cachePut(url, buffer)
+        trackActiveAudioBuffer(this, buffer)
         this.state = "ready"
         this.emit("loadedmetadata")
         this.emit("progress")
@@ -316,7 +400,7 @@ export class WebAudioBackend implements AudioBackend {
         const buffer = await pending
         if (gen !== this.generation) return
         if (buffer) {
-            this.completeLoad(url, buffer)
+            this.completeLoad(buffer)
             return
         }
         await this.fetchAndDecode(url, gen)
@@ -353,10 +437,12 @@ export class WebAudioBackend implements AudioBackend {
         this.state = "playing"
     }
 
+    /** Resume and await loading, starting a source only while this playback request remains valid. */
     private async playInternal(): Promise<void> {
         if (!this.srcUrl) {
             throw namedError("NotSupportedError", "No audio source set.")
         }
+        const token = this.playbackToken
         const ctx = this.ensureContext()
         // Kick off the load before any await so the download starts inside the
         // user gesture's synchronous window.
@@ -364,6 +450,16 @@ export class WebAudioBackend implements AudioBackend {
             this.load()
         }
         const gen = this.generation
+        const assertCurrentPlayback = () => {
+            if (gen !== this.generation || token !== this.playbackToken) {
+                throw namedError(
+                    "AbortError",
+                    "Playback cancelled or source changed during play()."
+                )
+            }
+        }
+        // load() emits synchronous events whose listeners can pause playback.
+        assertCurrentPlayback()
 
         let resumed = false
         try {
@@ -372,22 +468,19 @@ export class WebAudioBackend implements AudioBackend {
         } catch {
             resumed = false
         }
+        // A stale request must not release a newer play request's demand or
+        // report a cancelled resume as an autoplay failure.
+        assertCurrentPlayback()
         // resume() can resolve while the context stays suspended (no gesture);
         // treat that as autoplay-blocked so the hook's affordance shows.
         if (!resumed || ctx.state !== "running") {
             void this.contextLease?.setActive(false).catch(() => {})
             throw namedError("NotAllowedError", "AudioContext requires a user gesture to start.")
         }
-        if (gen !== this.generation) {
-            throw namedError("AbortError", "Source changed during play().")
-        }
-
         if (!this.buffer) {
             this.emit("waiting")
             await this.loadPromise
-            if (gen !== this.generation) {
-                throw namedError("AbortError", "Source changed during play().")
-            }
+            assertCurrentPlayback()
             if (!this.buffer) {
                 void this.contextLease?.setActive(false).catch(() => {})
                 throw namedError("NotSupportedError", "Audio failed to load or decode.")
@@ -399,6 +492,7 @@ export class WebAudioBackend implements AudioBackend {
         // Like the html5 element, playing an ended track restarts it.
         const duration = this.buffer.duration
         const startAt = this.state === "ended" || this.offset >= duration ? 0 : this.offset
+        assertCurrentPlayback()
         this.startSource(startAt)
         this.emit("play")
         this.emit("playing")
@@ -417,18 +511,21 @@ export class WebAudioBackend implements AudioBackend {
         this.stopSourceNode()
         this.srcUrl = next
         this.buffer = null
+        trackActiveAudioBuffer(this, null)
         this.offset = 0
         this.lastError = null
         this.loadPromise = null
         this.state = "idle"
     }
 
+    /** Replace the current load generation and reuse eligible memory or preload results. */
     load(): void {
         this.generation += 1
         const gen = this.generation
         this.abortFetch()
         this.stopSourceNode()
         this.buffer = null
+        trackActiveAudioBuffer(this, null)
         this.offset = 0
         this.lastError = null
         this.emit("loadstart")
@@ -439,8 +536,8 @@ export class WebAudioBackend implements AudioBackend {
             return
         }
         const cached = this.cacheTouch(url)
-        if (cached) {
-            this.completeLoad(url, cached)
+        if (cached && decodedBytes(cached) <= getAudioResourcePolicy().maxDecodedBytes) {
+            this.completeLoad(cached)
             this.loadPromise = Promise.resolve()
             return
         }
@@ -459,10 +556,14 @@ export class WebAudioBackend implements AudioBackend {
         return this.playInternal()
     }
 
+    /** Cancel pending playback and stop an active source without cancelling its buffer load. */
     pause(): void {
-        if (this.state !== "playing") return
-        this.offset = this.getCurrentTime()
+        this.playbackToken += 1
+        const wasPlaying = this.state === "playing"
+        if (wasPlaying) this.offset = this.getCurrentTime()
+        // Pending play owns context demand even before a source node exists.
         this.stopSourceNode()
+        if (!wasPlaying) return
         this.state = "paused"
         this.emit("pause")
     }
@@ -637,6 +738,7 @@ export class WebAudioBackend implements AudioBackend {
         this.releasePreload()
         sharedAudioBufferCache.clear()
         this.buffer = null
+        trackActiveAudioBuffer(this, null)
         this.offset = 0
         this.lastError = null
         this.loadPromise = null

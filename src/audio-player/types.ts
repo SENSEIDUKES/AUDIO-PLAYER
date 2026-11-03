@@ -590,6 +590,14 @@ export interface PlayerEventPayload {
 }
 
 export interface CacheStats {
+    /** Buffers retained by WebAudioBackend instances, including paused buffers; overlaps cache bytes. */
+    activeBufferBytes?: number
+    /** Encoded bytes and transient copies; disk reads reserve their maximum until complete. */
+    inFlightEncodedBytes?: number
+    /** Policy reservation, not a measured native decoder allocation or hard heap cap. */
+    decodingReservedBytes?: number
+    activeLoads?: number
+    queuedLoads?: number
     decodedBufferCount: number
     decodedBufferBytes: number
     preloadElementCount: number

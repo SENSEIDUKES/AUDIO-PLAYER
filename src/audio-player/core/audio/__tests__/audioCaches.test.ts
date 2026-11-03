@@ -7,6 +7,12 @@ import {
     sharedAudioBufferCache,
     sharedAudioStorageCache,
 } from "../audioCaches"
+import {
+    configureAudioResources,
+    getAudioResourcePolicy,
+    getAudioResourceStats,
+} from "../audioResources"
+import { invalidateAudioCache } from "../audioCaches"
 import { WebAudioBackend, WEBAUDIO_CAPABILITIES } from "../WebAudioBackend"
 
 function fakeBuffer(id: string): AudioBuffer {
@@ -219,7 +225,10 @@ describe("AudioStorageCache", () => {
 
     it("reads cached audio as an ArrayBuffer", async () => {
         const data = new ArrayBuffer(4)
-        const match = vi.fn(async () => new Response(data))
+        const match = vi.fn(
+            async () =>
+                new Response(data, { headers: { "X-SEI-Audio-Saved": Date.now().toString() } })
+        )
         const open = vi.fn(async () => ({ match }))
         Object.defineProperty(globalThis, "caches", {
             configurable: true,
@@ -473,5 +482,158 @@ describe("WebAudioBackend cache integration", () => {
         backend.destroy()
 
         expect(sharedAudioBufferCache.get("song.mp3")).toBeNull()
+    })
+})
+
+describe("Web Audio cache recovery and resource admission", () => {
+    const defaults = getAudioResourcePolicy()
+    afterEach(() => configureAudioResources(defaults))
+
+    it("preserves healthy disk bytes when the decoded-size policy rejects them", async () => {
+        configureAudioResources({ maxDecodedBytes: 8 })
+        installWebAudioContext(async () => sizedBuffer(12))
+        vi.spyOn(sharedAudioStorageCache, "getArrayBuffer").mockResolvedValue(new ArrayBuffer(1))
+        const remove = vi.spyOn(sharedAudioStorageCache, "delete").mockResolvedValue()
+        globalThis.fetch = vi.fn()
+        const backend = createWebAudioBackend()
+        backend.setSource("offline.mp3")
+        backend.load()
+        await (backend as unknown as { loadPromise: Promise<void> }).loadPromise
+        expect(backend.getError()).toBe("src-not-supported")
+        expect(remove).not.toHaveBeenCalled()
+        expect(fetch).not.toHaveBeenCalled()
+        configureAudioResources({ maxDecodedBytes: 16 })
+        backend.load()
+        await (backend as unknown as { loadPromise: Promise<void> }).loadPromise
+        expect(backend.getDecodedData()).not.toBeNull()
+        expect(backend.getError()).toBeNull()
+        expect(fetch).not.toHaveBeenCalled()
+        backend.destroy()
+    })
+
+    it("evicts corrupt disk bytes and retries network once without emitting a recoverable error", async () => {
+        const decoded = fakeBuffer("fresh")
+        const context = installWebAudioContext(async () => decoded)
+        context.decodeAudioData.mockRejectedValueOnce(new Error("bad disk bytes"))
+        vi.spyOn(sharedAudioStorageCache, "getArrayBuffer").mockResolvedValue(new ArrayBuffer(4))
+        const remove = vi.spyOn(sharedAudioStorageCache, "delete").mockResolvedValue()
+        const put = vi.spyOn(sharedAudioStorageCache, "putArrayBuffer").mockResolvedValue()
+        globalThis.fetch = vi.fn(async () => new Response(new Uint8Array([1, 2])))
+        const backend = createWebAudioBackend()
+        const error = vi.fn()
+        backend.addEventListener("error", error)
+        backend.setSource("repaired.mp3")
+        backend.load()
+        await (backend as unknown as { loadPromise: Promise<void> }).loadPromise
+        expect(remove).toHaveBeenCalledWith("repaired.mp3")
+        expect(fetch).toHaveBeenCalledTimes(1)
+        expect(fetch).toHaveBeenCalledWith(
+            "repaired.mp3",
+            expect.objectContaining({ cache: "reload" })
+        )
+        expect(context.decodeAudioData).toHaveBeenCalledTimes(2)
+        expect(put).toHaveBeenCalledOnce()
+        expect(error).not.toHaveBeenCalled()
+        expect(backend.getDecodedData()).toBe(decoded)
+        backend.destroy()
+    })
+
+    it("reports one terminal error when fresh bytes also fail decoding", async () => {
+        installWebAudioContext(async () => {
+            throw new Error("bad bytes")
+        })
+        vi.spyOn(sharedAudioStorageCache, "getArrayBuffer").mockResolvedValue(new ArrayBuffer(4))
+        vi.spyOn(sharedAudioStorageCache, "delete").mockResolvedValue()
+        globalThis.fetch = vi.fn(async () => new Response(new Uint8Array([1])))
+        const backend = createWebAudioBackend()
+        const error = vi.fn()
+        backend.addEventListener("error", error)
+        backend.setSource("broken.mp3")
+        backend.load()
+        await (backend as unknown as { loadPromise: Promise<void> }).loadPromise
+        expect(fetch).toHaveBeenCalledOnce()
+        expect(error).toHaveBeenCalledOnce()
+        expect(backend.getError()).toBe("decode")
+        backend.destroy()
+    })
+
+    it("bounds concurrent preloads through decode and does not cache a cancelled decode", async () => {
+        configureAudioResources({ maxConcurrentLoads: 1 })
+        let finish!: (buffer: AudioBuffer) => void
+        const context = installWebAudioContext(
+            () =>
+                new Promise((resolve) => {
+                    finish = resolve
+                })
+        )
+        vi.spyOn(sharedAudioStorageCache, "getArrayBuffer").mockResolvedValue(null)
+        vi.spyOn(sharedAudioStorageCache, "putArrayBuffer").mockResolvedValue()
+        globalThis.fetch = vi.fn(async () => new Response(new Uint8Array([1, 2, 3])))
+        const first = createWebAudioBackend()
+        const second = createWebAudioBackend()
+        first.preload("first.mp3")
+        second.preload("second.mp3")
+        await vi.waitFor(() => expect(context.decodeAudioData).toHaveBeenCalledOnce())
+        expect(fetch).toHaveBeenCalledOnce()
+        expect(getAudioResourceStats()).toMatchObject({
+            activeLoads: 1,
+            queuedLoads: 1,
+            inFlightEncodedBytes: 6,
+            decodingReservedBytes: defaults.maxDecodedBytes,
+        })
+        first.releasePreload()
+        second.releasePreload()
+        finish(fakeBuffer("cancelled"))
+        await vi.waitFor(() => expect(getAudioResourceStats().activeLoads).toBe(0))
+        expect(getAudioResourceStats().queuedLoads).toBe(0)
+        expect(fetch).toHaveBeenCalledOnce()
+        expect(sharedAudioBufferCache.has("first.mp3")).toBe(false)
+        first.destroy()
+        second.destroy()
+    })
+
+    it("rejects an oversized decoded buffer before cache insertion or playback adoption", async () => {
+        configureAudioResources({ maxDecodedBytes: 8 })
+        installWebAudioContext(async () => sizedBuffer(12))
+        vi.spyOn(sharedAudioStorageCache, "getArrayBuffer").mockResolvedValue(null)
+        const put = vi.spyOn(sharedAudioStorageCache, "putArrayBuffer").mockResolvedValue()
+        globalThis.fetch = vi.fn(async () => new Response(new Uint8Array([1])))
+        const backend = createWebAudioBackend()
+        backend.setSource("large.mp3")
+        backend.load()
+        await (backend as unknown as { loadPromise: Promise<void> }).loadPromise
+        expect(backend.getError()).toBe("src-not-supported")
+        expect(backend.getDecodedData()).toBeNull()
+        expect(sharedAudioBufferCache.has("large.mp3")).toBe(false)
+        expect(put).not.toHaveBeenCalled()
+        expect(getAudioResourceStats().inFlightEncodedBytes).toBe(0)
+        backend.destroy()
+    })
+
+    it("tracks resident buffers separately and prevents invalidated work from repopulating caches", async () => {
+        let finish!: (buffer: AudioBuffer) => void
+        const context = installWebAudioContext(
+            () =>
+                new Promise((resolve) => {
+                    finish = resolve
+                })
+        )
+        vi.spyOn(sharedAudioStorageCache, "getArrayBuffer").mockResolvedValue(null)
+        vi.spyOn(sharedAudioStorageCache, "delete").mockResolvedValue()
+        const put = vi.spyOn(sharedAudioStorageCache, "putArrayBuffer").mockResolvedValue()
+        globalThis.fetch = vi.fn(async () => new Response(new Uint8Array([1])))
+        const backend = createWebAudioBackend()
+        backend.setSource("replaced.mp3")
+        backend.load()
+        await vi.waitFor(() => expect(context.decodeAudioData).toHaveBeenCalledOnce())
+        await invalidateAudioCache("replaced.mp3")
+        finish(sizedBuffer(16))
+        await (backend as unknown as { loadPromise: Promise<void> }).loadPromise
+        expect(sharedAudioBufferCache.has("replaced.mp3")).toBe(false)
+        expect(put).not.toHaveBeenCalled()
+        expect(getAudioResourceStats().activeBufferBytes).toBe(16)
+        backend.clearSource()
+        expect(getAudioResourceStats().activeBufferBytes).toBe(0)
+        backend.destroy()
     })
 })

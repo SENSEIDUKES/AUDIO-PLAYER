@@ -563,3 +563,16 @@ export type {
     SpatialAudioState,
 } from "./types"
 export type { NarrativeFaceProps } from "./skins/NarrativeFace"
+
+export {
+    configureAudioResources,
+    getAudioResourcePolicy,
+    recommendAudioBackend,
+} from "./core/audio/audioResources"
+export type { AudioResourcePolicy } from "./core/audio/audioResources"
+export {
+    invalidateAudioCache,
+    configureAudioCacheRetention,
+    getAudioCacheStats,
+} from "./core/audio/audioCaches"
+export type { AudioCacheRetention } from "./core/audio/audioCaches"

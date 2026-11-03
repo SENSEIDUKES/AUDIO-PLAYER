@@ -23,7 +23,7 @@ import { usePluginManager } from "../core/plugins/usePluginManager"
 import { usePluginSoundLayer } from "../core/audio/usePluginSoundLayer"
 import { trackKey } from "../utils/trackKey"
 import { getTrackSources, getPrimaryTrackSource, trackSourcesSignature } from "../utils/sources"
-import { sharedAudioBufferCache, sharedHTML5AudioPool } from "../core/audio/audioCaches"
+import { sharedAudioBufferCache, getAudioCacheStats } from "../core/audio/audioCaches"
 
 const AudioSessionContext = createContext<SessionEngine | null>(null)
 export interface AudioTimeValue {
@@ -811,14 +811,7 @@ export function AudioSessionProvider({
     const canNext = stepIndex(currentIndex, 1) !== null
     const canPrevious = queue.length > 1 || engine.currentTime > 3
 
-    const getCacheStats = useCallback(() => {
-        const stats = sharedAudioBufferCache.getStats()
-        const html5Stats = sharedHTML5AudioPool.getStats()
-        return {
-            ...stats,
-            preloadElementCount: html5Stats.preloadElementCount,
-        }
-    }, [])
+    const getCacheStats = useCallback(() => getAudioCacheStats(), [])
 
     const pruneAudioCache = useCallback(
         (keepRecent = 0) => {
