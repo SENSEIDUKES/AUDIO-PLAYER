@@ -5,6 +5,7 @@ import type {
 } from "../core/plugins/PluginInterface"
 import type { ReaderMixer } from "../narrative/ReaderMixer"
 import type { Track } from "../types"
+import { trackKey } from "../utils/trackKey"
 import { CueRuntime, notifyCue, resolveCueEventTarget, type CueRuntimeOptions } from "./cueRuntime"
 import {
     formatCueManifestIssue,
@@ -33,6 +34,9 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
      * source is actually confirmed (an onPlay hook, or the media element reporting it).
      */
     private awaitingStart = false
+    /** Identity of the source last loaded, to tell a metadata refresh from a new source. */
+    private loadedSource: string | null = null
+    private loadedManifest: { inline: unknown; url: unknown } | null = null
     private clock: ReturnType<typeof setInterval> | null = null
     /** Where the next play window begins: track start, pause position, or last seek target. */
     private resumeFrom: number | null = 0
@@ -58,6 +62,8 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
         this.target = null
         this.stopClock()
         this.playing = false
+        this.loadedSource = null
+        this.loadedManifest = null
         try {
             this.cleanup()
         } finally {
@@ -220,14 +226,42 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
 
     /** Install the newest inline or fetched manifest; superseded fetch completions are ignored. */
     onTrackLoad(track: Track | null): PluginHookResult {
+        const source =
+            track && this.context ? `${this.context.getSourceKey()}|${trackKey(track)}` : null
+        // The host re-runs this for any new Track object. When the source is unchanged
+        // (a metadata refresh) playback never restarts, so no new play event will arrive:
+        // keep the playing state and, if the manifest is the same, the running runtime.
+        const refresh = source !== null && source === this.loadedSource
+        if (
+            refresh &&
+            track &&
+            this.loadedManifest?.inline === track.cueManifest &&
+            this.loadedManifest?.url === track.cueManifestUrl
+        ) {
+            return
+        }
+        const wasAwaiting = this.awaitingStart
         this.cleanup()
-        this.resumeFrom = 0
-        if (!track || !this.context) return
+        this.loadedSource = source
+        this.loadedManifest = track
+            ? { inline: track.cueManifest, url: track.cueManifestUrl }
+            : null
+        if (!track || !this.context) {
+            this.resumeFrom = 0
+            return
+        }
         const generation = this.generation
-        // Never carry the previous track's playing state over: wait for the new source.
-        this.playing = false
-        this.awaitingStart = this.readIsPlaying()
+        if (refresh) {
+            this.resumeFrom = null // continue from the live position
+            this.awaitingStart = wasAwaiting
+        } else {
+            // Never carry the previous track's playing state over: wait for the new source.
+            this.resumeFrom = 0
+            this.playing = false
+            this.awaitingStart = this.readIsPlaying()
+        }
         if (this.awaitingStart) this.startClock()
+        else if (this.playing && refresh) this.startClock()
 
         if (track.cueManifest) {
             this.install(track.cueManifest)
@@ -300,6 +334,8 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
     }
 
     onStop(): PluginHookResult {
+        this.loadedSource = null
+        this.loadedManifest = null
         this.cleanup()
     }
 }

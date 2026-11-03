@@ -387,6 +387,33 @@ describe("CueManifestPlugin playback clock", () => {
         plugin.destroy()
     })
 
+    it("keeps cues running when only the track object is refreshed (same source)", () => {
+        const h = harness({ getSourceKey: () => "0:id:t:/voice.mp3" })
+        const plugin = createCueManifestPlugin()
+        plugin.init(h.context)
+        const manifest = manifestOf(cue("a", 1), cue("b", 5))
+        plugin.onTrackLoad(track(manifest))
+        h.engine.isPlaying = true
+        plugin.onPlay()
+        h.position.value = 2
+        vi.advanceTimersByTime(100)
+        expect(h.fired).toEqual(["a"])
+
+        // playNow() with a refreshed object for the playing track: same source, same
+        // manifest, no restart and therefore no new play event (e.g. Web Audio).
+        plugin.onTrackLoad({ ...track(manifest) })
+        h.position.value = 6
+        vi.advanceTimersByTime(100)
+        expect(h.fired).toEqual(["a", "b"]) // "a" is not replayed, "b" still fires
+
+        // A refresh that changes the manifest swaps the runtime but stays active.
+        plugin.onTrackLoad(track(manifestOf(cue("c", 7))))
+        h.position.value = 8
+        vi.advanceTimersByTime(100)
+        expect(h.fired).toEqual(["a", "b", "c"])
+        plugin.destroy()
+    })
+
     it("confirms a new source from the media element when no play hook arrives", () => {
         const element = { paused: true, readyState: 0, seeking: false }
         const h = harness({ getAudioElement: () => element as unknown as HTMLAudioElement })

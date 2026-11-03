@@ -135,7 +135,7 @@ matter.
 | **Pause** | Catches up to the pause position, then stops timing. Seeks while paused only reposition; cues with `fireOnSeek` wait and fire when playback resumes. |
 | **Seek** | Cues at or behind the target are consumed without firing, unless `fireOnSeek`. Replayable cues at or after the target re-arm. Samples are ignored while the engine reports a seek in progress. |
 | **Rewind / loop** (position jumps back without a seek) | Replayable cues at or after the new position re-arm and can fire again. Non-replayable cues never repeat. Backward jitter under 0.1 s is ignored. |
-| **Track change** | The previous manifest's runtime is disposed before the next track's cues are installed; late completions cannot fire old cues. The new track's cues stay inactive until its source is confirmed playing (the player's play event, or the media element reporting it), so a source that is still loading or fails never fires zero-time cues. |
+| **Track change** | The previous manifest's runtime is disposed before the next track's cues are installed; late completions cannot fire old cues. The new track's cues stay inactive until its source is confirmed playing (the player's play event, or the media element reporting it), so a source that is still loading or fails never fires zero-time cues. A same-source metadata refresh (for example `playNow` with a refreshed track object) is not a track change: the runtime keeps running, or is swapped without interrupting playback if the manifest changed. |
 | **Track end** | Every remaining cue up to the track's end fires once, then timing stops. The plugin never claims the end-of-track advance. |
 
 Background behavior depends on the browser: audio keeps playing, but timers on a
