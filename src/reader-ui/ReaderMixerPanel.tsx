@@ -35,6 +35,9 @@ export interface ReaderMixerLabels {
     formatRemainingTime: (remainingMs: number) => string
     /** Shown where the browser ignores volume and sliders act as on/off. */
     deviceVolumeHint: string
+    /** Accessible names of a choice row's ◀ and ▶ buttons; receive the row's name. */
+    previous: (rowLabel: string) => string
+    next: (rowLabel: string) => string
     /** Row messages for statuses worth telling the reader about. */
     status: Readonly<Partial<Record<ReaderMixerLayerStatus, string>>>
 }
@@ -65,6 +68,8 @@ export const DEFAULT_READER_MIXER_LABELS: ReaderMixerLabels = Object.freeze({
     sleepStopped: "Stopped by sleep timer",
     formatRemainingTime: (remainingMs: number) => `Stops in ${Math.ceil(remainingMs / 60000)} min`,
     deviceVolumeHint: "Volume is set by your device on this browser",
+    previous: (rowLabel: string) => `Previous ${rowLabel}`,
+    next: (rowLabel: string) => `Next ${rowLabel}`,
     status: Object.freeze({
         loading: "Loading…",
         blocked: "Tap anywhere to start audio",
@@ -174,6 +179,93 @@ function MixerSlider({
     )
 }
 
+interface StepperOption {
+    value: string
+    label: string
+}
+
+/**
+ * A choice row's control: ◀ and ▶ step through the choices in place, and the
+ * native select between them opens the device's own picker for a direct jump.
+ * The row never expands, so the menu keeps its height.
+ */
+function ChoiceStepper({
+    id,
+    rowLabel,
+    value,
+    options,
+    groups,
+    labels,
+    describedBy,
+    onChange,
+}: {
+    id: string
+    rowLabel: string
+    value: string
+    /** Every choice in stepping order. */
+    options: readonly StepperOption[]
+    /** Optional grouping for the native picker; defaults to `options` ungrouped. */
+    groups?: readonly { name: string | null; options: readonly StepperOption[] }[]
+    labels: ReaderMixerLabels
+    describedBy?: string
+    onChange: (value: string) => void
+}) {
+    const index = options.findIndex((option) => option.value === value)
+    const step = (delta: number) => {
+        const next = options[index + delta]
+        if (next) onChange(next.value)
+    }
+    return (
+        <div className="sap-reader-mixer__stepper">
+            <button
+                type="button"
+                className="sap-reader-mixer__step"
+                aria-label={labels.previous(rowLabel)}
+                disabled={index <= 0}
+                onClick={() => step(-1)}
+            >
+                <span aria-hidden="true">◀</span>
+            </button>
+            <SEISelect
+                className="sap-reader-mixer__stepper-select"
+                wrapperClassName="sap-reader-mixer__stepper-field"
+                id={id}
+                aria-describedby={describedBy}
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+            >
+                {index < 0 && <option value={value} disabled hidden />}
+                {(groups ?? [{ name: null, options }]).map((group) =>
+                    group.name === null ? (
+                        group.options.map((option) => (
+                            <option key={option.value} value={option.value}>
+                                {option.label}
+                            </option>
+                        ))
+                    ) : (
+                        <optgroup key={group.name} label={group.name}>
+                            {group.options.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </optgroup>
+                    )
+                )}
+            </SEISelect>
+            <button
+                type="button"
+                className="sap-reader-mixer__step"
+                aria-label={labels.next(rowLabel)}
+                disabled={index < 0 || index >= options.length - 1}
+                onClick={() => step(1)}
+            >
+                <span aria-hidden="true">▶</span>
+            </button>
+        </div>
+    )
+}
+
 /** Group host choices in catalog order, placing ungrouped choices before named groups. */
 function groupAtmospheres(options: readonly ReaderAtmosphereOption[]): AtmosphereGroup[] {
     const groups: AtmosphereGroup[] = []
@@ -230,7 +322,6 @@ export function ReaderMixerPanel({
     const baseId = useId()
     const options = atmospheres ?? state?.atmosphereOptions
     const groups = useMemo(() => groupAtmospheres(options ?? []), [options])
-    const [pickerOpen, setPickerOpen] = useState(false)
     const [focusedLayer, setFocusedLayer] = useState<ReaderMixerLayer | null>(null)
     const [draggingLayer, setDraggingLayer] = useState<ReaderMixerLayer | null>(null)
     useEffect(() => {
@@ -251,10 +342,8 @@ export function ReaderMixerPanel({
         title: `${baseId}-title`,
         master: `${baseId}-master`,
         layer: (layer: ReaderMixerLayer) => `${baseId}-${layer}`,
-        picker: `${baseId}-atmosphere`,
+        picker: `${baseId}-atmosphere-sound`,
         presets: `${baseId}-presets`,
-        group: (index: number) => `${baseId}-group-${index}`,
-        pickerList: `${baseId}-atmosphere-list`,
         sleep: `${baseId}-sleep`,
         sleepStatus: `${baseId}-sleep-status`,
     }
@@ -267,88 +356,42 @@ export function ReaderMixerPanel({
 
     const renderPicker = (): ReactNode => {
         if (!showAtmospherePicker) return null
-        const selected = preferences.atmosphereId
+        // Off first, then the host's choices in catalog order (ungrouped first).
+        const off: StepperOption = { value: "null", label: labels.atmosphereOff }
+        const toOption = (option: ReaderAtmosphereOption): StepperOption => ({
+            value: JSON.stringify(option.id),
+            label: option.label,
+        })
+        const pickerGroups = [
+            {
+                name: null,
+                options: [
+                    off,
+                    ...(groups[0]?.name === null ? groups[0].options.map(toOption) : []),
+                ],
+            },
+            ...groups
+                .filter((group) => group.name !== null)
+                .map((group) => ({ name: group.name, options: group.options.map(toOption) })),
+        ]
         return (
-            <div className="sap-reader-mixer__atmosphere">
-                {/* A key/value row: the key is visual only, the button names itself. */}
-                <span className="sap-reader-mixer__atmosphere-key" aria-hidden="true">
+            <div className="sap-reader-mixer__atmosphere sap-reader-mixer__choice-row">
+                <label className="sap-reader-mixer__name" htmlFor={ids.picker}>
                     {labels.atmospherePicker}
-                </span>
-                <button
-                    type="button"
-                    className="sap-reader-mixer__atmosphere-summary"
-                    aria-expanded={pickerOpen}
-                    aria-controls={ids.pickerList}
-                    aria-label={`${labels.layers.atmosphere}: ${options?.find((option) => option.id === selected)?.label ?? labels.atmosphereOff}`}
-                    onClick={() => setPickerOpen((open) => !open)}
-                >
-                    <span className="sap-reader-mixer__atmosphere-value">
-                        {options?.find((option) => option.id === selected)?.label ??
-                            labels.atmosphereOff}
-                    </span>
-                    <span aria-hidden="true">{pickerOpen ? "⌄" : "›"}</span>
-                </button>
-                {pickerOpen && (
-                    <fieldset className="sap-reader-mixer__picker" id={ids.pickerList}>
-                        <legend
-                            className="sap-reader-mixer__picker-legend"
-                            id={`${ids.picker}-legend`}
-                        >
-                            {labels.atmospherePicker}
-                        </legend>
-                        <SEIRadioGroup
-                            name={ids.picker}
-                            aria-labelledby={`${ids.picker}-legend`}
-                            value={JSON.stringify(selected)}
-                            onChange={(value) =>
-                                mixer.setAtmosphere(
-                                    options?.find(
-                                        (option) => JSON.stringify(option.id) === value
-                                    ) ?? null
-                                )
-                            }
-                            className="sap-reader-mixer__choices"
-                        >
-                            <div className="sap-reader-mixer__chips">
-                                <AtmosphereChip value="null" label={labels.atmosphereOff} />
-                                {groups[0]?.name === null &&
-                                    groups[0].options.map((option) => (
-                                        <AtmosphereChip
-                                            key={option.id}
-                                            value={JSON.stringify(option.id)}
-                                            label={option.label}
-                                        />
-                                    ))}
-                            </div>
-                            {groups.map((group, index) =>
-                                group.name === null ? null : (
-                                    <div
-                                        key={group.name}
-                                        className="sap-reader-mixer__group"
-                                        role="group"
-                                        aria-labelledby={ids.group(index)}
-                                    >
-                                        <span
-                                            className="sap-reader-mixer__group-name"
-                                            id={ids.group(index)}
-                                        >
-                                            {group.name}
-                                        </span>
-                                        <div className="sap-reader-mixer__chips">
-                                            {group.options.map((option) => (
-                                                <AtmosphereChip
-                                                    key={option.id}
-                                                    value={JSON.stringify(option.id)}
-                                                    label={option.label}
-                                                />
-                                            ))}
-                                        </div>
-                                    </div>
-                                )
-                            )}
-                        </SEIRadioGroup>
-                    </fieldset>
-                )}
+                </label>
+                <ChoiceStepper
+                    id={ids.picker}
+                    rowLabel={labels.atmospherePicker}
+                    value={JSON.stringify(preferences.atmosphereId)}
+                    options={pickerGroups.flatMap((group) => group.options)}
+                    groups={pickerGroups}
+                    labels={labels}
+                    onChange={(value) =>
+                        mixer.setAtmosphere(
+                            options?.find((option) => JSON.stringify(option.id) === value) ?? null
+                        )
+                    }
+                />
             </div>
         )
     }
@@ -484,15 +527,13 @@ export function ReaderMixerPanel({
                 <p className="sap-reader-mixer__hint">{labels.deviceVolumeHint}</p>
             )}
             <div className="sap-reader-mixer__sleep">
-                <div className="sap-reader-mixer__sleep-row">
+                <div className="sap-reader-mixer__sleep-row sap-reader-mixer__choice-row">
                     <label className="sap-reader-mixer__name" htmlFor={ids.sleep}>
                         {labels.sleepTimer}
                     </label>
-                    <SEISelect
-                        className="sap-reader-mixer__sleep-select"
-                        wrapperClassName="sap-reader-mixer__sleep-field"
+                    <ChoiceStepper
                         id={ids.sleep}
-                        aria-describedby={ids.sleepStatus}
+                        rowLabel={labels.sleepTimer}
                         value={
                             (state.sleepTimer.status === "running"
                                 ? state.sleepTimer.choiceId
@@ -500,19 +541,14 @@ export function ReaderMixerPanel({
                             state.sleepTimerChoices.find((choice) => choice.kind === "off")?.id ??
                             ""
                         }
-                        onChange={(event) => mixer.setSleepTimer(event.target.value)}
-                    >
-                        {!state.sleepTimerChoices.some((choice) => choice.kind === "off") && (
-                            <option value="" disabled>
-                                {labels.cancelTimer}
-                            </option>
-                        )}
-                        {state.sleepTimerChoices.map((choice) => (
-                            <option key={choice.id} value={choice.id}>
-                                {choice.label}
-                            </option>
-                        ))}
-                    </SEISelect>
+                        options={state.sleepTimerChoices.map((choice) => ({
+                            value: choice.id,
+                            label: choice.label,
+                        }))}
+                        labels={labels}
+                        describedBy={ids.sleepStatus}
+                        onChange={(value) => mixer.setSleepTimer(value)}
+                    />
                 </div>
                 <div
                     className="sap-reader-mixer__sleep-status"

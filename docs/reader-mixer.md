@@ -235,7 +235,7 @@ choice saves it and plays a **10 second** preview with **1 second** fades at bot
 ends, then returns to silence. Changing choice replaces the preview; Off,
 page hiding and disposal cancel it. `atmospherePreviewMs` and
 `atmospherePreviewFadeMs` override those durations. Preview does not open a
-chapter. The collapsed choice button expands the native grouped radio picker.
+chapter. The Atmosphere sound row steps through the choices with ◀ and ▶, or jumps through its grouped native select.
 Reader-facing UI contains no score/cue/voice preview or catalog.
 
 ## Sleep, music rests and activity
@@ -809,25 +809,32 @@ chapter with `stopAll()` cancels any automatic Voice resume.
 
 ## Mixer view
 
-`ReaderMixerPanel` is laid out mobile first, so a phone sees the whole mixer
-without scrolling. Master and each layer in use (Soundscapes, Atmosphere, Sound
-Cues, connected Voice) is one compact **channel line**: on/off switch, name,
-0–100 slider and percentage. Fixed name and percentage columns keep every slider
-aligned, and a row's status message sits on a line of its own underneath. In a
-container narrower than 320px each slider drops to its own line under its name.
+`ReaderMixerPanel` is an **options table** laid out mobile first, so a phone sees
+the whole mixer on one screen without scrolling. Every setting is one strip, its
+name on the left and its control on the right; the strip in use gets an accent
+frame. Nothing expands: choices step in place, so the menu keeps its height.
 
-The atmosphere choice is a key/value line under the Atmosphere channel
-("Atmosphere sound … Gentle rain ›"), collapsed by default. Expanding it reveals
-native radios drawn as wrapping pills, Off first and the host's options grouped
-by `group`. The sleep timer is a key/value line too (name, then the select),
-with its countdown and Cancel underneath; the select is described by that
-countdown.
+- **Channels.** Master and each layer in use (Soundscapes, Atmosphere, Sound
+  Cues, connected Voice) is one line: name, on/off switch, 0–100 slider and
+  percentage. Fixed columns keep every slider aligned; a row's status message
+  sits under it.
+- **Choice rows.** The atmosphere sound (a quieter sub-row of the Atmosphere
+  strip) and the sleep timer are `name ◀ value ▶` rows. ◀ and ▶ step through
+  the choices and dim at either end; the value between them is a native
+  select, so a tap opens the device's own picker for a direct jump. The
+  atmosphere picker lists Off first, then the host's options in `<optgroup>`s
+  by `group`. While a timer runs, its countdown and Cancel sit under its row,
+  and the select is described by the countdown.
+- **Narrow phones.** In a container narrower than 340px every row stays one
+  line: the name column narrows and the percentage hides (the slider still
+  announces its value).
 
 - **Inline only.** Normal document flow, no fixed positioning, so it fits in
   the Audio section of a settings menu.
 - **Host-owned catalog.** `atmospheres` (or the mixer's catalog) supplies the options; the view only displays them.
 - **Labels.** `labels` overrides every string, including `volume(layerLabel)`,
-  `formatPercent(percent)`, row status messages and the device-volume hint.
+  `formatPercent(percent)`, row status messages, the device-volume hint and the
+  ◀/▶ button names `previous(rowLabel)` and `next(rowLabel)`.
   `DEFAULT_READER_MIXER_LABELS` lists them all.
 - **Theme.** Set these custom properties on the panel (via `style` or CSS):
 
@@ -841,15 +848,19 @@ countdown.
     | `--sap-reader-mixer-target-size` | `44px`, with a 44px minimum |
     | `--sap-reader-mixer-column-gap` | `10px` |
     | `--sap-reader-mixer-name-width` / `--sap-reader-mixer-percent-width` | `6.75rem` / `3.25rem` |
+    | `--sap-reader-mixer-name-width-narrow` | `5.75rem`, under 340px |
+    | `--sap-reader-mixer-row-bg` / `--sap-reader-mixer-row-radius` | 5% of the text color / `10px` |
+    | `--sap-reader-mixer-row-gap` / `--sap-reader-mixer-row-padding` | `3px` / `10px` |
     | `--sap-reader-mixer-font` | inherited |
 
-- **Mobile first.** Designed for 390px (Master, four layers, the atmosphere and
-  timer lines and the presets fit in under 500px), with every switch, slider
-  and chip at least 44px tall.
+- **Mobile first.** Designed for 390px: the whole Settings › Audio page (Master,
+  four layers, the atmosphere and timer rows and the presets) is about 410px
+  tall, with every switch, slider, arrow and pill at least 44px tall.
 - **Accessible.** Switches are native inputs with `role="switch"` named by their row;
   sliders are native range inputs named "Soundscapes volume" and so on, with the
-  percentage as their value text; the picker is a native radio group in a
-  `fieldset`; row status messages are polite live regions. Transitions are
+  percentage as their value text; the atmosphere and sleep timer choices are
+  native selects named by their row, with named ◀/▶ buttons; row status
+  messages are polite live regions. Transitions are
   removed under `prefers-reduced-motion: reduce`.
 - **Tokens.** Style switch, slider, select and radio colors through universal
   `--sh-*` tokens such as `--sh-interactive-primary`, `--sh-progress-track`,
@@ -862,10 +873,11 @@ countdown.
 
 `ReaderSettingsAudio` (reader-ui entry, 5.1.0) is the Audio tab of SEN's Reader
 Settings in one piece: a help line, then `ReaderMixerPanel` without its title or
-radio presets, then `ReaderAudioPresets` (the presets as one segmented row of
-44px pills, two columns under 300px, placed under the levels so they stay
+radio presets, then `ReaderAudioPresets` (the presets as one more strip: its
+name, then a segmented row of 44px pills, placed under the levels so they stay
 secondary to them), then any `children` the host adds, such as SEN's scene and
-soundtrack chooser. The page is one flat sheet: inside it the panel and the
+soundtrack chooser. On short screens (700px or less) the help line hides so
+every row fits. The page is one flat sheet: inside it the panel and the
 presets drop their own card backgrounds and borders and are divided by
 hairlines instead, so there is never a card inside the sheet's card.
 
