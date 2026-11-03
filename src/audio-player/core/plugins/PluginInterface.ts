@@ -8,15 +8,27 @@ import type {
 /** Restricted sound-effects surface for Vault Radio and plugin-layer sounds. */
 export interface PluginSoundLayer {
     /** Load one sprite pack whose manifest maps names to offset/duration clips. */
-    loadSpritePack: (manifest: AudioSpriteManifest) => Promise<void>
+    loadSpritePack: (manifest: AudioSpriteManifest, pack?: string) => Promise<void>
     /** Play a named clip and return its active instance id, or null when unavailable. */
-    playSprite: (clipName: string, options?: AudioSpritePlayOptions) => AudioSpriteInstanceId | null
+    playSprite: (
+        clipName: string,
+        options?: AudioSpritePlayOptions & { pack?: string }
+    ) => AudioSpriteInstanceId | null
     /** Stop one active sprite instance by id. */
     stopSprite: (id: AudioSpriteInstanceId) => void
     /** Fade one active sprite instance to a target volume over the given duration. */
     fadeSprite: (id: AudioSpriteInstanceId, toVolume: number, durationMs: number) => void
-    /** Stop every active plugin/Vault Radio sprite instance. */
+    /** Stop every instance owned by this facade or scope; other scopes are independent. */
     stopAllSprites: () => void
+    /** Acquire an isolated named-pack lifetime. The caller must dispose it. */
+    createScope?: () => PluginSoundScope
+    /** Reason for the latest rejected play, when supplied by a policy-aware host. */
+    getLastSkipReason?: () => string | undefined
+}
+
+/** One manifest's sounds; disposing it never stops another plugin's sounds. */
+export interface PluginSoundScope extends PluginSoundLayer {
+    dispose: () => void
 }
 
 /** Playback/control surface exposed to plugins without coupling them to React. */

@@ -1,32 +1,51 @@
-import { useEffect, useMemo, useRef } from "react"
+import { useEffect, useMemo } from "react"
 import { AudioSpriteEngine } from "./AudioSpriteEngine"
-import type { PluginSoundLayer } from "../plugins/PluginInterface"
+import type { PluginSoundLayer, PluginSoundScope } from "../plugins/PluginInterface"
+import { cleanupSounds, createPluginSoundScope } from "./pluginSoundScope"
 
-/**
- * Creates the restricted sprite facade passed to plugins. One engine is shared
- * by the player/session so plugin-layer sounds never touch primary playback.
- */
+/** Stable facade with commit-owned resources, including Strict Mode effect replay. */
 export function usePluginSoundLayer(): PluginSoundLayer {
-    const engineRef = useRef<AudioSpriteEngine | null>(null)
-    if (engineRef.current === null) engineRef.current = new AudioSpriteEngine()
-
-    useEffect(
-        () => () => {
-            engineRef.current?.dispose()
-            engineRef.current = null
-        },
-        []
-    )
-
-    return useMemo<PluginSoundLayer>(
-        () => ({
-            loadSpritePack: (manifest) => engineRef.current!.load(manifest),
-            playSprite: (clipName, options) => engineRef.current!.play(clipName, options),
-            stopSprite: (id) => engineRef.current!.stop(id),
-            fadeSprite: (id, toVolume, durationMs) =>
-                engineRef.current!.fade(id, toVolume, durationMs),
-            stopAllSprites: () => engineRef.current!.stopAll(),
-        }),
-        []
-    )
+    const lifetime = useMemo(() => {
+        let active = false
+        let primary: PluginSoundScope | null = null
+        const scopes = new Set<PluginSoundScope>()
+        const createOwnedScope = (bounded: boolean) => {
+            if (!active) throw new DOMException("Sound layer inactive", "AbortError")
+            const scope = createPluginSoundScope(
+                bounded ? undefined : () => new AudioSpriteEngine(),
+                () => scopes.delete(scope)
+            )
+            scopes.add(scope)
+            return scope
+        }
+        const layer: PluginSoundLayer = {
+            createScope: () => createOwnedScope(true),
+            loadSpritePack: async (manifest, pack) => {
+                primary ??= createOwnedScope(false)
+                return primary.loadSpritePack(manifest, pack)
+            },
+            playSprite: (clip, options) => primary?.playSprite(clip, options) ?? null,
+            stopSprite: (id) => primary?.stopSprite(id),
+            fadeSprite: (id, volume, duration) => primary?.fadeSprite(id, volume, duration),
+            stopAllSprites: () => primary?.stopAllSprites(),
+        }
+        return {
+            layer,
+            setup() {
+                active = true
+            },
+            cleanup() {
+                active = false
+                primary = null
+                const owned = [...scopes]
+                scopes.clear()
+                cleanupSounds(owned.map((scope) => () => scope.dispose()))
+            },
+        }
+    }, [])
+    useEffect(() => {
+        lifetime.setup()
+        return () => lifetime.cleanup()
+    }, [lifetime])
+    return lifetime.layer
 }

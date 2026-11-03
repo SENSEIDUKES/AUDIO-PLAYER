@@ -80,6 +80,31 @@ describe("AudioSpriteEngine", () => {
         vi.restoreAllMocks()
     })
 
+    it("does not acquire a context or decode a late response after disposal", async () => {
+        let finish!: (response: Response) => void
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(
+                () =>
+                    new Promise<Response>((resolve) => {
+                        finish = resolve
+                    })
+            )
+        )
+        const engine = new AudioSpriteEngine()
+        const pending = engine.load({
+            src: "/late.wav",
+            clips: { chime: { offset: 0, duration: 1 } },
+        })
+        await Promise.resolve()
+        engine.dispose()
+        finish(new Response(new Uint8Array(12)))
+        await expect(pending).rejects.toMatchObject({ name: "AbortError" })
+        expect(AudioContext).not.toHaveBeenCalled()
+        expect(context.decodeAudioData).not.toHaveBeenCalled()
+        expect(engine.play("chime")).toBeNull()
+    })
+
     it("loads one pack and plays named clips by offset and duration", async () => {
         const engine = new AudioSpriteEngine()
 

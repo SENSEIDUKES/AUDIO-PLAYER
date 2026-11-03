@@ -185,6 +185,14 @@ export class LayerGainGraph<Layer extends string> {
         }
     }
 
+    /** Attach a decoded sprite output to the same limited bus as media cues. */
+    connectSource(layer: Layer, source: AudioNode): void {
+        const bus = this.buses.get(layer)
+        if (this.closed || !bus || source.context !== this.ctx)
+            throw new Error("Cue output graph unavailable")
+        source.connect(bus)
+    }
+
     setLayerGain(layer: Layer, value: number): void {
         const bus = this.buses.get(layer)
         if (bus) this.setParam(bus.gain, value)

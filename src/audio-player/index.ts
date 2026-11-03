@@ -36,7 +36,11 @@ export { AnalyticsPlugin, createAnalyticsPlugin } from "./plugins/AnalyticsPlugi
 export { LyricsPlugin, createLyricsPlugin } from "./plugins/LyricsPlugin"
 export { SleepTimerPlugin, createSleepTimerPlugin } from "./plugins/SleepTimerPlugin"
 export { WaveformPlugin, createWaveformPlugin } from "./plugins/WaveformPlugin"
-export { CueManifestPlugin, createCueManifestPlugin } from "./cues/CueManifestPlugin"
+export {
+    CueManifestPlugin,
+    createCueManifestPlugin,
+    createReaderMixerCuePlugin,
+} from "./cues/CueManifestPlugin"
 export { validateCueManifest } from "./cues/cueManifestSchema"
 export { CueRuntime } from "./cues/cueRuntime"
 export { useNarrativeCueController } from "./cues/useNarrativeCueController"
@@ -419,6 +423,7 @@ export type {
     PluginHookResult,
     PluginPlayerContext,
     PluginSoundLayer,
+    PluginSoundScope,
 } from "./core/plugins/PluginInterface"
 export type {
     AudioSpriteClipDefinition,
@@ -426,6 +431,7 @@ export type {
     AudioSpriteInstanceInfo,
     AudioSpriteManifest,
     AudioSpritePlayOptions,
+    AudioSpriteEngineOptions,
 } from "./core/audio/AudioSpriteEngine"
 export type {
     AudioBackend,
@@ -576,3 +582,10 @@ export {
     getAudioCacheStats,
 } from "./core/audio/audioCaches"
 export type { AudioCacheRetention } from "./core/audio/audioCaches"
+
+export type {
+    CueRuntimeOptions,
+    CueStatusEvent,
+    CueOutcomeEvent,
+    CuePackState,
+} from "./cues/cueRuntime"

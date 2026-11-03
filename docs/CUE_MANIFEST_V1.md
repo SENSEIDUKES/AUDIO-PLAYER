@@ -117,3 +117,51 @@ Fires an arbitrary event back to the host UI using a string signature matching w
   ]
 }
 ```
+
+
+## Runtime readiness and replacement
+
+Each installed manifest owns a sound scope. `sprite.play.pack` selects that exact
+named pack; clip names may repeat across packs. Only referenced play packs preload.
+By default at most four valid referenced packs are admitted in manifest cue order;
+additional packs report `failed` with a pack-limit message and are never queued.
+Set `maxSpritePacks` in the plugin/runtime options to a positive safe integer to
+choose a different per-manifest budget; invalid values use four. With the default
+64 MiB decoded-per-asset limit, this bounds retained pack buffers to 256 MiB per
+runtime (not a whole-process heap cap). Split large manifests rather than raising
+the limit without a memory budget. Loads share the audio resource concurrency
+limit (two by default). Decoded packs
+also obey the encoded/decoded byte limits; element packs stream instead of decoding
+the whole asset. Element preloads have a 12-second readiness deadline.
+
+Pack states are `loading`, `ready`, and `failed`. **A trigger while its pack is
+loading or failed is skipped immediately.** It is never replayed when the pack
+becomes ready. A later explicit trigger can play; time cues retain their existing
+`replayable`/`fireOnSeek` rules. Non-audio actions in the same cue still execute.
+
+`createCueManifestPlugin({ onStatus, onOutcome })` accepts optional observers.
+`onStatus` reports installation, per-pack readiness/failure, and cleanup failures.
+`onOutcome` reports each action with manifest/cue/pack/clip identifiers. `accepted`
+means an instance was allocated; `started` means its playback start was observed,
+not proof that a listener heard it. Skips include `pack-loading`, `pack-failed`,
+`missing-asset`, and playback/policy rejection reasons. Asynchronous playback
+failures are reported separately. Observer exceptions cannot stop playback.
+
+Replacement, stop and destruction retire the runtime before releasing sounds.
+Late fetch/decode completions cannot install or revive it. Cleanup is idempotent,
+isolated per sound, and safe before or after the session sound layer is disposed.
+React development Strict Mode is supported. Keep plugin arrays stable during a
+session; create a new plugin instance for a new keyed session.
+
+Custom `PluginSoundLayer` implementations can implement `createScope()` to return
+a disposable `PluginSoundScope` supporting named packs. Existing single-pack
+facades still work; multi-pack use without this capability reports a failure
+instead of silently choosing the first pack. A custom layer owns cancellation of
+its own asynchronous work; implementing scopes is recommended for replacement.
+
+## Reader-owned story cues
+
+Use `createReaderMixerCuePlugin(mixer, options)` instead of the standalone factory
+when a reader's controls should govern the sounds. See the integration example in
+[Reader mixer](./reader-mixer.md#story-manifest-integration). The standalone factory
+does not discover a surrounding mixer automatically.

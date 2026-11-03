@@ -169,11 +169,11 @@ export const WORKSHOP_ENTRIES: readonly WorkshopEntry[] = [
             "Check a cue list and apply it",
             "Time cues fire during playback; story cues fire by scene, tension or chapter",
             "Cues drive a live NarrativeFace bar (the older narrator face, kept for this test)",
-            "Sound-effect cues play from a stand-in sound pack (on the built site)",
+            "Named sound packs preload; skipped cues report their reason in the event log",
         ],
         placeholders: [
             "The sound pack is a stand-in cut from the sample track; no real cue sound packs exist yet",
-            "Known bug: on the local dev server, a cue list with a sound pack stops every cue. Built sites are not affected.",
+            "Element-route sprite boundaries are not sample-accurate; physical iPhone listening remains a separate check.",
         ],
         sources: [
             "src/audio-player/cues/CueManifestPlugin.ts",
