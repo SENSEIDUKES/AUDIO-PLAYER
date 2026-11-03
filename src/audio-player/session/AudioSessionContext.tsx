@@ -38,6 +38,7 @@ const DEFAULT_AUDIO_TIME: AudioTimeValue = {
     buffered: 0,
 }
 
+const AudioSessionCueTargetContext = createContext<EventTarget | null>(null)
 const AudioTimeContext = createContext<AudioTimeValue>(DEFAULT_AUDIO_TIME)
 const AudioTimeProviderContext = createContext(false)
 const EMPTY_PLUGINS: readonly AudioPlayerPlugin[] = []
@@ -103,7 +104,11 @@ export function AudioSessionProvider({
     sourceResolver,
     onFallbackSource,
     preloadConfig,
+    cueEventTarget: cueEventTargetProp,
 }: AudioSessionProviderProps) {
+    // One private channel per provider unless the host supplies one; stable for its lifetime.
+    const [ownCueEventTarget] = useState<EventTarget>(() => new EventTarget())
+    const cueEventTarget = cueEventTargetProp ?? ownCueEventTarget
     const [queue, setQueueState] = useState<Track[]>(initialQueue)
     const [currentIndex, setCurrentIndex] = useState<number>(
         sanitizeInitialIndex(initialIndex, initialQueue.length)
@@ -441,6 +446,15 @@ export function AudioSessionProvider({
         () => ({
             getEngine: () => pluginContextStateRef.current.engine,
             getRootElement: () => null,
+            getEventTarget: () => cueEventTarget,
+            getPlaybackPosition: () => {
+                const { engine: current } = pluginContextStateRef.current
+                return (
+                    current.getPosition?.() ??
+                    current.audioRef.current?.currentTime ??
+                    current.currentTime
+                )
+            },
             getAudioElement: () => pluginContextStateRef.current.engine.audioRef.current,
             getCurrentTrack: () => pluginContextStateRef.current.currentTrack,
             getNextTrack: () => pluginContextStateRef.current.nextTrack,
@@ -454,7 +468,7 @@ export function AudioSessionProvider({
             getShuffle: () => pluginContextStateRef.current.shuffle,
             sounds: pluginSoundLayer,
         }),
-        [pluginSoundLayer]
+        [pluginSoundLayer, cueEventTarget]
     )
     const pluginManager = usePluginManager(allPlugins, pluginContext)
 
@@ -972,17 +986,33 @@ export function AudioSessionProvider({
 
     return (
         <AudioSessionContext.Provider value={value}>
-            <AudioTimeProviderContext.Provider value>
-                <AudioTimeContext.Provider value={timeValue}>
-                    {/* The single, app-wide audio element. Skins never render their own. */}
-                    {engine.getBackendInfo().active === "html5" && (
-                        <audio ref={engine.audioRef} src={engine.currentSrc || undefined} />
-                    )}
-                    {children}
-                </AudioTimeContext.Provider>
-            </AudioTimeProviderContext.Provider>
+            <AudioSessionCueTargetContext.Provider value={cueEventTarget}>
+                <AudioTimeProviderContext.Provider value>
+                    <AudioTimeContext.Provider value={timeValue}>
+                        {/* The single, app-wide audio element. Skins never render their own. */}
+                        {engine.getBackendInfo().active === "html5" && (
+                            <audio ref={engine.audioRef} src={engine.currentSrc || undefined} />
+                        )}
+                        {children}
+                    </AudioTimeContext.Provider>
+                </AudioTimeProviderContext.Provider>
+            </AudioSessionCueTargetContext.Provider>
         </AudioSessionContext.Provider>
     )
+}
+
+/**
+ * The cue event channel of the surrounding session, or null outside a provider.
+ * Listen here for `event.emit` events and `sap-narrative-cue`; dispatch
+ * `sap-dispatch-cue` here to run story-triggered cues.
+ */
+export function useAudioSessionCueTarget(): EventTarget | null {
+    return useContext(AudioSessionCueTargetContext)
+}
+
+/** The session, or null outside a provider (unlike `useAudioSession`, never throws). */
+export function useOptionalAudioSession(): SessionEngine | null {
+    return useContext(AudioSessionContext)
 }
 
 /**

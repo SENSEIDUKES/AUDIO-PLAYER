@@ -201,9 +201,11 @@ describe("cue readiness and ownership", () => {
         const plugin = createCueManifestPlugin({ onStatus: status })
         plugin.init(context({ ...old, createScope }))
         plugin.onTrackLoad(track())
+        plugin.onPlay() // time cues only fire while the new source is playing
         await flushMicrotasks()
         plugin.onTimeUpdate(1)
         expect(() => plugin.onTrackLoad(track({ ...manifest, id: "replacement" }))).not.toThrow()
+        plugin.onPlay()
         await flushMicrotasks()
         plugin.onTimeUpdate(1)
         expect(next.playSprite).toHaveBeenCalled()

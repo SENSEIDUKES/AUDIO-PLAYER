@@ -4,13 +4,21 @@ import type {
     PluginPlayerContext,
 } from "../core/plugins/PluginInterface"
 import type { CueManifest, CueEvent, CueAction } from "./cueTypes"
+import type { CueManifestIssue } from "./cueManifestSchema"
 
 export type CuePackState = "loading" | "ready" | "failed"
 export interface CueStatusEvent {
     manifestId?: string
-    status: "installed" | "loading" | "ready" | "failed" | "cleanup-failed"
+    /**
+     * `accepted-with-omissions` is reported just before `installed` when validation dropped
+     * cues or actions; `failed` with `issues` means the manifest was rejected outright.
+     */
+    status:
+        "installed" | "accepted-with-omissions" | "loading" | "ready" | "failed" | "cleanup-failed"
     pack?: string
     message?: string
+    /** Validation findings (errors and warnings) behind this status. */
+    issues?: CueManifestIssue[]
 }
 export interface CueOutcomeEvent {
     manifestId?: string
@@ -24,8 +32,30 @@ export interface CueOutcomeEvent {
 export interface CueRuntimeOptions {
     /** Maximum referenced packs admitted per manifest. Defaults to 4; invalid values use 4. */
     maxSpritePacks?: number
+    /**
+     * How late (seconds) a time cue may fire before its `sprite.play` actions are skipped
+     * with reason `late`. Delayed updates (e.g. a backgrounded page) still apply state
+     * changes in order, but a one-shot sound that is long overdue is not played.
+     * Defaults to 2; use `Infinity` to never skip. Invalid values use the default.
+     */
+    lateCueToleranceSeconds?: number
+    /** Validation findings to attach to the `installed` status. Set by the cue plugin. */
+    validationIssues?: CueManifestIssue[]
     onStatus?: (event: CueStatusEvent) => void
     onOutcome?: (event: CueOutcomeEvent) => void
+}
+
+export const DEFAULT_LATE_CUE_TOLERANCE_SECONDS = 2
+/** Backward position jitter below this is decoder noise, not a rewind. */
+const REWIND_EPSILON_SECONDS = 0.1
+
+/**
+ * Where cue events (`event.emit`, `sap-narrative-cue`, `sap-dispatch-cue`) travel.
+ * A session-scoped target wins so two players never hear each other; the root element
+ * and finally `window` remain the fallback for standalone and legacy hosts.
+ */
+export function resolveCueEventTarget(context: PluginPlayerContext): EventTarget {
+    return context.getEventTarget?.() ?? context.getRootElement() ?? window
 }
 
 /** Observer failures must never prevent a cue or a replacement runtime. */
@@ -37,13 +67,36 @@ export function notifyCue<T>(callback: ((event: T) => void) | undefined, event: 
     }
 }
 
+/**
+ * Runs one manifest against a player.
+ *
+ * Time-cue playback policy (see docs/CUE_MANIFEST_V1.md):
+ * - **Playing only.** Position updates are ignored while paused, so a cue at 0:00 never
+ *   fires on a paused player; `setPlaying(true, position)` is the start of a play window.
+ * - **Start / resume.** Cues before the starting position are treated as already passed;
+ *   a cue exactly at the starting position fires immediately.
+ * - **Forward playback.** Each update fires the unfired cues in `[previous, current]`,
+ *   in time order, once. A delayed update (backgrounded page) therefore catches up
+ *   instead of dropping cues, subject to `lateCueToleranceSeconds` for sprites.
+ * - **Seek.** Cues behind the target are consumed without firing unless `fireOnSeek`.
+ *   While paused, `fireOnSeek` cues wait and fire when playback resumes. Replayable cues
+ *   at or after the target re-arm.
+ * - **Rewind** (position jumps backward without a seek, e.g. a loop) re-arms replayable
+ *   cues at or after the new position; non-replayable cues never repeat.
+ * - **Track end.** Callers flush the final position; `dispose()` retires the runtime.
+ */
 export class CueRuntime {
     private context: PluginPlayerContext
-    private firedCueIds = new Set<string>()
+    private firedCues = new Set<CueEvent>()
     private timeCues: CueEvent[]
     private cueMap = new Map<string, CueEvent>()
     private triggerMap = new Map<string, CueEvent[]>()
-    private lastTime = 0
+    private lastTime: number | null = null
+    private playing = true
+    private deferredSeekCues: CueEvent[] = []
+    /** Bumped by every seek so a sample can tell that one of its own cues moved playback. */
+    private seekEpoch = 0
+    private lateToleranceSeconds: number
     private activeSprites = new Map<string, string[]>()
 
     private sounds: PluginSoundLayer | undefined
@@ -59,6 +112,11 @@ export class CueRuntime {
         private options: CueRuntimeOptions = {}
     ) {
         this.context = context
+        const tolerance = options.lateCueToleranceSeconds
+        this.lateToleranceSeconds =
+            typeof tolerance === "number" && tolerance >= 0 && !Number.isNaN(tolerance)
+                ? tolerance
+                : DEFAULT_LATE_CUE_TOLERANCE_SECONDS
 
         // Sort cues that are bound to a specific time
         this.timeCues = manifest.cues
@@ -71,7 +129,8 @@ export class CueRuntime {
 
         // Build lookup maps
         for (const cue of manifest.cues) {
-            if (cue.id) {
+            // The first cue with an id wins, matching manifest validation.
+            if (cue.id && !this.cueMap.has(cue.id)) {
                 this.cueMap.set(cue.id, cue)
             }
             if (cue.trigger.kind !== "time") {
@@ -89,7 +148,11 @@ export class CueRuntime {
         } catch (error) {
             this.reportStatus("failed", undefined, String(error))
         }
-        this.reportStatus("installed")
+        notifyCue(this.options.onStatus, {
+            manifestId: this.manifest.id,
+            status: "installed",
+            issues: options.validationIssues?.length ? options.validationIssues : undefined,
+        })
         const packs = manifest.assets?.spritePacks ?? {}
         const referenced = new Set(
             manifest.cues.flatMap((cue) =>
@@ -175,8 +238,9 @@ export class CueRuntime {
         const fading = [...this.stopTimers.values()]
         for (const timer of this.stopTimers.keys()) clearTimeout(timer)
         this.stopTimers.clear()
-        this.firedCueIds.clear()
-        this.lastTime = 0
+        this.firedCues.clear()
+        this.deferredSeekCues = []
+        this.lastTime = null
         const ids = [...this.activeSprites.values()].flat().concat(fading)
         this.activeSprites.clear()
         for (const id of ids) {
@@ -188,45 +252,114 @@ export class CueRuntime {
         }
     }
 
-    /** Consume eligible time cues once; only replayable cues rearm when rewound past their trigger. */
-    handleTimeUpdate(currentTime: number, isSeeking = false) {
-        // A backward jump in playback position is a rewind even when no explicit
-        // seek event fired — e.g. automatic looping or a custom player rewind.
-        // Detecting it here lets replayable cues reset in those cases too.
-        if (this.disposed) return
-        const isRewind = isSeeking || currentTime < this.lastTime
+    /** Time cues are always `trigger.kind === "time"`; narrow once. */
+    private cueTime(cue: CueEvent): number {
+        return cue.trigger.kind === "time" ? cue.trigger.at : Number.NaN
+    }
 
+    /** Make replayable cues at or after `position` eligible to fire again. */
+    private rearmFrom(position: number) {
         for (const cue of this.timeCues) {
-            if (cue.trigger.kind !== "time") continue
+            if (cue.replayable && this.cueTime(cue) >= position) this.firedCues.delete(cue)
+        }
+    }
 
-            const hasFired = this.firedCueIds.has(cue.id)
-            const triggerTime = cue.trigger.at
+    private fireTimeCue(cue: CueEvent, position: number) {
+        this.firedCues.add(cue)
+        this.executeActions(cue, Math.max(0, position - this.cueTime(cue)))
+    }
 
-            // If rewinding past a cue, allow replayable cues to fire again later.
-            if (isRewind && currentTime < triggerTime) {
-                if (cue.replayable) {
-                    this.firedCueIds.delete(cue.id)
-                }
-                continue
-            }
+    /**
+     * Tell the runtime whether the player is playing. Position updates are ignored while
+     * paused. Resuming at `position` starts a fresh window there: earlier cues count as
+     * passed, cues exactly at `position` fire now, and `fireOnSeek` cues deferred by a
+     * paused seek fire first. Direct users that never call this are treated as playing.
+     */
+    setPlaying(playing: boolean, position?: number) {
+        if (this.disposed) return
+        if (!playing) {
+            this.playing = false
+            return
+        }
+        this.playing = true
+        if (position === undefined || !Number.isFinite(position)) return
+        // Resuming behind where we stopped (loop / repeat-one restart) is a rewind.
+        if (this.lastTime !== null && position < this.lastTime - REWIND_EPSILON_SECONDS) {
+            this.rearmFrom(position)
+        }
+        this.lastTime = position
+        const deferred = this.deferredSeekCues
+        this.deferredSeekCues = []
+        for (const cue of deferred) this.fireTimeCue(cue, position)
+        this.advance(position)
+    }
 
-            // Normal playback: fire if we crossed the cue time
-            if (!hasFired && currentTime >= triggerTime) {
-                // If this is a forward seek, respect fireOnSeek flag
-                if (isSeeking && !cue.fireOnSeek) {
-                    this.firedCueIds.add(cue.id)
-                    continue
-                }
+    /**
+     * Report the playback position. `isSeeking` marks an explicit seek; otherwise this is
+     * a continuous-playback sample (see the class policy for start/pause/seek/rewind).
+     */
+    handleTimeUpdate(currentTime: number, isSeeking = false) {
+        if (this.disposed || !Number.isFinite(currentTime)) return
+        if (isSeeking) this.handleSeek(currentTime)
+        else this.advance(currentTime)
+    }
 
-                // Either normal playback crossing, or a seek that allows firing
-                if (isSeeking || (this.lastTime <= triggerTime && currentTime >= triggerTime)) {
-                    this.firedCueIds.add(cue.id)
-                    this.executeActions(cue)
-                }
+    /**
+     * The track finished at `position`: fire every remaining cue up to it (even if the
+     * player already reported paused), then stop timing. Later cues never fire.
+     */
+    handleTrackEnd(position: number) {
+        if (this.disposed || !Number.isFinite(position)) return
+        this.playing = true
+        this.advance(position)
+        this.playing = false
+    }
+
+    private advance(currentTime: number) {
+        if (!this.playing) return
+        const previous = this.lastTime
+        // A backward jump without an explicit seek (loop, custom rewind) is a rewind.
+        if (previous !== null && currentTime < previous - REWIND_EPSILON_SECONDS) {
+            this.rearmFrom(currentTime)
+            this.lastTime = currentTime
+        } else if (previous !== null && currentTime < previous) {
+            return // decoder jitter
+        } else {
+            this.lastTime = currentTime
+        }
+        const from = previous === null || currentTime < previous ? currentTime : previous
+        for (const cue of this.timeCues) {
+            const at = this.cueTime(cue)
+            if (at > currentTime) break
+            if (at >= from && !this.firedCues.has(cue)) {
+                const epoch = this.seekEpoch
+                this.fireTimeCue(cue, currentTime)
+                // A cue's player.seek made the rest of this sample stale; the next sample
+                // continues from the seek target with replayable cues re-armed.
+                if (epoch !== this.seekEpoch) break
             }
         }
+    }
 
-        this.lastTime = currentTime
+    private handleSeek(target: number) {
+        ++this.seekEpoch
+        // A newer seek supersedes cues an earlier paused seek was holding back.
+        for (const cue of this.deferredSeekCues) this.firedCues.delete(cue)
+        this.deferredSeekCues = []
+        this.lastTime = target
+        this.rearmFrom(target)
+        for (const cue of this.timeCues) {
+            if (this.cueTime(cue) > target) break
+            if (this.firedCues.has(cue)) continue
+            if (!cue.fireOnSeek) {
+                this.firedCues.add(cue)
+            } else if (this.playing) {
+                this.fireTimeCue(cue, target)
+            } else {
+                this.firedCues.add(cue)
+                this.deferredSeekCues.push(cue)
+            }
+        }
     }
 
     /** Manually execute a cue by its ID, ignoring time checks. */
@@ -268,8 +401,11 @@ export class CueRuntime {
         this.stopTimers.set(timer, id)
     }
 
-    /** Run independent actions, reporting unavailable sprites immediately without queuing late playback. */
-    private executeActions(cue: CueEvent) {
+    /**
+     * Run independent actions, reporting unavailable sprites immediately without queuing
+     * late playback. `lateBySeconds` is how far past its trigger a time cue fired.
+     */
+    private executeActions(cue: CueEvent, lateBySeconds = 0) {
         if (this.disposed) return
         for (const action of cue.actions) {
             const report = (outcome: CueOutcomeEvent["outcome"], reason?: string) =>
@@ -296,6 +432,12 @@ export class CueRuntime {
                             report("skipped", state === "loading" ? "pack-loading" : "pack-failed")
                             break
                         }
+                        if (lateBySeconds > this.lateToleranceSeconds) {
+                            report("skipped", "late")
+                            break
+                        }
+                        const fadeInMs =
+                            action.fadeInMs && action.fadeInMs > 0 ? action.fadeInMs : 0
                         // Completion can be synchronous when a backend rejects a start.
                         // eslint-disable-next-line prefer-const
                         let id: string | null | undefined
@@ -303,7 +445,8 @@ export class CueRuntime {
                         id = this.sounds?.playSprite(action.clip, {
                             pack: this.scope ? action.pack : undefined,
                             loop: action.loop,
-                            volume: action.volume,
+                            // A fade-in ramps up from silence rather than from the clip level.
+                            volume: fadeInMs ? 0 : action.volume,
                             onStarted: () => {
                                 if (!this.disposed) report("started")
                             },
@@ -325,12 +468,11 @@ export class CueRuntime {
                             const key = JSON.stringify([action.pack, action.clip])
                             if (!this.activeSprites.has(key)) this.activeSprites.set(key, [])
                             this.activeSprites.get(key)!.push(id)
-                            if (action.fadeInMs && action.fadeInMs > 0) {
-                                this.sounds!.fadeSprite(id, 0, 0)
+                            if (fadeInMs) {
                                 this.sounds!.fadeSprite(
                                     id,
                                     action.volume ?? clip.volume ?? 1,
-                                    action.fadeInMs
+                                    fadeInMs
                                 )
                             }
                             report("accepted")
@@ -381,8 +523,7 @@ export class CueRuntime {
                         this.context.getEngine().pause()
                         break
                     case "event.emit": {
-                        const root = this.context.getRootElement() || window
-                        root.dispatchEvent(
+                        resolveCueEventTarget(this.context).dispatchEvent(
                             new CustomEvent(action.eventName, {
                                 detail: action.detail,
                                 bubbles: true,
@@ -391,20 +532,24 @@ export class CueRuntime {
                         break
                     }
 
-                    // Narrative state actions - broadcast to UI layer
+                    // Narrative state actions are applied by a handler on the UI layer
+                    // (see CUE_ACTION_SUPPORT). A handler claims one with preventDefault();
+                    // an unclaimed action is reported as skipped rather than "executed".
                     case "ambience.crossfade":
                     case "duck.set":
                     case "volume.fadeNarration":
                     case "layer.set":
                     case "spatial.pan": {
-                        const target = this.context.getRootElement() || window
-                        target.dispatchEvent(
+                        const handled = !resolveCueEventTarget(this.context).dispatchEvent(
                             new CustomEvent("sap-narrative-cue", {
-                                detail: action, // Action itself is the payload now
+                                detail: action,
                                 bubbles: true,
+                                cancelable: true,
                             })
                         )
-                        break
+                        if (handled) report("executed")
+                        else report("skipped", "no-host-handler")
+                        continue
                     }
                 }
                 if (action.command !== "sprite.play") report("executed")

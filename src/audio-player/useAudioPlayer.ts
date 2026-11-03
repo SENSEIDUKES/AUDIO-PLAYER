@@ -1252,8 +1252,10 @@ export function useAudioPlayer(options: UseAudioPlayerOptions): AudioPlayerEngin
         backendRef.current!.setOutputGain?.(gain)
     }, [])
     const getDecodedData = useCallback(() => backendRef.current!.getDecodedData(), [])
+    const getPosition = useCallback(() => backendRef.current?.getCurrentTime() ?? 0, [])
 
     return {
+        getPosition,
         audioRef,
         isPlaying,
         currentTime,

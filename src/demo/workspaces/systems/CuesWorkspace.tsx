@@ -9,11 +9,14 @@ import {
     formatTime,
     useAudioSession,
     useAudioTime,
+    useAudioSessionCueTarget,
     useNarrativeCueController,
-    validateCueManifest,
+    parseCueManifest,
+    formatCueManifestIssue,
+    describeCueManifestSupport,
 } from "../../../audio-player"
 import { ReaderMixerPanel } from "../../../reader-ui"
-import type { CueManifest, Track } from "../../../audio-player"
+import type { CueManifest, CueManifestIssue, Track } from "../../../audio-player"
 import { SAMPLE, SEA_THEME, STAND_IN_SPRITE_PACK } from "../../data"
 import {
     Button,
@@ -134,7 +137,7 @@ function describeAction(command: string, detail: Record<string, unknown>): strin
     return `${command}${extras.length ? ` (${extras.join(", ")})` : ""}`
 }
 
-/** Listens where the cue runtime broadcasts (window, for session plugins). */
+/** Listens where the cue runtime broadcasts: the session's private cue channel. */
 function CueListener({
     manifest,
     append,
@@ -152,7 +155,11 @@ function CueListener({
         return [...names]
     }, [manifest])
 
+    const sessionTarget = useAudioSessionCueTarget()
+
     useEffect(() => {
+        const target = sessionTarget ?? window
+        // Log only; the cue controller claims the actions it applies.
         const onNarrative = (event: Event) => {
             const detail = (event as CustomEvent<Record<string, unknown>>).detail ?? {}
             append(`narrative cue → ${describeAction(String(detail.command), detail)}`, "ok")
@@ -164,13 +171,13 @@ function CueListener({
                 "ok"
             )
         }
-        window.addEventListener("sap-narrative-cue", onNarrative)
-        eventNames.forEach((name) => window.addEventListener(name, onCustom))
+        target.addEventListener("sap-narrative-cue", onNarrative)
+        eventNames.forEach((name) => target.addEventListener(name, onCustom))
         return () => {
-            window.removeEventListener("sap-narrative-cue", onNarrative)
-            eventNames.forEach((name) => window.removeEventListener(name, onCustom))
+            target.removeEventListener("sap-narrative-cue", onNarrative)
+            eventNames.forEach((name) => target.removeEventListener(name, onCustom))
         }
-    }, [eventNames, append])
+    }, [eventNames, append, sessionTarget])
     return null
 }
 
@@ -259,24 +266,46 @@ export function CuesWorkspace() {
     )
 }
 
+interface Validation {
+    /** Plain-language outcome shown above the findings; null when there is nothing to say. */
+    headline: string | null
+    issues: CueManifestIssue[]
+    /** Cues plus actions dropped from `pending`, from the parse result. */
+    omitted: number
+    /** Manifest with invalid parts omitted, offered only after the user has seen what is dropped. */
+    pending: CueManifest | null
+}
+
+const NO_VALIDATION: Validation = { headline: null, issues: [], omitted: 0, pending: null }
+
 /** Apply keyed manifests and show runtime installation, pack readiness and cue outcomes. */
 function CuesContent() {
     const [manifest, setManifest] = useState<CueManifest>(STORY_MANIFEST)
     const [draft, setDraft] = useState(() => JSON.stringify(STORY_MANIFEST, null, 2))
     const [integrated, setIntegrated] = useState(true)
     const [generation, setGeneration] = useState(0)
-    const [draftError, setDraftError] = useState<string | null>(null)
+    const [validation, setValidation] = useState<Validation>(NO_VALIDATION)
     const { lines, append, clear } = useEventLog(60)
-    const { narrativeOptions, dispatchCueEvent } = useNarrativeCueController()
     const track = useMemo(() => cueTrack(manifest), [manifest])
 
-    const applyManifest = (valid: CueManifest) => {
-        setDraftError(null)
+    const applyManifest = (valid: CueManifest, issues: CueManifestIssue[], omitted = 0) => {
+        setValidation(
+            issues.length
+                ? {
+                      headline: omitted
+                          ? `Applied with ${omitted} omission(s).`
+                          : "Applied. The manifest has warnings:",
+                      issues,
+                      omitted,
+                      pending: null,
+                  }
+                : NO_VALIDATION
+        )
         setManifest(valid)
         setGeneration((g) => g + 1)
         append(
-            `Requested manifest “${valid.id ?? "custom"}” with ${valid.cues.length} cues`,
-            "info"
+            `Requested manifest “${valid.id ?? "custom"}” with ${valid.cues.length} cues${omitted ? ` (${omitted} omitted)` : ""}`,
+            omitted ? "warn" : "info"
         )
     }
 
@@ -285,23 +314,50 @@ function CuesContent() {
         try {
             parsed = JSON.parse(draft)
         } catch (error) {
-            setDraftError(`Not valid JSON: ${(error as Error).message}`)
+            setValidation({
+                headline: `Not valid JSON: ${(error as Error).message}`,
+                issues: [],
+                omitted: 0,
+                pending: null,
+            })
             return
         }
-        const valid = validateCueManifest(parsed)
-        if (!valid) {
-            setDraftError("The manifest did not validate (details are in the browser console).")
-            return
+        const result = parseCueManifest(parsed)
+        if (result.status === "invalid") {
+            setValidation({
+                headline: "Not applied: nothing in this manifest is usable.",
+                issues: result.issues,
+                omitted: 0,
+                pending: null,
+            })
+        } else if (result.status === "accepted-with-omissions") {
+            setValidation({
+                headline: `Not applied yet: ${result.omittedCueCount} cue(s) and ${result.omittedActionCount} action(s) would be dropped. Fix them, or apply only what is valid.`,
+                issues: result.issues,
+                omitted: result.omittedCueCount + result.omittedActionCount,
+                pending: result.manifest,
+            })
+        } else {
+            applyManifest(result.manifest, result.issues)
         }
-        applyManifest(valid)
+    }
+
+    const applyValidPart = () => {
+        const pending = validation.pending
+        if (!pending) return
+        applyManifest(pending, validation.issues, validation.omitted)
+    }
+
+    // Findings and the pending manifest describe the draft they were parsed from.
+    const editDraft = (value: string) => {
+        setDraft(value)
+        setValidation(NO_VALIDATION)
     }
 
     const loadPreset = (preset: CueManifest) => {
         setDraft(JSON.stringify(preset, null, 2))
-        applyManifest(preset)
+        applyManifest(preset, [])
     }
-
-    const storyCues = manifest.cues.filter((cue) => cue.trigger.kind !== "time")
 
     return (
         <CueSession
@@ -310,6 +366,66 @@ function CuesContent() {
             append={append}
             integrated={integrated}
         >
+            <CueConsole
+                manifest={manifest}
+                draft={draft}
+                setDraft={editDraft}
+                validation={validation}
+                integrated={integrated}
+                setIntegrated={setIntegrated}
+                onApply={apply}
+                onApplyValidPart={applyValidPart}
+                onRevert={() => {
+                    setDraft(JSON.stringify(manifest, null, 2))
+                    setValidation(NO_VALIDATION)
+                }}
+                onPreset={loadPreset}
+                append={append}
+                lines={lines}
+                clear={clear}
+            />
+        </CueSession>
+    )
+}
+
+interface CueConsoleProps {
+    manifest: CueManifest
+    draft: string
+    setDraft: (value: string) => void
+    validation: Validation
+    integrated: boolean
+    setIntegrated: (value: boolean) => void
+    onApply: () => void
+    onApplyValidPart: () => void
+    onRevert: () => void
+    onPreset: (manifest: CueManifest) => void
+    append: (text: string, tone?: LogLine["tone"]) => void
+    lines: LogLine[]
+    clear: () => void
+}
+
+/** Lives inside the session so the cue controller shares the session's private cue channel. */
+function CueConsole({
+    manifest,
+    draft,
+    setDraft,
+    validation,
+    integrated,
+    setIntegrated,
+    onApply,
+    onApplyValidPart,
+    onRevert,
+    onPreset,
+    append,
+    lines,
+    clear,
+}: CueConsoleProps) {
+    const { narrativeOptions, dispatchCueEvent } = useNarrativeCueController()
+    const storyCues = manifest.cues.filter((cue) => cue.trigger.kind !== "time")
+    const support = useMemo(() => describeCueManifestSupport(manifest), [manifest])
+
+    return (
+        <>
             <SessionEventFeed append={append} />
             <CueListener manifest={manifest} append={append} />
             <SplitLayout
@@ -319,21 +435,27 @@ function CuesContent() {
                             <p className="wk-stage-card__title">Transport</p>
                             <TestControls />
                             <CueTimeline manifest={manifest} />
-                            <Note>Markers are time cues; tap one to jump just before it.</Note>
+                            <Note>
+                                Markers are time cues; tap one to jump just before it. Time cues
+                                only fire while playing.
+                            </Note>
                         </div>
                         <div className="wk-stage-card">
                             <p className="wk-stage-card__title">NarrativeFace driven by cues</p>
                             <NarrativeFace
                                 {...narrativeOptions}
                                 sceneMood={
-                                    narrativeOptions.ambientProfile?.replace("-loop", "") ?? "—"
+                                    narrativeOptions.sceneMood ??
+                                    narrativeOptions.ambientProfile?.replace("-loop", "") ??
+                                    "—"
                                 }
                                 ambienceManifest={STAND_IN_SPRITE_PACK}
                                 {...SEA_THEME}
                             />
                             <Note>
-                                Ambience crossfades and duck changes arrive through
-                                useNarrativeCueController, exactly as a reader app would wire them.
+                                Ambience crossfades, ducking, narration fades and layers arrive
+                                through useNarrativeCueController, exactly as a reader app would
+                                wire them.
                             </Note>
                         </div>
                         <Panel
@@ -402,20 +524,48 @@ function CuesContent() {
                                 spellCheck={false}
                                 onChange={(event) => setDraft(event.target.value)}
                             />
-                            {draftError && <Note tone="warn">{draftError}</Note>}
+                            {validation.headline && <Note tone="warn">{validation.headline}</Note>}
+                            {validation.issues.map((issue, index) => (
+                                <Note
+                                    key={index}
+                                    tone={issue.severity === "error" ? "warn" : "info"}
+                                >
+                                    <strong>{issue.severity}</strong> ·{" "}
+                                    {formatCueManifestIssue(issue)}
+                                </Note>
+                            ))}
                             <ButtonRow>
-                                <Button variant="primary" onClick={apply}>
+                                <Button variant="primary" onClick={onApply}>
                                     Validate &amp; apply
                                 </Button>
-                                <Button
-                                    onClick={() => {
-                                        setDraft(JSON.stringify(manifest, null, 2))
-                                        setDraftError(null)
-                                    }}
-                                >
-                                    Revert draft
-                                </Button>
+                                {validation.pending && (
+                                    <Button onClick={onApplyValidPart}>
+                                        Apply only what is valid
+                                    </Button>
+                                )}
+                                <Button onClick={onRevert}>Revert draft</Button>
                             </ButtonRow>
+                        </Panel>
+                        <Panel
+                            title="Action support"
+                            hint="Which of this manifest's actions need more than the cue runtime."
+                        >
+                            {support.needsAttention.length === 0 ? (
+                                <Note>The cue runtime applies every action in this manifest.</Note>
+                            ) : (
+                                support.needsAttention.map((item) => (
+                                    <Note
+                                        key={item.command}
+                                        tone={item.handledBy === "host" ? "warn" : "placeholder"}
+                                    >
+                                        <strong>{item.command}</strong> ·{" "}
+                                        {item.handledBy === "host"
+                                            ? "needs host integration"
+                                            : "applied by useNarrativeCueController"}{" "}
+                                        — {item.summary}
+                                    </Note>
+                                ))
+                            )}
                         </Panel>
                         <Panel title="Reader audio controls">
                             <label className="wk-field wk-field--checkbox">
@@ -434,7 +584,7 @@ function CuesContent() {
                                     <Button
                                         key={preset.id}
                                         pressed={manifest.id === preset.manifest.id}
-                                        onClick={() => loadPreset(preset.manifest)}
+                                        onClick={() => onPreset(preset.manifest)}
                                     >
                                         {preset.label}
                                     </Button>
@@ -451,6 +601,6 @@ function CuesContent() {
                     </>
                 }
             />
-        </CueSession>
+        </>
     )
 }

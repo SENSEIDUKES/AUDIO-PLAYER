@@ -136,6 +136,24 @@ describe("AudioSpriteEngine", () => {
         expect(engine.getActiveInstances()).toEqual([])
     })
 
+    it("fades in from the clip's starting level even when gain.value is stale", async () => {
+        const engine = new AudioSpriteEngine()
+        await engine.load({
+            src: "/sprites/vault-radio.mp3",
+            clips: { bed: { offset: 0, duration: 1 } },
+        })
+
+        const id = engine.play("bed", { volume: 0 })!
+        // AudioParam.value only advances per render quantum, so it can still read the
+        // default (1) right after play(); the ramp must still begin from silence.
+        const param = context.gains[1].gain
+        param.value = 1
+        engine.fade(id, 0.8, 500)
+
+        expect(param.setValueAtTime).toHaveBeenLastCalledWith(0, 10)
+        expect(param.linearRampToValueAtTime).toHaveBeenLastCalledWith(0.8, 10.5)
+    })
+
     it("configures loop boundaries for looping clips", async () => {
         const engine = new AudioSpriteEngine()
         await engine.load({

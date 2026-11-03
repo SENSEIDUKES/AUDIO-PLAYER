@@ -37,6 +37,17 @@ export interface PluginPlayerContext {
     getEngine: () => AudioPlayerEngine
     /** Root element for scoped DOM behavior. Null for headless/global sessions. */
     getRootElement: () => HTMLElement | null
+    /**
+     * Private event channel for this player/session. Cue plugins dispatch and listen here
+     * instead of on `window`, so several players on one page cannot trigger each other.
+     */
+    getEventTarget?: () => EventTarget
+    /**
+     * Live playback position in seconds, read from the backend rather than the throttled
+     * `getEngine().currentTime` state. Plugins that need accurate timing while the page is
+     * hidden (when animation frames stop) should poll this.
+     */
+    getPlaybackPosition?: () => number
     /** Current rendered/managed audio element. */
     getAudioElement: () => HTMLAudioElement | null
     /** Active track, or null when no track is loaded. */

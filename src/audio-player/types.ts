@@ -469,6 +469,12 @@ export interface AudioPlayerEngine {
      * after load; null on html5). Used for waveform rendering.
      */
     getDecodedData: () => AudioBuffer | null
+    /**
+     * Live playback position in seconds, read straight from the backend. Unlike
+     * `currentTime` (React state refreshed from animation frames, which stop while the
+     * page is hidden) this is accurate whenever it is called.
+     */
+    getPosition?: () => number
 }
 
 /** How the global session behaves when a track ends. */
@@ -718,4 +724,11 @@ export interface AudioSessionProviderProps {
     onFallbackSource?: (event: FallbackSourceEvent) => void
     /** Preload behavior configuration. */
     preloadConfig?: PreloadConfig
+    /**
+     * Event channel for cue plugins and `useNarrativeCueController` in this session
+     * (`event.emit`, `sap-narrative-cue`, `sap-dispatch-cue`). Each provider creates a
+     * private one by default, so two sessions never trigger each other. Pass `window` to
+     * restore the old page-wide behavior, or share one target between sessions on purpose.
+     */
+    cueEventTarget?: EventTarget
 }

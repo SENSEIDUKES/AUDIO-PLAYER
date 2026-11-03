@@ -41,7 +41,23 @@ export {
     createCueManifestPlugin,
     createReaderMixerCuePlugin,
 } from "./cues/CueManifestPlugin"
-export { validateCueManifest } from "./cues/cueManifestSchema"
+export {
+    parseCueManifest,
+    formatCueManifestIssue,
+    validateCueManifest,
+} from "./cues/cueManifestSchema"
+export type {
+    CueManifestIssue,
+    CueManifestIssueCode,
+    CueManifestParseResult,
+    CueManifestParseStatus,
+} from "./cues/cueManifestSchema"
+export { CUE_ACTION_SUPPORT, describeCueManifestSupport } from "./cues/cueSupport"
+export type {
+    CueActionHandler,
+    CueActionSupport,
+    CueManifestSupportReport,
+} from "./cues/cueSupport"
 export { CueRuntime } from "./cues/cueRuntime"
 export { useNarrativeCueController } from "./cues/useNarrativeCueController"
 export type {
@@ -209,7 +225,12 @@ export type {
 
 // Global session (one <audio> element + shared queue) and the narrator face
 // that reads from it. The v4 music faces live in archive/faces-v4.
-export { AudioSessionProvider, useAudioSession, useAudioTime } from "./session/AudioSessionContext"
+export {
+    AudioSessionProvider,
+    useAudioSession,
+    useAudioSessionCueTarget,
+    useAudioTime,
+} from "./session/AudioSessionContext"
 export type { AudioTimeValue } from "./session/AudioSessionContext"
 export { serializeSession, deserializeSession } from "./session/sessionSerializer"
 export type { SerializedSession } from "./session/sessionSerializer"

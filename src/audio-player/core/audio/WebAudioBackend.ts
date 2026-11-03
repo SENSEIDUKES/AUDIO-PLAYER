@@ -939,7 +939,7 @@ export class WebAudioBackend implements AudioBackend {
             newPanner.orientationY.value = this.orientation[1]
             newPanner.orientationZ.value = this.orientation[2]
 
-            // Reconnect: source → newPanner → stereoPanner → gain
+            // Reconnect: source → newPanner → (stereoPanner →) gain
             if (this.source) {
                 try {
                     this.source.disconnect(oldPanner)
@@ -949,11 +949,11 @@ export class WebAudioBackend implements AudioBackend {
                 this.source.connect(newPanner)
             }
             try {
-                oldPanner.disconnect(this.stereoPanner!)
+                oldPanner.disconnect()
             } catch {
                 // Already disconnected.
             }
-            newPanner.connect(this.stereoPanner!)
+            newPanner.connect(this.stereoPanner ?? this.gain!)
 
             this.panner = newPanner
         }
