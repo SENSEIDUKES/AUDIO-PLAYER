@@ -33,6 +33,16 @@ function disk() {
 }
 
 describe("persistent audio retention", () => {
+    it("preserves valid offline bytes when a read exceeds a temporary memory limit", async () => {
+        const { entries, cache } = disk()
+        const store = new PersistentAudioCache()
+        await store.putArrayBuffer("a", new ArrayBuffer(4))
+        expect(await store.getArrayBuffer("a", 2)).toBeNull()
+        expect(entries.has("a")).toBe(true)
+        expect(cache.delete).not.toHaveBeenCalled()
+        expect(await store.getArrayBuffer("a", 4)).toEqual(new ArrayBuffer(4))
+    })
+
     it("ignores undefined retention options while applying defined options", async () => {
         const { entries } = disk()
         const store = new PersistentAudioCache()
@@ -176,19 +186,22 @@ describe("audio download admission", () => {
     })
 })
 
-it("estimates PCM expansion and context resampling before native decoding", () => {
-    const data = new ArrayBuffer(44)
-    const view = new DataView(data)
-    view.setUint32(0, 0x52494646)
-    view.setUint32(8, 0x57415645)
-    view.setUint32(12, 0x666d7420)
-    view.setUint32(16, 16, true)
-    view.setUint16(20, 1, true)
-    view.setUint16(22, 2, true)
-    view.setUint32(24, 24000, true)
-    view.setUint16(32, 4, true)
-    view.setUint32(36, 0x64617461)
-    view.setUint32(40, 96000, true)
-    expect(estimateWavDecodedBytes(data, 48000)).toBe(384000)
-    expect(estimateWavDecodedBytes(new ArrayBuffer(4), 48000)).toBeNull()
-})
+it.each([1, 3, 0xfffe])(
+    "estimates PCM/float expansion and defers extensible WAV (format %i)",
+    (format) => {
+        const data = new ArrayBuffer(44)
+        const view = new DataView(data)
+        view.setUint32(0, 0x52494646)
+        view.setUint32(8, 0x57415645)
+        view.setUint32(12, 0x666d7420)
+        view.setUint32(16, 16, true)
+        view.setUint16(20, format, true)
+        view.setUint16(22, 2, true)
+        view.setUint32(24, 24000, true)
+        view.setUint16(32, 4, true)
+        view.setUint32(36, 0x64617461)
+        view.setUint32(40, 96000, true)
+        expect(estimateWavDecodedBytes(data, 48000)).toBe(format === 0xfffe ? null : 384000)
+        expect(estimateWavDecodedBytes(new ArrayBuffer(4), 48000)).toBeNull()
+    }
+)

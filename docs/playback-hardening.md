@@ -96,13 +96,19 @@ effort when browser storage is unavailable.
 
 The root package exports `invalidateAudioCache(url?)` to clear a trimmed URL from
 memory and persistent storage, or all stored audio when the URL is omitted.
-Invalidation prevents older in-flight jobs from repopulating the caches. It does
+Invalidation prevents older in-flight jobs in this page's shared cache instance
+from repopulating the caches. Other tabs or separately loaded package instances
+can still write to the origin's persistent cache; cross-tab coordination is not
+provided. It does
 not stop audio or release a mounted backend's buffer: clear/reload its source to
 adopt replaced bytes. Versioned URLs remain preferable for replaced files.
 `configureAudioCacheRetention()` controls persistent FIFO retention. Defaults:
 32 entries, 256 MiB total encoded bytes, seven days from storage. Expired and
 legacy entries without timestamps are removed on access; writes and explicit
 retention configuration prune the store. There is no background expiry timer.
+Per-load encoded/decoded limits preserve healthy stored bytes, so raising a
+memory limit later can reuse them offline. Storage-retention limits still prune
+entries according to the configured policy.
 Set `maxEntries: 0` to clear and disable persistence. These controls affect only
 the named audio cache, not other application Cache API stores. Storage deletion
 is best effort if the browser denies Cache API access.

@@ -1,4 +1,9 @@
-import { getAudioResourcePolicy, getAudioResourceStats, readBoundedAudio } from "./audioResources"
+import {
+    AudioResourceLimitError,
+    getAudioResourcePolicy,
+    getAudioResourceStats,
+    readBoundedAudio,
+} from "./audioResources"
 
 /** Shared decoded-buffer LRU cache for Web Audio playback. */
 export class LRUAudioCache {
@@ -133,6 +138,7 @@ export class PersistentAudioCache {
         return pending
     }
 
+    /** Apply defined retention options atomically, then prune existing disk entries. */
     async configureRetention(next: Partial<AudioCacheRetention>): Promise<void> {
         const updated = { ...this.retention }
         for (const key of Object.keys(updated) as (keyof AudioCacheRetention)[]) {
@@ -146,6 +152,7 @@ export class PersistentAudioCache {
         await this.prune()
     }
 
+    /** Remove expired/legacy entries and evict oldest entries until storage limits hold. */
     private async trim(cache: Cache): Promise<void> {
         const entries: Array<{ key: Request; bytes: number }> = []
         let total = 0
@@ -205,6 +212,7 @@ export class PersistentAudioCache {
         })
     }
 
+    /** Read fresh bytes within the caller's memory limit, preserving healthy oversized entries. */
     async getArrayBuffer(
         url: string,
         maxBytes = getAudioResourcePolicy().maxEncodedBytes
@@ -227,7 +235,9 @@ export class PersistentAudioCache {
             }
             try {
                 return await readBoundedAudio(response, Math.min(maxBytes, this.retention.maxBytes))
-            } catch {
+            } catch (error) {
+                // A per-load limit does not make an otherwise valid offline copy corrupt.
+                if (error instanceof AudioResourceLimitError) return null
                 await this.delete(url)
                 return null
             }
@@ -236,6 +246,7 @@ export class PersistentAudioCache {
         }
     }
 
+    /** Serialize best-effort writes with deletion and enforce retention after each write. */
     async putArrayBuffer(url: string, buffer: ArrayBuffer): Promise<void> {
         await this.serial(async () => {
             if (
@@ -306,13 +317,15 @@ export const sharedAudioStorageCache = new PersistentAudioCache()
 export const sharedPersistentAudioCache = sharedAudioStorageCache
 export const sharedHTML5AudioPool = new HTML5AudioPool()
 
-// Invalidating during a download/decode prevents it from repopulating either cache.
+// Invalidation prevents jobs in this shared module instance from repopulating either cache.
 let cacheRevision = 0
 export function getAudioCacheRevision(): number {
     return cacheRevision
 }
 
-/** Clear future cache reads; mounted backends retain their current buffer until reloaded. */
+/** Clear cache entries and guard this page's jobs; other tabs may write independently.
+ * Mounted backends retain their current buffer until reloaded.
+ */
 export async function invalidateAudioCache(url?: string): Promise<void> {
     cacheRevision += 1
     if (url !== undefined) {

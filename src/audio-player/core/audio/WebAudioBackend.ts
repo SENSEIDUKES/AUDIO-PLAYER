@@ -233,6 +233,7 @@ export class WebAudioBackend implements AudioBackend {
         this.emit("error")
     }
 
+    /** Preflight known sizes and validate decoded PCM before adopting or caching it. */
     private async decodeArrayBuffer(data: ArrayBuffer, job: AudioLoadJob): Promise<AudioBuffer> {
         if (data.byteLength > job.policy.maxEncodedBytes) throw new AudioResourceLimitError()
         const ctx = this.ensureContext()
@@ -253,6 +254,7 @@ export class WebAudioBackend implements AudioBackend {
         }
     }
 
+    /** Fetch a bounded body and suppress failures belonging to cancelled source generations. */
     private async fetchNetworkArrayBuffer(
         url: string,
         gen: number,
@@ -300,6 +302,7 @@ export class WebAudioBackend implements AudioBackend {
         }
     }
 
+    /** Load memory/disk/network in order, recovering corrupt disk bytes once within a load slot. */
     private async loadBufferWaterfall(
         url: string,
         gen: number,
@@ -331,9 +334,9 @@ export class WebAudioBackend implements AudioBackend {
                         return buffer
                     } catch (error) {
                         if (!current()) return null
+                        if (error instanceof AudioResourceLimitError) throw error
                         await sharedAudioStorageCache.delete(url)
                         if (!current()) return null
-                        if (error instanceof AudioResourceLimitError) throw error
                         // Bad cached bytes get exactly one fresh network attempt.
                         retryingDisk = true
                     }
@@ -434,6 +437,7 @@ export class WebAudioBackend implements AudioBackend {
         this.state = "playing"
     }
 
+    /** Resume and await loading, starting a source only while this playback request remains valid. */
     private async playInternal(): Promise<void> {
         if (!this.srcUrl) {
             throw namedError("NotSupportedError", "No audio source set.")
@@ -514,6 +518,7 @@ export class WebAudioBackend implements AudioBackend {
         this.state = "idle"
     }
 
+    /** Replace the current load generation and reuse eligible memory or preload results. */
     load(): void {
         this.generation += 1
         const gen = this.generation
@@ -551,6 +556,7 @@ export class WebAudioBackend implements AudioBackend {
         return this.playInternal()
     }
 
+    /** Cancel pending playback and stop an active source without cancelling its buffer load. */
     pause(): void {
         this.playbackToken += 1
         const wasPlaying = this.state === "playing"

@@ -489,6 +489,28 @@ describe("Web Audio cache recovery and resource admission", () => {
     const defaults = getAudioResourcePolicy()
     afterEach(() => configureAudioResources(defaults))
 
+    it("preserves healthy disk bytes when the decoded-size policy rejects them", async () => {
+        configureAudioResources({ maxDecodedBytes: 8 })
+        installWebAudioContext(async () => sizedBuffer(12))
+        vi.spyOn(sharedAudioStorageCache, "getArrayBuffer").mockResolvedValue(new ArrayBuffer(1))
+        const remove = vi.spyOn(sharedAudioStorageCache, "delete").mockResolvedValue()
+        globalThis.fetch = vi.fn()
+        const backend = createWebAudioBackend()
+        backend.setSource("offline.mp3")
+        backend.load()
+        await (backend as unknown as { loadPromise: Promise<void> }).loadPromise
+        expect(backend.getError()).toBe("src-not-supported")
+        expect(remove).not.toHaveBeenCalled()
+        expect(fetch).not.toHaveBeenCalled()
+        configureAudioResources({ maxDecodedBytes: 16 })
+        backend.load()
+        await (backend as unknown as { loadPromise: Promise<void> }).loadPromise
+        expect(backend.getDecodedData()).not.toBeNull()
+        expect(backend.getError()).toBeNull()
+        expect(fetch).not.toHaveBeenCalled()
+        backend.destroy()
+    })
+
     it("evicts corrupt disk bytes and retries network once without emitting a recoverable error", async () => {
         const decoded = fakeBuffer("fresh")
         const context = installWebAudioContext(async () => decoded)

@@ -53,6 +53,7 @@ export class AudioResourceLimitError extends Error {
     }
 }
 
+/** Estimate PCM storage from sample frames and channels, excluding native overhead. */
 export function decodedBytes(buffer: AudioBuffer): number {
     const bytes = buffer.length * buffer.numberOfChannels * 4
     return Number.isFinite(bytes) ? Math.max(0, bytes) : 0
@@ -92,6 +93,7 @@ const jobs = new Set<AudioLoadJob>()
 const queue: Array<() => void> = []
 const activeBuffers = new Map<object, AudioBuffer>()
 
+/** Admit queued work while the shared concurrency policy has capacity. */
 function drain() {
     while (queue.length && jobs.size < policy.maxConcurrentLoads) queue.shift()!()
 }
@@ -114,11 +116,13 @@ export async function withAudioLoad<T>(work: (job: AudioLoadJob) => Promise<T>):
     }
 }
 
+/** Track buffers retained by backends until their source is cleared or destroyed. */
 export function trackActiveAudioBuffer(owner: object, buffer: AudioBuffer | null): void {
     if (buffer) activeBuffers.set(owner, buffer)
     else activeBuffers.delete(owner)
 }
 
+/** Report resident/in-flight estimates; active buffers may also exist in the decoded cache. */
 export function getAudioResourceStats() {
     return {
         activeBufferBytes: [...new Set(activeBuffers.values())].reduce(
@@ -145,7 +149,9 @@ export async function readBoundedAudio(
 ): Promise<ArrayBuffer> {
     const declared = Number(response.headers?.get("Content-Length"))
     if (declared > maxBytes) {
-        await response.body?.cancel().catch(() => {})
+        // Cancellation of a cloned/teed response can wait for its sibling reader.
+        // Request cleanup without delaying the policy failure on that other reader.
+        void response.body?.cancel().catch(() => {})
         throw new AudioResourceLimitError()
     }
     const reader = response.body?.getReader()
@@ -183,7 +189,7 @@ export async function readBoundedAudio(
         return data.buffer
     } finally {
         signal?.removeEventListener("abort", cancel)
-        await reader.cancel().catch(() => {})
+        void reader.cancel().catch(() => {})
         reader.releaseLock()
     }
 }
