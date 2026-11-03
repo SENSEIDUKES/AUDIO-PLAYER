@@ -1,4 +1,12 @@
-import { useCallback, useId, useState } from "react"
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useId,
+    useLayoutEffect,
+    useRef,
+    useState,
+} from "react"
 import type { ReactNode } from "react"
 import { STATUS_LABELS } from "./catalog"
 import type { EntryStatus } from "./catalog"
@@ -364,6 +372,99 @@ export function WidthFrame({ width, children }: { width: number | "auto"; childr
     return (
         <div className="wk-width-frame wk-width-frame--fixed" style={{ width, maxWidth: "100%" }}>
             <span className="wk-width-frame__label">{width}px</span>
+            {children}
+        </div>
+    )
+}
+
+/* ------------------------- Mobile app shell -------------------------
+   On phones (see `.wk-shell` in workshop.css) a workspace that opts in becomes
+   a viewport-locked app screen: the page never scrolls, one section shows at a
+   time, and a floating pill dock switches sections in place. On wider screens
+   the dock is hidden and every section renders in the normal layout. Sections
+   stay mounted when hidden, so audio and state survive a tab switch. */
+
+export interface ShellTab {
+    id: string
+    label: string
+}
+
+/** The workspace chrome's part in a shell: it holds the tab so its own header can be the About tab. */
+export interface ShellHost {
+    tab: string | null
+    select: (id: string) => void
+    attach: () => () => void
+}
+
+export const ShellHostContext = createContext<ShellHost | null>(null)
+export const SHELL_ABOUT_TAB = "about"
+
+const ActiveShellTab = createContext<string | null>(null)
+
+/** Opt a workspace into the mobile app shell. Wrap each section's content in a `ShellPanel`. */
+export function MobileShell({
+    tabs,
+    children,
+}: {
+    tabs: readonly ShellTab[]
+    children: ReactNode
+}) {
+    const host = useContext(ShellHostContext)
+    const [localTab, setLocalTab] = useState<string | null>(null)
+    const root = useRef<HTMLDivElement>(null)
+    const active = (host ? host.tab : localTab) ?? tabs[0]?.id ?? ""
+    const attach = host?.attach
+    useLayoutEffect(() => attach?.(), [attach])
+    const all = host ? [...tabs, { id: SHELL_ABOUT_TAB, label: "About" }] : tabs
+    const select = (id: string) => {
+        if (host) host.select(id)
+        else setLocalTab(id)
+        root.current?.closest(".wk-workspace")?.scrollTo?.({ top: 0 })
+    }
+    return (
+        <ActiveShellTab.Provider value={active}>
+            <div className="wk-shell" data-tab={active} ref={root}>
+                {children}
+                <nav className="wk-shell__dock" aria-label="Sections">
+                    {all.map((tab) => (
+                        <button
+                            key={tab.id}
+                            type="button"
+                            className={`wk-shell__tab${tab.id === active ? " wk-shell__tab--on" : ""}`}
+                            aria-pressed={tab.id === active}
+                            onClick={() => select(tab.id)}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
+                </nav>
+            </div>
+        </ActiveShellTab.Provider>
+    )
+}
+
+/**
+ * Content for one shell section; shown only while its tab is active on phones.
+ * `fill` makes the section a full-bleed stage that fills the space between the
+ * top bar and the dock instead of a column of rows.
+ */
+export function ShellPanel({
+    tab,
+    fill,
+    children,
+}: {
+    tab: string
+    fill?: boolean
+    children: ReactNode
+}) {
+    const active = useContext(ActiveShellTab)
+    return (
+        <div
+            className={`wk-shell-panel${active === tab ? " wk-shell-panel--on" : ""}${
+                fill ? " wk-shell-panel--fill" : ""
+            }`}
+            data-shell-panel={tab}
+        >
             {children}
         </div>
     )
