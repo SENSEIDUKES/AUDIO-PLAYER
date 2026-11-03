@@ -308,3 +308,32 @@ See [reader-mixer.md](./reader-mixer.md) for the API, configurable policies,
 measurement CLI, defaults, migrations, source provenance and physical-device
 checklist. The SEN import, note placement, Listen generation and publishing
 remain host/owner work.
+
+
+## Audio cache and resource controls
+
+The root exports `invalidateAudioCache`, `configureAudioCacheRetention`,
+`configureAudioResources`, `getAudioResourcePolicy`, `getAudioCacheStats`, and
+`recommendAudioBackend`, plus `AudioResourcePolicy` and `AudioCacheRetention`.
+Controls apply to the shared WebAudioBackend caches/load scheduler. Other
+narrative and sprite engines keep their existing policies.
+
+```ts
+import {
+    configureAudioResources,
+    configureAudioCacheRetention,
+    invalidateAudioCache,
+    getAudioCacheStats,
+    recommendAudioBackend,
+} from "@seihouse/audio-player"
+
+configureAudioResources({ maxConcurrentLoads: 1, maxEncodedBytes: 16 * 1024 * 1024 })
+await configureAudioCacheRetention({ maxEntries: 16, maxAgeMs: 24 * 60 * 60 * 1000 })
+await invalidateAudioCache("https://media.example/chapter.mp3")
+const audioBackend = recommendAudioBackend({ durationSeconds: 600 }) // "html5"
+// Pass audioBackend to useAudioPlayer or AudioSessionProvider before mounting.
+const stats = getAudioCacheStats()
+```
+
+See [cache recovery and loading limits](./playback-hardening.md) for defaults,
+invalidation semantics, memory-estimate limitations and device checks.
