@@ -275,9 +275,14 @@ export class PersistentAudioCache {
     }
 }
 
-/** Pool of detached HTMLAudioElements for passive preload / streaming fallbacks. */
+/**
+ * Pool of detached HTMLAudioElements for passive preload / streaming fallbacks.
+ * Ownership is tracked explicitly: preload elements are normally paused, so
+ * `paused` cannot tell an idle element from one a backend is still using.
+ */
 export class HTML5AudioPool {
     private pool: HTMLAudioElement[] = []
+    private checkedOut = new Set<HTMLAudioElement>()
 
     constructor(private maxSize = 5) {}
 
@@ -286,27 +291,33 @@ export class HTML5AudioPool {
     }
 
     acquire(): HTMLAudioElement {
-        let audio = this.pool.find((candidate) => candidate.paused && !candidate.ended)
-        if (!audio && this.pool.length < this.maxSize) {
+        let audio = this.pool.find((candidate) => !this.checkedOut.has(candidate))
+        if (!audio) {
             audio = new Audio()
             audio.preload = "auto"
-            this.pool.push(audio)
-        } else if (!audio) {
-            audio = this.pool[0]
-            audio.pause()
+            // At capacity the extra element stays unpooled rather than stealing an owned one.
+            if (this.pool.length < this.maxSize) this.pool.push(audio)
         }
+        this.checkedOut.add(audio)
         return audio
     }
 
+    /** Clear and return an element to the pool; elements this pool did not hand out are untouched. */
     release(audio: HTMLAudioElement): void {
+        if (!this.checkedOut.delete(audio)) return
+        this.reset(audio)
+    }
+
+    releaseAll(): void {
+        for (const audio of new Set([...this.pool, ...this.checkedOut])) this.reset(audio)
+        this.checkedOut.clear()
+    }
+
+    private reset(audio: HTMLAudioElement): void {
         audio.pause()
         audio.removeAttribute("src")
         audio.src = ""
         audio.load()
-    }
-
-    releaseAll(): void {
-        for (const audio of this.pool) this.release(audio)
     }
 }
 

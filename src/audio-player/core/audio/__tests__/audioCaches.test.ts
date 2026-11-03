@@ -323,6 +323,92 @@ describe("HTML5AudioPool", () => {
         pool.acquire()
         expect(pool.getStats().preloadElementCount).toBe(2)
     })
+
+    describe("ownership", () => {
+        const createAudio = () =>
+            ({
+                paused: true,
+                pause: vi.fn(),
+                removeAttribute: vi.fn(),
+                load: vi.fn(),
+                preload: "",
+                src: "",
+            }) as unknown as HTMLAudioElement
+
+        beforeEach(() => {
+            Object.defineProperty(globalThis, "Audio", {
+                configurable: true,
+                writable: true,
+                value: vi.fn(function AudioMock() {
+                    return createAudio()
+                }),
+            })
+        })
+
+        it("hands paused elements to one owner at a time", () => {
+            const pool = new HTML5AudioPool(2)
+            const first = pool.acquire()
+            const second = pool.acquire()
+
+            expect(second).not.toBe(first)
+            first.src = "first.mp3"
+            second.src = "second.mp3"
+            expect(first.src).toBe("first.mp3")
+        })
+
+        it("keeps one owner's preload intact when the other owner releases", () => {
+            const pool = new HTML5AudioPool(2)
+            const first = pool.acquire()
+            const second = pool.acquire()
+            first.src = "first.mp3"
+            second.src = "second.mp3"
+
+            pool.release(first)
+            pool.release(first)
+
+            expect(second.src).toBe("second.mp3")
+            expect(second.load).not.toHaveBeenCalled()
+            expect(first.src).toBe("")
+        })
+
+        it("ignores releases of elements that are not checked out", () => {
+            const pool = new HTML5AudioPool(1)
+            const audio = pool.acquire()
+            pool.release(audio)
+            const next = pool.acquire()
+            next.src = "next.mp3"
+            const stranger = createAudio()
+            stranger.src = "stranger.mp3"
+
+            pool.release(stranger)
+
+            expect(stranger.src).toBe("stranger.mp3")
+            expect(stranger.load).not.toHaveBeenCalled()
+        })
+
+        it("never reuses an owned element when the pool is exhausted", () => {
+            const pool = new HTML5AudioPool(1)
+            const owned = pool.acquire()
+            owned.src = "owned.mp3"
+            const overflow = pool.acquire()
+
+            expect(overflow).not.toBe(owned)
+            expect(owned.src).toBe("owned.mp3")
+            expect(pool.getStats().preloadElementCount).toBe(1)
+
+            pool.release(overflow)
+            expect(pool.acquire()).not.toBe(overflow)
+        })
+
+        it("reuses released elements", () => {
+            const pool = new HTML5AudioPool(1)
+            const audio = pool.acquire()
+            pool.release(audio)
+
+            expect(pool.acquire()).toBe(audio)
+            expect(pool.getStats().preloadElementCount).toBe(1)
+        })
+    })
 })
 
 class FakeWebAudioNode {
@@ -482,6 +568,51 @@ describe("WebAudioBackend cache integration", () => {
         backend.destroy()
 
         expect(sharedAudioBufferCache.get("song.mp3")).toBeNull()
+    })
+})
+
+describe("WebAudioBackend lite mode switching", () => {
+    beforeEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    type Internals = { panner: FakeWebAudioNode; stereoPanner: unknown; gain: FakeWebAudioNode }
+
+    function createBackendWithGraph(options: { stereoPanner: boolean }) {
+        const context = installWebAudioContext(async () => fakeBuffer("unused"))
+        if (!options.stereoPanner) {
+            ;(context as Partial<typeof context>).createStereoPanner = undefined
+        }
+        const backend = createWebAudioBackend()
+        ;(backend as unknown as { ensureContext(): AudioContext }).ensureContext()
+        return { backend, internals: backend as unknown as Internals }
+    }
+
+    it("reconnects the new panner to the stereo panner when supported", () => {
+        const { backend, internals } = createBackendWithGraph({ stereoPanner: true })
+        const oldPanner = internals.panner
+        const stereoPanner = internals.stereoPanner
+
+        backend.setLiteMode(true)
+
+        expect(internals.panner).not.toBe(oldPanner)
+        expect(oldPanner.disconnect).toHaveBeenCalledWith()
+        expect(internals.panner.connect).toHaveBeenCalledWith(stereoPanner)
+        backend.destroy()
+    })
+
+    it("falls back to the gain node when the context has no stereo panner", () => {
+        const { backend, internals } = createBackendWithGraph({ stereoPanner: false })
+        const oldPanner = internals.panner
+        expect(internals.stereoPanner).toBeNull()
+
+        expect(() => backend.setLiteMode(true)).not.toThrow()
+        expect(() => backend.setLiteMode(false)).not.toThrow()
+
+        expect(internals.panner).not.toBe(oldPanner)
+        expect(oldPanner.disconnect).toHaveBeenCalledWith()
+        expect(internals.panner.connect).toHaveBeenCalledWith(internals.gain)
+        backend.destroy()
     })
 })
 
