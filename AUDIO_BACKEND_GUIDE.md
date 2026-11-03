@@ -118,9 +118,13 @@ that plays fine under HTML5 will fail under Web Audio with a
 
 The full file is downloaded and decoded before playback starts (the player
 shows its buffering state during this window). The decoded buffer is cached
-(LRU, 3 entries) so repeat plays and `preload()`ed next tracks start
+(shared LRU, 4 entries and 250 MiB by default) so repeat plays and `preload()`ed next tracks start
 near-instantly. Decoded PCM is large — roughly 10 MB per stereo minute at
-44.1 kHz — which is why the cache is capped and cleared on unload/unmount.
+44.1 kHz — which is why the cache is capped. Backends retain the cache when
+loading or preloading and release ownership on destroy; only the last owner's
+destroy clears it. Track changes preserve in-flight preloads, and `load()`
+adopts their results. `releasePreload()` and destroy cancel that backend's
+preloads; explicit cache invalidation still prevents stale cache writes.
 
 ### Autoplay
 

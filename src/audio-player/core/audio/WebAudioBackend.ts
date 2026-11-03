@@ -9,6 +9,7 @@ import type {
 import { DEFAULT_PLAYBACK_RATE, sanitizePlaybackRate } from "./AudioBackend"
 import {
     getAudioCacheRevision,
+    retainAudioBufferCache,
     sharedAudioBufferCache,
     sharedAudioStorageCache,
 } from "./audioCaches"
@@ -87,8 +88,9 @@ function getAudioContextCtor(): typeof AudioContext | undefined {
  *   suppresses the `ended` event — repeat-one relies on that.
  * - volume = GainNode, so programmatic volume works on iOS Safari.
  *
- * A monotonic `generation` invalidates every in-flight fetch/decode/play when
+ * A monotonic `generation` invalidates active-source fetch/decode/play when
  * the source changes — the backend-level mirror of the hook's playbackToken.
+ * Preloads have independent abort signals and survive source changes.
  * A separate playback token lets pause cancel pending play without cancelling
  * the download or discarding its decoded buffer.
  */
@@ -119,6 +121,7 @@ export class WebAudioBackend implements AudioBackend {
     private sourceToken = 0
     private loadPromise: Promise<void> | null = null
     private fetchAbort: AbortController | null = null
+    private releaseBufferCache: (() => void) | null = null
     private preloadAborts = new Map<string, AbortController>()
     /** In-flight preload decodes, so load() can adopt them instead of re-fetching. */
     private preloadPromises = new Map<string, Promise<AudioBuffer | null>>()
@@ -254,10 +257,10 @@ export class WebAudioBackend implements AudioBackend {
         }
     }
 
-    /** Fetch a bounded body and suppress failures belonging to cancelled source generations. */
+    /** Fetch a bounded body and suppress failures belonging to cancelled load lifecycles. */
     private async fetchNetworkArrayBuffer(
         url: string,
-        gen: number,
+        current: () => boolean,
         job: AudioLoadJob,
         reportErrors = true,
         signal?: AbortSignal,
@@ -272,7 +275,7 @@ export class WebAudioBackend implements AudioBackend {
                 signal: fetchSignal,
                 ...(reload ? { cache: "reload" as const } : {}),
             })
-            if (gen !== this.generation || fetchSignal?.aborted) return null
+            if (!current() || fetchSignal?.aborted) return null
             if (!response.ok) {
                 if (reportErrors) this.failLoad("src-not-supported", url)
                 return null
@@ -285,10 +288,10 @@ export class WebAudioBackend implements AudioBackend {
                     job.encodedBytes = bytes
                 }
             )
-            if (gen !== this.generation || fetchSignal?.aborted) return null
+            if (!current() || fetchSignal?.aborted) return null
             return data
         } catch (error: unknown) {
-            if (gen !== this.generation) return null
+            if (!current() || fetchSignal?.aborted) return null
             if (error instanceof Error && error.name === "AbortError") return null
             // Includes CORS rejections, which surface as opaque network errors.
             if (reportErrors)
@@ -305,7 +308,7 @@ export class WebAudioBackend implements AudioBackend {
     /** Load memory/disk/network in order, recovering corrupt disk bytes once within a load slot. */
     private async loadBufferWaterfall(
         url: string,
-        gen: number,
+        current: () => boolean,
         reportErrors = true,
         signal?: AbortSignal
     ): Promise<AudioBuffer | null> {
@@ -313,7 +316,6 @@ export class WebAudioBackend implements AudioBackend {
         const memoryHit = this.cacheTouch(url)
         if (memoryHit && decodedBytes(memoryHit) <= getAudioResourcePolicy().maxDecodedBytes)
             return memoryHit
-        const current = () => gen === this.generation && !signal?.aborted
         return withAudioLoad(async (job) => {
             if (!current()) return null
             try {
@@ -344,7 +346,7 @@ export class WebAudioBackend implements AudioBackend {
                 job.encodedBytes = 0
                 const networkData = await this.fetchNetworkArrayBuffer(
                     url,
-                    gen,
+                    current,
                     job,
                     reportErrors,
                     signal,
@@ -372,7 +374,7 @@ export class WebAudioBackend implements AudioBackend {
     }
 
     private async fetchAndDecode(url: string, gen: number): Promise<void> {
-        const buffer = await this.loadBufferWaterfall(url, gen)
+        const buffer = await this.loadBufferWaterfall(url, () => gen === this.generation)
         if (buffer && gen === this.generation) this.completeLoad(buffer)
     }
 
@@ -535,6 +537,7 @@ export class WebAudioBackend implements AudioBackend {
             this.loadPromise = null
             return
         }
+        this.releaseBufferCache ??= retainAudioBufferCache()
         const cached = this.cacheTouch(url)
         if (cached && decodedBytes(cached) <= getAudioResourcePolicy().maxDecodedBytes) {
             this.completeLoad(cached)
@@ -689,6 +692,7 @@ export class WebAudioBackend implements AudioBackend {
     preload(url: string): void {
         const trimmed = url.trim()
         if (!trimmed) return
+        this.releaseBufferCache ??= retainAudioBufferCache()
         if (sharedAudioBufferCache.has(trimmed) || this.preloadPromises.has(trimmed)) {
             return
         }
@@ -698,7 +702,7 @@ export class WebAudioBackend implements AudioBackend {
             try {
                 const buffer = await this.loadBufferWaterfall(
                     trimmed,
-                    this.generation,
+                    () => !abort.signal.aborted,
                     false,
                     abort.signal
                 )
@@ -710,8 +714,8 @@ export class WebAudioBackend implements AudioBackend {
             } finally {
                 if (this.preloadAborts.get(trimmed) === abort) {
                     this.preloadAborts.delete(trimmed)
+                    this.preloadPromises.delete(trimmed)
                 }
-                this.preloadPromises.delete(trimmed)
             }
         }
         this.preloadPromises.set(trimmed, run())
@@ -736,7 +740,8 @@ export class WebAudioBackend implements AudioBackend {
         this.abortFetch()
         this.stopSourceNode()
         this.releasePreload()
-        sharedAudioBufferCache.clear()
+        this.releaseBufferCache?.()
+        this.releaseBufferCache = null
         this.buffer = null
         trackActiveAudioBuffer(this, null)
         this.offset = 0

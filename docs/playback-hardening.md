@@ -120,6 +120,14 @@ queued jobs check cancellation before allocating. Preload cancellation also
 prevents a completed native decode from entering the cache. New jobs snapshot
 the policy; existing jobs keep their limits.
 
+Preloads use their own abort lifecycle, independent of active-track generations.
+Changing tracks preserves active and queued preloads, so the next load can adopt
+the same download and decode. Releasing preloads or destroying their backend
+still cancels them. Decoded-cache ownership is retained lazily by loading or
+preloading backends: one player's teardown preserves other players' buffers,
+and the last owner's teardown clears the shared LRU. A revived backend retains
+ownership again on its next load or preload.
+
 The reader checks declared sizes before downloading and counts streamed chunks,
 including missing or inaccurate Content-Length headers. PCM/float WAV headers
 provide a decoded-size estimate before calling the native decoder, accounting
