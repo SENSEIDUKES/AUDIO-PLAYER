@@ -238,6 +238,37 @@ a.wk-card:hover {
     border-radius: var(--wk-radius);
     background: linear-gradient(145deg, #203a4a, #0c1c32);
 }
+/* SEN's Reader Settings tabs (Audio, Narration) as segmented pills. */
+.wk-sen-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 6px;
+    padding: 4px;
+    border: 1px solid #d6bd872e;
+    border-radius: 14px;
+    background: #ffffff09;
+}
+.wk-sen-tabs__tab {
+    flex: 1;
+    min-width: 0;
+    min-height: 40px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: #a3a3a3;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+}
+.wk-sen-tabs__tab[aria-pressed="true"] {
+    background: #ffffff1a;
+    color: #fafafa;
+}
+.wk-sen-tabs__tab:focus-visible {
+    outline: 2px solid #96ddf9;
+    outline-offset: 2px;
+}
 .wk-reader--sen {
     background: #050505;
 }

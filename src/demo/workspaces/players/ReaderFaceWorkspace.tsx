@@ -11,7 +11,8 @@ import {
     useReaderMixerState,
 } from "../../../audio-player"
 import type { ReaderAtmosphereOption, ReaderMixerOptions } from "../../../audio-player"
-import { ReaderSettingsAudio } from "../../../reader-ui"
+import { ReaderSettingsAudio, ReaderSettingsNarration } from "../../../reader-ui"
+import { useNarrationSamples } from "../../narrationSamples"
 import { narrationTracks } from "../../data"
 import { SEN_SOUNDSCAPES_VOLUME_1 } from "../../senSoundscapes"
 import {
@@ -35,8 +36,9 @@ import "./reader-face.css"
 /* The narrator face SEN's reader ships, and the Reader Settings it opens:
    the floating music note (tap mutes, hold opens a quick master volume) over
    the chapter, and the gear's Text / Audio / Narration sheet whose Audio page
-   is ReaderSettingsAudio. Text and Narration belong to SEN's reader, so here
-   they only say so. The page never saves settings. */
+   is ReaderSettingsAudio and whose Narration page is ReaderSettingsNarration
+   (with sample tiers, voices and speakers). Text belongs to SEN's reader, so
+   here it only says so. The page never saves settings. */
 
 const CELESTIAL = "https://celestialaudio.seihouse.org/DEFAULT"
 
@@ -131,6 +133,7 @@ function ReaderSettingsSheet({
     onSection: (section: Section) => void
     onClose: () => void
 }) {
+    const narration = useNarrationSamples()
     return (
         <SEITabs
             value={section}
@@ -180,11 +183,7 @@ function ReaderSettingsSheet({
                         <ReaderSettingsAudio />
                     </SEITabsPanel>
                     <SEITabsPanel value="narration" className="wk-rf-page">
-                        <p className="sap-reader-settings__help">
-                            Read-aloud voices and speed belong to SEN&apos;s reader (device speech),
-                            not the audio player, so they are not shown here. Narration still ducks
-                            the music through the mixer&apos;s Voice layer.
-                        </p>
+                        <ReaderSettingsNarration {...narration} />
                     </SEITabsPanel>
                     <p className="sap-reader-settings__help wk-rf-saved">
                         In SEN, changes are saved on the device. This page keeps them until you

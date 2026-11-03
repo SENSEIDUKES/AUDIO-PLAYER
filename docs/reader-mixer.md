@@ -906,6 +906,32 @@ variable defaulting to the SEN reader's roles: `light`, `shade`, `text`,
 (`#67d4e3`), `field`, `track`, `border` and `group-bg`. The Library's Reader blue
 glass sets `border` to `#d6bd872e` and `group-bg` to its sheet-group gradient.
 
+### Settings › Narration: `ReaderSettingsNarration`
+
+`ReaderSettingsNarration` (reader-ui entry) is the Narration tab in the same
+design language, and the home of the Voice layer: Settings › Audio is the
+soundtrack, so `ReaderSettingsAudio` leaves Voice out unless `showVoice` is set
+(`ReaderMixerPanel` takes `layers` to choose which layers it shows).
+
+- **Voice | Tier.** The top row has the Voice layer's switch and volume on the
+  left and the reader's tier on the right, a `◀ value ▶` with the tier's mark
+  (`icon`) before its name. SEN's tiers are its Energy grades (Mortal,
+  Immortal, Heaven) with its Fate Pressure flames: what reading aloud costs,
+  from the device's own speech to generated and designed voices.
+- **Voice slots.** Below, a fixed grid of `slotCount` slots (8), two across.
+  Each speaker in the chapter (the narrator, the main character, any named
+  codex character) gets a slot whose `◀ voice ▶` picks from the chosen tier's
+  `voices` (`{ id, label, group? }`; groups name a voice's source, such as a
+  provider). Unused slots keep their place with a dash, so the page never
+  changes shape.
+- **Host-owned.** The host supplies `tiers`, `tier`, `voices` and `slots`,
+  and decides what `onTierChange` and `onAssign(slotId, voiceId)` do. The page
+  never prices, generates or stores anything.
+
+Props: `mixer`, `tiers`, `tier`, `onTierChange`, `voices`, `slots`, `onAssign`,
+`slotCount`, `labels` (`DEFAULT_READER_NARRATION_LABELS`), `help`, `children`,
+`className` and `style`.
+
 **Moving SEN onto these.** SEN still carries its own copies, built on the
 4.0.0 package: `ReaderAudioNote` (now `ReaderNoteFace`) and the `AudioPresets`
 pills plus the mixer theming in `ReaderSettingsSheet` (now

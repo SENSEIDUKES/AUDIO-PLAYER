@@ -1,10 +1,12 @@
 import type { CSSProperties, ReactNode } from "react"
 import { useOptionalReaderMixer } from "@seihouse/audio-player"
-import type { ReaderAtmosphereOption, ReaderMixer } from "@seihouse/audio-player"
+import type { ReaderAtmosphereOption, ReaderMixer, ReaderMixerLayer } from "@seihouse/audio-player"
 import { ReaderMixerPanel } from "./ReaderMixerPanel.js"
 import type { ReaderMixerLabelOverrides, ReaderMixerPanelProps } from "./ReaderMixerPanel.js"
 import { ReaderAudioPresets } from "./ReaderAudioPresets.js"
 import "./reader-ui.css"
+
+const SOUNDTRACK_LAYERS: readonly ReaderMixerLayer[] = ["soundscapes", "atmosphere", "cues"]
 
 export interface ReaderSettingsAudioProps {
     /** The mixer to control. Defaults to the one from `ReaderMixerProvider`. */
@@ -22,8 +24,13 @@ export interface ReaderSettingsAudioProps {
     showAtmospherePicker?: boolean
     /** Show the preset pills under the levels. Defaults to true. */
     showPresets?: boolean
-    /** Sound choices for Soundscapes, Sound Cues and Voice; see `ReaderMixerPanel`. */
+    /** Sound choices for Soundscapes and Sound Cues; see `ReaderMixerPanel`. */
     sounds?: ReaderMixerPanelProps["sounds"]
+    /**
+     * Show the Voice channel here too. Defaults to false: Voice lives on the
+     * Narration page (`ReaderSettingsNarration`), so Audio is the soundtrack.
+     */
+    showVoice?: boolean
     /** Host-owned pieces below the presets, such as SEN's scene and soundtrack chooser. */
     children?: ReactNode
     className?: string
@@ -33,8 +40,8 @@ export interface ReaderSettingsAudioProps {
 
 /**
  * The Audio page of the reader's Settings, composed the way SEN's reader
- * ships it: Master and each layer first, then the presets as pills, then
- * whatever the host adds. The root carries the opt-in `.sap-reader-settings`
+ * ships it: Master and the soundtrack's layers first, then the presets as
+ * pills, then whatever the host adds. Voice lives on the Narration page. The root carries the opt-in `.sap-reader-settings`
  * theme, whose colors default to the SEN reader's own and are all
  * `--sap-reader-settings-*` variables.
  */
@@ -46,6 +53,7 @@ export function ReaderSettingsAudio({
     showAtmospherePicker = true,
     showPresets = true,
     sounds,
+    showVoice = false,
     children,
     className,
     style,
@@ -70,6 +78,7 @@ export function ReaderSettingsAudio({
                 showPresets={false}
                 showAtmospherePicker={showAtmospherePicker}
                 sounds={sounds}
+                layers={showVoice ? undefined : SOUNDTRACK_LAYERS}
             />
             {showPresets && <ReaderAudioPresets mixer={mixer} legend={labels?.presets} />}
             {children}

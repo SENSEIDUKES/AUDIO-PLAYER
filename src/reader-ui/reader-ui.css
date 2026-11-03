@@ -211,6 +211,26 @@
     color: var(--_muted);
     opacity: 0.6;
 }
+/* A choice can carry a small mark before its value, such as a tier's flame. */
+.sap-reader-mixer__stepper-value {
+    position: relative;
+    min-width: 0;
+}
+.sap-reader-mixer__adornment {
+    position: absolute;
+    z-index: 1;
+    top: 50%;
+    left: 8px;
+    display: grid;
+    place-items: center;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: var(--sh-interactive-primary);
+}
+.sap-reader-mixer__stepper[data-adorned="true"] .sap-reader-mixer__stepper-select {
+    padding-left: 26px;
+}
+
 /* While a timer runs, its countdown and Cancel sit on Master's status line. */
 .sap-reader-mixer__channel > .sap-reader-mixer__sleep-status {
     grid-area: status;
@@ -648,5 +668,68 @@
             color 150ms,
             background-color 150ms,
             border-color 150ms;
+    }
+}
+
+/*
+ * Settings › Narration: the Voice | Tier row, then a fixed grid of voice
+ * slots, two across, one per speaker in the chapter. Unused slots keep their
+ * place with a dash, so the page never changes shape.
+ */
+.sap-reader-narration {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+.sap-reader-narration__slots {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 3px;
+}
+.sap-reader-mixer .sap-reader-narration__slot {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    min-height: 0;
+    padding: 4px 4px 0;
+}
+.sap-reader-narration__who {
+    min-width: 0;
+    padding: 2px 6px 0;
+    overflow: hidden;
+    color: var(--sh-text-primary);
+    font-size: 12px;
+    font-weight: var(--sh-weight-medium);
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.sap-reader-narration__slot .sap-reader-mixer__stepper {
+    grid-template-columns: 26px minmax(0, 1fr) 26px;
+}
+.sap-reader-narration__slot .sap-reader-mixer__step {
+    width: 26px;
+}
+.sap-reader-narration__slot .sap-reader-mixer__stepper-select {
+    font-size: 13px;
+}
+.sap-reader-mixer .sap-reader-narration__slot--empty {
+    display: grid;
+    place-items: center;
+    align-content: center;
+    min-height: calc(var(--_target) + 24px);
+    border-radius: var(--_row-radius);
+    background: var(--_row-bg);
+}
+.sap-reader-narration__slot--empty .sap-reader-narration__who {
+    color: var(--_muted);
+    opacity: 0.6;
+}
+@container (max-width: 339px) {
+    .sap-reader-narration__slot .sap-reader-mixer__step {
+        display: none;
+    }
+    .sap-reader-narration__slot .sap-reader-mixer__stepper {
+        grid-template-columns: minmax(0, 1fr);
     }
 }

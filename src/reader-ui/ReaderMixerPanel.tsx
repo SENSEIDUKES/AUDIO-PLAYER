@@ -1,6 +1,6 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react"
+import { useEffect, useId, useMemo, useState } from "react"
 import type { CSSProperties, ReactNode } from "react"
-import { SEIRadio, SEIRadioGroup, SEISelect, SEISlider, SEISwitch } from "@seihouse/ui"
+import { SEIRadio, SEIRadioGroup } from "@seihouse/ui"
 import {
     READER_MIXER_LAYERS,
     useOptionalReaderMixer,
@@ -12,6 +12,8 @@ import type {
     ReaderMixerLayer,
     ReaderMixerLayerStatus,
 } from "@seihouse/audio-player"
+import { ChoiceStepper, MixerSlider, MixerSwitch, groupChoices } from "./controls.js"
+import type { StepperOption } from "./controls.js"
 import "./reader-ui.css"
 
 /** Every piece of text the mixer view shows, for wording and translation. */
@@ -130,6 +132,11 @@ export interface ReaderMixerPanelProps {
     /** Show the preset picker above the master switch. Defaults to true. */
     showPresets?: boolean
     /**
+     * The layers the panel shows, kept in mixer order. Defaults to all of them;
+     * `ReaderSettingsAudio` leaves Voice to the Narration page.
+     */
+    layers?: readonly ReaderMixerLayer[]
+    /**
      * Sound choices for Soundscapes, Sound Cues and Voice, each shown on the
      * right of its channel's row. Atmosphere's comes from the mixer's catalog.
      */
@@ -154,169 +161,7 @@ function mergeLabels(overrides: ReaderMixerLabelOverrides | undefined): ReaderMi
     }
 }
 
-/** Apply mixer selection to the approved switch, retaining its Enter shortcut. */
-function MixerSwitch({
-    checked,
-    labelledBy,
-    onChange,
-}: {
-    checked: boolean
-    labelledBy: string
-    onChange: (checked: boolean) => void
-}) {
-    return (
-        <SEISwitch
-            size="compact"
-            isSelected={checked}
-            aria-labelledby={labelledBy}
-            className="sap-reader-mixer__switch"
-            onChange={onChange}
-            onKeyDown={(event) => {
-                // Native switches own Space. Preserve the previous button's
-                // Enter shortcut without repeating a toggle while held.
-                if (event.key !== "Enter") return
-                event.preventDefault()
-                if (!event.repeat) onChange(!checked)
-            }}
-        />
-    )
-}
-
 type AtmosphereGroup = { name: string | null; options: ReaderAtmosphereOption[] }
-const VOLUME_FORMAT = { style: "unit", unit: "percent", unitDisplay: "narrow" } as const
-
-/** Keep percentage volume and host spoken wording on the approved native range. */
-function MixerSlider({
-    percent,
-    label,
-    formatPercent,
-    onChange,
-}: {
-    percent: number
-    label: string
-    formatPercent: ReaderMixerLabels["formatPercent"]
-    onChange: (value: number) => void
-}) {
-    const control = useRef<HTMLDivElement>(null)
-    // SEISlider owns the native range and all interaction. Its number formatter
-    // cannot express the host's arbitrary wording, so preserve that public hook
-    // on the range's spoken value when the value or host wording changes.
-    useEffect(() => {
-        const input = control.current?.querySelector('input[type="range"]')
-        const valueText = formatPercent(percent)
-        // Timer/status updates must not repeatedly announce an unchanged value.
-        if (input && input.getAttribute("aria-valuetext") !== valueText) {
-            input.setAttribute("aria-valuetext", valueText)
-        }
-    }, [percent, formatPercent])
-    return (
-        <div ref={control} className="sap-reader-mixer__slider">
-            <SEISlider
-                minValue={0}
-                maxValue={100}
-                step={1}
-                value={percent}
-                formatOptions={VOLUME_FORMAT}
-                aria-label={label}
-                onChange={onChange}
-            />
-        </div>
-    )
-}
-
-interface StepperOption {
-    value: string
-    label: string
-}
-
-/**
- * A choice row's control: ◀ and ▶ step through the choices in place, and the
- * native select between them opens the device's own picker for a direct jump.
- * The row never expands, so the menu keeps its height.
- */
-function ChoiceStepper({
-    id,
-    rowLabel,
-    value,
-    options,
-    groups,
-    labels,
-    describedBy,
-    placeholder = "",
-    onChange,
-}: {
-    id: string
-    rowLabel: string
-    value: string
-    /** Every choice in stepping order. */
-    options: readonly StepperOption[]
-    /** Optional grouping for the native picker; defaults to `options` ungrouped. */
-    groups?: readonly { name: string | null; options: readonly StepperOption[] }[]
-    labels: ReaderMixerLabels
-    describedBy?: string
-    /** Text shown while the value matches none of the options. */
-    placeholder?: string
-    onChange: (value: string) => void
-}) {
-    const index = options.findIndex((option) => option.value === value)
-    const step = (delta: number) => {
-        const next = options[index + delta]
-        if (next) onChange(next.value)
-    }
-    return (
-        <div className="sap-reader-mixer__stepper">
-            <button
-                type="button"
-                className="sap-reader-mixer__step"
-                aria-label={labels.previous(rowLabel)}
-                disabled={index <= 0}
-                onClick={() => step(-1)}
-            >
-                <span aria-hidden="true">◀</span>
-            </button>
-            <SEISelect
-                className="sap-reader-mixer__stepper-select"
-                wrapperClassName="sap-reader-mixer__stepper-field"
-                id={id}
-                aria-describedby={describedBy}
-                value={value}
-                onChange={(event) => onChange(event.target.value)}
-            >
-                {index < 0 && (
-                    <option value={value} disabled hidden>
-                        {placeholder}
-                    </option>
-                )}
-                {(groups ?? [{ name: null, options }]).map((group) =>
-                    group.name === null ? (
-                        group.options.map((option) => (
-                            <option key={option.value} value={option.value}>
-                                {option.label}
-                            </option>
-                        ))
-                    ) : (
-                        <optgroup key={group.name} label={group.name}>
-                            {group.options.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                    {option.label}
-                                </option>
-                            ))}
-                        </optgroup>
-                    )
-                )}
-            </SEISelect>
-            <button
-                type="button"
-                className="sap-reader-mixer__step"
-                aria-label={labels.next(rowLabel)}
-                disabled={index < 0 || index >= options.length - 1}
-                onClick={() => step(1)}
-            >
-                <span aria-hidden="true">▶</span>
-            </button>
-        </div>
-    )
-}
 
 /** Group host choices in catalog order, placing ungrouped choices before named groups. */
 function groupAtmospheres(options: readonly ReaderAtmosphereOption[]): AtmosphereGroup[] {
@@ -365,6 +210,7 @@ export function ReaderMixerPanel({
     showAtmospherePicker = true,
     showPresets = true,
     sounds,
+    layers: shownLayers = READER_MIXER_LAYERS,
     className,
     style,
 }: ReaderMixerPanelProps) {
@@ -422,28 +268,11 @@ export function ReaderMixerPanel({
         const sound = sounds?.[layer]
         if (!sound) return emptySlot
         const rowLabel = labels.channelSounds[layer]
-        const groupNames: (string | null)[] = []
-        for (const choice of sound.choices) {
-            const name = typeof choice.group === "string" ? choice.group.trim() || null : null
-            if (!groupNames.includes(name)) groupNames.push(name)
-        }
-        const toOption = (choice: ReaderChannelSoundChoice): StepperOption => ({
-            value: choice.id,
-            label: choice.label,
-        })
-        const soundGroups = [...groupNames]
-            .sort((a, b) => (a === null ? -1 : b === null ? 1 : 0))
-            .map((name) => ({
-                name,
-                options: sound.choices
-                    .filter(
-                        (choice) =>
-                            (typeof choice.group === "string"
-                                ? choice.group.trim() || null
-                                : null) === name
-                    )
-                    .map(toOption),
-            }))
+        const soundGroups = groupChoices(
+            sound.choices,
+            (choice) => choice.group,
+            (choice): StepperOption => ({ value: choice.id, label: choice.label })
+        )
         return (
             <div
                 className="sap-reader-mixer__sound sap-reader-mixer__choice-row"
@@ -618,15 +447,16 @@ export function ReaderMixerPanel({
                     )}
                 </div>
             </div>
-            {!READER_MIXER_LAYERS.some((layer) => state.availability[layer]) && (
-                <p className="sap-reader-mixer__empty">{labels.noAudio}</p>
-            )}
+            {!READER_MIXER_LAYERS.some(
+                (layer) => shownLayers.includes(layer) && state.availability[layer]
+            ) && <p className="sap-reader-mixer__empty">{labels.noAudio}</p>}
             <ul className="sap-reader-mixer__layers">
                 {READER_MIXER_LAYERS.filter(
                     (layer) =>
-                        state.availability[layer] ||
-                        focusedLayer === layer ||
-                        draggingLayer === layer
+                        shownLayers.includes(layer) &&
+                        (state.availability[layer] ||
+                            focusedLayer === layer ||
+                            draggingLayer === layer)
                 ).map((layer) => {
                     const preference = preferences.layers[layer]
                     const layerState = state.layers[layer]
