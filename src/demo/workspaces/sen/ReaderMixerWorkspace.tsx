@@ -13,7 +13,8 @@ import {
     useReaderMixer,
     useReaderMixerState,
 } from "../../../audio-player"
-import { ReaderSettingsAudio } from "../../../reader-ui"
+import { ReaderSettingsAudio, ReaderSettingsNarration } from "../../../reader-ui"
+import { useNarrationSamples } from "../../narrationSamples"
 import type { ReaderSettingsAudioProps } from "../../../reader-ui"
 import type {
     ReaderAtmosphereOption,
@@ -251,6 +252,8 @@ function ReaderSimulation({
     const [category, setCategory] = useState(set.categories[0])
     const [chapterScore, setChapterScore] = useState(set.scores[0])
     const [cueSound, setCueSound] = useState<string | null>(null)
+    const [settingsPage, setSettingsPage] = useState<"audio" | "narration">("audio")
+    const narration = useNarrationSamples((text) => append(`narration · ${text}`))
     const battleTurn = useRef(0)
     const scene = useRef(0)
     const titleFor = (key: string | null) =>
@@ -300,8 +303,9 @@ function ReaderSimulation({
         )
     }
 
-    /* Every channel's sound choice, as NovelExpanded would supply them: the
-       chapter score, an audition of each cue, and the narration recording. */
+    /* Each soundtrack layer's sound choice, as NovelExpanded would supply them:
+       the chapter score and an audition of each cue. Voices live on the
+       Narration page. */
     const sounds: ReaderSettingsAudioProps["sounds"] = {
         soundscapes: {
             choices: set.scores.map((score) => ({
@@ -327,20 +331,6 @@ function ReaderSimulation({
                 if (!cue) return
                 setCueSound(id)
                 playCue(cue, "cue sound chosen in Settings")
-            },
-        },
-        voice: {
-            // Recordings are chosen by their place in the narration queue.
-            choices: session.queue.map((track, index) => ({
-                id: String(index),
-                label: track.title,
-            })),
-            value: session.currentIndex >= 0 ? String(session.currentIndex) : null,
-            onChange: (id) => {
-                const index = Number(id)
-                if (!session.queue[index]) return
-                session.playTrack(index)
-                append(`narrator chosen in Settings → “${session.queue[index].title}”`)
             },
         },
     }
@@ -543,7 +533,29 @@ function ReaderSimulation({
                 >
                     <WidthFrame width={width}>
                         <div className="wk-sen-settings" id={MIXER_VIEW_ID}>
-                            <ReaderSettingsAudio sounds={sounds} />
+                            {/* SEN's Reader Settings tabs, Audio and Narration, in place. */}
+                            <div
+                                className="wk-sen-tabs"
+                                role="group"
+                                aria-label="Reader Settings page"
+                            >
+                                {(["audio", "narration"] as const).map((page) => (
+                                    <button
+                                        key={page}
+                                        type="button"
+                                        className="wk-sen-tabs__tab"
+                                        aria-pressed={settingsPage === page}
+                                        onClick={() => setSettingsPage(page)}
+                                    >
+                                        {page === "audio" ? "Audio" : "Narration"}
+                                    </button>
+                                ))}
+                            </div>
+                            {settingsPage === "audio" ? (
+                                <ReaderSettingsAudio sounds={sounds} />
+                            ) : (
+                                <ReaderSettingsNarration {...narration} />
+                            )}
                         </div>
                     </WidthFrame>
                 </Panel>
