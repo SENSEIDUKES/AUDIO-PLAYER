@@ -270,11 +270,13 @@ interface Validation {
     /** Plain-language outcome shown above the findings; null when there is nothing to say. */
     headline: string | null
     issues: CueManifestIssue[]
+    /** Cues plus actions dropped from `pending`, from the parse result. */
+    omitted: number
     /** Manifest with invalid parts omitted, offered only after the user has seen what is dropped. */
     pending: CueManifest | null
 }
 
-const NO_VALIDATION: Validation = { headline: null, issues: [], pending: null }
+const NO_VALIDATION: Validation = { headline: null, issues: [], omitted: 0, pending: null }
 
 /** Apply keyed manifests and show runtime installation, pack readiness and cue outcomes. */
 function CuesContent() {
@@ -294,6 +296,7 @@ function CuesContent() {
                           ? `Applied with ${omitted} omission(s).`
                           : "Applied. The manifest has warnings:",
                       issues,
+                      omitted,
                       pending: null,
                   }
                 : NO_VALIDATION
@@ -314,6 +317,7 @@ function CuesContent() {
             setValidation({
                 headline: `Not valid JSON: ${(error as Error).message}`,
                 issues: [],
+                omitted: 0,
                 pending: null,
             })
             return
@@ -323,12 +327,14 @@ function CuesContent() {
             setValidation({
                 headline: "Not applied: nothing in this manifest is usable.",
                 issues: result.issues,
+                omitted: 0,
                 pending: null,
             })
         } else if (result.status === "accepted-with-omissions") {
             setValidation({
                 headline: `Not applied yet: ${result.omittedCueCount} cue(s) and ${result.omittedActionCount} action(s) would be dropped. Fix them, or apply only what is valid.`,
                 issues: result.issues,
+                omitted: result.omittedCueCount + result.omittedActionCount,
                 pending: result.manifest,
             })
         } else {
@@ -339,8 +345,13 @@ function CuesContent() {
     const applyValidPart = () => {
         const pending = validation.pending
         if (!pending) return
-        const omitted = validation.issues.filter((issue) => issue.severity === "error").length
-        applyManifest(pending, validation.issues, omitted)
+        applyManifest(pending, validation.issues, validation.omitted)
+    }
+
+    // Findings and the pending manifest describe the draft they were parsed from.
+    const editDraft = (value: string) => {
+        setDraft(value)
+        setValidation(NO_VALIDATION)
     }
 
     const loadPreset = (preset: CueManifest) => {
@@ -358,7 +369,7 @@ function CuesContent() {
             <CueConsole
                 manifest={manifest}
                 draft={draft}
-                setDraft={setDraft}
+                setDraft={editDraft}
                 validation={validation}
                 integrated={integrated}
                 setIntegrated={setIntegrated}
@@ -434,7 +445,9 @@ function CueConsole({
                             <NarrativeFace
                                 {...narrativeOptions}
                                 sceneMood={
-                                    narrativeOptions.ambientProfile?.replace("-loop", "") ?? "—"
+                                    narrativeOptions.sceneMood ??
+                                    narrativeOptions.ambientProfile?.replace("-loop", "") ??
+                                    "—"
                                 }
                                 ambienceManifest={STAND_IN_SPRITE_PACK}
                                 {...SEA_THEME}

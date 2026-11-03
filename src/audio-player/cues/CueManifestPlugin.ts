@@ -116,6 +116,11 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
         return typeof live === "number" && Number.isFinite(live) ? live : fallback
     }
 
+    private readEngineTime(): number | undefined {
+        const time = this.context?.getEngine().currentTime
+        return typeof time === "number" && Number.isFinite(time) ? time : undefined
+    }
+
     /** True while a seek has been requested but the live position has not caught up. */
     private isSeekPending(): boolean {
         const context = this.context
@@ -166,7 +171,8 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
      * it, and the live position otherwise (e.g. a restored position).
      */
     private startPosition(): number | undefined {
-        const live = this.readPosition()
+        // At play start only, the engine's (throttled) time beats having no position at all.
+        const live = this.readPosition(this.readEngineTime())
         const from = this.resumeFrom
         this.resumeFrom = null
         if (from === null) return live

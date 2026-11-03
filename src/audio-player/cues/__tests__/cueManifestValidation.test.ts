@@ -181,6 +181,51 @@ describe("parseCueManifest", () => {
         ])
     })
 
+    it("an omitted cue does not reserve its id for a later valid cue", () => {
+        const result = parseCueManifest({
+            version: "sap-cues/1",
+            cues: [
+                {
+                    id: "same",
+                    trigger: { kind: "time", at: 1 },
+                    actions: [{ command: "duck.set" }],
+                },
+                { ...good, id: "same" },
+            ],
+        })
+        expect(result.status).toBe("accepted-with-omissions")
+        expect(result.manifest?.cues.map((c) => c.id)).toEqual(["same"])
+        expect(result.issues.map((issue) => issue.code)).not.toContain("duplicate-cue-id")
+    })
+
+    it("treats inherited property names as undeclared packs and clips instead of throwing", () => {
+        const action = (pack: string, clip: string) => ({ command: "sprite.play", pack, clip })
+        const result = parseCueManifest({
+            version: "sap-cues/1",
+            assets: {
+                spritePacks: { p: { src: "/p.wav", clips: { hit: { offset: 0, duration: 1 } } } },
+            },
+            cues: [
+                {
+                    id: "proto",
+                    trigger: { kind: "time", at: 1 },
+                    actions: [action("constructor", "hit"), action("p", "toString")],
+                },
+            ],
+        })
+        expect(result.status).toBe("valid")
+        expect(result.issues.map((issue) => [issue.severity, issue.field])).toEqual([
+            ["warning", "pack"],
+            ["warning", "clip"],
+        ])
+        expect(() =>
+            parseCueManifest({
+                version: "sap-cues/1",
+                cues: [{ ...good, actions: [action("__proto__", "x")] }],
+            })
+        ).not.toThrow()
+    })
+
     it("rejects an unsupported version at the manifest level", () => {
         const result = parseCueManifest({ version: "sap-cues/2", cues: [] })
         expect(result.status).toBe("invalid")

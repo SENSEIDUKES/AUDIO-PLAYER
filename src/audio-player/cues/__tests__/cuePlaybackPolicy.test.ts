@@ -206,6 +206,28 @@ describe("CueRuntime playback policy", () => {
         expect(h.fired).toEqual(["end"])
     })
 
+    it("stops the current sample when a cue's own player.seek moved playback", () => {
+        let runtime!: CueRuntime
+        const h = harness({
+            getEngine: () =>
+                ({ seek: (time: number) => runtime.handleTimeUpdate(time, true) }) as never,
+        })
+        runtime = new CueRuntime(
+            h.context,
+            manifestOf(
+                cue("a", 1, { actions: [{ command: "player.seek", time: 0 }] }),
+                cue("b", 2, { replayable: true })
+            )
+        )
+        runtime.setPlaying(true, 0)
+
+        runtime.handleTimeUpdate(3) // "a" rewinds playback to 0 mid-sample
+        expect(h.fired).toEqual([]) // "b" belongs to the stale sample and stays armed
+
+        runtime.handleTimeUpdate(2.5) // playback reaches "b" again
+        expect(h.fired).toEqual(["b"])
+    })
+
     it("fires same-id cues in a hand-built manifest independently", () => {
         const h = harness()
         const runtime = new CueRuntime(h.context, manifestOf(cue("x", 1), cue("x", 2)))
@@ -257,6 +279,17 @@ describe("CueManifestPlugin playback clock", () => {
         h.position.value = 0.02
         plugin.onPlay()
         expect(h.fired).toEqual(["zero", "a"])
+        plugin.destroy()
+    })
+
+    it("falls back to the engine time at play start when there is no live position", () => {
+        const h = harness({ getPlaybackPosition: undefined })
+        h.engine.currentTime = 12
+        const plugin = createCueManifestPlugin()
+        plugin.init(h.context)
+        plugin.onTrackLoad(track(manifestOf(cue("a", 5), cue("b", 12))))
+        plugin.onPlay()
+        expect(h.fired).toEqual(["b"]) // 5 is behind the engine time; 12 is exactly at it
         plugin.destroy()
     })
 

@@ -596,6 +596,7 @@ describe("WebAudioBackend lite mode switching", () => {
         backend.setLiteMode(true)
 
         expect(internals.panner).not.toBe(oldPanner)
+        expect(internals.panner.panningModel).toBe("equalpower")
         expect(oldPanner.disconnect).toHaveBeenCalledWith()
         expect(internals.panner.connect).toHaveBeenCalledWith(stereoPanner)
         backend.destroy()
@@ -607,7 +608,10 @@ describe("WebAudioBackend lite mode switching", () => {
         expect(internals.stereoPanner).toBeNull()
 
         expect(() => backend.setLiteMode(true)).not.toThrow()
+        expect(internals.panner.panningModel).toBe("equalpower")
+        expect(internals.panner.connect).toHaveBeenCalledWith(internals.gain)
         expect(() => backend.setLiteMode(false)).not.toThrow()
+        expect(internals.panner.panningModel).toBe("HRTF")
 
         expect(internals.panner).not.toBe(oldPanner)
         expect(oldPanner.disconnect).toHaveBeenCalledWith()

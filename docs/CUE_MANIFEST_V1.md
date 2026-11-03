@@ -199,7 +199,7 @@ purpose).
 | `event.emit` | cue runtime | dispatches a DOM event on the session cue target for the host |
 | `ambience.crossfade` | `useNarrativeCueController` | profile and `durationMs` (as `crossfadeMs`) |
 | `duck.set` | `useNarrativeCueController` | |
-| `volume.fadeNarration` | `useNarrativeCueController` | timed ramp of `narrationVolume`; pass the same `mixer` you give `useNarrativeAudio` so it starts from the reader's Voice level |
+| `volume.fadeNarration` | `useNarrativeCueController` | timed ramp of `narrationVolume`; pass the same `mixer` you give `useNarrativeAudio` so it starts from the reader's Voice level (with neither a mixer nor a session, the first fade applies its target immediately because the starting level is unknown) |
 | `layer.set` | `useNarrativeCueController` (partial) | `intensity` and `mood`/`scene` drive narrative options; every layer is exposed as `layers` for host UI |
 | `spatial.pan` | **host only** | Not supported yet: nothing bundled pans sprites or narration |
 

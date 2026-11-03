@@ -301,7 +301,6 @@ export function parseCueManifest(json: unknown): CueManifestParseResult {
                 })
                 return
             }
-            seenIds.set(cueId, cueIndex)
         }
 
         const actions: CueAction[] = []
@@ -342,8 +341,10 @@ export function parseCueManifest(json: unknown): CueManifestParseResult {
             }
             const action = parsed.data as CueAction
             if (action.command === "sprite.play" || action.command === "sprite.fade") {
-                const pack = packs[action.pack]
-                const field = !pack ? "pack" : !pack.clips[action.clip] ? "clip" : undefined
+                const own = (object: object, key: string) =>
+                    Object.prototype.hasOwnProperty.call(object, key)
+                const pack = own(packs, action.pack) ? packs[action.pack] : undefined
+                const field = !pack ? "pack" : !own(pack.clips, action.clip) ? "clip" : undefined
                 if (field) {
                     issues.push({
                         severity: "warning",
@@ -386,6 +387,8 @@ export function parseCueManifest(json: unknown): CueManifestParseResult {
             return
         }
 
+        // Reserve the id only now: an omitted cue must not block a later valid cue's id.
+        if (cueId !== undefined) seenIds.set(cueId, cueIndex)
         cues.push({
             ...shell.data,
             id: cueId ?? "cue-" + generateSecureId(),

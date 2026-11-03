@@ -45,6 +45,9 @@ const clamp01 = (value: number) => Math.max(0, Math.min(1, value))
  * `narrationVolume`), and `layer.set` (`intensity`, `mood`/`scene`, plus every layer in
  * `layers`). `spatial.pan` is not supported here and is left unclaimed. Spread
  * `narrativeOptions` into `useNarrativeAudio` / `NarrativeFace` for the audio to follow.
+ * A narration fade needs a starting level: it reads the `mixer` option's Voice level or the
+ * surrounding session's volume. With neither (and no earlier fade) the level is unknown, so
+ * the first `volume.fadeNarration` applies its target immediately rather than guessing.
  * See `CUE_ACTION_SUPPORT`.
  */
 export function useNarrativeCueController(options: UseNarrativeCueControllerOptions = {}) {

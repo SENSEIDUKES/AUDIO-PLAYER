@@ -94,6 +94,8 @@ export class CueRuntime {
     private lastTime: number | null = null
     private playing = true
     private deferredSeekCues: CueEvent[] = []
+    /** Bumped by every seek so a sample can tell that one of its own cues moved playback. */
+    private seekEpoch = 0
     private lateToleranceSeconds: number
     private activeSprites = new Map<string, string[]>()
 
@@ -329,11 +331,18 @@ export class CueRuntime {
         for (const cue of this.timeCues) {
             const at = this.cueTime(cue)
             if (at > currentTime) break
-            if (at >= from && !this.firedCues.has(cue)) this.fireTimeCue(cue, currentTime)
+            if (at >= from && !this.firedCues.has(cue)) {
+                const epoch = this.seekEpoch
+                this.fireTimeCue(cue, currentTime)
+                // A cue's player.seek made the rest of this sample stale; the next sample
+                // continues from the seek target with replayable cues re-armed.
+                if (epoch !== this.seekEpoch) break
+            }
         }
     }
 
     private handleSeek(target: number) {
+        ++this.seekEpoch
         // A newer seek supersedes cues an earlier paused seek was holding back.
         for (const cue of this.deferredSeekCues) this.firedCues.delete(cue)
         this.deferredSeekCues = []
