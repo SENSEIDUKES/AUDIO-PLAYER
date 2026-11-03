@@ -54,7 +54,7 @@ TypeScript signatures live in
 | Shared sessions | `AudioSessionProvider`, `useAudioSession`, `useAudioTime`, `SessionEngine`, `serializeSession`, `deserializeSession` | A single queue and audio element shared by multiple React surfaces. |
 | Skins and reusable UI | `ReaderNoteFace`, `NarrativeFace` (deprecated) | `ReaderNoteFace` is the narrator face SEN's reader ships: a music note that mutes on tap and opens a quick master volume on hold. `NarrativeFace` is deprecated in 5.1.0; no reader uses it. The v4 music faces (`AudioPlayer`, `FullCardPlayer`, `StickyBottomPlayer`, `VaultRowPlayer`, `MiniSidebarPlayer`, `SeaCardPlayer`) were archived in 5.0.0 while one new player face is designed. |
 | Plugins | `PluginManager`, `AudioPlayerPlugin`, `createAutomixPlugin`, `createKeyboardShortcutPlugin`, `createAnalyticsPlugin`, `createLyricsPlugin`, `createSleepTimerPlugin`, `createWaveformPlugin` | Optional lifecycle behavior without changing a skin. See [`PLUGIN_DEVELOPMENT_GUIDE.md`](../PLUGIN_DEVELOPMENT_GUIDE.md). |
-| Cues | `CueManifestPlugin`, `CueRuntime`, `validateCueManifest`, `useNarrativeCueController`, `CueManifest` | Validated, time-based events that coordinate a player with host UI or a narrative experience. See [`CUE_MANIFEST_V1.md`](./CUE_MANIFEST_V1.md). |
+| Cues | `CueManifestPlugin`, `createReaderMixerCuePlugin`, `CueRuntime`, `validateCueManifest`, `useNarrativeCueController`, `CueManifest` | Validated, time-based events that coordinate a player with host UI or a narrative experience. See [`CUE_MANIFEST_V1.md`](./CUE_MANIFEST_V1.md). |
 | Narrative engines | `useNarrativeAudio`, `SceneMixEngine`, `createSceneMixEngine`, `OneShotEngine`, `createOneShotEngine`, `MediaGainSink` | Narration, ambience, one-shots, and scene-score transitions independent of a visible player skin. Both engines accept an optional `createGainSink` (Web Audio gain) and an `unlock()` for gesture-unlocked spare elements; `SceneMixEngine` adds `pause()`/`resume()`. |
 | Reader mixer | `createReaderMixer`, `ReaderMixer`, `ReaderMixerProvider`, `useReaderMixer`, `useReaderMixerState`, `ReaderNoteFace`, `ReaderMixerNote`, `ReaderMixerVoice`, `ReaderMixerVoiceOutput`, `ReaderMixerPreferences`, `computeReaderMixerGain`, `loadReaderMixerPreferences`, `saveReaderMixerPreferences` | Core soundtrack/narration engines and chapter note. See [`reader-mixer.md`](./reader-mixer.md). |
 | Reader UI (`/reader-ui`) | `ReaderSettingsAudio`, `ReaderAudioPresets`, `ReaderMixerPanel`, `DEFAULT_READER_MIXER_LABELS`, `ReaderSettingsAudioProps`, `ReaderAudioPresetsProps`, `ReaderMixerPanelProps`, `ReaderMixerLabels`, `ReaderMixerLabelOverrides` | Approved universal SEIHouse UI controls, isolated from the core. `ReaderSettingsAudio` is SEN's Settings › Audio page as the reader ships it. |
@@ -316,7 +316,7 @@ The root exports `invalidateAudioCache`, `configureAudioCacheRetention`,
 `configureAudioResources`, `getAudioResourcePolicy`, `getAudioCacheStats`, and
 `recommendAudioBackend`, plus `AudioResourcePolicy` and `AudioCacheRetention`.
 Controls apply to the shared WebAudioBackend caches/load scheduler. Other
-narrative and sprite engines keep their existing policies.
+decoded sprite loads share these limits; media-element narrative and sprite playback streams instead of decoding whole assets.
 
 ```ts
 import {
@@ -337,3 +337,19 @@ const stats = getAudioCacheStats()
 
 See [cache recovery and loading limits](./playback-hardening.md) for defaults,
 invalidation semantics, memory-estimate limitations and device checks.
+
+
+### Cue lifecycle and mixer adapter
+
+`createCueManifestPlugin(options?)` and `createReaderMixerCuePlugin(mixer, options?)`
+accept `CueRuntimeOptions` (`onStatus`, `onOutcome`). `CueStatusEvent`,
+`CueOutcomeEvent` and `CuePackState` describe their diagnostics. Loading cues skip
+immediately; named packs preload independently. See [cue lifecycle](./CUE_MANIFEST_V1.md#runtime-readiness-and-replacement).
+
+`PluginSoundLayer.createScope?()` returns a `PluginSoundScope` with `dispose()`;
+`loadSpritePack(manifest, pack?)` and `playSprite(clip, { pack, ...options })`
+address independent packs within that scope. Existing default-pack calls remain
+valid. `getLastSkipReason?()` exposes policy rejections. `AudioSpritePlayOptions`
+adds optional `onStarted`, `onEnded`, and `onError` observers. `AudioSpriteEngineOptions`
+adds host output connection, active-count observation, and an optional start deadline.
+The mixer adapter configures these internally; hosts need no raw audio nodes.

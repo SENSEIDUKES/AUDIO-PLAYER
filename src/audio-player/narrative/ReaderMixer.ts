@@ -1,5 +1,9 @@
 import type { FallbackSourceEvent, Track, TrackSource } from "../types"
 import { trackKey } from "../utils/trackKey"
+import { AudioSpriteEngine } from "../core/audio/AudioSpriteEngine"
+import { createPluginSoundScope } from "../core/audio/pluginSoundScope"
+import type { PluginSoundScope } from "../core/plugins/PluginInterface"
+import { ElementSpriteEngine } from "./ElementSpriteEngine"
 import { OneShotEngine } from "./OneShotEngine"
 import type { OneShotPlaybackErrorEvent } from "./OneShotEngine"
 import { SCENE_FADE_MS, SceneMixEngine } from "./SceneMixEngine"
@@ -595,7 +599,21 @@ export class ReaderMixer {
     private cueStatus: CueStatus = "idle"
     private cueFailure: string | null = null
     private lastCue: string | null = null
-    private activeCues = 0
+    private urlActiveCues = 0
+    private readonly spriteEngines = new Set<{
+        engine: AudioSpriteEngine | ElementSpriteEngine
+        count: number
+        routed: boolean
+    }>()
+    private readonly spriteScopes = new Set<PluginSoundScope>()
+    private readonly spriteOptions: ReaderMixerOptions
+    private lastSpriteSkip: string | undefined
+    private get activeCues(): number {
+        return (
+            this.urlActiveCues +
+            [...this.spriteEngines].reduce((sum, record) => sum + record.count, 0)
+        )
+    }
     private pageHidden = false
     /** Duck applied to the engines right now (ramps toward duckTarget). */
     private duckLevel = 0
@@ -621,6 +639,7 @@ export class ReaderMixer {
     private voicePausedForSleep = false
 
     constructor(options: ReaderMixerOptions = {}) {
+        this.spriteOptions = { ...options }
         this.leveling = {
             ...DEFAULT_LOUDNESS_LEVELING,
             ...(typeof options.leveling === "object"
@@ -741,7 +760,7 @@ export class ReaderMixer {
             onPlaybackChange: () => this.refresh(),
             onPlaybackError: (event) => this.handleCueError(event),
             onActiveCountChange: (count) => {
-                this.activeCues = count
+                this.urlActiveCues = count
                 this.refresh()
             },
         })
@@ -941,6 +960,7 @@ export class ReaderMixer {
         )
             return false
         if (computeReaderMixerGain(this.prefs, "cues", options.volume ?? 1) <= 0) return false
+        if (this.activeCues >= this.cueLimit()) return false
         const element = this.cues.playOneShot(url, {
             volume: options.volume,
             startTime: options.startTime,
@@ -957,6 +977,152 @@ export class ReaderMixer {
         return true
     }
 
+    private cueLimit(): number {
+        const value = this.spriteOptions.maxConcurrentCues
+        return typeof value === "number" && Number.isFinite(value)
+            ? Math.max(1, Math.floor(value))
+            : 6
+    }
+
+    /** Acquire one manifest's sprites under the reader's shared cue policy. */
+    createCueSoundScope(): PluginSoundScope {
+        if (this.disposed) throw new Error("Reader mixer disposed")
+        const scope = createPluginSoundScope(
+            () => {
+                const record = {
+                    engine: null as unknown as AudioSpriteEngine | ElementSpriteEngine,
+                    count: 0,
+                    routed: !!this.graph && !this.elementFallbacks.has("cues"),
+                }
+                let disposed = false
+                let generation = 0
+                const changed = (count: number) => {
+                    record.count = count
+                    this.refresh()
+                }
+                const elementEngine = (fallback = false) =>
+                    new ElementSpriteEngine({
+                        crossOrigin: fallback
+                            ? null
+                            : this.spriteOptions.crossOrigin === undefined
+                              ? "anonymous"
+                              : this.spriteOptions.crossOrigin,
+                        startTimeoutMs: Math.max(1, this.spriteOptions.cueStartTimeoutMs ?? 1500),
+                        onActiveCountChange: changed,
+                    })
+                record.engine = record.routed
+                    ? new AudioSpriteEngine({
+                          connectOutput: (output) => this.graph!.connectSource("cues", output),
+                          startTimeoutMs: Math.max(1, this.spriteOptions.cueStartTimeoutMs ?? 1500),
+                          onActiveCountChange: changed,
+                      })
+                    : elementEngine()
+                this.spriteEngines.add(record)
+                return {
+                    load: async (manifest) => {
+                        const request = ++generation
+                        try {
+                            await record.engine.load(manifest)
+                        } catch (error) {
+                            if (
+                                disposed ||
+                                request !== generation ||
+                                !record.routed ||
+                                (this.spriteOptions.routing ?? "auto") !== "auto" ||
+                                (error as Error)?.name === "AbortError"
+                            )
+                                throw error
+                            record.engine.dispose()
+                            record.routed = false
+                            record.engine = elementEngine(true)
+                            this.routingFallback("cues")
+                            await record.engine.load(manifest)
+                        }
+                        if (disposed || request !== generation)
+                            throw new DOMException("Cancelled", "AbortError")
+                        this.applySpriteLevels()
+                    },
+                    play: (clip, options) => {
+                        this.lastSpriteSkip = undefined
+                        if (disposed || this.disposed) this.lastSpriteSkip = "disposed"
+                        else if (this.pageHidden) this.lastSpriteSkip = "page-hidden"
+                        else if (this.session.idle || this.session.sleep.status === "fired")
+                            this.lastSpriteSkip = "session-inactive"
+                        else if (this.layerGain("cues") <= 0)
+                            this.lastSpriteSkip = "mixer-suppressed"
+                        else if (this.activeCues >= this.cueLimit())
+                            this.lastSpriteSkip = "concurrency-limit"
+                        if (this.lastSpriteSkip) return null
+                        const id = record.engine.play(clip, {
+                            ...options,
+                            onStarted: () => {
+                                this.cueStatus = "idle"
+                                this.cueFailure = null
+                                this.refresh()
+                                options?.onStarted?.()
+                            },
+                            onError: (reason) => {
+                                this.handleCueError({
+                                    url: clip,
+                                    reason:
+                                        reason === "autoplay-blocked" || reason === "start-timeout"
+                                            ? "autoplay-blocked"
+                                            : "failed",
+                                })
+                                options?.onError?.(reason)
+                            },
+                        })
+                        if (id) {
+                            this.lastCue = clip
+                            this.session.start()
+                            this.refresh()
+                        }
+                        return id
+                    },
+                    stop: (id) => record.engine.stop(id),
+                    fade: (id, volume, duration) => record.engine.fade(id, volume, duration),
+                    stopAll: () => record.engine.stopAll(),
+                    dispose: () => {
+                        if (disposed) return
+                        disposed = true
+                        ++generation
+                        try {
+                            record.engine.dispose()
+                        } finally {
+                            this.spriteEngines.delete(record)
+                            this.refresh()
+                        }
+                    },
+                }
+            },
+            () => this.spriteScopes.delete(scope)
+        )
+        scope.getLastSkipReason = () => this.lastSpriteSkip
+        this.spriteScopes.add(scope)
+        return scope
+    }
+
+    private stopCueSprites(): void {
+        for (const { engine } of this.spriteEngines) engine.stopAll()
+    }
+
+    private applySpriteLevels(): void {
+        const gain = this.layerGain("cues")
+        for (const record of this.spriteEngines) {
+            // Native outputs already receive the shared bus gain, even after URL fallback.
+            record.engine.setMasterVolume(
+                record.routed ? (this.elementFallbacks.has("cues") ? gain : 1) : gain
+            )
+            if (
+                gain <= 0 ||
+                this.pageHidden ||
+                this.session.idle ||
+                this.session.sleep.status === "fired"
+            )
+                record.engine.stopAll()
+        }
+    }
+
     /**
      * Stop all playing or loading Sound Cues immediately. A late media start
      * cannot revive them. Loops, Voice, session timers and preferences stay as
@@ -967,6 +1133,7 @@ export class ReaderMixer {
         this.cueStatus = "idle"
         this.cueFailure = null
         this.cues.stopAll()
+        this.stopCueSprites()
         this.lastCue = null
         this.refresh()
     }
@@ -1279,6 +1446,8 @@ export class ReaderMixer {
         this.soundscapes.unlock()
         this.atmosphere.unlock()
         this.cues.unlock()
+        for (const { engine } of this.spriteEngines)
+            if (engine instanceof ElementSpriteEngine) engine.unlock()
         if (!this.pageHidden && !this.session.idle && this.session.sleep.status !== "fired") {
             if (this.layerGain("soundscapes") > 0) this.soundscapes.resume()
             if (this.layerGain("atmosphere") > 0) this.atmosphere.resume()
@@ -1323,6 +1492,7 @@ export class ReaderMixer {
         this.soundscapes.dispose()
         this.atmosphere.dispose()
         this.cues.dispose()
+        for (const scope of [...this.spriteScopes]) scope.dispose()
         this.voiceOutput?.pause()
         this.disconnectVoice?.()
         this.restoreAudioSession?.()
@@ -1470,6 +1640,7 @@ export class ReaderMixer {
             // Muting is what silences a layer where element volume is ignored.
             engine.setMuted(gain <= 0)
         }
+        this.applySpriteLevels()
         this.voiceOutput?.setLevel(this.prefs.layers.voice.level)
         this.voiceOutput?.setEnabled(this.voiceEnabled())
         this.syncRuntime()
@@ -1499,7 +1670,12 @@ export class ReaderMixer {
                     this.loopStatus[layer].state !== "resting") ||
                     this[layer].hasRoutedDemand())
         )
-        return loopWanted || (this.layerGain("cues") > 0 && this.cues.hasRoutedDemand())
+        return (
+            loopWanted ||
+            (this.layerGain("cues") > 0 &&
+                (this.cues.hasRoutedDemand() ||
+                    [...this.spriteEngines].some((record) => record.routed && record.count > 0)))
+        )
     }
 
     private handleCueError(event: OneShotPlaybackErrorEvent): void {
@@ -1543,6 +1719,7 @@ export class ReaderMixer {
                 this.soundscapes.pause()
                 this.atmosphere.pause()
                 this.cues.stopAll()
+                this.stopCueSprites()
                 this.voiceOutput?.setEnabled(false)
                 this.pauseVoiceWhileHidden()
             } else if (!this.session.idle && this.session.sleep.status !== "fired") {

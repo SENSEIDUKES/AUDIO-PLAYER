@@ -1,14 +1,18 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
 import {
     AudioSessionProvider,
     NarrativeFace,
     createCueManifestPlugin,
+    createReaderMixerCuePlugin,
+    ReaderMixerProvider,
+    useReaderMixer,
     formatTime,
     useAudioSession,
     useAudioTime,
     useNarrativeCueController,
     validateCueManifest,
 } from "../../../audio-player"
+import { ReaderMixerPanel } from "../../../reader-ui"
 import type { CueManifest, Track } from "../../../audio-player"
 import { SAMPLE, SEA_THEME, STAND_IN_SPRITE_PACK } from "../../data"
 import {
@@ -91,11 +95,7 @@ const STORY_MANIFEST: CueManifest = {
     ],
 }
 
-/* The same story plus a sprite cue and the stand-in pack it plays from.
-   Known package issue: under React's development double-mount (the local dev
-   server) the plugin sound layer is disposed and never recreated, so loading a
-   sprite pack throws and the cue runtime never starts. Built sites are not
-   affected. See usePluginSoundLayer.ts. */
+/* The same story plus a stand-in sprite pack. */
 const SPRITE_MANIFEST: CueManifest = {
     ...STORY_MANIFEST,
     id: "workshop-archive-sprites",
@@ -211,21 +211,71 @@ function CueTimeline({ manifest }: { manifest: CueManifest }) {
     )
 }
 
+/** The plugin lifetime matches the keyed session, including Strict Mode replay. */
+function CueSession({
+    track,
+    append,
+    integrated,
+    children,
+}: {
+    track: Track
+    append: (message: string, tone?: LogLine["tone"]) => void
+    integrated: boolean
+    children: ReactNode
+}) {
+    const mixer = useReaderMixer()
+    const plugins = useMemo(() => {
+        const options = {
+            onStatus: (event: import("../../../audio-player").CueStatusEvent) =>
+                append(
+                    `Manifest ${event.manifestId ?? "custom"}: ${event.status}${event.pack ? ` (${event.pack})` : ""}${event.message ? ` — ${event.message}` : ""}`,
+                    event.status === "failed" || event.status === "cleanup-failed" ? "warn" : "info"
+                ),
+            onOutcome: (event: import("../../../audio-player").CueOutcomeEvent) =>
+                append(
+                    `Cue ${event.cueId}: ${event.outcome}${event.reason ? ` (${event.reason})` : ""}`,
+                    event.outcome === "skipped" || event.outcome === "failed" ? "warn" : "ok"
+                ),
+        }
+        return [
+            integrated
+                ? createReaderMixerCuePlugin(mixer, options)
+                : createCueManifestPlugin(options),
+        ]
+    }, [append, integrated, mixer])
+    return (
+        <AudioSessionProvider initialQueue={[track]} plugins={plugins}>
+            {children}
+        </AudioSessionProvider>
+    )
+}
+
 export function CuesWorkspace() {
+    return (
+        <ReaderMixerProvider>
+            <CuesContent />
+        </ReaderMixerProvider>
+    )
+}
+
+function CuesContent() {
     const [manifest, setManifest] = useState<CueManifest>(STORY_MANIFEST)
     const [draft, setDraft] = useState(() => JSON.stringify(STORY_MANIFEST, null, 2))
+    const [integrated, setIntegrated] = useState(true)
     const [generation, setGeneration] = useState(0)
     const [draftError, setDraftError] = useState<string | null>(null)
     const { lines, append, clear } = useEventLog(60)
     const { narrativeOptions, dispatchCueEvent } = useNarrativeCueController()
-    const plugins = useMemo(() => [createCueManifestPlugin()], [])
     const track = useMemo(() => cueTrack(manifest), [manifest])
 
     const applyManifest = (valid: CueManifest) => {
         setDraftError(null)
         setManifest(valid)
         setGeneration((g) => g + 1)
-        append(`Applied manifest “${valid.id ?? "custom"}” with ${valid.cues.length} cues`, "ok")
+        append(
+            `Requested manifest “${valid.id ?? "custom"}” with ${valid.cues.length} cues`,
+            "info"
+        )
     }
 
     const apply = () => {
@@ -252,7 +302,12 @@ export function CuesWorkspace() {
     const storyCues = manifest.cues.filter((cue) => cue.trigger.kind !== "time")
 
     return (
-        <AudioSessionProvider key={generation} initialQueue={[track]} plugins={plugins}>
+        <CueSession
+            key={`${generation}:${integrated}`}
+            track={track}
+            append={append}
+            integrated={integrated}
+        >
             <SessionEventFeed append={append} />
             <CueListener manifest={manifest} append={append} />
             <SplitLayout
@@ -360,6 +415,17 @@ export function CuesWorkspace() {
                                 </Button>
                             </ButtonRow>
                         </Panel>
+                        <Panel title="Reader audio controls">
+                            <label className="wk-field wk-field--checkbox">
+                                <input
+                                    type="checkbox"
+                                    checked={integrated}
+                                    onChange={(event) => setIntegrated(event.target.checked)}
+                                />
+                                Route story sprites through Reader Mixer
+                            </label>
+                            {integrated && <ReaderMixerPanel />}
+                        </Panel>
                         <Panel title="Presets">
                             <ButtonRow>
                                 {PRESETS.map((preset) => (
@@ -374,15 +440,15 @@ export function CuesWorkspace() {
                             </ButtonRow>
                             <Note tone="placeholder">
                                 The sprite preset plays a stand-in clip cut from the sample track;
-                                no real cue sound packs exist yet. Known package bug: on the local
-                                dev server a manifest with a sprite pack stops every cue from
-                                running (the plugin sound layer does not survive React's development
-                                double-mount). The built site is not affected.
+                                no real cue sound packs exist yet. Packs preload when installed.
+                                Triggers while a pack is loading are skipped immediately and
+                                reported in the event log. Trigger again after the pack reports
+                                ready.
                             </Note>
                         </Panel>
                     </>
                 }
             />
-        </AudioSessionProvider>
+        </CueSession>
     )
 }

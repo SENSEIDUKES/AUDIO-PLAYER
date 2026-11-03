@@ -1,12 +1,30 @@
 import { retainAudioContext, type AudioContextLease } from "./sharedAudioContext"
 import { ACTIVATION_EVENTS, isActivationEvent } from "../../narrative/mediaRouting"
 
+import {
+    withAudioLoad,
+    readBoundedAudio,
+    decodedBytes,
+    estimateWavDecodedBytes,
+    AudioResourceLimitError,
+    trackActiveAudioBuffer,
+} from "./audioResources"
+
 function getAudioContextCtor(): typeof AudioContext | undefined {
     if (typeof window === "undefined") return undefined
     return (
         window.AudioContext ??
         (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
     )
+}
+
+/** Keep observer failures outside the playback and resource lifecycle. */
+export function notifySprite(callback: () => void): void {
+    try {
+        callback()
+    } catch (error) {
+        console.warn("SAP sprites: observer failed", error)
+    }
 }
 
 function clamp01(value: number): number {
@@ -42,6 +60,18 @@ export interface AudioSpriteManifest {
 export interface AudioSpritePlayOptions {
     volume?: number
     loop?: boolean
+    /** Actual start/end notifications, including asynchronous autoplay failures. */
+    onStarted?: () => void
+    onEnded?: () => void
+    onError?: (reason: string) => void
+}
+
+export interface AudioSpriteEngineOptions {
+    /** Connect the sprite output to a host bus instead of the destination. */
+    connectOutput?: (output: GainNode) => void
+    onActiveCountChange?: (count: number) => void
+    /** Bound pending context resume. Zero preserves standalone gesture recovery. */
+    startTimeoutMs?: number
 }
 
 export interface AudioSpriteInstanceInfo {
@@ -56,6 +86,8 @@ type AudioSpriteInstance = AudioSpriteInstanceInfo & {
     gain: GainNode
     /** Pending stop scheduled by `fadeOut`, cleared if the instance is retargeted. */
     fadeStopTimer?: ReturnType<typeof setTimeout>
+    cancelStart?: () => void
+    onEnded?: () => void
 }
 
 let nextInstanceId = 0
@@ -91,16 +123,36 @@ export class AudioSpriteEngine {
     /** Removes the armed unlock-gesture listeners, when armed. */
     private disarmGestureResume: (() => void) | null = null
 
+    constructor(private options: AudioSpriteEngineOptions = {}) {}
+
     private ensureContext(): AudioContext {
         if (this.ctx && this.ctx.state !== "closed") return this.ctx
         const Ctor = getAudioContextCtor()
         if (!Ctor) throw new Error("Web Audio API unavailable for SAP sprites.")
-        this.contextLease = retainAudioContext(Ctor)
-        this.ctx = this.contextLease.context
-        this.output = this.ctx.createGain()
-        this.output.gain.value = this.masterVolume
-        this.output.connect(this.ctx.destination)
-        return this.ctx
+        this.contextLease?.release()
+        this.output?.disconnect()
+        this.contextLease = null
+        this.ctx = null
+        this.output = null
+        const lease = retainAudioContext(Ctor)
+        let output: GainNode | undefined
+        try {
+            output = lease.context.createGain()
+            output.gain.value = this.masterVolume
+            if (this.options.connectOutput) this.options.connectOutput(output)
+            else output.connect(lease.context.destination)
+            this.contextLease = lease
+            this.ctx = lease.context
+            this.output = output
+            return this.ctx
+        } catch (error) {
+            try {
+                output?.disconnect()
+            } finally {
+                lease.release()
+            }
+            throw error
+        }
     }
 
     /**
@@ -175,19 +227,40 @@ export class AudioSpriteEngine {
         this.stopAll()
         this.manifest = { ...manifest, src }
         this.buffer = null
+        trackActiveAudioBuffer(this, null)
 
         const abort = new AbortController()
         this.loadAbort = abort
-        const work = (async () => {
-            const response = await fetch(src, { signal: abort.signal })
-            if (!response.ok) {
-                throw new Error(`Audio sprite pack failed to load: ${response.status}`)
+        const work = withAudioLoad(async (job) => {
+            const check = () => {
+                if (abort.signal.aborted || generation !== this.generation)
+                    throw new DOMException("Sprite load cancelled", "AbortError")
             }
-            const data = await response.arrayBuffer()
-            const decoded = await this.ensureContext().decodeAudioData(data)
-            if (generation !== this.generation) return
+            check()
+            const response = await fetch(src, { signal: abort.signal })
+            check()
+            if (!response.ok)
+                throw new Error(`Audio sprite pack failed to load: ${response.status}`)
+            const data = await readBoundedAudio(
+                response,
+                job.policy.maxEncodedBytes,
+                abort.signal,
+                (bytes) => {
+                    job.encodedBytes = bytes
+                }
+            )
+            check()
+            const ctx = this.ensureContext()
+            if ((estimateWavDecodedBytes(data, ctx.sampleRate) ?? 0) > job.policy.maxDecodedBytes)
+                throw new AudioResourceLimitError()
+            job.decoding = true
+            const decoded = await ctx.decodeAudioData(data)
+            check()
+            if (decodedBytes(decoded) > job.policy.maxDecodedBytes)
+                throw new AudioResourceLimitError()
             this.buffer = decoded
-        })()
+            trackActiveAudioBuffer(this, decoded)
+        })
 
         // `ready()` and any internal awaiters consume a never-rejecting view of
         // the load: an aborted/failed load (e.g. a superseding `load()` call, or
@@ -242,11 +315,12 @@ export class AudioSpriteEngine {
                 // Chrome resolves resume() while leaving the context suspended
                 // when there has been no user gesture yet; recover on the first
                 // real interaction instead of playing into a frozen timeline.
-                if (ctx.state === "suspended") this.armGestureResume()
+                if (ctx.state === "suspended" && !this.options.startTimeoutMs)
+                    this.armGestureResume()
             },
             () => {
                 if (ctx !== this.ctx) return
-                this.armGestureResume()
+                if (!this.options.startTimeoutMs) this.armGestureResume()
             }
         )
         const loop = options.loop ?? clip.loop ?? false
@@ -270,6 +344,7 @@ export class AudioSpriteEngine {
             clipName,
             loop,
             volume,
+            onEnded: options.onEnded,
             source,
             gain,
         }
@@ -277,8 +352,52 @@ export class AudioSpriteEngine {
         source.onended = () => {
             if (this.instances.get(id) === instance) this.removeInstance(id)
         }
-        source.start(0, offset, loop ? undefined : duration)
-        return id
+        notifySprite(() => this.options.onActiveCountChange?.(this.instances.size))
+        if (!this.instances.has(id)) return null
+        let started = false
+        const deadline = this.options.startTimeoutMs
+            ? Date.now() + this.options.startTimeoutMs
+            : null
+        let timer: ReturnType<typeof setTimeout> | undefined
+        const start = () => {
+            if (this.instances.get(id) !== instance || started) return
+            if (deadline !== null && Date.now() >= deadline) {
+                this.stop(id)
+                notifySprite(() => options.onError?.("start-timeout"))
+                return
+            }
+            if (ctx.state !== "running") return
+            try {
+                source.start(0, offset, loop ? undefined : duration)
+                started = true
+                instance.cancelStart?.()
+                notifySprite(() => options.onStarted?.())
+            } catch {
+                this.stop(id)
+                notifySprite(() => options.onError?.("playback-failed"))
+            }
+        }
+        if (this.options.startTimeoutMs) {
+            ctx.addEventListener("statechange", start)
+            timer = setTimeout(() => {
+                this.stop(id)
+                notifySprite(() => options.onError?.("start-timeout"))
+            }, this.options.startTimeoutMs)
+            instance.cancelStart = () => {
+                clearTimeout(timer)
+                ctx.removeEventListener("statechange", start)
+            }
+            start()
+        } else {
+            try {
+                source.start(0, offset, loop ? undefined : duration)
+                notifySprite(() => options.onStarted?.())
+            } catch (error) {
+                this.stop(id)
+                throw error
+            }
+        }
+        return this.instances.has(id) ? id : null
     }
 
     stop(id: AudioSpriteInstanceId): void {
@@ -287,7 +406,9 @@ export class AudioSpriteEngine {
         instance.source.onended = null
         try {
             instance.source.stop()
-        } catch {}
+        } catch {
+            /* Already stopped or disconnected. */
+        }
         this.removeInstance(id)
     }
 
@@ -355,6 +476,7 @@ export class AudioSpriteEngine {
         this.output?.disconnect()
         this.output = null
         this.buffer = null
+        trackActiveAudioBuffer(this, null)
         this.manifest = null
         this.contextLease?.release()
         this.contextLease = null
@@ -365,17 +487,24 @@ export class AudioSpriteEngine {
         const instance = this.instances.get(id)
         if (!instance) return
         this.clearFadeStop(instance)
+        instance.cancelStart?.()
         this.instances.delete(id)
+        notifySprite(() => this.options.onActiveCountChange?.(this.instances.size))
+        notifySprite(() => instance.onEnded?.())
         if (!this.instances.size) {
             this.disarmGestureResume?.()
             void this.contextLease?.setActive(false).catch(() => {})
         }
         try {
             instance.source.disconnect()
-        } catch {}
+        } catch {
+            /* Already stopped or disconnected. */
+        }
         try {
             instance.gain.disconnect()
-        } catch {}
+        } catch {
+            /* Already stopped or disconnected. */
+        }
     }
 }
 

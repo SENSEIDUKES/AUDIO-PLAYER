@@ -186,7 +186,7 @@ export class FakeAudioContext {
     }
 
     createGain(): FakeGainNode {
-        const node = new FakeGainNode()
+        const node = Object.assign(new FakeGainNode(), { context: this })
         this.gains.push(node)
         return node
     }

@@ -946,3 +946,78 @@ mixer view. Before shipping a change to this path:
 Record browser and OS versions and listening results in the PR. Desktop Chrome
 and physical iPhone Safari (ring on and silent) are separate evidence. A responsive
 Chrome viewport does not satisfy the physical-device gate.
+
+
+## Story manifest integration
+
+Connect a cue plugin explicitly to the reader's existing mixer:
+
+```tsx
+import { useMemo } from "react"
+import {
+    AudioSessionProvider,
+    createReaderMixerCuePlugin,
+    useReaderMixer,
+    type Track,
+} from "@seihouse/audio-player"
+
+// Mount inside ReaderMixerProvider. Key this component when replacing the chapter.
+function ChapterAudio({ track }: { track: Track }) {
+    const mixer = useReaderMixer()
+    const plugins = useMemo(() => [createReaderMixerCuePlugin(mixer, {
+        onStatus: event => console.info("Cue readiness", event),
+        onOutcome: event => console.info("Cue outcome", event),
+    })], [mixer])
+    return <AudioSessionProvider initialQueue={[track]} plugins={plugins} />
+}
+```
+
+The plugin acquires one scope per manifest and releases only that scope. It never
+disposes the caller's mixer. Advanced hosts can acquire the same scoped contract
+with `mixer.createCueSoundScope()` and must dispose it when finished.
+
+Story sprites use the **Sound Cues** level and soundtrack master, including live
+gain/mute changes, hidden-page dropping, idle/sleep suppression and `stopCues()`.
+`maxConcurrentCues` is shared across URL cues, sprite packs and manifest scopes.
+A looping sprite holds a slot until stopped. Preloading consumes no playback slot.
+A zero cue/master gain stops integrated sprites, including pending starts; restoring
+the level does not replay them. `stopAll()` retains its documented cue-finish
+behavior; call `stopCues()` as well when leaving a chapter that owns looping cues.
+
+A loading or failed pack causes an immediate reported skip, with no late replay.
+Accepted ready sprites have the existing `cueStartTimeoutMs` deadline (default
+1.5 seconds; sprites enforce a minimum of 1 ms). Browser-blocked and expired
+starts release their slots. Hidden-page dropping follows `pauseWhenHidden`.
+
+On Web Audio routes, decoded sprites feed the mixer's Sound Cues bus and safety
+limiter, with native offset/duration and loop boundaries. On element routes,
+sprites use media-element clips with confirmed seeks, duration stops and bounded
+looping. Element clip boundaries and loops are **not sample-accurate**; scheduling
+and media events can introduce boundary jitter. On iPhone element routing,
+intermediate levels/fades remain subject to device-volume limitations; zero/off
+still mutes. Auto routing can retry a failed decoded pack through a fresh non-CORS
+media element. Explicit Web Audio does not downgrade.
+
+The integration controls sprite effects only. Story-controlled Soundscapes,
+reader-selected Atmosphere, Sound Cues, and Voice remain distinct. Narrative events
+such as `ambience.crossfade` still go to the host's narrative controller; this
+adapter does not change the reader's Atmosphere choice or take over Voice.
+Sprite manifests currently carry per-clip volume, not loudness measurements;
+source loudness normalization is not inferred from their containing file.
+
+### Story-cue verification checklist
+
+- Development Strict Mode and production preview: load the sprite preset, wait
+  for `ready`, trigger its chime, apply again, switch presets, trigger the new
+  cue, and leave/reopen the workspace. No cleanup error or stale sound may remain.
+- Throttle pack loading, trigger before ready, and observe `pack-loading`; readiness
+  must not play it later. Trigger explicitly after ready. Repeat with a failed pack.
+- Use two packs with the same clip name and verify each named action and scoped stop.
+- With URL cues and sprites together, check the shared cap, master and cue sliders,
+  cue/master off, hidden/visible, idle, sleep, and disposal. Voice and Atmosphere
+  preferences must remain unchanged.
+- **Physical iPhone Safari listening required:** repeat native and element routes,
+  ring switch on/silent, unlock then story-trigger without another tap, and background
+  or interrupt a pending cue. Listen for neighboring-segment leakage and element
+  loop boundaries. Record device/OS, route, audible result and limitations separately
+  from automated browser evidence. This checklist is not a claim that it was run.

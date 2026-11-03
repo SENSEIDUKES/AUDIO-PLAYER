@@ -1,4 +1,5 @@
 /** @vitest-environment jsdom */
+import { StrictMode } from "react"
 import { renderHook } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { usePluginSoundLayer } from "../usePluginSoundLayer"
@@ -64,13 +65,35 @@ describe("usePluginSoundLayer", () => {
         expect(mockStopAll).toHaveBeenCalled()
     })
 
-    it("disposes AudioSpriteEngine on unmount", () => {
-        const { unmount } = renderHook(() => usePluginSoundLayer())
+    it("disposes a loaded AudioSpriteEngine on unmount", async () => {
+        const { result, unmount } = renderHook(() => usePluginSoundLayer())
+        await result.current.loadSpritePack({ src: "test.mp3", clips: {} })
 
         expect(mockDispose).not.toHaveBeenCalled()
 
         unmount()
 
         expect(mockDispose).toHaveBeenCalledTimes(1)
+    })
+})
+
+it("survives Strict Mode replay and either scope/layer cleanup order", async () => {
+    const { result, unmount } = renderHook(() => usePluginSoundLayer(), { wrapper: StrictMode })
+    const first = result.current.createScope!()
+    const second = result.current.createScope!()
+    await first.loadSpritePack({ src: "first.mp3", clips: {} }, "first")
+    await second.loadSpritePack({ src: "second.mp3", clips: {} }, "second")
+    first.dispose()
+    expect(second.playSprite("clip", { pack: "second" })).toBe("sprite-1")
+    const facade = result.current
+    unmount()
+    expect(() => {
+        second.stopSprite("sprite-1")
+        second.dispose()
+        facade.stopAllSprites()
+    }).not.toThrow()
+    expect(facade.playSprite("clip")).toBeNull()
+    await expect(facade.loadSpritePack({ src: "late.mp3", clips: {} })).rejects.toMatchObject({
+        name: "AbortError",
     })
 })

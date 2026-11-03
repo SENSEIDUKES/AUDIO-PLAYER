@@ -3,8 +3,9 @@ import type {
     PluginPlayerContext,
     PluginHookResult,
 } from "../core/plugins/PluginInterface"
+import type { ReaderMixer } from "../narrative/ReaderMixer"
 import type { Track } from "../types"
-import { CueRuntime } from "./cueRuntime"
+import { CueRuntime, notifyCue, type CueRuntimeOptions } from "./cueRuntime"
 import { validateCueManifest } from "./cueManifestSchema"
 
 export class CueManifestPlugin implements AudioPlayerPlugin {
@@ -14,55 +15,71 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
     private runtime: CueRuntime | null = null
     private abortController: AbortController | null = null
 
+    private generation = 0
+    private target: EventTarget | null = null
+
+    constructor(private options: CueRuntimeOptions = {}) {}
+
     init(context: PluginPlayerContext) {
+        this.destroy()
         this.context = context
-        this.handleDispatchCue = this.handleDispatchCue.bind(this)
         const target = this.context.getRootElement() || window
+        this.target = target
         target.addEventListener("sap-dispatch-cue", this.handleDispatchCue as EventListener)
     }
 
     destroy() {
-        if (this.context) {
-            const target = this.context.getRootElement() || window
-            target.removeEventListener("sap-dispatch-cue", this.handleDispatchCue as EventListener)
+        this.target?.removeEventListener(
+            "sap-dispatch-cue",
+            this.handleDispatchCue as EventListener
+        )
+        this.target = null
+        try {
+            this.cleanup()
+        } finally {
+            this.context = null
         }
-        this.cleanup()
-        this.context = null
     }
 
-    private handleDispatchCue(e: CustomEvent) {
-        if (!this.runtime) return
-
-        const detail = e.detail
-        if (!detail) return
-
-        if (detail.id) {
-            this.runtime.executeCueById(detail.id)
-        } else if (detail.kind && detail.value !== undefined) {
-            this.runtime.executeCueByTrigger(detail.kind, detail.value)
-        }
+    private handleDispatchCue = (e: CustomEvent) => {
+        if (!this.runtime || !e.detail) return
+        if (e.detail.id) this.runtime.executeCueById(e.detail.id)
+        else if (e.detail.kind && e.detail.value !== undefined)
+            this.runtime.executeCueByTrigger(e.detail.kind, e.detail.value)
     }
 
     private cleanup() {
-        if (this.abortController) {
-            this.abortController.abort()
-            this.abortController = null
-        }
-        if (this.runtime) {
-            this.runtime.reset()
-            this.runtime = null
+        ++this.generation
+        const abort = this.abortController
+        const runtime = this.runtime
+        this.abortController = null
+        this.runtime = null
+        for (const cleanup of [() => abort?.abort(), () => runtime?.dispose()]) {
+            try {
+                cleanup()
+            } catch (error) {
+                notifyCue(this.options.onStatus, {
+                    status: "cleanup-failed",
+                    message: String(error),
+                })
+            }
         }
     }
 
     onTrackLoad(track: Track | null): PluginHookResult {
         this.cleanup()
         if (!track || !this.context) return
+        const generation = this.generation
 
         if (track.cueManifest) {
             const manifest = validateCueManifest(track.cueManifest)
             if (manifest) {
-                this.runtime = new CueRuntime(this.context, manifest)
-            }
+                this.runtime = new CueRuntime(this.context, manifest, this.options)
+            } else
+                notifyCue(this.options.onStatus, {
+                    status: "failed",
+                    message: "Invalid cue manifest",
+                })
         } else if (track.cueManifestUrl) {
             this.abortController = new AbortController()
             fetch(track.cueManifestUrl, { signal: this.abortController.signal })
@@ -75,14 +92,19 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
                     return res.json()
                 })
                 .then((data) => {
+                    if (generation !== this.generation) return
                     const manifest = validateCueManifest(data)
-                    if (manifest && this.context) {
-                        this.runtime = new CueRuntime(this.context, manifest)
-                    }
+                    if (manifest && this.context && generation === this.generation) {
+                        this.runtime = new CueRuntime(this.context, manifest, this.options)
+                    } else if (!manifest)
+                        notifyCue(this.options.onStatus, {
+                            status: "failed",
+                            message: "Invalid cue manifest",
+                        })
                 })
                 .catch((e) => {
-                    if (e.name !== "AbortError") {
-                        console.warn("Failed to fetch cue manifest from URL:", e)
+                    if (generation === this.generation && e.name !== "AbortError") {
+                        notifyCue(this.options.onStatus, { status: "failed", message: String(e) })
                     }
                 })
         }
@@ -105,6 +127,30 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
     }
 }
 
-export function createCueManifestPlugin(): CueManifestPlugin {
-    return new CueManifestPlugin()
+export function createCueManifestPlugin(options: CueRuntimeOptions = {}): CueManifestPlugin {
+    return new CueManifestPlugin(options)
+}
+
+/** Opt-in story sprites governed by the supplied mixer; the host still owns it. */
+export function createReaderMixerCuePlugin(
+    mixer: ReaderMixer,
+    options: CueRuntimeOptions = {}
+): CueManifestPlugin {
+    const plugin = new CueManifestPlugin(options)
+    const init = plugin.init.bind(plugin)
+    plugin.init = (context) =>
+        init({
+            ...context,
+            sounds: {
+                createScope: () => mixer.createCueSoundScope(),
+                loadSpritePack: async () => {
+                    throw new Error("Acquire a cue scope first")
+                },
+                playSprite: () => null,
+                stopSprite: () => {},
+                fadeSprite: () => {},
+                stopAllSprites: () => {},
+            },
+        })
+    return plugin
 }
