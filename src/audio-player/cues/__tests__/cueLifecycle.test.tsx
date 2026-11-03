@@ -109,6 +109,68 @@ describe("cue readiness and ownership", () => {
         window.removeEventListener("beat", beat)
     })
 
+    it("bounds referenced pack loads before they enter the shared queue", async () => {
+        const sound = scope(),
+            status = vi.fn(),
+            outcome = vi.fn()
+        const packs = Object.fromEntries(
+            Array.from({ length: 12 }, (_, index) => [
+                `pack-${index}`,
+                manifest.assets!.spritePacks!.first,
+            ])
+        )
+        const many: CueManifest = {
+            ...manifest,
+            assets: { spritePacks: packs },
+            cues: Object.keys(packs).map((pack) => ({
+                id: pack,
+                trigger: { kind: "chapter", value: pack },
+                actions: [{ command: "sprite.play", pack, clip: "chime" }],
+            })),
+        }
+        const runtime = new CueRuntime(context({ ...sound, createScope: () => sound }), many, {
+            onStatus: status,
+            onOutcome: outcome,
+        })
+        await flushMicrotasks()
+        expect(sound.loadSpritePack).toHaveBeenCalledTimes(4)
+        runtime.executeCueById("pack-11")
+        expect(sound.playSprite).not.toHaveBeenCalled()
+        expect(status).toHaveBeenCalledWith(
+            expect.objectContaining({
+                pack: "pack-11",
+                status: "failed",
+                message: "Sprite pack limit exceeded (4)",
+            })
+        )
+        expect(outcome).toHaveBeenCalledWith(
+            expect.objectContaining({ cueId: "pack-11", reason: "pack-failed" })
+        )
+        runtime.dispose()
+        const limited = new CueRuntime(context({ ...sound, createScope: () => sound }), many, {
+            maxSpritePacks: 2,
+        })
+        await flushMicrotasks()
+        expect(sound.loadSpritePack).toHaveBeenCalledTimes(6)
+        limited.dispose()
+    })
+
+    it("reports a synchronous start failure once without also reporting skipped", async () => {
+        const sound = scope(),
+            outcome = vi.fn()
+        sound.playSprite = vi.fn((_clip, options) => {
+            options?.onError?.("seek-failed")
+            return null
+        })
+        const runtime = new CueRuntime(context({ ...sound, createScope: () => sound }), manifest, {
+            onOutcome: outcome,
+        })
+        await flushMicrotasks()
+        runtime.executeCueById("second")
+        expect(outcome.mock.calls.map(([event]) => event.outcome)).toEqual(["failed"])
+        runtime.dispose()
+    })
+
     it("reports failed and missing packs without swallowing event actions", async () => {
         const sound = scope()
         sound.loadSpritePack = vi.fn().mockRejectedValue(new Error("network"))

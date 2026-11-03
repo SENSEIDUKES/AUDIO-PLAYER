@@ -100,6 +100,7 @@ describe("AudioSpriteEngine", () => {
         engine.dispose()
         finish(new Response(new Uint8Array(12)))
         await expect(pending).rejects.toMatchObject({ name: "AbortError" })
+        expect(AudioContext).not.toHaveBeenCalled()
         expect(context.decodeAudioData).not.toHaveBeenCalled()
         expect(engine.play("chime")).toBeNull()
     })

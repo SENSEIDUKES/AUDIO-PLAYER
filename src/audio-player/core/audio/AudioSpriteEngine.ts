@@ -123,8 +123,10 @@ export class AudioSpriteEngine {
     /** Removes the armed unlock-gesture listeners, when armed. */
     private disarmGestureResume: (() => void) | null = null
 
+    /** Configure standalone output or a host-owned bus without allocating audio resources. */
     constructor(private options: AudioSpriteEngineOptions = {}) {}
 
+    /** Acquire the shared context and connect output atomically; release a failed graph. */
     private ensureContext(): AudioContext {
         if (this.ctx && this.ctx.state !== "closed") return this.ctx
         const Ctor = getAudioContextCtor()
@@ -217,6 +219,7 @@ export class AudioSpriteEngine {
         return this.masterVolume
     }
 
+    /** Replace the pack through the shared load budget; cancellation cannot recreate a retired context. */
     async load(manifest: AudioSpriteManifest): Promise<void> {
         const src = manifest.src.trim()
         if (!src) throw new Error("Audio sprite manifest requires a src URL.")
@@ -291,6 +294,7 @@ export class AudioSpriteEngine {
         }
     }
 
+    /** Allocate one clip instance; managed starts wait for running output only until their deadline. */
     play(clipName: string, options: AudioSpritePlayOptions = {}): AudioSpriteInstanceId | null {
         const manifest = this.manifest
         const buffer = this.buffer
@@ -400,6 +404,7 @@ export class AudioSpriteEngine {
         return this.instances.has(id) ? id : null
     }
 
+    /** Cancel a pending or playing instance and release its context demand. */
     stop(id: AudioSpriteInstanceId): void {
         const instance = this.instances.get(id)
         if (!instance) return
@@ -466,6 +471,7 @@ export class AudioSpriteEngine {
         }))
     }
 
+    /** Invalidate loads and starts before releasing every owned source, buffer and context lease. */
     dispose(): void {
         this.generation += 1
         this.disarmGestureResume?.()
@@ -483,6 +489,7 @@ export class AudioSpriteEngine {
         this.ctx = null
     }
 
+    /** Release instance accounting and observers once, then disconnect its audio nodes. */
     private removeInstance(id: AudioSpriteInstanceId): void {
         const instance = this.instances.get(id)
         if (!instance) return

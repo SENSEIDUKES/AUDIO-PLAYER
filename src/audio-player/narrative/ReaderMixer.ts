@@ -977,6 +977,7 @@ export class ReaderMixer {
         return true
     }
 
+    /** Use the same normalized concurrency limit for URL cues and every sprite scope. */
     private cueLimit(): number {
         const value = this.spriteOptions.maxConcurrentCues
         return typeof value === "number" && Number.isFinite(value)
@@ -1102,10 +1103,12 @@ export class ReaderMixer {
         return scope
     }
 
+    /** Drop sprite starts and loops across all manifest scopes without disposing their packs. */
     private stopCueSprites(): void {
         for (const { engine } of this.spriteEngines) engine.stopAll()
     }
 
+    /** Compose bus/element gain once and cancel sprites suppressed by reader session policy. */
     private applySpriteLevels(): void {
         const gain = this.layerGain("cues")
         for (const record of this.spriteEngines) {
@@ -1659,6 +1662,7 @@ export class ReaderMixer {
         else this.graph.suspend()
     }
 
+    /** Keep the shared output active only for enabled loop, URL-cue or native-sprite demand. */
     private graphWanted(): boolean {
         if (this.session?.idle && this.idleGain === 0) return false
         const loopWanted = (["soundscapes", "atmosphere"] as const).some(
@@ -1704,6 +1708,7 @@ export class ReaderMixer {
         })
     }
 
+    /** Pause reader loops and discard transient cues while hidden under the configured visibility policy. */
     private followVisibility(): void {
         if (typeof document === "undefined") return
         const sync = () => {
@@ -1777,6 +1782,7 @@ export class ReaderMixer {
         })
     }
 
+    /** Combine URL and sprite demand into the public reader snapshot without merging layer preferences. */
     private buildState(): ReaderMixerState {
         const cueStatus: ReaderMixerLayerStatus =
             this.cueStatus === "idle" && this.activeCues > 0 ? "playing" : this.cueStatus

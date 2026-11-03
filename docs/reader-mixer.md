@@ -984,6 +984,7 @@ A zero cue/master gain stops integrated sprites, including pending starts; resto
 the level does not replay them. `stopAll()` retains its documented cue-finish
 behavior; call `stopCues()` as well when leaving a chapter that owns looping cues.
 
+Each manifest admits at most four referenced packs by default (`maxSpritePacks`); excess packs fail explicitly without entering the load queue.
 A loading or failed pack causes an immediate reported skip, with no late replay.
 Accepted ready sprites have the existing `cueStartTimeoutMs` deadline (default
 1.5 seconds; sprites enforce a minimum of 1 ms). Browser-blocked and expired

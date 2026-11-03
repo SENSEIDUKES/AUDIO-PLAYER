@@ -83,6 +83,7 @@ export class ElementSpriteEngine {
         })
     }
 
+    /** Take a gesture-primed element and apply request settings before assigning its source. */
     private createElement(src: string): HTMLAudioElement {
         const element = this.pool.take()
         if (this.options.crossOrigin) element.crossOrigin = this.options.crossOrigin
@@ -100,6 +101,7 @@ export class ElementSpriteEngine {
         }
     }
 
+    /** Play a confirmed-seek segment with bounded start/stall recovery and cancellable loop boundaries. */
     play(clipName: string, options: AudioSpritePlayOptions = {}): string | null {
         const clip = this.manifest?.clips[clipName]
         if (
@@ -198,9 +200,9 @@ export class ElementSpriteEngine {
             seeking = false
             start()
         }
-        const boundaryReached = () => {
+        const boundaryReached = (ended = false) => {
             if (!current() || !started || seeking) return
-            if (element.currentTime < end - 0.005) {
+            if (!ended && element.currentTime < end - 0.005) {
                 scheduleBoundary()
                 return
             }
@@ -233,7 +235,7 @@ export class ElementSpriteEngine {
             if (element.currentTime >= end) boundaryReached()
         }
         const onEnded = () => {
-            if (loop) boundaryReached()
+            if (loop) boundaryReached(true)
             else this.stop(id)
         }
         const onError = () => fail("playback-failed")
@@ -287,15 +289,18 @@ export class ElementSpriteEngine {
         return current() ? id : null
     }
 
+    /** Keep unconfirmed seeks muted and compose reader gain with the instance fade. */
     private applyVolume(instance: Instance) {
         const gain = Math.max(0, Math.min(1, this.volume * instance.volume))
         instance.element.volume = gain
         instance.element.muted = !instance.ready || gain <= 0
     }
+    /** Apply the current reader level to every live instance without releasing its clip position. */
     setMasterVolume(volume: number): void {
         this.volume = clamp01(volume)
         for (const instance of this.instances.values()) this.applyVolume(instance)
     }
+    /** Remove ownership before cleanup, then publish released capacity before completion observers. */
     stop(id: string): void {
         const instance = this.instances.get(id)
         if (!instance) return
@@ -304,6 +309,7 @@ export class ElementSpriteEngine {
         notifySprite(() => this.options.onActiveCountChange(this.instances.size))
         notifySprite(() => instance.onEnded?.())
     }
+    /** Replace an instance fade; its timer cannot affect disposed or replaced instances. */
     fade(id: string, volume: number, durationMs: number): void {
         const instance = this.instances.get(id)
         if (!instance) return
@@ -322,15 +328,18 @@ export class ElementSpriteEngine {
         if (durationMs > 0) instance.fadeTimer = setInterval(tick, 16)
         tick()
     }
+    /** Stop all owned segments, including pending seeks and starts. */
     stopAll(): void {
         for (const id of [...this.instances.keys()]) this.stop(id)
     }
+    /** Pause and detach one element so late play settlement cannot retain the media source. */
     private releaseElement(element: HTMLAudioElement | null) {
         if (!element) return
         element.pause()
         element.removeAttribute("src")
         element.load()
     }
+    /** Cancel preload admission and active segments, then release retained media and unlock spares. */
     dispose(): void {
         ++this.generation
         this.abort?.abort()

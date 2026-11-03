@@ -250,6 +250,7 @@ function CueSession({
     )
 }
 
+/** Own the Workshop mixer outside replaceable narration/manifest sessions. */
 export function CuesWorkspace() {
     return (
         <ReaderMixerProvider>
@@ -258,6 +259,7 @@ export function CuesWorkspace() {
     )
 }
 
+/** Apply keyed manifests and show runtime installation, pack readiness and cue outcomes. */
 function CuesContent() {
     const [manifest, setManifest] = useState<CueManifest>(STORY_MANIFEST)
     const [draft, setDraft] = useState(() => JSON.stringify(STORY_MANIFEST, null, 2))

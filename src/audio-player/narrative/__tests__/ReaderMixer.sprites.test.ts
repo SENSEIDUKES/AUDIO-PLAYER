@@ -203,6 +203,33 @@ describe("reader-owned sprite scopes", () => {
         expect(instance.getState().activeCues).toBe(0)
     })
 
+    it("restarts a looping element at media end within the permitted duration tolerance", async () => {
+        const instance = mixer({ routing: "element", maxConcurrentCues: 1 })
+        const scope = instance.createCueSoundScope()
+        const pending = scope.loadSpritePack(
+            { ...pack, clips: { tail: { offset: 2, duration: 2.008, loop: true } } },
+            "named"
+        )
+        await flushMicrotasks()
+        const element = FakeAudio.withSrc(pack.src).slice(-1)[0]
+        element.duration = 4
+        element.dispatch("loadedmetadata")
+        element.readyState = 2
+        element.dispatch("loadeddata")
+        await pending
+        const id = scope.playSprite("tail", { pack: "named" })!
+        await flushMicrotasks()
+        element.currentTime = 4
+        element.dispatch("ended")
+        await flushMicrotasks()
+        expect(element.currentTime).toBe(2)
+        expect(element.playCalls).toBe(2)
+        expect(element.paused).toBe(false)
+        expect(instance.getState().activeCues).toBe(1)
+        scope.stopSprite(id)
+        expect(instance.playCue("/next.wav")).toBe(true)
+    })
+
     it("rejects a failed element seek without playing the file from zero", async () => {
         const instance = mixer({ routing: "element" })
         const scope = instance.createCueSoundScope()

@@ -22,6 +22,8 @@ export interface CueOutcomeEvent {
     reason?: string
 }
 export interface CueRuntimeOptions {
+    /** Maximum referenced packs admitted per manifest. Defaults to 4; invalid values use 4. */
+    maxSpritePacks?: number
     onStatus?: (event: CueStatusEvent) => void
     onOutcome?: (event: CueOutcomeEvent) => void
 }
@@ -50,6 +52,7 @@ export class CueRuntime {
     private stopTimers = new Map<ReturnType<typeof setTimeout>, string>()
     private packStates = new Map<string, CuePackState>()
 
+    /** Index cues and admit a bounded set of exact named packs for this manifest lifetime. */
     constructor(
         context: PluginPlayerContext,
         private manifest: CueManifest,
@@ -95,7 +98,17 @@ export class CueRuntime {
                 )
             )
         )
+        const packLimit =
+            Number.isSafeInteger(options.maxSpritePacks) && options.maxSpritePacks! > 0
+                ? options.maxSpritePacks!
+                : 4
+        let admitted = 0
         for (const name of referenced) {
+            if (admitted >= packLimit) {
+                this.packStates.set(name, "failed")
+                this.reportStatus("failed", name, `Sprite pack limit exceeded (${packLimit})`)
+                continue
+            }
             const pack = packs[name]
             if (!pack || !this.sounds || (!this.scope && referenced.size > 1)) {
                 this.packStates.set(name, "failed")
@@ -110,6 +123,7 @@ export class CueRuntime {
                 )
                 continue
             }
+            ++admitted
             this.packStates.set(name, "loading")
             this.reportStatus("loading", name)
             // Start through a promise boundary to isolate synchronous custom-layer failures.
@@ -133,6 +147,7 @@ export class CueRuntime {
         }
     }
 
+    /** Publish readiness and cleanup diagnostics without letting host observers interrupt the runtime. */
     private reportStatus(status: CueStatusEvent["status"], pack?: string, message?: string) {
         notifyCue(this.options.onStatus, { manifestId: this.manifest.id, status, pack, message })
     }
@@ -155,6 +170,7 @@ export class CueRuntime {
         }
     }
 
+    /** Stop tracked and fading sprites and reset timeline eligibility while keeping loaded packs. */
     reset() {
         const fading = [...this.stopTimers.values()]
         for (const timer of this.stopTimers.keys()) clearTimeout(timer)
@@ -172,6 +188,7 @@ export class CueRuntime {
         }
     }
 
+    /** Consume eligible time cues once; only replayable cues rearm when rewound past their trigger. */
     handleTimeUpdate(currentTime: number, isSeeking = false) {
         // A backward jump in playback position is a rewind even when no explicit
         // seek event fired — e.g. automatic looping or a custom player rewind.
@@ -231,6 +248,7 @@ export class CueRuntime {
         }
     }
 
+    /** Stop immediately or schedule a fade stop owned and cancelled by this runtime. */
     private stopSprite(id: string, fadeOutMs = 0) {
         if (fadeOutMs <= 0) {
             this.sounds?.stopSprite(id)
@@ -250,6 +268,7 @@ export class CueRuntime {
         this.stopTimers.set(timer, id)
     }
 
+    /** Run independent actions, reporting unavailable sprites immediately without queuing late playback. */
     private executeActions(cue: CueEvent) {
         if (this.disposed) return
         for (const action of cue.actions) {
@@ -280,6 +299,7 @@ export class CueRuntime {
                         // Completion can be synchronous when a backend rejects a start.
                         // eslint-disable-next-line prefer-const
                         let id: string | null | undefined
+                        let startFailed = false
                         id = this.sounds?.playSprite(action.clip, {
                             pack: this.scope ? action.pack : undefined,
                             loop: action.loop,
@@ -297,6 +317,7 @@ export class CueRuntime {
                                 else this.activeSprites.delete(key)
                             },
                             onError: (reason) => {
+                                startFailed = true
                                 if (!this.disposed) report("failed", reason)
                             },
                         })
@@ -313,7 +334,7 @@ export class CueRuntime {
                                 )
                             }
                             report("accepted")
-                        } else
+                        } else if (!startFailed)
                             report(
                                 "skipped",
                                 this.sounds?.getLastSkipReason?.() ?? "playback-unavailable"

@@ -123,7 +123,14 @@ Fires an arbitrary event back to the host UI using a string signature matching w
 
 Each installed manifest owns a sound scope. `sprite.play.pack` selects that exact
 named pack; clip names may repeat across packs. Only referenced play packs preload.
-Loads share the audio resource concurrency limit (two by default). Decoded packs
+By default at most four valid referenced packs are admitted in manifest cue order;
+additional packs report `failed` with a pack-limit message and are never queued.
+Set `maxSpritePacks` in the plugin/runtime options to a positive safe integer to
+choose a different per-manifest budget; invalid values use four. With the default
+64 MiB decoded-per-asset limit, this bounds retained pack buffers to 256 MiB per
+runtime (not a whole-process heap cap). Split large manifests rather than raising
+the limit without a memory budget. Loads share the audio resource concurrency
+limit (two by default). Decoded packs
 also obey the encoded/decoded byte limits; element packs stream instead of decoding
 the whole asset. Element preloads have a 12-second readiness deadline.
 

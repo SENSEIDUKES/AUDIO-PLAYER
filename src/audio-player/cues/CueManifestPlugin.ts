@@ -20,6 +20,7 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
 
     constructor(private options: CueRuntimeOptions = {}) {}
 
+    /** Bind one exact event target; reinitialization retires the previous context first. */
     init(context: PluginPlayerContext) {
         this.destroy()
         this.context = context
@@ -28,6 +29,7 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
         target.addEventListener("sap-dispatch-cue", this.handleDispatchCue as EventListener)
     }
 
+    /** Remove the original listener and release the runtime regardless of session cleanup order. */
     destroy() {
         this.target?.removeEventListener(
             "sap-dispatch-cue",
@@ -48,6 +50,7 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
             this.runtime.executeCueByTrigger(e.detail.kind, e.detail.value)
     }
 
+    /** Invalidate asynchronous work before best-effort cleanup so replacement can always continue. */
     private cleanup() {
         ++this.generation
         const abort = this.abortController
@@ -66,6 +69,7 @@ export class CueManifestPlugin implements AudioPlayerPlugin {
         }
     }
 
+    /** Install the newest inline or fetched manifest; superseded fetch completions are ignored. */
     onTrackLoad(track: Track | null): PluginHookResult {
         this.cleanup()
         if (!track || !this.context) return

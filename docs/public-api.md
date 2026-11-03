@@ -342,7 +342,7 @@ invalidation semantics, memory-estimate limitations and device checks.
 ### Cue lifecycle and mixer adapter
 
 `createCueManifestPlugin(options?)` and `createReaderMixerCuePlugin(mixer, options?)`
-accept `CueRuntimeOptions` (`onStatus`, `onOutcome`). `CueStatusEvent`,
+accept `CueRuntimeOptions` (`onStatus`, `onOutcome`, `maxSpritePacks`, default 4). `CueStatusEvent`,
 `CueOutcomeEvent` and `CuePackState` describe their diagnostics. Loading cues skip
 immediately; named packs preload independently. See [cue lifecycle](./CUE_MANIFEST_V1.md#runtime-readiness-and-replacement).
 
