@@ -913,19 +913,23 @@ design language, and the home of the Voice layer: Settings › Audio is the
 soundtrack, so `ReaderSettingsAudio` leaves Voice out unless `showVoice` is set
 (`ReaderMixerPanel` takes `layers` to choose which layers it shows).
 
-- **Voice | Tier.** The top row has the Voice layer's switch and volume on the
-  left and the reader's tier on the right, a `◀ value ▶` with the tier's mark
-  (`icon`) before its name. SEN's tiers are its Energy grades (Mortal,
-  Immortal, Heaven) with its Fate Pressure flames: what reading aloud costs,
-  from the device's own speech to generated and designed voices.
+- **Voice on top, Tier at the bottom.** The top row has the Voice layer's
+  switch and volume. The reader's tier sits at the bottom, one strip like the
+  Audio page's Presets: a pill per tier with its mark (`icon`) before its
+  name. SEN's tiers are its Energy grades (Mortal, Immortal, Heaven) with its
+  Fate Pressure flames: what reading aloud costs, from the device's own speech
+  to generated and designed voices.
 - **Voice slots.** Below, a fixed grid of `slotCount` slots (8), two across.
   Each speaker in the chapter (the narrator, the main character, any named
-  codex character) gets a slot whose `◀ voice ▶` picks from the chosen tier's
-  `voices` (`{ id, label, group? }`; groups name a voice's source, such as a
-  provider). Unused slots keep their place with a dash, so the page never
+  codex character) gets a slot whose `◀ voice ▶` picks from every voice in
+  `voices` (`{ id, label, tier?, group? }`), whatever the reader's tier. The
+  picker sections them "Tier · source" in tier order (Mortal · On this
+  device, Immortal · ElevenLabs, Immortal · Fish Audio, Heaven · Designed), so
+  a reader can mix tiers per speaker. The tier strip sets the reader's
+  preset; it never hides voices. Unused slots keep their place with a dash, so the page never
   changes shape. A chapter rarely has more speakers than slots; any beyond
   `slotCount` are not shown, and the host voices them itself (SEN gives them
-  a random voice from the tier). Reading speed is not here: it lives in the
+  a random voice from their tier). Reading speed is not here: it lives in the
   reader chamber.
 - **Host-owned.** The host supplies `tiers`, `tier`, `voices` and `slots`,
   and decides what `onTierChange` and `onAssign(slotId, voiceId)` do. The page
@@ -1085,3 +1089,26 @@ source loudness normalization is not inferred from their containing file.
   or interrupt a pending cue. Listen for neighboring-segment leakage and element
   loop boundaries. Record device/OS, route, audible result and limitations separately
   from automated browser evidence. This checklist is not a claim that it was run.
+
+## SEIHouse icons
+
+SAP ships SEIHouse's official icons from `@seihouse/audio-player`, so the
+player, the reader UI and SEN share one set of artwork. Each is an
+`SEI…Icon` component (`size`, `className` and SVG props; it paints with
+`currentColor` and is decorative unless given `aria-label`):
+
+- **Sound:** `SEIAudioIcon`, `SEISoundscapeIcon`, `SEIAtmosphereIcon`,
+  `SEICueIcon`. The mixer shows them before Master, Soundscapes, Atmosphere
+  and Sound Cues.
+- **Tiers:** `SEIMortalIcon`, `SEIImmortalIcon`, `SEIHeavenIcon` (or
+  `SEIPressureIcon level=…`), SEN's Fate Pressure flames for Narration's tiers.
+- **Navigation:** `SEIArrowIcon direction=…` (the steppers), `SEIBackIcon`,
+  `SEIExitIcon` (closing a sheet or panel), `SEIDownloadIcon`,
+  `SEIRetryIcon`, `SEIUndoIcon`.
+- **Actions and header:** `SEISaveIcon`, `SEIRemoveIcon`, `SEIDeleteIcon`,
+  `SEISettingsIcon`, `SEIHelpIcon`, `SEISearchIcon`, `SEIInformationIcon`.
+
+The artwork is copied from SEN and the LIBRARY CORE master icons; change it
+there first. `SEIArrowIcon` and `SEIRetryIcon` are built from the official
+arrowhead that Exit and Download share, since no master file exists for them.
+Voice has no SEIHouse icon yet, so its row shows none.

@@ -4,6 +4,7 @@ import type { ListChildComponentProps } from "react-window"
 import { AutoSizer } from "react-virtualized-auto-sizer"
 import type { Track } from "../types"
 import { trackKey } from "../utils/trackKey"
+import { SEIExitIcon, SEIRemoveIcon } from "../skins/seihouse-icons"
 
 interface QueueItemData {
     visibleQueue: Track[]
@@ -197,39 +198,9 @@ const DragHandleIcon = () => (
     </svg>
 )
 
-const CloseIcon = () => (
-    <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-    >
-        <line x1="18" y1="6" x2="6" y2="18" />
-        <line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-)
+const CloseIcon = () => <SEIExitIcon size={18} />
 
-const RemoveIcon = () => (
-    <svg
-        width="14"
-        height="14"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-    >
-        <line x1="18" y1="6" x2="6" y2="18" />
-        <line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-)
+const RemoveIcon = () => <SEIRemoveIcon size={14} />
 
 /* ----------------------------- Row component ----------------------------- */
 

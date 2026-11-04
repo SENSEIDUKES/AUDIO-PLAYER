@@ -13,7 +13,7 @@ export { ReaderSettingsAudio } from "./ReaderSettingsAudio.js"
 export type { ReaderSettingsAudioProps } from "./ReaderSettingsAudio.js"
 export { ReaderAudioPresets } from "./ReaderAudioPresets.js"
 export type { ReaderAudioPresetsProps } from "./ReaderAudioPresets.js"
-/** The reader Settings › Narration page: Voice | Tier, then the chapter's voice slots. */
+/** The reader Settings › Narration page: Voice, the chapter's voice slots, then the tier. */
 export {
     ReaderSettingsNarration,
     DEFAULT_READER_NARRATION_LABELS,
@@ -22,5 +22,6 @@ export type {
     ReaderSettingsNarrationProps,
     ReaderNarrationLabels,
     ReaderVoiceTier,
+    ReaderVoiceChoice,
     ReaderVoiceSlot,
 } from "./ReaderSettingsNarration.js"

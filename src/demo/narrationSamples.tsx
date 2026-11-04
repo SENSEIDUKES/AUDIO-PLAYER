@@ -1,59 +1,38 @@
 import { useState } from "react"
-import type { ReaderVoiceSlot, ReaderVoiceTier } from "../reader-ui"
+import { SEIHeavenIcon, SEIImmortalIcon, SEIMortalIcon } from "../audio-player"
+import type { ReaderVoiceChoice, ReaderVoiceSlot, ReaderVoiceTier } from "../reader-ui"
 
 /* Workshop stand-ins for what SEN supplies to Settings › Narration: its
-   tiers (with SEN's Fate Pressure flames, which belong to SEN), the voices
-   each tier offers, and the chapter's speakers. Every name here is a sample.
+   tiers (with SEIHouse's official Fate Pressure flames), every voice on
+   offer with its tier and source, and the chapter's speakers. Every name here is a sample.
    Mortal stands for voices that cost almost nothing (the device's own
    speech); Immortal for generated voices from providers such as ElevenLabs
    and Fish Audio; Heaven for the most expensive, such as voices designed for
    one story. */
 
-/** One, two or three flames: a simple stand-in for SEN's tier marks. */
-function Flames({ count, color }: { count: number; color: string }) {
-    const flame =
-        "M4 1C4 3 1.5 4 1.5 7a2.5 2.5 0 0 0 5 0C6.5 5 5 4.5 5 3c-.6.6-1 1.1-1 2C3 4 4 2.5 4 1z"
-    return (
-        <svg width={6 + count * 5} height="12" viewBox={`0 0 ${6 + count * 5} 12`} fill={color}>
-            {Array.from({ length: count }, (_, index) => (
-                <path key={index} d={flame} transform={`translate(${index * 5} 2)`} />
-            ))}
-        </svg>
-    )
-}
-
 export const SAMPLE_VOICE_TIERS: readonly ReaderVoiceTier[] = [
-    { id: "mortal", label: "Mortal", icon: <Flames count={1} color="#cbd5e1" /> },
-    { id: "immortal", label: "Immortal", icon: <Flames count={2} color="#c4b5fd" /> },
-    { id: "heaven", label: "Heaven", icon: <Flames count={3} color="#fcd34d" /> },
+    { id: "mortal", label: "Mortal", icon: <SEIMortalIcon size="1em" /> },
+    { id: "immortal", label: "Immortal", icon: <SEIImmortalIcon size="1em" /> },
+    { id: "heaven", label: "Heaven", icon: <SEIHeavenIcon size="1em" /> },
 ]
 
-const SAMPLE_VOICES: Record<string, { id: string; label: string; group: string }[]> = {
-    mortal: [
-        { id: "device-daniel", label: "Daniel (en-GB)", group: "On this device" },
-        { id: "device-samantha", label: "Samantha (en-US)", group: "On this device" },
-        { id: "device-rishi", label: "Rishi (en-IN)", group: "On this device" },
-        { id: "device-karen", label: "Karen (en-AU)", group: "On this device" },
-        { id: "device-moira", label: "Moira (en-IE)", group: "On this device" },
-    ],
-    immortal: [
-        { id: "eleven-brian", label: "Brian", group: "ElevenLabs" },
-        { id: "eleven-charlotte", label: "Charlotte", group: "ElevenLabs" },
-        { id: "eleven-george", label: "George", group: "ElevenLabs" },
-        { id: "fish-elder", label: "Elder sage", group: "Fish Audio" },
-        { id: "fish-swordsman", label: "Young swordsman", group: "Fish Audio" },
-        { id: "fish-court-lady", label: "Court lady", group: "Fish Audio" },
-    ],
-    heaven: [
-        { id: "designed-narrator", label: "Narrator, designed", group: "Designed for this story" },
-        { id: "designed-yan-wu", label: "Yan Wu, designed", group: "Designed for this story" },
-        {
-            id: "designed-physician",
-            label: "Physician, designed",
-            group: "Designed for this story",
-        },
-    ],
-}
+/** Every voice on offer, each with its tier and source: every slot lists them all. */
+const SAMPLE_VOICES: readonly ReaderVoiceChoice[] = [
+    { id: "device-daniel", label: "Daniel (en-GB)", tier: "mortal", group: "On this device" },
+    { id: "device-samantha", label: "Samantha (en-US)", tier: "mortal", group: "On this device" },
+    { id: "device-rishi", label: "Rishi (en-IN)", tier: "mortal", group: "On this device" },
+    { id: "device-karen", label: "Karen (en-AU)", tier: "mortal", group: "On this device" },
+    { id: "device-moira", label: "Moira (en-IE)", tier: "mortal", group: "On this device" },
+    { id: "eleven-brian", label: "Brian", tier: "immortal", group: "ElevenLabs" },
+    { id: "eleven-charlotte", label: "Charlotte", tier: "immortal", group: "ElevenLabs" },
+    { id: "eleven-george", label: "George", tier: "immortal", group: "ElevenLabs" },
+    { id: "fish-elder", label: "Elder sage", tier: "immortal", group: "Fish Audio" },
+    { id: "fish-swordsman", label: "Young swordsman", tier: "immortal", group: "Fish Audio" },
+    { id: "fish-court-lady", label: "Court lady", tier: "immortal", group: "Fish Audio" },
+    { id: "designed-narrator", label: "Narrator, designed", tier: "heaven", group: "Designed" },
+    { id: "designed-yan-wu", label: "Yan Wu, designed", tier: "heaven", group: "Designed" },
+    { id: "designed-physician", label: "Physician, designed", tier: "heaven", group: "Designed" },
+]
 
 /** The chapter's speakers: the narrator, the main character, then named codex characters. */
 const SAMPLE_CAST = [
@@ -74,7 +53,7 @@ const FIRST_ASSIGNMENTS: Record<string, Record<string, string>> = {
 export function useNarrationSamples(onEvent?: (text: string) => void) {
     const [tier, setTier] = useState("mortal")
     const [assigned, setAssigned] = useState(FIRST_ASSIGNMENTS)
-    const voices = SAMPLE_VOICES[tier] ?? []
+    const voices = SAMPLE_VOICES
     const slots: ReaderVoiceSlot[] = SAMPLE_CAST.map((speaker) => ({
         ...speaker,
         voiceId: assigned[tier]?.[speaker.id] ?? null,

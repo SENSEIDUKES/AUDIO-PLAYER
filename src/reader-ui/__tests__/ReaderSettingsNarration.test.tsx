@@ -40,9 +40,9 @@ const SLOTS = [
     { id: "physician", name: "The physician", voiceId: "samantha" },
 ]
 
-it("reads Voice | Tier on top: the Voice layer's controls, then the reader's tier", () => {
+it("has the Voice layer's controls on top and the tier as pills at the bottom", () => {
     const tiers: string[] = []
-    render(
+    const { container } = render(
         <ReaderSettingsNarration
             mixer={mixer}
             tiers={TIERS}
@@ -58,14 +58,17 @@ it("reads Voice | Tier on top: the Voice layer's controls, then the reader's tie
     fireEvent.click(within(page).getByRole("switch", { name: "Voice" }))
     expect(mixer.getPreferences().layers.voice.enabled).toBe(false)
 
-    const tier = within(page).getByRole("combobox", { name: "Tier" })
-    expect(tier).toHaveValue("mortal")
-    // The chosen tier's mark sits before its name.
-    expect(within(page).getByTestId("mortal-flame")).toBeInTheDocument()
-    expect(within(page).getByRole("button", { name: "Previous Tier" })).toBeDisabled()
-    fireEvent.click(within(page).getByRole("button", { name: "Next Tier" }))
-    fireEvent.change(tier, { target: { value: "heaven" } })
+    // Like the Audio page's Presets: one strip at the bottom, a pill per tier.
+    const strip = within(page).getByRole("radiogroup", { name: "Tier" })
+    expect(container.querySelector(".sap-reader-narration")?.contains(strip)).toBe(false)
+    expect(within(strip).getByRole("radio", { name: "Mortal" })).toBeChecked()
+    // Each tier's mark sits before its name.
+    expect(within(strip).getByTestId("mortal-flame")).toBeInTheDocument()
+    expect(within(strip).getByTestId("immortal-flame")).toBeInTheDocument()
+    fireEvent.click(within(strip).getByRole("radio", { name: "Immortal" }))
+    fireEvent.click(within(strip).getByRole("radio", { name: "Heaven" }))
     expect(tiers).toEqual(["immortal", "heaven"])
+    expect(within(page).queryByRole("combobox", { name: "Tier" })).toBeNull()
 })
 
 it("gives each speaker a slot to assign a voice from the tier's voices", () => {
@@ -92,6 +95,39 @@ it("gives each speaker a slot to assign a voice from the tier's voices", () => {
         ["yan-wu", "brian"],
         ["physician", "brian"],
     ])
+})
+
+it("lists every voice in every slot, sectioned by tier then source, whatever the tier", () => {
+    const voices = [
+        { id: "brian", label: "Brian", tier: "immortal", group: "ElevenLabs" },
+        { id: "sage", label: "Elder sage", tier: "immortal", group: "Fish Audio" },
+        { id: "designed", label: "Designed narrator", tier: "heaven", group: "Designed" },
+        { id: "daniel", label: "Daniel", tier: "mortal", group: "On this device" },
+        { id: "mystery", label: "Unlisted voice" },
+    ]
+    render(
+        <ReaderSettingsNarration
+            mixer={mixer}
+            tiers={TIERS}
+            tier="mortal"
+            voices={voices}
+            slots={SLOTS}
+        />
+    )
+    const narrator = screen.getByRole("combobox", { name: "Voice for Narrator" })
+    const sections = within(narrator)
+        .getAllByRole("group")
+        .map((group) => group.getAttribute("label"))
+    expect(sections).toEqual([
+        "Mortal · On this device",
+        "Immortal · ElevenLabs",
+        "Immortal · Fish Audio",
+        "Heaven · Designed",
+        // A voice with no tier or source comes last, never before the tiers.
+        "Other",
+    ])
+    // The Mortal tier still offers Immortal and Heaven voices.
+    expect(within(narrator).getByRole("option", { name: "Designed narrator" })).toBeInTheDocument()
 })
 
 it("always shows eight slots, unused ones as a dash, so the page keeps its shape", () => {
