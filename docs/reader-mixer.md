@@ -913,11 +913,12 @@ design language, and the home of the Voice layer: Settings › Audio is the
 soundtrack, so `ReaderSettingsAudio` leaves Voice out unless `showVoice` is set
 (`ReaderMixerPanel` takes `layers` to choose which layers it shows).
 
-- **Voice | Tier.** The top row has the Voice layer's switch and volume on the
-  left and the reader's tier on the right, a `◀ value ▶` with the tier's mark
-  (`icon`) before its name. SEN's tiers are its Energy grades (Mortal,
-  Immortal, Heaven) with its Fate Pressure flames: what reading aloud costs,
-  from the device's own speech to generated and designed voices.
+- **Voice on top, Tier at the bottom.** The top row has the Voice layer's
+  switch and volume. The reader's tier sits at the bottom, one strip like the
+  Audio page's Presets: a pill per tier with its mark (`icon`) before its
+  name. SEN's tiers are its Energy grades (Mortal, Immortal, Heaven) with its
+  Fate Pressure flames: what reading aloud costs, from the device's own speech
+  to generated and designed voices.
 - **Voice slots.** Below, a fixed grid of `slotCount` slots (8), two across.
   Each speaker in the chapter (the narrator, the main character, any named
   codex character) gets a slot whose `◀ voice ▶` picks from the chosen tier's

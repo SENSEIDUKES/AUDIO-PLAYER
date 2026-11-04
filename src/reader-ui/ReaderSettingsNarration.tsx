@@ -81,12 +81,13 @@ export interface ReaderSettingsNarrationProps {
 
 /**
  * The Narration page of the reader's Settings, in the Audio page's design
- * language. The top row is **Voice | Tier**: the Voice layer's switch and
- * volume on the left, the reader's tier on the right. Below it, a fixed grid
- * of voice slots: each speaker in the chapter (the narrator, the main
- * character, any named codex character) gets a slot whose ◀ voice ▶ picks
- * from the chosen tier's voices. The host supplies the tiers, the voices and
- * the speakers, and decides what an assignment does; the page never grows.
+ * language. The top row is the Voice layer's switch and volume. Below it, a
+ * fixed grid of voice slots: each speaker in the chapter (the narrator, the
+ * main character, any named codex character) gets a slot whose ◀ voice ▶
+ * picks from the chosen tier's voices. At the bottom, like the Audio page's
+ * Presets, the reader's tier as a row of pills. The host supplies the tiers,
+ * the voices and the speakers, and decides what an assignment does; the page
+ * never grows.
  */
 export function ReaderSettingsNarration({
     mixer: mixerProp,
@@ -130,7 +131,6 @@ export function ReaderSettingsNarration({
     if (!mixer || !state) return null
 
     const voiceOptions = voiceGroups.flatMap((group) => group.options)
-    const current = tiers.find((entry) => entry.id === tier)
     const preference = state.preferences.layers.voice
     const percent = Math.round(preference.level * 100)
     const visible = slots.slice(0, slotCount)
@@ -151,7 +151,7 @@ export function ReaderSettingsNarration({
         >
             {help != null && <p className="sap-reader-settings__help">{help}</p>}
             <div className="sap-reader-mixer sap-reader-narration">
-                {/* Voice | Tier: the same split row as each Audio channel. */}
+                {/* Voice: the same split row as each Audio channel. */}
                 <div
                     className="sap-reader-mixer__channel sap-reader-narration__voice"
                     data-enabled={preference.enabled ? "true" : "false"}
@@ -177,32 +177,13 @@ export function ReaderSettingsNarration({
                             {labels.formatPercent(percent)}
                         </span>
                     </div>
-                    {tiers.length > 0 ? (
-                        <div className="sap-reader-mixer__sound sap-reader-mixer__choice-row">
-                            <label className="sap-reader-mixer__name" htmlFor={ids.tier}>
-                                {labels.tier}
-                            </label>
-                            <ChoiceStepper
-                                id={ids.tier}
-                                rowLabel={labels.tier}
-                                value={tier ?? ""}
-                                options={tiers.map((entry) => ({
-                                    value: entry.id,
-                                    label: entry.label,
-                                }))}
-                                labels={labels}
-                                adornment={current?.icon}
-                                onChange={(id) => onTierChange?.(id)}
-                            />
-                        </div>
-                    ) : (
-                        <div
-                            className="sap-reader-mixer__sound sap-reader-mixer__sound--empty"
-                            aria-hidden="true"
-                        >
-                            <span className="sap-reader-mixer__stepper">—</span>
-                        </div>
-                    )}
+                    {/* The tier moved to the bottom strip, like the Audio page's presets. */}
+                    <div
+                        className="sap-reader-mixer__sound sap-reader-mixer__sound--empty"
+                        aria-hidden="true"
+                    >
+                        <span className="sap-reader-mixer__stepper">—</span>
+                    </div>
                 </div>
                 {/* A fixed grid of slots, one per speaker, so the page keeps its height. */}
                 <div
@@ -244,6 +225,47 @@ export function ReaderSettingsNarration({
                     ))}
                 </div>
             </div>
+            {tiers.length > 0 && (
+                <div className="sap-reader-settings__group">
+                    {/* One options-table strip like the Audio page's Presets: the name,
+                        then a pill per tier with its mark before its name. */}
+                    <div
+                        role="radiogroup"
+                        aria-labelledby={ids.tier}
+                        className="sap-reader-settings__field sap-reader-settings__row sap-reader-narration__tiers"
+                        data-control="reader-voice-tier"
+                    >
+                        <span className="sap-reader-settings__label" id={ids.tier}>
+                            {labels.tier}
+                        </span>
+                        <div className="sap-reader-settings__options sap-reader-settings__options--segmented">
+                            {tiers.map((entry) => (
+                                <label key={entry.id} className="sap-reader-settings__option">
+                                    <input
+                                        type="radio"
+                                        name={ids.tier}
+                                        value={entry.id}
+                                        checked={tier === entry.id}
+                                        onChange={() => onTierChange?.(entry.id)}
+                                        className="sap-reader-settings__radio"
+                                    />
+                                    <span className="sap-reader-settings__choice">
+                                        {entry.icon != null && (
+                                            <span
+                                                className="sap-reader-narration__tier-mark"
+                                                aria-hidden="true"
+                                            >
+                                                {entry.icon}
+                                            </span>
+                                        )}
+                                        {entry.label}
+                                    </span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
             {children}
         </section>
     )

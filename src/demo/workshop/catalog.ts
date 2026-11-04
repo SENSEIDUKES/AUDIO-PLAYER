@@ -100,7 +100,7 @@ export const WORKSHOP_ENTRIES: readonly WorkshopEntry[] = [
             "Hold the note (or press ↑) for the quick master volume",
             "The gear opens Reader Settings: Text, Audio, Narration",
             "The Audio tab is the real menu: Master and each layer, sleep timer, preset pills",
-            "The Narration tab: Voice | Tier, then a voice slot for each speaker in the chapter",
+            "The Narration tab: Voice, a voice slot for each speaker in the chapter, then the tier",
             "Narration ducks the music through the mixer's Voice layer",
         ],
         placeholders: [
@@ -127,7 +127,7 @@ export const WORKSHOP_ENTRIES: readonly WorkshopEntry[] = [
             "Atmosphere previews, and sound effects that play over the music without pausing it",
             "Presets (Default, Cinematic, Calm, Focus), sleep timers, idle pause and automatic loudness leveling",
             "A soundtrack master that leaves Voice on its own volume",
-            "Settings › Narration: Voice | Tier, and eight voice slots for the chapter's speakers",
+            "Settings › Narration: Voice, eight voice slots for the chapter's speakers, then the tier",
             "The Settings › Audio page exactly as SEN's reader shows it, in its colors",
             "The narrator face (the music note) shares the mixer's master level and mute",
         ],

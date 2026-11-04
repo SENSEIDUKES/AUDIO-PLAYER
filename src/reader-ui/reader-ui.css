@@ -672,9 +672,9 @@
 }
 
 /*
- * Settings › Narration: the Voice | Tier row, then a fixed grid of voice
- * slots, two across, one per speaker in the chapter. Unused slots keep their
- * place with a dash, so the page never changes shape.
+ * Settings › Narration: the Voice row, a fixed grid of voice slots (two
+ * across, one per speaker in the chapter), then the Tier strip. Unused slots
+ * keep their place with a dash, so the page never changes shape.
  */
 .sap-reader-narration {
     display: flex;
@@ -731,5 +731,29 @@
     }
     .sap-reader-narration__slot .sap-reader-mixer__stepper {
         grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* The tier strip at the bottom, like the Audio page's Presets: each pill shows
+   the tier's mark before its name. */
+.sap-reader-narration__tiers .sap-reader-settings__choice {
+    gap: 5px;
+}
+.sap-reader-narration__tier-mark {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+}
+.sap-reader-narration__tier-mark > svg {
+    max-height: 16px;
+}
+@container (max-width: 339px) {
+    /* "Tier" is short: the strip stays one line, so the page keeps its height. */
+    .sap-reader-settings-audio .sap-reader-narration__tiers {
+        grid-template-columns: auto minmax(0, 1fr);
+        padding: 0 2px 0 8px;
+    }
+    .sap-reader-narration__tiers .sap-reader-settings__choice {
+        gap: 3px;
     }
 }

@@ -40,9 +40,9 @@ const SLOTS = [
     { id: "physician", name: "The physician", voiceId: "samantha" },
 ]
 
-it("reads Voice | Tier on top: the Voice layer's controls, then the reader's tier", () => {
+it("has the Voice layer's controls on top and the tier as pills at the bottom", () => {
     const tiers: string[] = []
-    render(
+    const { container } = render(
         <ReaderSettingsNarration
             mixer={mixer}
             tiers={TIERS}
@@ -58,14 +58,17 @@ it("reads Voice | Tier on top: the Voice layer's controls, then the reader's tie
     fireEvent.click(within(page).getByRole("switch", { name: "Voice" }))
     expect(mixer.getPreferences().layers.voice.enabled).toBe(false)
 
-    const tier = within(page).getByRole("combobox", { name: "Tier" })
-    expect(tier).toHaveValue("mortal")
-    // The chosen tier's mark sits before its name.
-    expect(within(page).getByTestId("mortal-flame")).toBeInTheDocument()
-    expect(within(page).getByRole("button", { name: "Previous Tier" })).toBeDisabled()
-    fireEvent.click(within(page).getByRole("button", { name: "Next Tier" }))
-    fireEvent.change(tier, { target: { value: "heaven" } })
+    // Like the Audio page's Presets: one strip at the bottom, a pill per tier.
+    const strip = within(page).getByRole("radiogroup", { name: "Tier" })
+    expect(container.querySelector(".sap-reader-narration")?.contains(strip)).toBe(false)
+    expect(within(strip).getByRole("radio", { name: "Mortal" })).toBeChecked()
+    // Each tier's mark sits before its name.
+    expect(within(strip).getByTestId("mortal-flame")).toBeInTheDocument()
+    expect(within(strip).getByTestId("immortal-flame")).toBeInTheDocument()
+    fireEvent.click(within(strip).getByRole("radio", { name: "Immortal" }))
+    fireEvent.click(within(strip).getByRole("radio", { name: "Heaven" }))
     expect(tiers).toEqual(["immortal", "heaven"])
+    expect(within(page).queryByRole("combobox", { name: "Tier" })).toBeNull()
 })
 
 it("gives each speaker a slot to assign a voice from the tier's voices", () => {
