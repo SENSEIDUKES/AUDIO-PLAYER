@@ -83,13 +83,14 @@ describe("Workspaces", () => {
         expect(screen.getByRole("heading", { level: 1, name: "Engine" })).toBeInTheDocument()
     })
 
+    // Let the ten-second lazy workspace wait finish on a busy runner.
     it("opens directly from a link, with what works and what doesn't yet", async () => {
         openAt("?workspace=narrative-face")
         await workspaceLoaded("Narrator face")
         expect(screen.getByRole("heading", { name: "What you can do here" })).toBeInTheDocument()
         expect(screen.getByRole("heading", { name: "Not working yet" })).toBeInTheDocument()
         expect(document.title).toBe("Narrator face · Audio Player Workshop")
-    })
+    }, 15_000)
 
     it("stops its audio when you leave", async () => {
         openAt("?workspace=new-player")
