@@ -22,7 +22,8 @@ import type { ReactNode, SVGProps } from "react"
  * unless given an accessible name; the button around it carries the label.
  */
 
-export interface SEIIconProps extends Omit<SVGProps<SVGSVGElement>, "children"> {
+/** SVG props minus `ref`, which these plain function components do not forward. */
+export interface SEIIconProps extends Omit<SVGProps<SVGSVGElement>, "children" | "ref"> {
     size?: number | string
 }
 

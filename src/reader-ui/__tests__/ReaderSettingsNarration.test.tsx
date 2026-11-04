@@ -103,6 +103,7 @@ it("lists every voice in every slot, sectioned by tier then source, whatever the
         { id: "sage", label: "Elder sage", tier: "immortal", group: "Fish Audio" },
         { id: "designed", label: "Designed narrator", tier: "heaven", group: "Designed" },
         { id: "daniel", label: "Daniel", tier: "mortal", group: "On this device" },
+        { id: "mystery", label: "Unlisted voice" },
     ]
     render(
         <ReaderSettingsNarration
@@ -122,6 +123,8 @@ it("lists every voice in every slot, sectioned by tier then source, whatever the
         "Immortal · ElevenLabs",
         "Immortal · Fish Audio",
         "Heaven · Designed",
+        // A voice with no tier or source comes last, never before the tiers.
+        "Other",
     ])
     // The Mortal tier still offers Immortal and Heaven voices.
     expect(within(narrator).getByRole("option", { name: "Designed narrator" })).toBeInTheDocument()

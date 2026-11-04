@@ -44,6 +44,8 @@ export interface ReaderNarrationLabels {
     voiceFor: (name: string) => string
     /** Shown in a slot before a voice is assigned. */
     noVoice: string
+    /** The picker section for voices with neither a known tier nor a source; it comes last. */
+    otherVoices: string
     previous: (rowLabel: string) => string
     next: (rowLabel: string) => string
 }
@@ -57,6 +59,7 @@ export const DEFAULT_READER_NARRATION_LABELS: ReaderNarrationLabels = Object.fre
     slots: "Voices",
     voiceFor: (name: string) => `Voice for ${name}`,
     noVoice: "Choose…",
+    otherVoices: "Other",
     previous: (rowLabel: string) => `Previous ${rowLabel}`,
     next: (rowLabel: string) => `Next ${rowLabel}`,
 })
@@ -140,11 +143,13 @@ export function ReaderSettingsNarration({
             (voice) => {
                 const tierLabel = tiers.find((entry) => entry.id === voice.tier)?.label
                 const source = typeof voice.group === "string" ? voice.group.trim() : ""
-                return [tierLabel, source].filter(Boolean).join(" · ")
+                // A voice with neither keeps its place after the tiers, in a section of
+                // its own, rather than groupChoices' unnamed section at the front.
+                return [tierLabel, source].filter(Boolean).join(" · ") || labels.otherVoices
             },
             (voice): StepperOption => ({ value: voice.id, label: voice.label })
         )
-    }, [voices, tiers])
+    }, [voices, tiers, labels.otherVoices])
     // After every hook: like the Audio page, there is nothing to show without a mixer.
     if (!mixer || !state) return null
 
