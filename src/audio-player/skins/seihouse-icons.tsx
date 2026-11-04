@@ -118,11 +118,13 @@ const FLAME_OFFSET: Record<SEIPressureLevel, number> = { mortal: 6, immortal: 2,
 
 /** A tier's Fate Pressure flame: it grows from Mortal to Heaven, so no color is needed. */
 export function SEIPressureIcon({ level, ...props }: SEIIconProps & { level: SEIPressureLevel }) {
+    // Hosts may pass a tier id from untyped data: an unknown level draws Mortal.
+    const known = Object.prototype.hasOwnProperty.call(FLAMES, level) ? level : "mortal"
     return (
         <Glyph {...props} viewBox="0 0 24 28">
             <path
-                transform={`translate(0 ${FLAME_OFFSET[level]})`}
-                d={FLAMES[level]}
+                transform={`translate(0 ${FLAME_OFFSET[known]})`}
+                d={FLAMES[known]}
                 fillRule="evenodd"
                 clipRule="evenodd"
             />
@@ -149,10 +151,14 @@ export function SEIArrowIcon({
     direction = "right",
     ...props
 }: SEIIconProps & { direction?: SEIArrowDirection }) {
+    // An unknown direction (from untyped host data) points right.
+    const turn = Object.prototype.hasOwnProperty.call(ARROW_TURN, direction)
+        ? ARROW_TURN[direction]
+        : 0
     return (
         <Glyph {...props}>
             <path
-                transform={`rotate(${ARROW_TURN[direction]} 12 12) translate(12 12) scale(1.3) translate(-15.2 -12)`}
+                transform={`rotate(${turn} 12 12) translate(12 12) scale(1.3) translate(-15.2 -12)`}
                 d={ARROWHEAD}
             />
         </Glyph>

@@ -29,3 +29,16 @@ it("becomes an image when given a name, and takes a size", () => {
     expect(exit).toHaveAttribute("width", "32")
     expect(exit).not.toHaveAttribute("aria-hidden")
 })
+
+it("falls back for a tier or direction it does not know", () => {
+    const { container } = render(
+        <>
+            <icons.SEIPressureIcon level={"divine" as icons.SEIPressureLevel} />
+            <icons.SEIArrowIcon direction={"sideways" as icons.SEIArrowDirection} />
+        </>
+    )
+    const [flame, arrow] = [...container.querySelectorAll("path")]
+    expect(flame.getAttribute("d")).toBeTruthy()
+    expect(flame.getAttribute("transform")).toBe("translate(0 6)")
+    expect(arrow.getAttribute("transform")).toMatch(/^rotate\(0 12 12\)/)
+})
