@@ -97,6 +97,36 @@ it("gives each speaker a slot to assign a voice from the tier's voices", () => {
     ])
 })
 
+it("lists every voice in every slot, sectioned by tier then source, whatever the tier", () => {
+    const voices = [
+        { id: "brian", label: "Brian", tier: "immortal", group: "ElevenLabs" },
+        { id: "sage", label: "Elder sage", tier: "immortal", group: "Fish Audio" },
+        { id: "designed", label: "Designed narrator", tier: "heaven", group: "Designed" },
+        { id: "daniel", label: "Daniel", tier: "mortal", group: "On this device" },
+    ]
+    render(
+        <ReaderSettingsNarration
+            mixer={mixer}
+            tiers={TIERS}
+            tier="mortal"
+            voices={voices}
+            slots={SLOTS}
+        />
+    )
+    const narrator = screen.getByRole("combobox", { name: "Voice for Narrator" })
+    const sections = within(narrator)
+        .getAllByRole("group")
+        .map((group) => group.getAttribute("label"))
+    expect(sections).toEqual([
+        "Mortal · On this device",
+        "Immortal · ElevenLabs",
+        "Immortal · Fish Audio",
+        "Heaven · Designed",
+    ])
+    // The Mortal tier still offers Immortal and Heaven voices.
+    expect(within(narrator).getByRole("option", { name: "Designed narrator" })).toBeInTheDocument()
+})
+
 it("always shows eight slots, unused ones as a dash, so the page keeps its shape", () => {
     const { container, rerender } = render(<ReaderSettingsNarration mixer={mixer} slots={SLOTS} />)
     const slotsIn = () => container.querySelectorAll(".sap-reader-narration__slot")

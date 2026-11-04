@@ -15,6 +15,12 @@ export interface ReaderVoiceTier {
     icon?: ReactNode
 }
 
+/** A voice a speaker can be given. */
+export interface ReaderVoiceChoice extends ReaderChannelSoundChoice {
+    /** The tier the voice belongs to (a `ReaderVoiceTier` id); sections the picker by tier. */
+    tier?: string
+}
+
 /** One speaker in the chapter who can be given a voice. */
 export interface ReaderVoiceSlot {
     id: string
@@ -63,8 +69,12 @@ export interface ReaderSettingsNarrationProps {
     /** The reader's tier. */
     tier?: string | null
     onTierChange?: (tierId: string) => void
-    /** The voices the chosen tier offers; `group` names their source in the picker. */
-    voices?: readonly ReaderChannelSoundChoice[]
+    /**
+     * Every voice on offer, from every tier: each slot lists them all whatever
+     * the reader's tier, sectioned "Tier · source" in tier order. `tier` names a
+     * voice's tier, `group` its source (a provider, the device).
+     */
+    voices?: readonly ReaderVoiceChoice[]
     /** The chapter's speakers, in the order their slots show. */
     slots?: readonly ReaderVoiceSlot[]
     onAssign?: (slotId: string, voiceId: string) => void
@@ -84,7 +94,7 @@ export interface ReaderSettingsNarrationProps {
  * language. The top row is the Voice layer's switch and volume. Below it, a
  * fixed grid of voice slots: each speaker in the chapter (the narrator, the
  * main character, any named codex character) gets a slot whose ◀ voice ▶
- * picks from the chosen tier's voices. At the bottom, like the Audio page's
+ * picks from every voice on offer, sectioned by tier and source. At the bottom, like the Audio page's
  * Presets, the reader's tier as a row of pills. The host supplies the tiers,
  * the voices and the speakers, and decides what an assignment does; the page
  * never grows.
@@ -118,15 +128,23 @@ export function ReaderSettingsNarration({
         slots: `${baseId}-slots`,
         slot: (index: number) => `${baseId}-slot-${index}`,
     }
-    const voiceGroups = useMemo(
-        () =>
-            groupChoices(
-                voices,
-                (voice) => voice.group,
-                (voice): StepperOption => ({ value: voice.id, label: voice.label })
-            ),
-        [voices]
-    )
+    const voiceGroups = useMemo(() => {
+        // Tier order first (cheapest first, as `tiers` is), then each tier's sources.
+        const rank = (voice: ReaderVoiceChoice) => {
+            const index = tiers.findIndex((entry) => entry.id === voice.tier)
+            return index === -1 ? tiers.length : index
+        }
+        const ordered = [...voices].sort((a, b) => rank(a) - rank(b))
+        return groupChoices(
+            ordered,
+            (voice) => {
+                const tierLabel = tiers.find((entry) => entry.id === voice.tier)?.label
+                const source = typeof voice.group === "string" ? voice.group.trim() : ""
+                return [tierLabel, source].filter(Boolean).join(" · ")
+            },
+            (voice): StepperOption => ({ value: voice.id, label: voice.label })
+        )
+    }, [voices, tiers])
     // After every hook: like the Audio page, there is nothing to show without a mixer.
     if (!mixer || !state) return null
 

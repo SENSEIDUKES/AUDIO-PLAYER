@@ -22,5 +22,6 @@ export type {
     ReaderSettingsNarrationProps,
     ReaderNarrationLabels,
     ReaderVoiceTier,
+    ReaderVoiceChoice,
     ReaderVoiceSlot,
 } from "./ReaderSettingsNarration.js"

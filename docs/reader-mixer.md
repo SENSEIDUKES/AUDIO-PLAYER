@@ -921,12 +921,15 @@ soundtrack, so `ReaderSettingsAudio` leaves Voice out unless `showVoice` is set
   to generated and designed voices.
 - **Voice slots.** Below, a fixed grid of `slotCount` slots (8), two across.
   Each speaker in the chapter (the narrator, the main character, any named
-  codex character) gets a slot whose `◀ voice ▶` picks from the chosen tier's
-  `voices` (`{ id, label, group? }`; groups name a voice's source, such as a
-  provider). Unused slots keep their place with a dash, so the page never
+  codex character) gets a slot whose `◀ voice ▶` picks from every voice in
+  `voices` (`{ id, label, tier?, group? }`), whatever the reader's tier. The
+  picker sections them "Tier · source" in tier order (Mortal · On this
+  device, Immortal · ElevenLabs, Immortal · Fish Audio, Heaven · Designed), so
+  a reader can mix tiers per speaker. The tier strip sets the reader's
+  preset; it never hides voices. Unused slots keep their place with a dash, so the page never
   changes shape. A chapter rarely has more speakers than slots; any beyond
   `slotCount` are not shown, and the host voices them itself (SEN gives them
-  a random voice from the tier). Reading speed is not here: it lives in the
+  a random voice from their tier). Reading speed is not here: it lives in the
   reader chamber.
 - **Host-owned.** The host supplies `tiers`, `tier`, `voices` and `slots`,
   and decides what `onTierChange` and `onAssign(slotId, voiceId)` do. The page
