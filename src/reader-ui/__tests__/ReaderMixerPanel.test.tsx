@@ -74,6 +74,26 @@ describe("ReaderMixerPanel", () => {
         expect(screen.getByText("25%")).toBeInTheDocument()
     })
 
+    it("marks each channel with its SEIHouse icon without changing its name", () => {
+        const { container } = renderPanel()
+        // Master, Soundscapes, Atmosphere, Sound Cues: one decorative icon each.
+        const named = [
+            ...container.querySelectorAll(
+                ".sap-reader-mixer__channel > .sap-reader-mixer__row > .sap-reader-mixer__name"
+            ),
+        ]
+        expect(named).toHaveLength(4)
+        for (const name of named) {
+            expect(name.querySelector("svg.sap-reader-mixer__icon")).toHaveAttribute(
+                "aria-hidden",
+                "true"
+            )
+        }
+        expect(screen.getByRole("switch", { name: "Master" })).toBeInTheDocument()
+        // The steppers use the SEIHouse arrowhead, not text triangles.
+        expect(container.textContent).not.toMatch(/[◀▶]/)
+    })
+
     it("drives the mixer from its switches and sliders", () => {
         renderPanel()
         const layers = mixer!.getPreferences().layers

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react"
 import type { ReactNode } from "react"
 import { SEISelect, SEISlider, SEISwitch } from "@seihouse/ui"
+import { SEIArrowIcon } from "@seihouse/audio-player"
 
 /* The controls every reader settings page shares, so the Audio and Narration
    pages speak one design language. Internal: not exported from the entry. */
@@ -155,7 +156,7 @@ export function ChoiceStepper({
                 disabled={index <= 0}
                 onClick={() => step(-1)}
             >
-                <span aria-hidden="true">◀</span>
+                <SEIArrowIcon direction="left" size="1em" />
             </button>
             <div className="sap-reader-mixer__stepper-value">
                 {adornment && (
@@ -203,7 +204,7 @@ export function ChoiceStepper({
                 disabled={index < 0 || index >= options.length - 1}
                 onClick={() => step(1)}
             >
-                <span aria-hidden="true">▶</span>
+                <SEIArrowIcon direction="right" size="1em" />
             </button>
         </div>
     )

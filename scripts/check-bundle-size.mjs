@@ -6,9 +6,10 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 // These budgets stay below the measured unminified outputs while leaving room
 // for incremental library growth.
 const bundleLimits = {
-    // Reader policies, note and loudness measurement bring the measured ESM to 590 KiB.
-    // Keep ~15 KiB of explicit headroom; the CJS budget remains unchanged.
-    "dist/index.js": 605 * 1024,
+    // Reader policies, note and loudness measurement brought the measured ESM to 603 KiB;
+    // SEIHouse's official icon set (skins/seihouse-icons.tsx) adds ~6 KiB. Keep ~10 KiB of
+    // explicit headroom; the CJS budget remains unchanged.
+    "dist/index.js": 620 * 1024,
     "dist/index.cjs": 500 * 1024,
 }
 

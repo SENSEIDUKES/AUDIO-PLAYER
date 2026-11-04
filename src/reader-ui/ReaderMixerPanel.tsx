@@ -3,11 +3,16 @@ import type { CSSProperties, ReactNode } from "react"
 import { SEIRadio, SEIRadioGroup } from "@seihouse/ui"
 import {
     READER_MIXER_LAYERS,
+    SEIAtmosphereIcon,
+    SEIAudioIcon,
+    SEICueIcon,
+    SEISoundscapeIcon,
     useOptionalReaderMixer,
     useReaderMixerState,
 } from "@seihouse/audio-player"
 import type {
     ReaderAtmosphereOption,
+    SEIIconProps,
     ReaderMixer,
     ReaderMixerLayer,
     ReaderMixerLayerStatus,
@@ -144,6 +149,21 @@ export interface ReaderMixerPanelProps {
     className?: string
     /** Theme overrides, typically `--sap-reader-mixer-*` custom properties. */
     style?: CSSProperties
+}
+
+/** SEIHouse's official icons before each channel's name; Voice has none yet. */
+const CHANNEL_ICONS: Partial<
+    Record<"master" | ReaderMixerLayer, (props: SEIIconProps) => ReactNode>
+> = {
+    master: SEIAudioIcon,
+    soundscapes: SEISoundscapeIcon,
+    atmosphere: SEIAtmosphereIcon,
+    cues: SEICueIcon,
+}
+
+function ChannelIcon({ channel }: { channel: "master" | ReaderMixerLayer }) {
+    const Icon = CHANNEL_ICONS[channel]
+    return Icon ? <Icon className="sap-reader-mixer__icon" size="1em" /> : null
 }
 
 /** Merge host wording while retaining unspecified layer labels and statuses. */
@@ -382,6 +402,7 @@ export function ReaderMixerPanel({
             <div className="sap-reader-mixer__channel sap-reader-mixer__channel--master">
                 <div className="sap-reader-mixer__row sap-reader-mixer__row--master">
                     <span className="sap-reader-mixer__name" id={ids.master}>
+                        <ChannelIcon channel="master" />
                         {labels.master}
                     </span>
                     <MixerSwitch
@@ -486,6 +507,7 @@ export function ReaderMixerPanel({
                         >
                             <div className="sap-reader-mixer__row">
                                 <span className="sap-reader-mixer__name" id={ids.layer(layer)}>
+                                    <ChannelIcon channel={layer} />
                                     {label}
                                 </span>
                                 <MixerSwitch

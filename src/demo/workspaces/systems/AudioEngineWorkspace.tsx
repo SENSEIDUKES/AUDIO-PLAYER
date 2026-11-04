@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from "react"
-import { AudioSessionProvider, createAudioBackend, useAudioSession } from "../../../audio-player"
+import {
+    AudioSessionProvider,
+    SEIRetryIcon,
+    createAudioBackend,
+    useAudioSession,
+} from "../../../audio-player"
 import type { AudioBackend, AudioBackendKind } from "../../../audio-player"
 import { SAMPLE, TRACK_SETS, TRACK_SET_OPTIONS, isTrackSetId } from "../../data"
 import { useWorkspaceParam } from "../../workshop/routing"
@@ -83,6 +88,7 @@ function EngineControls({ append }: { append: (text: string, tone?: LogLine["ton
                         append("retry()")
                     }}
                 >
+                    <SEIRetryIcon size={16} />
                     Retry
                 </Button>
                 <Button

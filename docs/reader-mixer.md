@@ -1086,3 +1086,26 @@ source loudness normalization is not inferred from their containing file.
   or interrupt a pending cue. Listen for neighboring-segment leakage and element
   loop boundaries. Record device/OS, route, audible result and limitations separately
   from automated browser evidence. This checklist is not a claim that it was run.
+
+## SEIHouse icons
+
+SAP ships SEIHouse's official icons from `@seihouse/audio-player`, so the
+player, the reader UI and SEN share one set of artwork. Each is an
+`SEI…Icon` component (`size`, `className` and SVG props; it paints with
+`currentColor` and is decorative unless given `aria-label`):
+
+- **Sound:** `SEIAudioIcon`, `SEISoundscapeIcon`, `SEIAtmosphereIcon`,
+  `SEICueIcon`. The mixer shows them before Master, Soundscapes, Atmosphere
+  and Sound Cues.
+- **Tiers:** `SEIMortalIcon`, `SEIImmortalIcon`, `SEIHeavenIcon` (or
+  `SEIPressureIcon level=…`), SEN's Fate Pressure flames for Narration's tiers.
+- **Navigation:** `SEIArrowIcon direction=…` (the steppers), `SEIBackIcon`,
+  `SEIExitIcon` (closing a sheet or panel), `SEIDownloadIcon`,
+  `SEIRetryIcon`, `SEIUndoIcon`.
+- **Actions and header:** `SEISaveIcon`, `SEIRemoveIcon`, `SEIDeleteIcon`,
+  `SEISettingsIcon`, `SEIHelpIcon`, `SEISearchIcon`, `SEIInformationIcon`.
+
+The artwork is copied from SEN and the LIBRARY CORE master icons; change it
+there first. `SEIArrowIcon` and `SEIRetryIcon` are built from the official
+arrowhead that Exit and Download share, since no master file exists for them.
+Voice has no SEIHouse icon yet, so its row shows none.

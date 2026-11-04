@@ -210,7 +210,22 @@
         font-size: 17px;
         line-height: 1.9;
     }
+    /* The panel fills the sheet, not the stage behind it, so the settings
+       end above the sheet's lower edge instead of under it. */
+    .wk-shell .wk-rf-sheet {
+        display: flex;
+        flex-direction: column;
+    }
     .wk-shell .wk-rf-sheet__panel {
+        flex: 1;
+        height: auto;
+        min-height: 0;
         max-height: none;
+    }
+    .wk-shell .wk-rf-sheet__header {
+        padding: 8px 16px 10px;
+    }
+    .wk-shell .wk-rf-sheet__body {
+        padding: 8px 12px;
     }
 }

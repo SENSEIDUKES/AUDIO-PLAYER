@@ -328,6 +328,11 @@
     font-size: 11px;
     cursor: pointer;
 }
+/* The SEIHouse arrowhead (SEIArrowIcon), not a text triangle. */
+.sap-reader-mixer__step > svg {
+    width: 15px;
+    height: 15px;
+}
 .sap-reader-mixer__step:disabled {
     color: var(--_muted);
     opacity: 0.35;
@@ -756,4 +761,15 @@
     .sap-reader-narration__tiers .sap-reader-settings__choice {
         gap: 3px;
     }
+}
+
+/* SEIHouse's official icon before each channel's name (src/reader-ui/icons.tsx). */
+.sap-reader-mixer__icon {
+    flex: none;
+    width: 1.15em;
+    height: 1.15em;
+    /* Negative block margins: the icon never makes a row taller than its name. */
+    margin: -0.2em 0.4em -0.2em 0;
+    vertical-align: -0.2em;
+    opacity: 0.9;
 }

@@ -610,3 +610,29 @@ export type {
     CueOutcomeEvent,
     CuePackState,
 } from "./cues/cueRuntime"
+
+/* SEIHouse's official icons, shared by the player, the reader UI and SEN. */
+export {
+    SEIAudioIcon,
+    SEISoundscapeIcon,
+    SEIAtmosphereIcon,
+    SEICueIcon,
+    SEIPressureIcon,
+    SEIMortalIcon,
+    SEIImmortalIcon,
+    SEIHeavenIcon,
+    SEIArrowIcon,
+    SEIBackIcon,
+    SEIExitIcon,
+    SEIDownloadIcon,
+    SEIRetryIcon,
+    SEIUndoIcon,
+    SEISaveIcon,
+    SEIRemoveIcon,
+    SEIDeleteIcon,
+    SEISettingsIcon,
+    SEIHelpIcon,
+    SEISearchIcon,
+    SEIInformationIcon,
+} from "./skins/seihouse-icons"
+export type { SEIIconProps, SEIPressureLevel, SEIArrowDirection } from "./skins/seihouse-icons"
