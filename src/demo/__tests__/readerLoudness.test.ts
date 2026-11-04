@@ -7,7 +7,8 @@ it("reports seven measured beds without changing any catalog source gain", () =>
     for (const item of catalog) {
         const kind = item.kind as "integrated" | "momentary-max"
         const result = computeLoudnessGain({ ...item.loudness, kind }, kind)
-        expect(result.gain).toBe(item.leveling.gain)
+        // Exponentiation can round differently across supported Node versions.
+        expect(result.gain).toBeCloseTo(item.leveling.gain, 12)
         expect(result.appliedGainDb).toBe(item.leveling.appliedGainDb)
         if (result.tooQuietToLevel) flagged.push(item.id)
     }
