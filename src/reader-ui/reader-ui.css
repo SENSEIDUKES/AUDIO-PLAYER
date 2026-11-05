@@ -132,7 +132,13 @@
     gap: 0.4em;
 }
 .sap-reader-mixer__label {
+    display: -webkit-box;
     min-width: 0;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    line-height: 1.3;
 }
 .sap-reader-mixer__channel > .sap-reader-mixer__row > .sap-reader-mixer__switch {
     grid-area: switch;
@@ -141,7 +147,7 @@
     grid-area: level;
 }
 .sap-reader-mixer__channel > .sap-reader-mixer__level > .sap-reader-mixer__percent {
-    grid-area: percent;
+    display: none;
 }
 .sap-reader-mixer__channel > .sap-reader-mixer__status {
     grid-area: status;
@@ -155,8 +161,10 @@
     grid-template-columns:
         var(--_target) minmax(0, 1fr) var(--_split-percent)
         minmax(0, var(--_sound-share));
+    /* No visible percentage: the slider shows the level and still announces
+       it, and the name gets the whole left half. */
     grid-template-areas:
-        "name   name   percent caption"
+        "name   name   name    caption"
         "switch level  level   sound"
         "status status status  status";
     column-gap: 8px;
@@ -191,12 +199,18 @@
     padding-inline: 8px 0;
     border-inline-start: 1px solid var(--_border);
     color: var(--_muted);
-    font-size: 11px;
-    font-weight: var(--sh-weight-medium);
-    line-height: 1.15;
-    /* A long translation wraps onto a second line instead of being cut. */
-    overflow-wrap: break-word;
-    hyphens: auto;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.3;
+}
+/* Secondary text stays one line: a long translation ends in an ellipsis, and
+   the picker below it still names the choice in full. The ellipsis needs a
+   block of its own inside the caption's grid. */
+.sap-reader-mixer__caption-text {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 .sap-reader-mixer__channel > .sap-reader-mixer__sound > .sap-reader-mixer__stepper {
     grid-area: sound;
@@ -257,16 +271,14 @@
 }
 .sap-reader-mixer__name {
     min-width: 0;
-    /* Break between syllables where the language allows (the host sets lang),
-       and mid-word only when a single word is wider than its cell. */
+    /* Break between words or at a translator's soft hyphen, never by machine
+       hyphenation. A single word wider than the whole cell still breaks inside
+       itself, the last resort before it would spill. */
     overflow-wrap: break-word;
-    hyphens: auto;
     font-size: var(--sh-text-sm);
     font-weight: var(--sh-weight-medium);
 }
-.sap-reader-mixer__row--master .sap-reader-mixer__name {
-    font-weight: var(--sh-weight-semibold);
-}
+/* One weight for every channel name, Master included: one voice, not a hierarchy. */
 .sap-reader-mixer__switch {
     min-height: var(--_target);
     min-width: var(--_target);
@@ -411,16 +423,12 @@
     gap: var(--sh-space-1);
 }
 
-/* Narrow phones (iPhone SE and other 320px screens): every row stays one
-   line. The name column narrows and the percentage hides; the slider shows
-   the level and still announces it as its value. */
+/* Narrow phones (iPhone SE and other 320px screens): the name column
+   narrows and the choices drop their arrows. */
 @container (max-width: 339px) {
     .sap-reader-mixer {
         --_col-gap: 6px;
         --_row-pad: 8px;
-    }
-    .sap-reader-mixer__channel > .sap-reader-mixer__level > .sap-reader-mixer__percent {
-        display: none;
     }
     .sap-reader-mixer__name {
         font-size: 13px;
@@ -653,27 +661,42 @@
     float: none;
     width: auto;
     margin: 0;
-    color: var(--_rs-text);
-    font-size: 14px;
-    line-height: 1.15;
-    overflow-wrap: break-word;
-    hyphens: auto;
+    /* The strip's name is secondary, like a choice's caption: one quiet line. */
+    min-width: 0;
+    overflow: hidden;
+    color: var(--_rs-muted);
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .sap-reader-settings-audio .sap-reader-settings__row .sap-reader-settings__options--segmented {
+    /* Segments share the strip by their labels' length, as iOS can: a long
+       translation borrows room from a short one before anything truncates. */
+    grid-auto-columns: minmax(0, auto);
     padding: 0;
     border: 0;
     background: none;
     gap: 2px;
 }
 .sap-reader-settings-audio .sap-reader-settings__row .sap-reader-settings__choice {
-    padding: 2px 1px;
-    font-size: 12.5px;
-    /* A pill's label wraps inside its 44px height (two lines fit) rather than
-       spilling into its neighbour. */
-    line-height: 1.15;
-    overflow-wrap: break-word;
-    hyphens: auto;
+    padding: 2px 3px;
+    font-size: 13px;
+    line-height: 1.2;
+}
+/* A pill's label breaks only between words, two lines at most, inside the
+   pill's own height; a single word too long for it ends in an ellipsis. */
+.sap-reader-settings__choice-text {
+    display: -webkit-box;
+    min-width: 0;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
     text-wrap: balance;
+    overflow-wrap: normal;
+    text-overflow: ellipsis;
 }
 @container (max-width: 339px) {
     .sap-reader-settings-audio .sap-reader-settings__row {
@@ -806,4 +829,52 @@
 }
 [dir="rtl"] .sap-reader-mixer__step > svg {
     transform: scaleX(-1);
+}
+
+/*
+ * Short screens (a phone with its browser toolbars showing, or turned on its
+ * side): the same layout, tightened, so every setting still fits one screen
+ * without scrolling (AGENTS.md, Mobile Viewport Architecture). Controls keep
+ * a 36px target, taller than iOS's own 32pt segmented controls, and empty
+ * voice slots shrink to a thin dash.
+ */
+@media (max-height: 660px) {
+    .sap-reader-mixer {
+        /* 36px by default; a host's larger target size is kept. */
+        --_target: max(36px, var(--sap-reader-mixer-target-size, 36px));
+        --_row-gap: 2px;
+    }
+    .sap-reader-narration,
+    .sap-reader-narration__slots {
+        gap: 2px;
+    }
+    /* The approved slider and picker carry their own 44px; match the target. */
+    .sap-reader-mixer__slider [data-orientation="horizontal"]:not([role="group"]) {
+        height: var(--_target);
+    }
+    .sap-reader-mixer__slider [data-orientation="horizontal"]:not([role="group"]) > div {
+        min-width: var(--_target);
+        min-height: var(--_target);
+    }
+    .sap-reader-mixer .sap-reader-mixer__stepper-select {
+        height: var(--_target);
+    }
+    .sap-reader-mixer .sap-reader-mixer__channel > * > .sap-reader-mixer__name {
+        padding-top: 3px;
+    }
+    .sap-reader-mixer .sap-reader-narration__slot {
+        padding: 2px 4px 0;
+    }
+    .sap-reader-narration__who {
+        padding-top: 1px;
+    }
+    .sap-reader-mixer .sap-reader-narration__slot--empty {
+        min-height: 26px;
+    }
+    .sap-reader-settings-audio .sap-reader-settings__group {
+        margin-top: 2px;
+    }
+    .sap-reader-settings-audio .sap-reader-settings__row .sap-reader-settings__choice {
+        min-height: 36px;
+    }
 }

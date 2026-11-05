@@ -204,7 +204,7 @@ export function ReaderSettingsNarration({
                 >
                     <div className="sap-reader-mixer__row">
                         <span className="sap-reader-mixer__name" id={ids.voice}>
-                            {labels.voice}
+                            <span className="sap-reader-mixer__label">{labels.voice}</span>
                         </span>
                         <MixerSwitch
                             checked={preference.enabled}
@@ -227,7 +227,9 @@ export function ReaderSettingsNarration({
                     {onSpeedChange ? (
                         <div className="sap-reader-mixer__sound sap-reader-mixer__choice-row">
                             <label className="sap-reader-mixer__name" htmlFor={ids.speed}>
-                                {labels.speed}
+                                <span className="sap-reader-mixer__caption-text">
+                                    {labels.speed}
+                                </span>
                             </label>
                             <ChoiceStepper
                                 id={ids.speed}
@@ -324,7 +326,9 @@ export function ReaderSettingsNarration({
                                                 {entry.icon}
                                             </span>
                                         )}
-                                        {entry.label}
+                                        <span className="sap-reader-settings__choice-text">
+                                            {entry.label}
+                                        </span>
                                     </span>
                                 </label>
                             ))}
