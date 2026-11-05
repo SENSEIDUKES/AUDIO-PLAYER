@@ -126,6 +126,13 @@
    name of its own that must stay in that row's grid. */
 .sap-reader-mixer__channel > .sap-reader-mixer__row > .sap-reader-mixer__name {
     grid-area: name;
+    /* The icon stays beside the name when a long translation wraps. */
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+}
+.sap-reader-mixer__label {
+    min-width: 0;
 }
 .sap-reader-mixer__channel > .sap-reader-mixer__row > .sap-reader-mixer__switch {
     grid-area: switch;
@@ -176,26 +183,28 @@
 .sap-reader-mixer__channel > .sap-reader-mixer__sound > .sap-reader-mixer__name {
     grid-area: caption;
     align-self: stretch;
-    display: flex;
-    align-items: flex-end;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: end;
     min-width: 0;
-    padding: 4px 0 0 8px;
-    border-left: 1px solid var(--_border);
+    padding-block: 4px 0;
+    padding-inline: 8px 0;
+    border-inline-start: 1px solid var(--_border);
     color: var(--_muted);
     font-size: 11px;
     font-weight: var(--sh-weight-medium);
     line-height: 1.15;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    /* A long translation wraps onto a second line instead of being cut. */
+    overflow-wrap: break-word;
+    hyphens: auto;
 }
 .sap-reader-mixer__channel > .sap-reader-mixer__sound > .sap-reader-mixer__stepper {
     grid-area: sound;
     align-self: stretch;
     grid-template-columns: 26px minmax(0, 1fr) 26px;
     margin-top: -4px;
-    padding-left: 2px;
-    border-left: 1px solid var(--_border);
+    padding-inline-start: 2px;
+    border-inline-start: 1px solid var(--_border);
 }
 .sap-reader-mixer__channel > .sap-reader-mixer__sound .sap-reader-mixer__step {
     width: 26px;
@@ -220,7 +229,7 @@
     position: absolute;
     z-index: 1;
     top: 50%;
-    left: 8px;
+    inset-inline-start: 8px;
     display: grid;
     place-items: center;
     transform: translateY(-50%);
@@ -228,7 +237,7 @@
     color: var(--sh-interactive-primary);
 }
 .sap-reader-mixer__stepper[data-adorned="true"] .sap-reader-mixer__stepper-select {
-    padding-left: 26px;
+    padding-inline-start: 26px;
 }
 
 /* While a timer runs, its countdown and Cancel sit on Master's status line. */
@@ -248,7 +257,10 @@
 }
 .sap-reader-mixer__name {
     min-width: 0;
-    overflow-wrap: anywhere;
+    /* Break between syllables where the language allows (the host sets lang),
+       and mid-word only when a single word is wider than its cell. */
+    overflow-wrap: break-word;
+    hyphens: auto;
     font-size: var(--sh-text-sm);
     font-weight: var(--sh-weight-medium);
 }
@@ -624,10 +636,13 @@
 /* Presets as one more options-table strip: its name, then the pills. */
 .sap-reader-settings-audio .sap-reader-settings__row {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
+    /* The name takes at most 30%, so a long translation wraps instead of
+       squeezing the pills. */
+    grid-template-columns: fit-content(30%) minmax(0, 1fr);
     align-items: center;
     column-gap: 10px;
-    padding: 0 4px 0 10px;
+    padding-block: 0;
+    padding-inline: 10px 4px;
     border-radius: 10px;
     background: color-mix(in srgb, currentColor 5%, transparent);
 }
@@ -640,6 +655,9 @@
     margin: 0;
     color: var(--_rs-text);
     font-size: 14px;
+    line-height: 1.15;
+    overflow-wrap: break-word;
+    hyphens: auto;
 }
 .sap-reader-settings-audio .sap-reader-settings__row .sap-reader-settings__options--segmented {
     padding: 0;
@@ -650,8 +668,12 @@
 .sap-reader-settings-audio .sap-reader-settings__row .sap-reader-settings__choice {
     padding: 2px 1px;
     font-size: 12.5px;
-    overflow-wrap: normal;
-    white-space: nowrap;
+    /* A pill's label wraps inside its 44px height (two lines fit) rather than
+       spilling into its neighbour. */
+    line-height: 1.15;
+    overflow-wrap: break-word;
+    hyphens: auto;
+    text-wrap: balance;
 }
 @container (max-width: 339px) {
     .sap-reader-settings-audio .sap-reader-settings__row {
@@ -705,7 +727,8 @@
     color: var(--sh-text-primary);
     font-size: 12px;
     font-weight: var(--sh-weight-medium);
-    line-height: 1.2;
+    /* Room for Thai, Devanagari and Vietnamese marks above and below. */
+    line-height: 1.35;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -755,8 +778,9 @@
 @container (max-width: 339px) {
     /* "Tier" is short: the strip stays one line, so the page keeps its height. */
     .sap-reader-settings-audio .sap-reader-narration__tiers {
-        grid-template-columns: auto minmax(0, 1fr);
-        padding: 0 2px 0 8px;
+        grid-template-columns: fit-content(30%) minmax(0, 1fr);
+        padding-block: 0;
+        padding-inline: 8px 2px;
     }
     .sap-reader-narration__tiers .sap-reader-settings__choice {
         gap: 3px;
@@ -768,8 +792,18 @@
     flex: none;
     width: 1.15em;
     height: 1.15em;
-    /* Negative block margins: the icon never makes a row taller than its name. */
-    margin: -0.2em 0.4em -0.2em 0;
+    /* Negative block margins: the icon never makes a row taller than its name.
+       Its gap from the name comes from the name's flex gap. */
+    margin-block: -0.2em;
     vertical-align: -0.2em;
     opacity: 0.9;
+}
+
+/* Right-to-left pages (Arabic, Hebrew, Persian, Urdu): the layout mirrors
+   through logical properties, and the arrows turn to point outward. */
+.sap-reader-mixer__step:dir(rtl) > svg {
+    transform: scaleX(-1);
+}
+[dir="rtl"] .sap-reader-mixer__step > svg {
+    transform: scaleX(-1);
 }

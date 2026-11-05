@@ -17,6 +17,7 @@ export type { ReaderAudioPresetsProps } from "./ReaderAudioPresets.js"
 export {
     ReaderSettingsNarration,
     DEFAULT_READER_NARRATION_LABELS,
+    READER_NARRATION_SPEEDS,
 } from "./ReaderSettingsNarration.js"
 export type {
     ReaderSettingsNarrationProps,

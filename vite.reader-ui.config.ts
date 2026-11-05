@@ -26,6 +26,7 @@ export default defineConfig({
                 /^react($|\/)/,
                 /^react-dom($|\/)/,
                 /^@seihouse\/ui($|\/)/,
+                /^react-aria-components($|\/)/,
                 /^@seihouse\/audio-player$/,
             ],
         },

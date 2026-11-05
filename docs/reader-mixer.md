@@ -913,12 +913,15 @@ design language, and the home of the Voice layer: Settings › Audio is the
 soundtrack, so `ReaderSettingsAudio` leaves Voice out unless `showVoice` is set
 (`ReaderMixerPanel` takes `layers` to choose which layers it shows).
 
-- **Voice on top, Tier at the bottom.** The top row has the Voice layer's
-  switch and volume. The reader's tier sits at the bottom, one strip like the
-  Audio page's Presets: a pill per tier with its mark (`icon`) before its
-  name. SEN's tiers are its Energy grades (Mortal, Immortal, Heaven) with its
-  Fate Pressure flames: what reading aloud costs, from the device's own speech
-  to generated and designed voices.
+- **Voice and Speed on top, Tier at the bottom.** The top row has the Voice
+  layer's switch and volume on the left and the reading speed on the right,
+  a `◀ 1× ▶` like the sleep timer beside Master (`speed`, `speeds`, which
+  default to `READER_NARRATION_SPEEDS`, 0.5× to 2×, and `onSpeedChange`; with
+  no `onSpeedChange` the right half shows a dash). The reader's tier sits at
+  the bottom, one strip like the Audio page's Presets: a pill per tier with
+  its mark (`icon`) before its name. SEN's tiers are its Energy grades
+  (Mortal, Immortal, Heaven) with its Fate Pressure flames: what reading
+  aloud costs, from the device's own speech to generated and designed voices.
 - **Voice slots.** Below, a fixed grid of `slotCount` slots (8), two across.
   Each speaker in the chapter (the narrator, the main character, any named
   codex character) gets a slot whose `◀ voice ▶` picks from every voice in
@@ -929,13 +932,13 @@ soundtrack, so `ReaderSettingsAudio` leaves Voice out unless `showVoice` is set
   preset; it never hides voices. Unused slots keep their place with a dash, so the page never
   changes shape. A chapter rarely has more speakers than slots; any beyond
   `slotCount` are not shown, and the host voices them itself (SEN gives them
-  a random voice from their tier). Reading speed is not here: it lives in the
-  reader chamber.
+  a random voice from their tier).
 - **Host-owned.** The host supplies `tiers`, `tier`, `voices` and `slots`,
   and decides what `onTierChange` and `onAssign(slotId, voiceId)` do. The page
   never prices, generates or stores anything.
 
-Props: `mixer`, `tiers`, `tier`, `onTierChange`, `voices`, `slots`, `onAssign`,
+Props: `mixer`, `speed`, `speeds`, `onSpeedChange`, `tiers`, `tier`,
+`onTierChange`, `voices`, `slots`, `onAssign`,
 `slotCount`, `labels` (`DEFAULT_READER_NARRATION_LABELS`), `help`, `children`,
 `className` and `style`.
 
@@ -1089,6 +1092,33 @@ source loudness normalization is not inferred from their containing file.
   or interrupt a pending cue. Listen for neighboring-segment leakage and element
   loop boundaries. Record device/OS, route, audible result and limitations separately
   from automated browser evidence. This checklist is not a claim that it was run.
+
+## Languages and text direction
+
+The settings pages are built for SEN's 30 interface languages (60 planned),
+including right-to-left Arabic, Hebrew, Persian and Urdu and tall scripts such
+as Thai, Devanagari and Amharic. Every visible word comes from `labels`, so
+the host translates them; the pages take care of fit:
+
+- **Set `lang` and `dir`.** Put the interface language's `lang` and `dir` on
+  an ancestor (SEN's `<html>`). `lang` lets long words break between
+  syllables (`hyphens: auto`); `dir` mirrors the layout. Each volume slider
+  reads both, and looks again when either changes, so its thumb and fill grow
+  from the same side even when the interface language differs from the
+  device's.
+- **Labels wrap, never spill.** Channel names, choice captions, the Presets
+  and Tier names and their pills wrap onto a second line instead of being
+  cut or running into their neighbours; a pill's two lines fit inside its
+  44px height. A row name takes at most 30% of its strip. Speaker names and
+  long values (a song title) end in an ellipsis, and the native picker still
+  shows them in full.
+- **Right to left.** Borders, padding and the tier mark use logical
+  properties, and the ◀ ▶ arrows turn so they point outward. Each choice keeps
+  its own direction (`dir="auto"`), so a Latin song title reads correctly on
+  an Arabic page.
+- **Checked.** The pages were measured in 21 of SEN's languages (every script
+  it ships) at 390×664 and 320×640: nothing spills, is cut or leaves its row,
+  and both pages still fit the screen.
 
 ## SEIHouse icons
 

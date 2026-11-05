@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { ReactNode } from "react"
+import { I18nProvider } from "react-aria-components"
 import { SEISelect, SEISlider, SEISwitch } from "@seihouse/ui"
 import { SEIArrowIcon } from "@seihouse/audio-player"
 
@@ -36,6 +37,25 @@ export function MixerSwitch({
 
 const VOLUME_FORMAT = { style: "unit", unit: "percent", unitDisplay: "narrow" } as const
 
+/** Scripts written right to left, by language subtag. */
+const RTL_LANGUAGE = /^(ar|arc|ckb|dv|fa|he|iw|ku|ps|sd|ug|ur|yi)(-|$)/i
+
+/**
+ * The locale a slider should lay out in. React Aria places the thumb by its
+ * locale's direction, while the fill follows the page's CSS direction; a
+ * reader can choose an Arabic interface on an English device, so take the
+ * element's own `lang` and make its direction agree with the page.
+ */
+export function sliderLocale(element: HTMLElement): string {
+    const lang =
+        element.closest("[lang]")?.getAttribute("lang") ||
+        (typeof navigator === "undefined" ? "" : navigator.language) ||
+        "en-US"
+    const rtl = getComputedStyle(element).direction === "rtl"
+    if (RTL_LANGUAGE.test(lang) === rtl) return lang
+    return rtl ? "ar" : "en-US"
+}
+
 /** Keep percentage volume and host spoken wording on the approved native range. */
 export function MixerSlider({
     percent,
@@ -59,18 +79,41 @@ export function MixerSlider({
         if (input && input.getAttribute("aria-valuetext") !== valueText) {
             input.setAttribute("aria-valuetext", valueText)
         }
-    }, [percent, formatPercent])
+        // Every render: the slider rewrites its own value text when it re-renders
+        // (for instance after taking the page's locale), so restore the host's.
+    })
+    // Follow the page's direction so the thumb and the fill always grow from the
+    // same side, and look again whenever a dir or lang attribute changes.
+    const [locale, setLocale] = useState<string | null>(null)
+    useEffect(() => {
+        const element = control.current
+        if (!element) return
+        const update = () => setLocale(sliderLocale(element))
+        update()
+        // A host can switch the page's dir or lang without re-rendering us.
+        if (typeof MutationObserver === "undefined") return
+        const observer = new MutationObserver(update)
+        observer.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ["dir", "lang"],
+            subtree: true,
+        })
+        return () => observer.disconnect()
+    }, [label])
+    const slider = (
+        <SEISlider
+            minValue={0}
+            maxValue={100}
+            step={1}
+            value={percent}
+            formatOptions={VOLUME_FORMAT}
+            aria-label={label}
+            onChange={onChange}
+        />
+    )
     return (
         <div ref={control} className="sap-reader-mixer__slider">
-            <SEISlider
-                minValue={0}
-                maxValue={100}
-                step={1}
-                value={percent}
-                formatOptions={VOLUME_FORMAT}
-                aria-label={label}
-                onChange={onChange}
-            />
+            <I18nProvider locale={locale ?? undefined}>{slider}</I18nProvider>
         </div>
     )
 }
@@ -170,6 +213,9 @@ export function ChoiceStepper({
                     id={id}
                     aria-describedby={describedBy}
                     aria-label={ariaLabel}
+                    // A value keeps its own direction: a Latin title reads
+                    // correctly on an Arabic page, and an Arabic name on an English one.
+                    dir="auto"
                     value={value}
                     onChange={(event) => onChange(event.target.value)}
                 >

@@ -46,6 +46,9 @@ export interface ReaderNarrationLabels {
     noVoice: string
     /** The picker section for voices with neither a known tier nor a source; it comes last. */
     otherVoices: string
+    /** Name of the reading speed choice, beside the Voice volume. */
+    speed: string
+    formatSpeed: (rate: number) => string
     previous: (rowLabel: string) => string
     next: (rowLabel: string) => string
 }
@@ -60,15 +63,30 @@ export const DEFAULT_READER_NARRATION_LABELS: ReaderNarrationLabels = Object.fre
     voiceFor: (name: string) => `Voice for ${name}`,
     noVoice: "Choose…",
     otherVoices: "Other",
+    speed: "Speed",
+    formatSpeed: (rate: number) => `${rate}×`,
     previous: (rowLabel: string) => `Previous ${rowLabel}`,
     next: (rowLabel: string) => `Next ${rowLabel}`,
 })
+
+/** The reading speeds SEN offers, slowest first. */
+export const READER_NARRATION_SPEEDS: readonly number[] = Object.freeze([
+    0.5, 0.75, 1, 1.25, 1.5, 1.75, 2,
+])
 
 export interface ReaderSettingsNarrationProps {
     /** The mixer whose Voice layer the top row controls. Defaults to `ReaderMixerProvider`'s. */
     mixer?: ReaderMixer | null
     /** The tiers on offer, cheapest first. */
     tiers?: readonly ReaderVoiceTier[]
+    /**
+     * The reader's reading speed; 1 (normal) when not given. The Speed choice shows
+     * when `onSpeedChange` is given.
+     */
+    speed?: number | null
+    /** The speeds on offer, slowest first. Defaults to `READER_NARRATION_SPEEDS`. */
+    speeds?: readonly number[]
+    onSpeedChange?: (rate: number) => void
     /** The reader's tier. */
     tier?: string | null
     onTierChange?: (tierId: string) => void
@@ -94,7 +112,8 @@ export interface ReaderSettingsNarrationProps {
 
 /**
  * The Narration page of the reader's Settings, in the Audio page's design
- * language. The top row is the Voice layer's switch and volume. Below it, a
+ * language. The top row is the Voice layer's switch and volume, with the
+ * reading speed on its right. Below it, a
  * fixed grid of voice slots: each speaker in the chapter (the narrator, the
  * main character, any named codex character) gets a slot whose ◀ voice ▶
  * picks from every voice on offer, sectioned by tier and source. At the bottom, like the Audio page's
@@ -106,6 +125,9 @@ export function ReaderSettingsNarration({
     mixer: mixerProp,
     tiers = [],
     tier = null,
+    speed = null,
+    speeds = READER_NARRATION_SPEEDS,
+    onSpeedChange,
     onTierChange,
     voices = [],
     slots = [],
@@ -127,6 +149,7 @@ export function ReaderSettingsNarration({
     const baseId = useId()
     const ids = {
         voice: `${baseId}-voice`,
+        speed: `${baseId}-speed`,
         tier: `${baseId}-tier`,
         slots: `${baseId}-slots`,
         slot: (index: number) => `${baseId}-slot-${index}`,
@@ -200,13 +223,33 @@ export function ReaderSettingsNarration({
                             {labels.formatPercent(percent)}
                         </span>
                     </div>
-                    {/* The tier moved to the bottom strip, like the Audio page's presets. */}
-                    <div
-                        className="sap-reader-mixer__sound sap-reader-mixer__sound--empty"
-                        aria-hidden="true"
-                    >
-                        <span className="sap-reader-mixer__stepper">—</span>
-                    </div>
+                    {/* Speed on the right, like the sleep timer beside Master. */}
+                    {onSpeedChange ? (
+                        <div className="sap-reader-mixer__sound sap-reader-mixer__choice-row">
+                            <label className="sap-reader-mixer__name" htmlFor={ids.speed}>
+                                {labels.speed}
+                            </label>
+                            <ChoiceStepper
+                                id={ids.speed}
+                                rowLabel={labels.speed}
+                                value={String(speed ?? 1)}
+                                placeholder={labels.formatSpeed(speed ?? 1)}
+                                options={speeds.map((rate) => ({
+                                    value: String(rate),
+                                    label: labels.formatSpeed(rate),
+                                }))}
+                                labels={labels}
+                                onChange={(value) => onSpeedChange(Number(value))}
+                            />
+                        </div>
+                    ) : (
+                        <div
+                            className="sap-reader-mixer__sound sap-reader-mixer__sound--empty"
+                            aria-hidden="true"
+                        >
+                            <span className="sap-reader-mixer__stepper">—</span>
+                        </div>
+                    )}
                 </div>
                 {/* A fixed grid of slots, one per speaker, so the page keeps its height. */}
                 <div

@@ -403,7 +403,7 @@ export function ReaderMixerPanel({
                 <div className="sap-reader-mixer__row sap-reader-mixer__row--master">
                     <span className="sap-reader-mixer__name" id={ids.master}>
                         <ChannelIcon channel="master" />
-                        {labels.master}
+                        <span className="sap-reader-mixer__label">{labels.master}</span>
                     </span>
                     <MixerSwitch
                         checked={preferences.masterEnabled && state.sleepTimer.status !== "fired"}
@@ -508,7 +508,7 @@ export function ReaderMixerPanel({
                             <div className="sap-reader-mixer__row">
                                 <span className="sap-reader-mixer__name" id={ids.layer(layer)}>
                                     <ChannelIcon channel={layer} />
-                                    {label}
+                                    <span className="sap-reader-mixer__label">{label}</span>
                                 </span>
                                 <MixerSwitch
                                     checked={preference.enabled}
