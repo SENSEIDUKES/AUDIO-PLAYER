@@ -324,7 +324,9 @@ export function ReaderSettingsNarration({
                                                 {entry.icon}
                                             </span>
                                         )}
-                                        {entry.label}
+                                        <span className="sap-reader-settings__choice-text">
+                                            {entry.label}
+                                        </span>
                                     </span>
                                 </label>
                             ))}

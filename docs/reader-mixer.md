@@ -815,7 +815,8 @@ the strip in use gets an accent frame. Nothing expands: choices step in place,
 so the menu keeps its height.
 
 - **Split rows.** A channel with a choice beside it has two halves: on the
-  left its name and percentage over its on/off switch and 0–100 slider, on the
+  left its name over its on/off switch and 0–100 slider (no visible
+  percentage: the slider shows the level and announces it), on the
   right the choice's caption over a `◀ value ▶` control. ◀ and ▶ step through
   the choices and dim at either end; the value is a native select, so a tap
   opens the device's own picker for a direct jump. Every row has both halves:
@@ -831,9 +832,15 @@ so the menu keeps its height.
   `{ id, label, group? }`. What a pick means is the host's: a scene score, a
   cue set, a narrator. Until something is chosen the control shows
   `labels.noSound`, and a choice comes and goes with its layer.
-- **Narrow phones.** In a container narrower than 340px the percentage hides
-  (the slider still announces its value) and the choices drop their arrows so
-  the value stays readable; a tap still opens the device's picker.
+- **Narrow phones.** In a container narrower than 340px the choices drop
+  their arrows so the value stays readable; a tap still opens the device's
+  picker.
+- **Short screens.** On a screen 660px tall or less (a phone with its browser
+  toolbars showing, or turned on its side) the same layout tightens: controls
+  keep a 36px target (iOS's own segmented controls are 32pt), gaps narrow and
+  empty voice slots shrink to a thin dash, so Settings › Audio and
+  Settings › Narration still fit one screen without scrolling. Measured at
+  320×540, 375×560 and 390×597 (an iPhone 13 with Safari's toolbars).
 
 - **Inline only.** Normal document flow, no fixed positioning, so it fits in
   the Audio section of a settings menu.
@@ -859,8 +866,12 @@ so the menu keeps its height.
     | `--sap-reader-mixer-sound-share` | `2.4fr`, the choice half's share of a row against the controls' `1fr` |
     | `--sap-reader-mixer-font` | inherited |
 
+- **Calm type.** Two text styles: names and values at 14px (pills 13px), and
+  secondary text (choice captions, the Presets and Tier names) at 12px in the
+  muted color, one weight for every name. Nothing is hyphenated by machine:
+  names break only between words, at most two lines; captions stay one line.
 - **Mobile first.** Designed for 390px, with every switch, slider, arrow and
-  pill at least 44px tall. The whole Settings › Audio page (Master with the
+  pill at least 44px tall (36px on short screens). The whole Settings › Audio page (Master with the
   sleep timer, four layers each with its sound, and the presets) is about
   385px tall.
 - **Accessible.** Switches are native inputs with `role="switch"` named by their row;
@@ -1101,17 +1112,20 @@ as Thai, Devanagari and Amharic. Every visible word comes from `labels`, so
 the host translates them; the pages take care of fit:
 
 - **Set `lang` and `dir`.** Put the interface language's `lang` and `dir` on
-  an ancestor (SEN's `<html>`). `lang` lets long words break between
-  syllables (`hyphens: auto`); `dir` mirrors the layout. Each volume slider
+  an ancestor (SEN's `<html>`). `dir` mirrors the layout. Each volume slider
   reads both, and looks again when either changes, so its thumb and fill grow
   from the same side even when the interface language differs from the
   device's.
-- **Labels wrap, never spill.** Channel names, choice captions, the Presets
-  and Tier names and their pills wrap onto a second line instead of being
-  cut or running into their neighbours; a pill's two lines fit inside its
-  44px height. A row name takes at most 30% of its strip. Speaker names and
-  long values (a song title) end in an ellipsis, and the native picker still
-  shows them in full.
+- **Nothing spills, nothing is hyphenated by machine.** Channel names and
+  pill labels break only between words, at most two lines; captions, the
+  Presets and Tier names, speaker names and long values (a song title) stay
+  one line and end in an ellipsis, and the native picker still shows a value
+  in full. Pills share their strip by label length, so a long label borrows
+  room from a short one first. A translator may add a soft hyphen (`&shy;`,
+  U+00AD) where a long word may break.
+- **Keep segment labels short.** As with iOS segmented controls, a preset or
+  tier name should be one short word in every language (about 10 characters):
+  "Кино", not "Кинематографичный". A longer one ends in an ellipsis.
 - **Right to left.** Borders, padding and the tier mark use logical
   properties, and the ◀ ▶ arrows turn so they point outward. Each choice keeps
   its own direction (`dir="auto"`), so a Latin song title reads correctly on

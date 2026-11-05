@@ -52,7 +52,11 @@ export function ReaderAudioPresets({
                                 onChange={() => mixer.applyPreset(preset.id)}
                                 className="sap-reader-settings__radio"
                             />
-                            <span className="sap-reader-settings__choice">{preset.label}</span>
+                            <span className="sap-reader-settings__choice">
+                                <span className="sap-reader-settings__choice-text">
+                                    {preset.label}
+                                </span>
+                            </span>
                         </label>
                     ))}
                 </div>
