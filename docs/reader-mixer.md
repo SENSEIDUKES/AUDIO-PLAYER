@@ -1093,6 +1093,33 @@ source loudness normalization is not inferred from their containing file.
   loop boundaries. Record device/OS, route, audible result and limitations separately
   from automated browser evidence. This checklist is not a claim that it was run.
 
+## Languages and text direction
+
+The settings pages are built for SEN's 30 interface languages (60 planned),
+including right-to-left Arabic, Hebrew, Persian and Urdu and tall scripts such
+as Thai, Devanagari and Amharic. Every visible word comes from `labels`, so
+the host translates them; the pages take care of fit:
+
+- **Set `lang` and `dir`.** Put the interface language's `lang` and `dir` on
+  an ancestor (SEN's `<html>`). `lang` lets long words break between
+  syllables (`hyphens: auto`); `dir` mirrors the layout. Each volume slider
+  reads both, and looks again when either changes, so its thumb and fill grow
+  from the same side even when the interface language differs from the
+  device's.
+- **Labels wrap, never spill.** Channel names, choice captions, the Presets
+  and Tier names and their pills wrap onto a second line instead of being
+  cut or running into their neighbours; a pill's two lines fit inside its
+  44px height. A row name takes at most 30% of its strip. Speaker names and
+  long values (a song title) end in an ellipsis, and the native picker still
+  shows them in full.
+- **Right to left.** Borders, padding and the tier mark use logical
+  properties, and the ◀ ▶ arrows turn so they point outward. Each choice keeps
+  its own direction (`dir="auto"`), so a Latin song title reads correctly on
+  an Arabic page.
+- **Checked.** The pages were measured in 21 of SEN's languages (every script
+  it ships) at 390×664 and 320×640: nothing spills, is cut or leaves its row,
+  and both pages still fit the screen.
+
 ## SEIHouse icons
 
 SAP ships SEIHouse's official icons from `@seihouse/audio-player`, so the
