@@ -40,6 +40,7 @@ it("a hold opens the quick master volume, which sets the master level", () => {
     render(<ReaderNoteFace mixer={mixer} />)
     const note = screen.getByRole("button", { name: "Mute story audio" })
     hold(note)
+    expect(mixer.getPreferences().masterMuted).toBeFalsy()
     const slider = screen.getByRole("slider", { name: "Quick master volume" })
     expect(screen.getByRole("group", { name: "Quick master volume" })).toContainElement(slider)
     expect(slider).toHaveFocus()
