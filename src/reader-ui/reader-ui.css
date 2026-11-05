@@ -853,10 +853,7 @@
     .sap-reader-mixer .sap-reader-mixer__stepper-select {
         height: var(--_target);
     }
-    .sap-reader-mixer
-        .sap-reader-mixer__channel
-        > *
-        > :is(.sap-reader-mixer__name, .sap-reader-mixer__percent) {
+    .sap-reader-mixer .sap-reader-mixer__channel > * > .sap-reader-mixer__name {
         padding-top: 3px;
     }
     .sap-reader-mixer .sap-reader-narration__slot {
