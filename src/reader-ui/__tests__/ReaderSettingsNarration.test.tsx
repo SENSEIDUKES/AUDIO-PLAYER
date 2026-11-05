@@ -71,6 +71,29 @@ it("has the Voice layer's controls on top and the tier as pills at the bottom", 
     expect(within(page).queryByRole("combobox", { name: "Tier" })).toBeNull()
 })
 
+it("puts the reading speed beside the Voice volume, and a dash without a handler", () => {
+    const rates: number[] = []
+    const { rerender } = render(
+        <ReaderSettingsNarration
+            mixer={mixer}
+            speed={1}
+            onSpeedChange={(rate) => rates.push(rate)}
+        />
+    )
+    const speed = screen.getByRole("combobox", { name: "Speed" })
+    expect(speed).toHaveValue("1")
+    expect(
+        within(speed)
+            .getAllByRole("option")
+            .map((option) => option.textContent)
+    ).toEqual(["0.5×", "0.75×", "1×", "1.25×", "1.5×", "1.75×", "2×"])
+    fireEvent.click(screen.getByRole("button", { name: "Next Speed" }))
+    fireEvent.change(speed, { target: { value: "0.5" } })
+    expect(rates).toEqual([1.25, 0.5])
+    rerender(<ReaderSettingsNarration mixer={mixer} />)
+    expect(screen.queryByRole("combobox", { name: "Speed" })).toBeNull()
+})
+
 it("gives each speaker a slot to assign a voice from the tier's voices", () => {
     const assigned: [string, string][] = []
     render(

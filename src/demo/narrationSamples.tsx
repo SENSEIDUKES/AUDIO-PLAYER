@@ -52,6 +52,7 @@ const FIRST_ASSIGNMENTS: Record<string, Record<string, string>> = {
 /** Sample Narration props with their own state: a tier, and each tier's assignments. */
 export function useNarrationSamples(onEvent?: (text: string) => void) {
     const [tier, setTier] = useState("mortal")
+    const [speed, setSpeed] = useState(1)
     const [assigned, setAssigned] = useState(FIRST_ASSIGNMENTS)
     const voices = SAMPLE_VOICES
     const slots: ReaderVoiceSlot[] = SAMPLE_CAST.map((speaker) => ({
@@ -59,6 +60,11 @@ export function useNarrationSamples(onEvent?: (text: string) => void) {
         voiceId: assigned[tier]?.[speaker.id] ?? null,
     }))
     return {
+        speed,
+        onSpeedChange: (rate: number) => {
+            setSpeed(rate)
+            onEvent?.(`speed → ${rate}×`)
+        },
         tiers: SAMPLE_VOICE_TIERS,
         tier,
         onTierChange: (id: string) => {
