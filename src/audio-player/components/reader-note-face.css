@@ -17,6 +17,33 @@
     display: inline-flex;
 }
 
+/* Development's resting face belongs to the note, not a permanent host ring.
+ * It disappears for mute, scrolling and the open volume's continuous capsule.
+ * The host supplies the material; the portable default stays neutral. */
+.sap-reader-note-face::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 1px solid var(--sap-reader-note-rest-border, transparent);
+    border-radius: 999px;
+    background: var(--sap-reader-note-rest-surface, transparent);
+    box-shadow: var(--sap-reader-note-rest-shadow, none);
+    -webkit-backdrop-filter: var(--sap-reader-note-rest-filter, none);
+    backdrop-filter: var(--sap-reader-note-rest-filter, none);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 180ms ease;
+}
+.sap-reader-note-face:not(
+        :has(
+            .sap-reader-note-face__volume,
+            .sap-reader-mixer-note__slash,
+            .sap-reader-note-face__note[data-scrolling="true"]
+        )
+    )::before {
+    opacity: 1;
+}
+
 /* Keep the shared note's interactions and scroll signal; only skin it. */
 .sap-reader-mixer-note.sap-reader-note-face__note {
     position: relative;
@@ -51,7 +78,12 @@
     border-radius: 999px;
     background: var(--_surface);
     color: var(--_fg);
-    box-shadow: 0 8px 24px color-mix(in srgb, var(--_shade) 40%, transparent);
+    box-shadow: var(
+        --sap-reader-note-shadow,
+        0 8px 24px color-mix(in srgb, var(--_shade) 40%, transparent)
+    );
+    -webkit-backdrop-filter: var(--sap-reader-note-filter, none);
+    backdrop-filter: var(--sap-reader-note-filter, none);
 }
 .sap-reader-note-face__volume input {
     appearance: none;
@@ -124,6 +156,11 @@
     .sap-reader-note-face__volume {
         transform-origin: bottom center;
         animation: sap-reader-note-face-reveal 140ms ease-out;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .sap-reader-note-face::before {
+        transition: none;
     }
 }
 @media (forced-colors: active) {
