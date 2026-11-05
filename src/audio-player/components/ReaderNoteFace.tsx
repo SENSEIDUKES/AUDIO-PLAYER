@@ -81,11 +81,6 @@ export function ReaderNoteFace({
                     setOpen(true)
                 }
             }}
-            onBlur={(event) => {
-                // Keyboard users tabbing away close it, as a press outside does.
-                if (open && !event.currentTarget.contains(event.relatedTarget as Node | null))
-                    setOpen(false)
-            }}
         >
             <ReaderMixerNote
                 mixer={mixer}
@@ -96,7 +91,7 @@ export function ReaderNoteFace({
                 onOpenSettings={() => setOpen(true)}
             />
             {open && (
-                <div className="sap-reader-note-face__volume">
+                <div className="sap-reader-note-face__volume" role="group" aria-label={quickVolume}>
                     <input
                         ref={slider}
                         type="range"

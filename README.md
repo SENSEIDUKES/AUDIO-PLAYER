@@ -42,7 +42,7 @@ The player currently supports:
 - Browser and mobile quality checks documented in the repo.
 - Opt-in **Automix Lite** transitions with conservative silence trimming.
 - One shared session (one audio element, one queue) that any player face reads through public hooks.
-- The narrator face (`NarrativeFace`) for reading apps. The v4 music faces are archived while one new face is designed from scratch.
+- The narrator face (`ReaderNoteFace`) for reading apps, following Development's working note and quick volume. The older `NarrativeFace` is deprecated; the v4 music faces are archived while one new face is designed from scratch.
 - A four-layer **reader mixer** (music score, ambient atmosphere, sound cues, recorded/generated TTS voice) with per-layer switches and volume and an inline mixer view.
 
 ---

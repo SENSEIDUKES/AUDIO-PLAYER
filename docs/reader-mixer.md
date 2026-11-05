@@ -422,16 +422,21 @@ Theme with `--sap-reader-mixer-*` and the note's matching
 
 ### The narrator face SEN ships: `ReaderNoteFace`
 
-`ReaderNoteFace` (root entry, 5.1.0) is the face SEN's reader actually puts over
-the chapter. It wraps `ReaderMixerNote` with `muteMode="soundtrack-mute"`:
+`ReaderNoteFace` (root entry, 5.1.0) is the portable counterpart of Development's
+`ReaderAudioNote`, the face its Reader puts over the chapter. Development's
+working face is the source of truth. It wraps `ReaderMixerNote` with
+`muteMode="soundtrack-mute"`:
 
 - **Tap** mutes or unmutes the story audio. Master stays on; only the host's
   Settings switch turns Master off, and while it is off the face is hidden.
 - **Hold** (600 ms, `longPressMs` override), or **↑/↓** with the note focused,
   opens a vertical quick master volume above the note. It sets
   `mixer.setMasterLevel`. Escape closes it and returns focus to the note; a
-  press anywhere outside also closes it.
-- Mute reads by dimming, without the slash.
+  press anywhere outside also closes it. Moving keyboard focus alone leaves
+  it open, matching Development. The volume is a labelled group containing
+  the slider.
+- Mute reads by dimming, without the slash. The resting surface disappears
+  while muted, scrolling, or using the continuous quick-volume capsule.
 
 ```tsx
 <ReaderNoteFace labels={{ mute: "Quiet the story" }} />
@@ -442,6 +447,30 @@ Colors are `--sap-reader-note-*` variables whose defaults are the SEN reader's
 own: `fg`, `surface`, `border`, `shade`, `meter`, `meter-track`, `meter-thumb`
 and `focus`. A host maps its color roles onto them one to one. Labels extend
 the note's with `quickVolume` (default "Quick master volume").
+
+The host may supply the material with `--sap-reader-note-shadow` and
+`--sap-reader-note-filter` for the volume, and `rest-surface`, `rest-border`,
+`rest-shadow`, and `rest-filter` under the same `--sap-reader-note-` prefix
+for the note at rest. Without a host material the resting surface is
+transparent. These hooks let the Workshop use Development's exact glass
+without adding a second circle outside the 44px note.
+
+**2026-11-05 — Development parity:** the implementation was checked against
+[`ReaderAudioNote.tsx`](https://github.com/SENSEIDUKES/development/blob/6d85af0b4b9a5bf243ead8cfee8cc592cade7659/src/components/harness-generation/development/ReaderAudioNote.tsx),
+its adjacent `reader-audio-note.css`, and the host's
+[`reader-glass.css`](https://github.com/SENSEIDUKES/development/blob/6d85af0b4b9a5bf243ead8cfee8cc592cade7659/src/library/stories/reader-glass.css).
+The Narrator face workspace uses their 44px resting surface, disappearing
+glass on mute/scroll/open, and the same dense quick-volume capsule. It no
+longer supplies a permanent 64px outer circle or dismisses the volume on
+blur. Development's own source, installed archive, and dependency pin are
+unchanged; this change does not publish an npm release or update that app.
+
+**Listening checklist (physical iPhone Safari, not automated evidence):**
+open the chapter, tap to mute/unmute without hiding the note, hold and change
+volume without also muting, then press outside to close it. Confirm the
+soundtrack responds, narration keeps its own switch, and Master off/on in
+Settings hides/restores the note. Browser checks establish control behavior
+and appearance; they do not certify audible output on a phone.
 
 ### Level math
 

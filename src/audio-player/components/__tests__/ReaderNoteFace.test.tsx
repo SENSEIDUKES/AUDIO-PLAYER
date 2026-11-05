@@ -38,14 +38,18 @@ it("a tap mutes the story audio without turning Master off", () => {
 
 it("a hold opens the quick master volume, which sets the master level", () => {
     render(<ReaderNoteFace mixer={mixer} />)
-    hold(screen.getByRole("button", { name: "Mute story audio" }))
+    const note = screen.getByRole("button", { name: "Mute story audio" })
+    hold(note)
+    expect(mixer.getPreferences().masterMuted).toBeFalsy()
     const slider = screen.getByRole("slider", { name: "Quick master volume" })
+    expect(screen.getByRole("group", { name: "Quick master volume" })).toContainElement(slider)
     expect(slider).toHaveFocus()
     expect(slider).toHaveAttribute("aria-orientation", "vertical")
     fireEvent.change(slider, { target: { value: "40" } })
     expect(mixer.getPreferences().masterLevel).toBeCloseTo(0.4)
     expect(slider).toHaveAttribute("aria-valuetext", "40%")
     // The hold does not also mute.
+    fireEvent.click(note)
     expect(mixer.getPreferences().masterMuted).toBeFalsy()
 })
 
@@ -68,7 +72,7 @@ it("Escape and an outside press close the quick volume", () => {
     expect(screen.queryByRole("slider")).not.toBeInTheDocument()
 })
 
-it("closes the quick volume when focus leaves it, but not when it returns to the note", () => {
+it("keeps the volume open on focus changes, as Development does, until an outside press", () => {
     render(
         <>
             <ReaderNoteFace mixer={mixer} />
@@ -83,6 +87,8 @@ it("closes the quick volume when focus leaves it, but not when it returns to the
     fireEvent.blur(screen.getByRole("slider"), {
         relatedTarget: screen.getByRole("button", { name: "Next page" }),
     })
+    expect(screen.getByRole("slider")).toBeInTheDocument()
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Next page" }))
     expect(screen.queryByRole("slider")).not.toBeInTheDocument()
 })
 
