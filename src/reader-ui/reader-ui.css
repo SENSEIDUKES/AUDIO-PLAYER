@@ -202,10 +202,14 @@
     font-size: 12px;
     font-weight: 400;
     line-height: 1.3;
-    /* Secondary text stays one line: a long translation ends in an ellipsis,
-       and the picker below it still names the choice in full. */
-    white-space: nowrap;
+}
+/* Secondary text stays one line: a long translation ends in an ellipsis, and
+   the picker below it still names the choice in full. The ellipsis needs a
+   block of its own inside the caption's grid. */
+.sap-reader-mixer__caption-text {
+    min-width: 0;
     overflow: hidden;
+    white-space: nowrap;
     text-overflow: ellipsis;
 }
 .sap-reader-mixer__channel > .sap-reader-mixer__sound > .sap-reader-mixer__stepper {
@@ -267,8 +271,9 @@
 }
 .sap-reader-mixer__name {
     min-width: 0;
-    /* Break only between words (or at a translator's soft hyphen), never
-       mid-word by machine: no ragged hyphenation. */
+    /* Break between words or at a translator's soft hyphen, never by machine
+       hyphenation. A single word wider than the whole cell still breaks inside
+       itself, the last resort before it would spill. */
     overflow-wrap: break-word;
     font-size: var(--sh-text-sm);
     font-weight: var(--sh-weight-medium);
@@ -835,7 +840,8 @@
  */
 @media (max-height: 660px) {
     .sap-reader-mixer {
-        --_target: 36px;
+        /* 36px by default; a host's larger target size is kept. */
+        --_target: max(36px, var(--sap-reader-mixer-target-size, 36px));
         --_row-gap: 2px;
     }
     .sap-reader-narration,

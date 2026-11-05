@@ -299,7 +299,7 @@ export function ReaderMixerPanel({
                 id={ids.sound(layer)}
             >
                 <label className="sap-reader-mixer__name" htmlFor={`${ids.sound(layer)}-select`}>
-                    {rowLabel}
+                    <span className="sap-reader-mixer__caption-text">{rowLabel}</span>
                 </label>
                 <ChoiceStepper
                     id={`${ids.sound(layer)}-select`}
@@ -341,7 +341,9 @@ export function ReaderMixerPanel({
                 id={ids.sound("atmosphere")}
             >
                 <label className="sap-reader-mixer__name" htmlFor={ids.picker}>
-                    {labels.atmospherePicker}
+                    <span className="sap-reader-mixer__caption-text">
+                        {labels.atmospherePicker}
+                    </span>
                 </label>
                 <ChoiceStepper
                     id={ids.picker}
@@ -427,7 +429,9 @@ export function ReaderMixerPanel({
                 {state.sleepTimerChoices.length > 0 && (
                     <div className="sap-reader-mixer__sound sap-reader-mixer__timer sap-reader-mixer__choice-row">
                         <label className="sap-reader-mixer__name" htmlFor={ids.sleep}>
-                            {labels.sleepTimer}
+                            <span className="sap-reader-mixer__caption-text">
+                                {labels.sleepTimer}
+                            </span>
                         </label>
                         <ChoiceStepper
                             id={ids.sleep}

@@ -837,10 +837,13 @@ so the menu keeps its height.
   picker.
 - **Short screens.** On a screen 660px tall or less (a phone with its browser
   toolbars showing, or turned on its side) the same layout tightens: controls
-  keep a 36px target (iOS's own segmented controls are 32pt), gaps narrow and
-  empty voice slots shrink to a thin dash, so Settings › Audio and
-  Settings › Narration still fit one screen without scrolling. Measured at
-  320×540, 375×560 and 390×597 (an iPhone 13 with Safari's toolbars).
+  keep a 36px target (iOS's own segmented controls are 32pt; a larger
+  `--sap-reader-mixer-target-size` is kept), gaps narrow and empty voice
+  slots shrink to a thin dash, so Settings › Audio and Settings › Narration
+  still fit one screen without scrolling. Measured at 320×540, 375×560 and
+  390×597 (an iPhone 13 with Safari's toolbars) with a chapter of five
+  speakers; at 320×540 a chapter of seven or eight speakers (every slot
+  filled) runs about 23px long.
 
 - **Inline only.** Normal document flow, no fixed positioning, so it fits in
   the Audio section of a settings menu.
@@ -869,7 +872,8 @@ so the menu keeps its height.
 - **Calm type.** Two text styles: names and values at 14px (pills 13px), and
   secondary text (choice captions, the Presets and Tier names) at 12px in the
   muted color, one weight for every name. Nothing is hyphenated by machine:
-  names break only between words, at most two lines; captions stay one line.
+  names break between words, at most two lines (a single word wider than the
+  whole cell breaks inside itself as a last resort); captions stay one line.
 - **Mobile first.** Designed for 390px, with every switch, slider, arrow and
   pill at least 44px tall (36px on short screens). The whole Settings › Audio page (Master with the
   sleep timer, four layers each with its sound, and the presets) is about
