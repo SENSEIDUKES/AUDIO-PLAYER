@@ -90,6 +90,11 @@ it("puts the reading speed beside the Voice volume, and a dash without a handler
     fireEvent.click(screen.getByRole("button", { name: "Next Speed" }))
     fireEvent.change(speed, { target: { value: "0.5" } })
     expect(rates).toEqual([1.25, 0.5])
+    // A host that has no speed yet still gets a working control, at 1×.
+    rerender(<ReaderSettingsNarration mixer={mixer} onSpeedChange={(rate) => rates.push(rate)} />)
+    expect(screen.getByRole("combobox", { name: "Speed" })).toHaveValue("1")
+    fireEvent.click(screen.getByRole("button", { name: "Next Speed" }))
+    expect(rates).toEqual([1.25, 0.5, 1.25])
     rerender(<ReaderSettingsNarration mixer={mixer} />)
     expect(screen.queryByRole("combobox", { name: "Speed" })).toBeNull()
 })

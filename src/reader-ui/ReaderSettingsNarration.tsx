@@ -79,7 +79,10 @@ export interface ReaderSettingsNarrationProps {
     mixer?: ReaderMixer | null
     /** The tiers on offer, cheapest first. */
     tiers?: readonly ReaderVoiceTier[]
-    /** The reader's reading speed. The Speed choice shows when `onSpeedChange` is given. */
+    /**
+     * The reader's reading speed; 1 (normal) when not given. The Speed choice shows
+     * when `onSpeedChange` is given.
+     */
     speed?: number | null
     /** The speeds on offer, slowest first. Defaults to `READER_NARRATION_SPEEDS`. */
     speeds?: readonly number[]
@@ -229,8 +232,8 @@ export function ReaderSettingsNarration({
                             <ChoiceStepper
                                 id={ids.speed}
                                 rowLabel={labels.speed}
-                                value={speed == null ? "" : String(speed)}
-                                placeholder={speed == null ? "" : labels.formatSpeed(speed)}
+                                value={String(speed ?? 1)}
+                                placeholder={labels.formatSpeed(speed ?? 1)}
                                 options={speeds.map((rate) => ({
                                     value: String(rate),
                                     label: labels.formatSpeed(rate),
